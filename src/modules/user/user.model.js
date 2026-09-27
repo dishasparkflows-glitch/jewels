@@ -32,6 +32,43 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    bio: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    location: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    billingAddress: {
+      fullName: { type: String, default: '' },
+      addressLine: { type: String, default: '' },
+      city: { type: String, default: '' },
+      state: { type: String, default: '' },
+      pincode: { type: String, default: '' },
+      phone: { type: String, default: '' },
+    },
+    shippingAddress: {
+      fullName: { type: String, default: '' },
+      addressLine: { type: String, default: '' },
+      city: { type: String, default: '' },
+      state: { type: String, default: '' },
+      pincode: { type: String, default: '' },
+      phone: { type: String, default: '' },
+    },
+    addresses: [
+      {
+        title: { type: String, default: '' },
+        fullName: { type: String, default: '' },
+        addressLine: { type: String, default: '' },
+        city: { type: String, default: '' },
+        state: { type: String, default: '' },
+        pincode: { type: String, default: '' },
+        phone: { type: String, default: '' },
+      },
+    ],
     avatar: {
       type: String,
       default: null,

@@ -41,11 +41,15 @@ const notificationRoutes = require('../modules/notification/notification.routes'
 const uploadRoutes = require('../modules/upload/upload.routes');
 const reviewRoutes = require('../modules/review/review.routes');
 const settingRoutes = require('../modules/setting/setting.routes');
+const wishlistRoutes = require('../modules/wishlist/wishlist.routes');
+const cartRoutes = require('../modules/cart/cart.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/products', productRoutes);
+router.use('/wishlist', wishlistRoutes);
+router.use('/cart', cartRoutes);
 router.use('/banners', bannerRoutes);
 router.use('/birthstones', birthstoneRoutes);
 router.use('/appointments', appointmentRoutes);

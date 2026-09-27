@@ -9,6 +9,7 @@ router.use(authenticate);
 
 // Current user profile
 router.get('/me', userController.getMe);
+router.put('/me', userController.updateMe);
 
 // Admin-only routes
 router.get('/', authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), userController.getAll);

@@ -44,6 +44,13 @@ const getMe = catchAsync(async (req, res) => {
   return ApiResponse.success(res, user, 'Profile fetched successfully');
 });
 
+// ------------------------------- update current user profile ----------------------------
+const updateMe = catchAsync(async (req, res) => {
+  const { role, isActive, password, createdBy, ...allowedData } = req.body;
+  const user = await userService.update(req.user._id, allowedData);
+  return ApiResponse.success(res, user, 'Profile updated successfully');
+});
+
 module.exports = {
   getAll,
   getById,
@@ -52,4 +59,5 @@ module.exports = {
   remove,
   toggleStatus,
   getMe,
+  updateMe,
 };

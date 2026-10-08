@@ -68,13 +68,12 @@ const customInquirySchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
     versionKey: false,
   }
 );
 
-customInquirySchema.index({ createdAt: -1 });
-customInquirySchema.index({ status: 1, createdAt: -1 });
+customInquirySchema.index({ 'meta.createdAt': -1 });
+customInquirySchema.index({ status: 1, 'meta.createdAt': -1 });
 
 customInquirySchema.plugin(metaPlugin);
 

@@ -43,7 +43,6 @@ const birthstoneSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
     versionKey: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },

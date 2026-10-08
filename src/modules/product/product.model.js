@@ -291,7 +291,6 @@ const productSchema = new mongoose.Schema(
     }],
   },
   {
-    timestamps: true,
     versionKey: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
@@ -304,7 +303,7 @@ productSchema.index({ status: 1, isDeleted: 1, isOrnate: 1 });
 productSchema.index({ category: 1, status: 1 });
 productSchema.index({ displayPrice: 1 });
 productSchema.index({ salePrice: 1 });
-productSchema.index({ createdAt: -1 });
+productSchema.index({ 'meta.createdAt': -1 });
 
 // Helper pre-save: sync tagNo with sku if ornate, auto-compute slug
 productSchema.pre('save', function (next) {

@@ -29,6 +29,7 @@ class ReviewService {
       filter.$or = [
         { clientName: new RegExp(queryParams.search, 'i') },
         { comment: new RegExp(queryParams.search, 'i') },
+        { title: new RegExp(queryParams.search, 'i') },
       ];
     }
 
@@ -49,7 +50,7 @@ class ReviewService {
     const filter = { isDeleted: false, status: 'approved' };
     return await Review.find(filter)
       .sort({ reviewDate: -1 })
-      .select('_id clientName rating comment reviewDate')
+      .select('_id clientName title rating comment image reviewDate')
       .lean();
   }
 

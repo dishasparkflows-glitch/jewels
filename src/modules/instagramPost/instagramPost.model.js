@@ -24,7 +24,6 @@ const instagramPostSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
     versionKey: false,
   }
 );

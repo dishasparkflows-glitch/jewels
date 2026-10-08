@@ -73,7 +73,7 @@ const cartSchema = new mongoose.Schema(
     items: [cartItemSchema],
   },
   {
-    timestamps: true,
+    versionKey: false,
   }
 );
 

@@ -45,7 +45,6 @@ const appointmentSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
     versionKey: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
@@ -56,7 +55,7 @@ appointmentSchema.index({ status: 1 });
 appointmentSchema.index({ appointmentDate: 1 });
 appointmentSchema.index({ email: 1 });
 appointmentSchema.index({ phoneNumber: 1 });
-appointmentSchema.index({ createdAt: -1 });
+appointmentSchema.index({ 'meta.createdAt': -1 });
 
 appointmentSchema.plugin(metaPlugin);
 

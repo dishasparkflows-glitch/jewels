@@ -35,7 +35,6 @@ const codSequenceSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
     versionKey: false,
   }
 );

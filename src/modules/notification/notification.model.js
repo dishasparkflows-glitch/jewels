@@ -15,7 +15,7 @@ const notificationSchema = new mongoose.Schema(
     readAt: { type: Date, default: null },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
-  { timestamps: true }
+  { versionKey: false }
 );
 
 notificationSchema.plugin(metaPlugin);

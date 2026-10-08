@@ -55,14 +55,9 @@ const categorySchema = new mongoose.Schema(
       index: true,
     },
     subTypes: [subTypeSchema],
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
   {
     versionKey: false,
-    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
@@ -70,7 +65,7 @@ const categorySchema = new mongoose.Schema(
 
 categorySchema.index({ status: 1 });
 categorySchema.index({ isDeleted: 1 });
-categorySchema.index({ createdAt: -1 });
+categorySchema.index({ 'meta.createdAt': -1 });
 
 categorySchema.pre('save', function (next) {
   if (!this.slug && this.name) {

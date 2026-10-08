@@ -31,14 +31,9 @@ const diamondSizeSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
   {
     versionKey: false,
-    timestamps: true,
   }
 );
 

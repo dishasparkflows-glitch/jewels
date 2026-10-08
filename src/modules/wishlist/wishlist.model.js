@@ -62,7 +62,7 @@ const wishlistSchema = new mongoose.Schema(
     items: [wishlistItemSchema],
   },
   {
-    timestamps: true,
+    versionKey: false,
   }
 );
 

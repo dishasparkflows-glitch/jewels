@@ -14,6 +14,11 @@ const reviewSchema = new mongoose.Schema(
       lowercase: true,
       default: '',
     },
+    title: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     rating: {
       type: Number,
       required: [true, 'Rating is required'],
@@ -25,6 +30,16 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Comment is required'],
       trim: true,
+    },
+    image: {
+      url: {
+        type: String,
+        default: '',
+      },
+      key: {
+        type: String,
+        default: '',
+      },
     },
     status: {
       type: String,
@@ -43,12 +58,11 @@ const reviewSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
     versionKey: false,
   }
 );
 
-reviewSchema.index({ status: 1, createdAt: -1 });
+reviewSchema.index({ status: 1, 'meta.createdAt': -1 });
 
 reviewSchema.plugin(metaPlugin);
 

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const centerDiamondPriceSchema = new mongoose.Schema(
   {
@@ -73,5 +74,7 @@ centerDiamondPriceSchema.index(
   },
   { unique: true }
 );
+
+centerDiamondPriceSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('CenterDiamondPrice', centerDiamondPriceSchema);

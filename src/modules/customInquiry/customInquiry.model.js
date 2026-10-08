@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const customInquirySchema = new mongoose.Schema(
   {
@@ -74,5 +75,7 @@ const customInquirySchema = new mongoose.Schema(
 
 customInquirySchema.index({ createdAt: -1 });
 customInquirySchema.index({ status: 1, createdAt: -1 });
+
+customInquirySchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('CustomInquiry', customInquirySchema);

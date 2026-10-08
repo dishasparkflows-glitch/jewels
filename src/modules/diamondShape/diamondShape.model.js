@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const diamondShapeSchema = new mongoose.Schema(
   {
@@ -36,5 +37,7 @@ const diamondShapeSchema = new mongoose.Schema(
 );
 
 diamondShapeSchema.index({ status: 1, isDeleted: 1 });
+
+diamondShapeSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('DiamondShape', diamondShapeSchema);

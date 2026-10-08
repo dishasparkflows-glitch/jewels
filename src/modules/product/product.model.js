@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const studdedDetailSchema = new mongoose.Schema({
   stoneName: { type: String },
@@ -323,5 +324,7 @@ productSchema.pre('save', function (next) {
   }
   next();
 });
+
+productSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Product', productSchema);

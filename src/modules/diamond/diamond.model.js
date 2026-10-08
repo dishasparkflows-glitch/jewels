@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const diamondSchema = new mongoose.Schema(
   {
@@ -88,5 +89,7 @@ const diamondSchema = new mongoose.Schema(
 
 diamondSchema.index({ status: 1, isDeleted: 1 });
 diamondSchema.index({ carat: 1, price: 1 });
+
+diamondSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Diamond', diamondSchema);

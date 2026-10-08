@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const footerSettingsSchema = new mongoose.Schema(
   {
@@ -39,5 +40,7 @@ const footerSettingsSchema = new mongoose.Schema(
     versionKey: false,
   }
 );
+
+footerSettingsSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('FooterSettings', footerSettingsSchema);

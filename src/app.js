@@ -5,8 +5,11 @@ const morgan = require('morgan');
 const path = require('path');
 const routes = require('./routes');
 const { errorHandler } = require('./middleware/error.middleware');
+const { requestContextMiddleware } = require('./utils/context');
 
 const app = express();
+
+app.use(requestContextMiddleware);
 
 // ─── Security & Parsing ────────────────────────────────────────
 app.use(helmet({

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const diamondCutSchema = new mongoose.Schema(
   {
@@ -36,5 +37,7 @@ const diamondCutSchema = new mongoose.Schema(
 );
 
 diamondCutSchema.index({ status: 1, isDeleted: 1 });
+
+diamondCutSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('DiamondCut', diamondCutSchema);

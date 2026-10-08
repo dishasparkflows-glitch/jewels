@@ -19,7 +19,7 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await User.findById(decoded.id).select('-auth.password -password');
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -35,6 +35,8 @@ const authenticate = async (req, res, next) => {
     }
 
     req.user = user;
+    const { setRequestContext } = require('../utils/context');
+    setRequestContext('userId', user._id);
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
@@ -83,9 +85,11 @@ const optionalAuth = async (req, res, next) => {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       const decoded = jwt.verify(token, JWT_SECRET);
-      const user = await User.findById(decoded.id).select('-password');
+      const user = await User.findById(decoded.id).select('-auth.password -password');
       if (user && user.isActive) {
         req.user = user;
+        const { setRequestContext } = require('../utils/context');
+        setRequestContext('userId', user._id);
       }
     }
   } catch (error) {

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const sizeSchema = new mongoose.Schema(
   {
@@ -44,5 +45,7 @@ const sizeSchema = new mongoose.Schema(
 );
 
 sizeSchema.index({ category: 1, subType: 1, status: 1, isDeleted: 1 });
+
+sizeSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Size', sizeSchema);

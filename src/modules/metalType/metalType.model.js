@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const metalTypeSchema = new mongoose.Schema(
   {
@@ -45,5 +46,7 @@ const metalTypeSchema = new mongoose.Schema(
 );
 
 metalTypeSchema.index({ status: 1, isDeleted: 1 });
+
+metalTypeSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('MetalType', metalTypeSchema);

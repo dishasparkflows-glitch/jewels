@@ -403,7 +403,40 @@ const seedScreenshotModules = async () => {
 
     // 2. Seed Customers (retain super_admin and admin users, update or add customer users)
     await User.deleteMany({ role: 'user' });
-    const insertedUsers = await User.insertMany(customers);
+    const bcrypt = require('bcryptjs');
+    const hashedCustomers = await Promise.all(
+      customers.map(async (c) => ({
+        role: c.role || 'user',
+        isActive: c.isActive !== false,
+        profile: {
+          firstName: c.firstName,
+          lastName: c.lastName,
+          phone: c.phone || '',
+          avatar: null,
+          bio: '',
+          location: '',
+        },
+        auth: {
+          email: c.email,
+          password: await bcrypt.hash(c.password || 'User@123', 12),
+          lastLogin: null,
+        },
+        addresses: {
+          billing: {},
+          shipping: {},
+          saved: [],
+        },
+        statistics: {
+          ordersCount: c.ordersCount || 0,
+          lifetimeValue: c.lifetimeValue || 0,
+        },
+        meta: {
+          createdAt: c.createdAt || new Date(),
+          updatedAt: c.createdAt || new Date(),
+        },
+      }))
+    );
+    const insertedUsers = await User.insertMany(hashedCustomers);
     console.log(`✅ Seeded ${insertedUsers.length} Customers (Total 29 active elite clients)`);
 
     // 3. Seed Appointments

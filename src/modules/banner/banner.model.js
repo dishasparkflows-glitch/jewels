@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const bannerSchema = new mongoose.Schema(
   {
@@ -70,5 +71,7 @@ const bannerSchema = new mongoose.Schema(
 
 bannerSchema.index({ type: 1, status: 1, isDeleted: 1 });
 bannerSchema.index({ category: 1, status: 1 });
+
+bannerSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Banner', bannerSchema);

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const diamondColorSchema = new mongoose.Schema(
   {
@@ -36,5 +37,7 @@ const diamondColorSchema = new mongoose.Schema(
 );
 
 diamondColorSchema.index({ status: 1, isDeleted: 1 });
+
+diamondColorSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('DiamondColor', diamondColorSchema);

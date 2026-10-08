@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const cartItemSchema = new mongoose.Schema(
   {
@@ -77,5 +78,7 @@ const cartSchema = new mongoose.Schema(
 );
 
 cartSchema.index({ user: 1, sessionId: 1 });
+
+cartSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Cart', cartSchema);

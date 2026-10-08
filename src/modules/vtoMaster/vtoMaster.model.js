@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const vtoMasterSchema = new mongoose.Schema(
   {
@@ -51,5 +52,7 @@ const vtoMasterSchema = new mongoose.Schema(
 );
 
 vtoMasterSchema.index({ bodyPart: 1, isDeleted: 1 });
+
+vtoMasterSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('VTOMaster', vtoMasterSchema);

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const menuItemSchema = new mongoose.Schema(
   {
@@ -39,5 +40,7 @@ const menuItemSchema = new mongoose.Schema(
 );
 
 menuItemSchema.index({ menuSectionId: 1, status: 1, isDeleted: 1 });
+
+menuItemSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('MenuItem', menuItemSchema);

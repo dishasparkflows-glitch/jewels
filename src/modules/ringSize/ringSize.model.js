@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const ringSizeSchema = new mongoose.Schema(
   {
@@ -32,5 +33,7 @@ const ringSizeSchema = new mongoose.Schema(
 );
 
 ringSizeSchema.index({ status: 1, isDeleted: 1 });
+
+ringSizeSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('RingSize', ringSizeSchema);

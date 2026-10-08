@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const featuredSchema = new mongoose.Schema(
   {
@@ -56,5 +57,7 @@ const featuredSchema = new mongoose.Schema(
 
 featuredSchema.index({ status: 1, isDeleted: 1 });
 featuredSchema.index({ placement: 1, status: 1, isDeleted: 1 });
+
+featuredSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Featured', featuredSchema);

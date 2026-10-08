@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const wishlistItemSchema = new mongoose.Schema(
   {
@@ -67,5 +68,7 @@ const wishlistSchema = new mongoose.Schema(
 
 // Indexes
 wishlistSchema.index({ user: 1, sessionId: 1 });
+
+wishlistSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Wishlist', wishlistSchema);

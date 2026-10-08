@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const metalColorSchema = new mongoose.Schema(
   {
@@ -42,5 +43,7 @@ const metalColorSchema = new mongoose.Schema(
 );
 
 metalColorSchema.index({ status: 1, isDeleted: 1 });
+
+metalColorSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('MetalColor', metalColorSchema);

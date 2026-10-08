@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const sieveSizeSchema = new mongoose.Schema(
   {
@@ -32,5 +33,7 @@ const sieveSizeSchema = new mongoose.Schema(
 );
 
 sieveSizeSchema.index({ status: 1, isDeleted: 1 });
+
+sieveSizeSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('SieveSize', sieveSizeSchema);

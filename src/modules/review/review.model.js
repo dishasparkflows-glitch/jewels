@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const reviewSchema = new mongoose.Schema(
   {
@@ -48,5 +49,7 @@ const reviewSchema = new mongoose.Schema(
 );
 
 reviewSchema.index({ status: 1, createdAt: -1 });
+
+reviewSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Review', reviewSchema);

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const birthstoneSchema = new mongoose.Schema(
   {
@@ -50,5 +51,7 @@ const birthstoneSchema = new mongoose.Schema(
 );
 
 birthstoneSchema.index({ status: 1, isDeleted: 1 });
+
+birthstoneSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Birthstone', birthstoneSchema);

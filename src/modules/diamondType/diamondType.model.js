@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const diamondTypeSchema = new mongoose.Schema(
   {
@@ -36,5 +37,7 @@ const diamondTypeSchema = new mongoose.Schema(
 );
 
 diamondTypeSchema.index({ status: 1, isDeleted: 1 });
+
+diamondTypeSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('DiamondType', diamondTypeSchema);

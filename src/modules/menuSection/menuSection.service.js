@@ -38,7 +38,7 @@ class MenuSectionService {
     const [items, total] = await Promise.all([
       MenuSection.find(filter)
         .populate('categoryId', 'name slug type')
-        .sort({ createdAt: -1 })
+        .sort({ 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

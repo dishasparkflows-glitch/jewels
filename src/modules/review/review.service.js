@@ -26,16 +26,18 @@ class ReviewService {
       filter.status = queryParams.status;
     }
     if (queryParams.search) {
+      const reg = new RegExp(queryParams.search, 'i');
       filter.$or = [
-        { clientName: new RegExp(queryParams.search, 'i') },
-        { comment: new RegExp(queryParams.search, 'i') },
-        { title: new RegExp(queryParams.search, 'i') },
+        { 'customer.name': reg },
+        { 'customer.email': reg },
+        { 'review.title': reg },
+        { 'review.comment': reg },
       ];
     }
 
     const [items, total] = await Promise.all([
       Review.find(filter)
-        .sort({ reviewDate: -1, createdAt: -1 })
+        .sort({ 'review.reviewDate': -1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -49,8 +51,8 @@ class ReviewService {
   async getLookup(queryParams = {}) {
     const filter = { isDeleted: false, status: 'approved' };
     return await Review.find(filter)
-      .sort({ reviewDate: -1 })
-      .select('_id clientName title rating comment image reviewDate')
+      .sort({ 'review.reviewDate': -1 })
+      .select('_id customer review image status meta')
       .lean();
   }
 
@@ -59,7 +61,7 @@ class ReviewService {
     const item = await Review.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -74,7 +76,7 @@ class ReviewService {
     const item = await Review.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: { isDeleted: true } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!item) {

@@ -58,7 +58,7 @@ class SizeService {
     const [items, total] = await Promise.all([
       Size.find(filter)
         .populate('category', 'name slug type')
-        .sort({ createdAt: -1 })
+        .sort({ 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

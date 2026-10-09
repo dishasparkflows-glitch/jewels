@@ -32,7 +32,7 @@ class InstagramPostService {
 
     const [items, total] = await Promise.all([
       InstagramPost.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -46,7 +46,7 @@ class InstagramPostService {
   async getLookup(queryParams = {}) {
     const filter = { isDeleted: false, isActive: true };
     return await InstagramPost.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ 'meta.createdAt': -1 })
       .select('_id url position isActive')
       .lean();
   }

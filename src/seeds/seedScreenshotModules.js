@@ -28,7 +28,7 @@ const customers = [
     lifetimeValue: 99050,
     role: 'user',
     isActive: true,
-    createdAt: new Date('2026-09-01T10:00:00Z'),
+    meta: { createdAt: new Date('2026-09-01T10:00:00Z') },
   },
   {
     firstName: 'Keval',
@@ -40,7 +40,7 @@ const customers = [
     lifetimeValue: 0,
     role: 'user',
     isActive: true,
-    createdAt: new Date('2026-09-05T12:30:00Z'),
+    meta: { createdAt: new Date('2026-09-05T12:30:00Z') },
   },
   {
     firstName: 'Disha',
@@ -52,7 +52,7 @@ const customers = [
     lifetimeValue: 0,
     role: 'user',
     isActive: true,
-    createdAt: new Date('2026-09-10T14:15:00Z'),
+    meta: { createdAt: new Date('2026-09-10T14:15:00Z') },
   },
   {
     firstName: 'Customer',
@@ -64,7 +64,7 @@ const customers = [
     lifetimeValue: 0,
     role: 'user',
     isActive: true,
-    createdAt: new Date('2026-09-12T16:00:00Z'),
+    meta: { createdAt: new Date('2026-09-12T16:00:00Z') },
   },
   {
     firstName: 'Aarav',
@@ -76,7 +76,7 @@ const customers = [
     lifetimeValue: 245000,
     role: 'user',
     isActive: true,
-    createdAt: new Date('2026-09-14T09:00:00Z'),
+    meta: { createdAt: new Date('2026-09-14T09:00:00Z') },
   },
   {
     firstName: 'Meera',
@@ -88,7 +88,7 @@ const customers = [
     lifetimeValue: 68500,
     role: 'user',
     isActive: true,
-    createdAt: new Date('2026-09-15T11:00:00Z'),
+    meta: { createdAt: new Date('2026-09-15T11:00:00Z') },
   },
   {
     firstName: 'Vikramaditya',
@@ -100,7 +100,7 @@ const customers = [
     lifetimeValue: 182000,
     role: 'user',
     isActive: true,
-    createdAt: new Date('2026-09-16T15:00:00Z'),
+    meta: { createdAt: new Date('2026-09-16T15:00:00Z') },
   },
   {
     firstName: 'Ananya',
@@ -112,7 +112,7 @@ const customers = [
     lifetimeValue: 32000,
     role: 'user',
     isActive: true,
-    createdAt: new Date('2026-09-18T10:00:00Z'),
+    meta: { createdAt: new Date('2026-09-18T10:00:00Z') },
   },
   {
     firstName: 'Devansh',
@@ -124,7 +124,7 @@ const customers = [
     lifetimeValue: 54000,
     role: 'user',
     isActive: true,
-    createdAt: new Date('2026-09-19T13:00:00Z'),
+    meta: { createdAt: new Date('2026-09-19T13:00:00Z') },
   },
   {
     firstName: 'Pooja',
@@ -136,7 +136,7 @@ const customers = [
     lifetimeValue: 0,
     role: 'user',
     isActive: true,
-    createdAt: new Date('2026-09-20T17:00:00Z'),
+    meta: { createdAt: new Date('2026-09-20T17:00:00Z') },
   },
 ];
 
@@ -174,123 +174,179 @@ extraNames.forEach(([first, last, email, phone], i) => {
     lifetimeValue: i % 4 === 0 ? 25000 : 0,
     role: 'user',
     isActive: true,
-    createdAt: new Date(`2026-09-${(15 + (i % 12)).toString().padStart(2, '0')}T10:00:00Z`),
+    meta: { createdAt: new Date(`2026-09-${(15 + (i % 12)).toString().padStart(2, '0')}T10:00:00Z`) },
   });
 });
 
 // ─── 3. APPOINTMENTS (Matches Screenshot 3: 14 Total, 12 Pending, 0 Completed, 2 Cancelled) ───
 const appointments = [
   {
-    fullName: 'Krushnakant',
-    email: 'jayswalkrushnikant4444@gmail.com',
-    phoneNumber: '6353516141',
-    appointmentDate: new Date('2026-09-28'),
-    preferredTime: '06:00 PM',
+    customer: {
+      name: 'Krushnakant',
+      email: 'jayswalkrushnikant4444@gmail.com',
+      phone: { countryCode: '91', number: '6353516141' },
+    },
+    appointment: {
+      date: new Date('2026-09-28'),
+      preferredTime: '06:00 PM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Krushnakant',
-    email: 'jayswalkrushnikant4444@gmail.com',
-    phoneNumber: '6353516141',
-    appointmentDate: new Date('2026-09-26'),
-    preferredTime: '06:00 PM',
+    customer: {
+      name: 'Krushnakant',
+      email: 'jayswalkrushnikant4444@gmail.com',
+      phone: { countryCode: '91', number: '6353516141' },
+    },
+    appointment: {
+      date: new Date('2026-09-26'),
+      preferredTime: '06:00 PM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Krushnakant',
-    email: 'jayswalkrushnikant4444@gmail.com',
-    phoneNumber: '6353516141',
-    appointmentDate: new Date('2026-09-26'),
-    preferredTime: '06:00 PM',
+    customer: {
+      name: 'Krushnakant',
+      email: 'jayswalkrushnikant4444@gmail.com',
+      phone: { countryCode: '91', number: '6353516141' },
+    },
+    appointment: {
+      date: new Date('2026-09-26'),
+      preferredTime: '06:00 PM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Test mobile',
-    email: 'testi@gmail.com',
-    phoneNumber: '9848484848',
-    appointmentDate: new Date('2026-09-24'),
-    preferredTime: '05:00 PM',
+    customer: {
+      name: 'Test mobile',
+      email: 'testi@gmail.com',
+      phone: { countryCode: '91', number: '9848484848' },
+    },
+    appointment: {
+      date: new Date('2026-09-24'),
+      preferredTime: '05:00 PM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Test Demo',
-    email: 'testi@gmail.com',
-    phoneNumber: '9193838388',
-    appointmentDate: new Date('2026-09-25'),
-    preferredTime: '05:00 PM',
+    customer: {
+      name: 'Test Demo',
+      email: 'testi@gmail.com',
+      phone: { countryCode: '91', number: '9193838388' },
+    },
+    appointment: {
+      date: new Date('2026-09-25'),
+      preferredTime: '05:00 PM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Priya Sharma',
-    email: 'priya.sharma@luxury.com',
-    phoneNumber: '9820199881',
-    appointmentDate: new Date('2026-09-29'),
-    preferredTime: '02:00 PM',
+    customer: {
+      name: 'Priya Sharma',
+      email: 'priya.sharma@luxury.com',
+      phone: { countryCode: '91', number: '9820199881' },
+    },
+    appointment: {
+      date: new Date('2026-09-29'),
+      preferredTime: '02:00 PM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Vikram Malhotra',
-    email: 'vikram.m@gmail.com',
-    phoneNumber: '9820299882',
-    appointmentDate: new Date('2026-09-29'),
-    preferredTime: '04:00 PM',
+    customer: {
+      name: 'Vikram Malhotra',
+      email: 'vikram.m@gmail.com',
+      phone: { countryCode: '91', number: '9820299882' },
+    },
+    appointment: {
+      date: new Date('2026-09-29'),
+      preferredTime: '04:00 PM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Ananya Birla',
-    email: 'ananya.b@gmail.com',
-    phoneNumber: '9820399883',
-    appointmentDate: new Date('2026-09-30'),
-    preferredTime: '11:00 AM',
+    customer: {
+      name: 'Ananya Birla',
+      email: 'ananya.b@gmail.com',
+      phone: { countryCode: '91', number: '9820399883' },
+    },
+    appointment: {
+      date: new Date('2026-09-30'),
+      preferredTime: '11:00 AM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Rohan Mehra',
-    email: 'rohan.m@gmail.com',
-    phoneNumber: '9820499884',
-    appointmentDate: new Date('2026-09-30'),
-    preferredTime: '01:00 PM',
+    customer: {
+      name: 'Rohan Mehra',
+      email: 'rohan.m@gmail.com',
+      phone: { countryCode: '91', number: '9820499884' },
+    },
+    appointment: {
+      date: new Date('2026-09-30'),
+      preferredTime: '01:00 PM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Devika Singhania',
-    email: 'devika.s@gmail.com',
-    phoneNumber: '9820599885',
-    appointmentDate: new Date('2026-10-01'),
-    preferredTime: '03:00 PM',
+    customer: {
+      name: 'Devika Singhania',
+      email: 'devika.s@gmail.com',
+      phone: { countryCode: '91', number: '9820599885' },
+    },
+    appointment: {
+      date: new Date('2026-10-01'),
+      preferredTime: '03:00 PM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Karan Johar',
-    email: 'karan.j@gmail.com',
-    phoneNumber: '9820699886',
-    appointmentDate: new Date('2026-10-02'),
-    preferredTime: '05:00 PM',
+    customer: {
+      name: 'Karan Johar',
+      email: 'karan.j@gmail.com',
+      phone: { countryCode: '91', number: '9820699886' },
+    },
+    appointment: {
+      date: new Date('2026-10-02'),
+      preferredTime: '05:00 PM',
+    },
     status: 'pending',
   },
   {
-    fullName: 'Ritu Kumar',
-    email: 'ritu.k@gmail.com',
-    phoneNumber: '9820799887',
-    appointmentDate: new Date('2026-10-03'),
-    preferredTime: '04:30 PM',
+    customer: {
+      name: 'Ritu Kumar',
+      email: 'ritu.k@gmail.com',
+      phone: { countryCode: '91', number: '9820799887' },
+    },
+    appointment: {
+      date: new Date('2026-10-03'),
+      preferredTime: '04:30 PM',
+    },
     status: 'pending',
   },
   // 2 Cancelled appointments
   {
-    fullName: 'Harsh Vardhan',
-    email: 'harsh.v@gmail.com',
-    phoneNumber: '9820899888',
-    appointmentDate: new Date('2026-09-21'),
-    preferredTime: '03:00 PM',
+    customer: {
+      name: 'Harsh Vardhan',
+      email: 'harsh.v@gmail.com',
+      phone: { countryCode: '91', number: '9820899888' },
+    },
+    appointment: {
+      date: new Date('2026-09-21'),
+      preferredTime: '03:00 PM',
+    },
     status: 'cancelled',
   },
   {
-    fullName: 'Sunita Rao',
-    email: 'sunita.rao@gmail.com',
-    phoneNumber: '9820999889',
-    appointmentDate: new Date('2026-09-22'),
-    preferredTime: '12:00 PM',
+    customer: {
+      name: 'Sunita Rao',
+      email: 'sunita.rao@gmail.com',
+      phone: { countryCode: '91', number: '9820999889' },
+    },
+    appointment: {
+      date: new Date('2026-09-22'),
+      preferredTime: '12:00 PM',
+    },
     status: 'cancelled',
   },
 ];
@@ -298,96 +354,135 @@ const appointments = [
 // ─── 4. CUSTOM DESIGN INQUIRIES (Matches Screenshot 4: 5 Total, 3 Pending) ───
 const customInquiries = [
   {
-    name: 'Krushnakant',
-    email: 'jayswalkrushnikant4444@gmail.com',
-    phoneNumber: '6353516141',
-    stoneType: 'Natural Diamond',
-    metalType: '18KT Gold',
-    jewelryType: ['RING/BAND'],
-    budget: 'Above ₹5,00,000+',
-    comments: 'Looking for a solitaire engagement ring design with custom halo.',
+    customer: {
+      name: 'Krushnakant',
+      email: 'jayswalkrushnikant4444@gmail.com',
+      phone: { countryCode: '91', number: '6353516141' },
+    },
+    requirements: {
+      stoneType: 'Natural Diamond',
+      metalType: '18KT Gold',
+      jewelryTypes: ['RING/BAND'],
+      comments: 'Looking for a solitaire engagement ring design with custom halo.',
+    },
     status: 'pending',
-    createdAt: new Date('2026-09-26T14:30:00Z'),
+    meta: { createdAt: new Date('2026-09-26T14:30:00Z') },
   },
   {
-    name: 'Test Mobile',
-    email: 'test@gmail.com',
-    phoneNumber: '9393939933',
-    stoneType: 'Lab Grown Diamond',
-    metalType: '9KT Gold',
-    jewelryType: ['RING/BAND'],
-    budget: '₹2,00,000 - ₹2,50,000',
-    comments: 'Minimalist band with baguette cut diamonds.',
+    customer: {
+      name: 'Test Mobile',
+      email: 'test@gmail.com',
+      phone: { countryCode: '91', number: '9393939933' },
+    },
+    requirements: {
+      stoneType: 'Lab Grown Diamond',
+      metalType: '9KT Gold',
+      jewelryTypes: ['RING/BAND'],
+      comments: 'Minimalist band with baguette cut diamonds.',
+    },
     status: 'pending',
-    createdAt: new Date('2026-09-25T11:20:00Z'),
+    meta: { createdAt: new Date('2026-09-25T11:20:00Z') },
   },
   {
-    name: 'Disha Radadiya',
-    email: 'disha.sparkflows@gmail.com',
-    phoneNumber: '9825032534',
-    stoneType: 'Natural Diamond',
-    metalType: '14KT Gold',
-    jewelryType: ['BRACELETS', 'OTHER'],
-    budget: '₹1,00,000 - ₹2,00,000',
-    comments: 'Tennis bracelet with round brilliant diamonds in rose gold.',
+    customer: {
+      name: 'Disha Radadiya',
+      email: 'disha.sparkflows@gmail.com',
+      phone: { countryCode: '91', number: '9825032534' },
+    },
+    requirements: {
+      stoneType: 'Natural Diamond',
+      metalType: '14KT Gold',
+      jewelryTypes: ['BRACELETS', 'OTHER'],
+      comments: 'Tennis bracelet with round brilliant diamonds in rose gold.',
+    },
     status: 'pending',
-    createdAt: new Date('2026-09-24T16:45:00Z'),
+    meta: { createdAt: new Date('2026-09-24T16:45:00Z') },
   },
   {
-    name: 'Aarav Singhania',
-    email: 'aarav.singhania@heritage.in',
-    phoneNumber: '9820011223',
-    stoneType: 'Natural Diamond',
-    metalType: '18KT Gold',
-    jewelryType: ['NECKLACES'],
-    budget: 'Above ₹5,00,000+',
-    comments: 'Heritage bridal choker necklace with emerald accents.',
+    customer: {
+      name: 'Aarav Singhania',
+      email: 'aarav.singhania@heritage.in',
+      phone: { countryCode: '91', number: '9820011223' },
+    },
+    requirements: {
+      stoneType: 'Natural Diamond',
+      metalType: '18KT Gold',
+      jewelryTypes: ['NECKLACES'],
+      comments: 'Heritage bridal choker necklace with emerald accents.',
+    },
     status: 'confirmed',
-    createdAt: new Date('2026-09-20T10:00:00Z'),
+    meta: { createdAt: new Date('2026-09-20T10:00:00Z') },
   },
   {
-    name: 'Meera Shah',
-    email: 'meera.shah@gmail.com',
-    phoneNumber: '9819922334',
-    stoneType: 'Lab Grown Diamond',
-    metalType: '18KT Gold',
-    jewelryType: ['EARRINGS'],
-    budget: '₹2,50,000 - ₹5,00,000',
-    comments: 'Chandelier diamond earrings for anniversary celebration.',
+    customer: {
+      name: 'Meera Shah',
+      email: 'meera.shah@gmail.com',
+      phone: { countryCode: '91', number: '9819922334' },
+    },
+    requirements: {
+      stoneType: 'Lab Grown Diamond',
+      metalType: '18KT Gold',
+      jewelryTypes: ['EARRINGS'],
+      comments: 'Chandelier diamond earrings for anniversary celebration.',
+    },
     status: 'confirmed',
-    createdAt: new Date('2026-09-18T12:00:00Z'),
+    meta: { createdAt: new Date('2026-09-18T12:00:00Z') },
   },
 ];
 
 // ─── 5. CUSTOMER REVIEWS (Matches Screenshot 5) ──────────────
 const reviews = [
   {
-    clientName: 'Disha',
-    rating: 5,
+    customer: {
+      name: 'Disha',
+      email: 'disharadadiya13@gmail.com',
+    },
+    review: {
+      title: 'Exceeded Expectations',
+      rating: 5,
+      comment: 'I was looking for a budget-friendly jewellery set and this completely exceeded my expectations. The finishing is top-notch and it is the best handcrafted set I have ever bought.',
+      reviewDate: new Date('2026-09-24T00:00:00.000Z'),
+    },
     status: 'approved',
-    reviewDate: new Date('2026-09-24'),
-    comment: 'I was looking for a budget-friendly jewellery set and this completely exceeded my expectations. The finishing is top-notch and it is the best handcrafted set I have ever bought.',
   },
   {
-    clientName: 'Krushnakant Jayswal',
-    rating: 5,
+    customer: {
+      name: 'Krushnakant Jayswal',
+      email: 'krushnakant.jayswal@gmail.com',
+    },
+    review: {
+      title: 'Exquisite Diamond Solitaire',
+      rating: 5,
+      comment: 'I was looking for a masterfully cut solitaire engagement ring and this completely exceeded my expectations. The finishing is top-notch and it is the most exquisite diamond piece in my collection.',
+      reviewDate: new Date('2026-09-22T00:00:00.000Z'),
+    },
     status: 'approved',
-    reviewDate: new Date('2026-09-22'),
-    comment: 'I was looking for a budget-friendly jewellery set and this completely exceeded my expectations. The finishing is top-notch and it is the most exquisite diamond piece in my collection.',
   },
   {
-    clientName: 'Ananya Deshmukh',
-    rating: 5,
+    customer: {
+      name: 'Ananya Deshmukh',
+      email: 'ananya.d@gmail.com',
+    },
+    review: {
+      title: 'World-Class Atelier Service',
+      rating: 5,
+      comment: 'The atelier service and private consultation were truly world-class. The sparkle on the natural diamond solitaire is unmatched.',
+      reviewDate: new Date('2026-09-19T00:00:00.000Z'),
+    },
     status: 'approved',
-    reviewDate: new Date('2026-09-19'),
-    comment: 'The atelier service and private consultation were truly world-class. The sparkle on the natural diamond solitaire is unmatched.',
   },
   {
-    clientName: 'Vikramaditya Rathore',
-    rating: 5,
+    customer: {
+      name: 'Vikramaditya Rathore',
+      email: 'rathore.vikram@regal.in',
+    },
+    review: {
+      title: 'Certified Hallmarked Purity',
+      rating: 5,
+      comment: 'Prompt delivery, insured packaging, and certified hallmarked purity. Highly recommend Neirah Jewellers for fine heritage collections.',
+      reviewDate: new Date('2026-09-15T00:00:00.000Z'),
+    },
     status: 'approved',
-    reviewDate: new Date('2026-09-15'),
-    comment: 'Prompt delivery, insured packaging, and certified hallmarked purity. Highly recommend Neirah Jewellers for fine heritage collections.',
   },
 ];
 
@@ -431,8 +526,8 @@ const seedScreenshotModules = async () => {
           lifetimeValue: c.lifetimeValue || 0,
         },
         meta: {
-          createdAt: c.createdAt || new Date(),
-          updatedAt: c.createdAt || new Date(),
+          createdAt: c.meta?.createdAt || new Date(),
+          updatedAt: c.meta?.createdAt || new Date(),
         },
       }))
     );

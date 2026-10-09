@@ -63,8 +63,6 @@ const categorySchema = new mongoose.Schema(
   }
 );
 
-categorySchema.index({ status: 1 });
-categorySchema.index({ isDeleted: 1 });
 categorySchema.index({ 'meta.createdAt': -1 });
 
 categorySchema.pre('save', function (next) {

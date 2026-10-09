@@ -32,7 +32,7 @@ class CustJewelleryBeforeAfterService {
 
     const [items, total] = await Promise.all([
       CustJewelleryBeforAfter.find(filter)
-        .sort({ position: 1, createdAt: -1 })
+        .sort({ position: 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -46,7 +46,7 @@ class CustJewelleryBeforeAfterService {
   async getLookup(queryParams = {}) {
     const filter = { isDeleted: false, status: 'active' };
     return await CustJewelleryBeforAfter.find(filter)
-      .sort({ position: 1, createdAt: -1 })
+      .sort({ position: 1, 'meta.createdAt': -1 })
       .select('_id beforeImage afterImage alt position')
       .lean();
   }

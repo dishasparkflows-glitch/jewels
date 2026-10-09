@@ -27,16 +27,17 @@ class AppointmentService {
     }
 
     if (queryParams.search) {
+      const reg = new RegExp(queryParams.search, 'i');
       filter.$or = [
-        { fullName: new RegExp(queryParams.search, 'i') },
-        { email: new RegExp(queryParams.search, 'i') },
-        { phoneNumber: new RegExp(queryParams.search, 'i') },
+        { 'customer.name': reg },
+        { 'customer.email': reg },
+        { 'customer.phone.number': reg },
       ];
     }
 
     const [items, total] = await Promise.all([
       Appointment.find(filter)
-        .sort({ appointmentDate: -1, createdAt: -1 })
+        .sort({ 'appointment.date': -1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -54,8 +55,8 @@ class AppointmentService {
     }
 
     return await Appointment.find(filter)
-      .sort({ appointmentDate: -1 })
-      .select('_id fullName email phoneNumber appointmentDate preferredTime status')
+      .sort({ 'appointment.date': -1 })
+      .select('_id customer appointment status meta')
       .lean();
   }
 
@@ -64,7 +65,7 @@ class AppointmentService {
     const item = await Appointment.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -79,7 +80,7 @@ class AppointmentService {
     const item = await Appointment.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: { isDeleted: true } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!item) {

@@ -50,7 +50,7 @@ class MetalTypeService {
 
     const [items, total] = await Promise.all([
       MetalType.find(filter)
-        .sort({ karat: -1, createdAt: -1 })
+        .sort({ karat: -1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

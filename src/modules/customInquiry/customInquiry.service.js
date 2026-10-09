@@ -28,22 +28,26 @@ class CustomInquiryService {
       filter.status = queryParams.status;
     }
     if (queryParams.stoneType) {
-      filter.stoneType = queryParams.stoneType;
+      filter['requirements.stoneType'] = queryParams.stoneType;
     }
     if (queryParams.metalType) {
-      filter.metalType = queryParams.metalType;
+      filter['requirements.metalType'] = queryParams.metalType;
     }
     if (queryParams.search) {
+      const reg = new RegExp(queryParams.search, 'i');
       filter.$or = [
-        { name: new RegExp(queryParams.search, 'i') },
-        { email: new RegExp(queryParams.search, 'i') },
-        { phoneNumber: new RegExp(queryParams.search, 'i') },
+        { 'customer.name': reg },
+        { 'customer.email': reg },
+        { 'customer.phone.number': reg },
+        { 'requirements.comments': reg },
+        { 'requirements.stoneType': reg },
+        { 'requirements.metalType': reg },
       ];
     }
 
     const [items, total] = await Promise.all([
       CustomInquiry.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -62,8 +66,8 @@ class CustomInquiryService {
     }
 
     return await CustomInquiry.find(filter)
-      .sort({ createdAt: -1 })
-      .select('_id name email phoneNumber stoneType metalType budget status createdAt')
+      .sort({ 'meta.createdAt': -1 })
+      .select('_id customer requirements referenceImages status meta')
       .lean();
   }
 
@@ -73,7 +77,7 @@ class CustomInquiryService {
     const item = await CustomInquiry.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -89,7 +93,7 @@ class CustomInquiryService {
     const item = await CustomInquiry.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: { isDeleted: true } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!item) {

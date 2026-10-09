@@ -43,6 +43,7 @@ const reviewRoutes = require('../modules/review/review.routes');
 const settingRoutes = require('../modules/setting/setting.routes');
 const wishlistRoutes = require('../modules/wishlist/wishlist.routes');
 const cartRoutes = require('../modules/cart/cart.routes');
+const whatsappRoutes = require('../modules/whatsapp/whatsapp.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -50,6 +51,7 @@ router.use('/users', userRoutes);
 router.use('/products', productRoutes);
 router.use('/wishlist', wishlistRoutes);
 router.use('/cart', cartRoutes);
+router.use('/whatsapp', whatsappRoutes);
 router.use('/banners', bannerRoutes);
 router.use('/birthstones', birthstoneRoutes);
 router.use('/appointments', appointmentRoutes);

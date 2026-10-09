@@ -5,21 +5,20 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class CouponService {
   // ------------------------------- create coupon ----------------------------
   async create(data) {
-    if (data.couponcode) {
-      data.couponcode = data.couponcode.trim().toUpperCase();
+    if (data.coupon?.code) {
+      data.coupon.code = data.coupon.code.trim().toUpperCase();
       const existing = await Coupon.findOne({
-        couponcode: data.couponcode,
+        'coupon.code': data.coupon.code,
         isDeleted: false,
       });
       if (existing) {
-        throw new ApiError(409, `Coupon with code "${data.couponcode}" already exists`);
+        throw new ApiError(409, `Coupon with code "${data.coupon.code}" already exists`);
       }
     }
     return await Coupon.create(data);
   }
 
   // ------------------------------- get one coupon ----------------------------
-
   async getOne(id) {
     const coupon = await Coupon.findOne({ _id: id, isDeleted: false });
     if (!coupon) {
@@ -31,7 +30,7 @@ class CouponService {
   // ------------------------------- get coupon by code ----------------------------
   async getByCode(code) {
     const coupon = await Coupon.findOne({
-      couponcode: code.trim().toUpperCase(),
+      'coupon.code': code.trim().toUpperCase(),
       isDeleted: false,
     });
     if (!coupon) {
@@ -41,7 +40,6 @@ class CouponService {
   }
 
   // ------------------------------- get all coupons ----------------------------
-
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { isDeleted: false };
@@ -50,18 +48,19 @@ class CouponService {
       filter.status = queryParams.status;
     }
     if (queryParams.discounttype) {
-      filter.discounttype = queryParams.discounttype;
+      filter['discount.type'] = queryParams.discounttype;
     }
     if (queryParams.search) {
+      const reg = new RegExp(queryParams.search, 'i');
       filter.$or = [
-        { couponcode: new RegExp(queryParams.search, 'i') },
-        { description: new RegExp(queryParams.search, 'i') },
+        { 'coupon.code': reg },
+        { 'coupon.description': reg },
       ];
     }
 
     const [items, total] = await Promise.all([
       Coupon.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -72,20 +71,19 @@ class CouponService {
   }
 
   // ------------------------------- get coupon lookup ----------------------------
-
   async getLookup(queryParams = {}) {
     const filter = { isDeleted: false, status: 'active' };
     const now = new Date();
 
     // Only return currently valid coupons in active lookup
     filter.$or = [
-      { enddate: null },
-      { enddate: { $gte: now } },
+      { 'validity.endDate': null },
+      { 'validity.endDate': { $gte: now } },
     ];
 
     return await Coupon.find(filter)
-      .select('_id couponcode description discounttype discountvalue minimumorderamount')
-      .sort({ couponcode: 1 })
+      .select('_id coupon discount validity usage status meta')
+      .sort({ 'coupon.code': 1 })
       .lean();
   }
 
@@ -96,7 +94,7 @@ class CouponService {
     }
 
     const coupon = await Coupon.findOne({
-      couponcode: code.trim().toUpperCase(),
+      'coupon.code': code.trim().toUpperCase(),
       isDeleted: false,
     });
 
@@ -109,31 +107,36 @@ class CouponService {
     }
 
     const now = new Date();
-    if (coupon.startdate && now < new Date(coupon.startdate)) {
+    if (coupon.validity?.startDate && now < new Date(coupon.validity.startDate)) {
       throw new ApiError(400, 'This coupon has not started yet');
     }
 
-    if (coupon.enddate && now > new Date(coupon.enddate)) {
+    if (coupon.validity?.endDate && now > new Date(coupon.validity.endDate)) {
       throw new ApiError(400, 'This coupon has expired');
     }
 
-    if (coupon.usagelimit && coupon.usedCount >= coupon.usagelimit) {
+    const usageLimit = coupon.usage?.usageLimit;
+    const usedCount = coupon.usage?.usedCount || 0;
+    if (usageLimit && usedCount >= usageLimit) {
       throw new ApiError(400, 'This coupon has reached its maximum usage limit');
     }
 
     const amount = Number(cartAmount) || 0;
-    if (amount < coupon.minimumorderamount) {
+    const minOrder = coupon.discount?.minimumOrderAmount || 0;
+    if (amount < minOrder) {
       throw new ApiError(
         400,
-        `Minimum order amount of ₹${coupon.minimumorderamount} required for this coupon`
+        `Minimum order amount of ₹${minOrder} required for this coupon`
       );
     }
 
     let discountAmount = 0;
-    if (coupon.discounttype === 'Percentage') {
-      discountAmount = (amount * coupon.discountvalue) / 100;
+    const discountType = coupon.discount?.type || 'Percentage';
+    const discountValue = coupon.discount?.value || 0;
+    if (discountType === 'Percentage') {
+      discountAmount = (amount * discountValue) / 100;
     } else {
-      discountAmount = Math.min(coupon.discountvalue, amount);
+      discountAmount = Math.min(discountValue, amount);
     }
 
     discountAmount = Math.round(discountAmount * 100) / 100;
@@ -142,34 +145,31 @@ class CouponService {
     return {
       isValid: true,
       couponId: coupon._id,
-      couponcode: coupon.couponcode,
-      discounttype: coupon.discounttype,
-      discountvalue: coupon.discountvalue,
+      coupon: coupon.coupon,
+      discount: coupon.discount,
       discountAmount,
       finalAmount,
-      description: coupon.description,
     };
   }
 
   // ------------------------------- update coupon ----------------------------
-
   async update(id, data) {
-    if (data.couponcode) {
-      data.couponcode = data.couponcode.trim().toUpperCase();
+    if (data.coupon?.code) {
+      data.coupon.code = data.coupon.code.trim().toUpperCase();
       const existing = await Coupon.findOne({
-        couponcode: data.couponcode,
+        'coupon.code': data.coupon.code,
         _id: { $ne: id },
         isDeleted: false,
       });
       if (existing) {
-        throw new ApiError(409, `Coupon with code "${data.couponcode}" already exists`);
+        throw new ApiError(409, `Coupon with code "${data.coupon.code}" already exists`);
       }
     }
 
     const coupon = await Coupon.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!coupon) {
@@ -180,12 +180,11 @@ class CouponService {
   }
 
   // ------------------------------- delete coupon ----------------------------
-
   async delete(id) {
     const coupon = await Coupon.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!coupon) {

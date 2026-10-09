@@ -48,6 +48,10 @@ const cartRoutes = require('../modules/cart/cart.routes');
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/products', productRoutes);
+router.use('/catalog/ornate-products', (req, res, next) => {
+  req.query.isOrnate = 'true';
+  return productRoutes(req, res, next);
+});
 router.use('/wishlist', wishlistRoutes);
 router.use('/cart', cartRoutes);
 router.use('/banners', bannerRoutes);

@@ -44,7 +44,7 @@ class BannerService {
     const [items, total] = await Promise.all([
       Banner.find(filter)
         .populate('category', 'name slug')
-        .sort({ order: 1, createdAt: -1 })
+        .sort({ order: 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

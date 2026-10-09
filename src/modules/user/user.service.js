@@ -33,7 +33,7 @@ class UserService {
     const [users, total] = await Promise.all([
       User.find(filter)
         .select('-auth.password -password')
-        .sort({ createdAt: -1 })
+        .sort({ 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

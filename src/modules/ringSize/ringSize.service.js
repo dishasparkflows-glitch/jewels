@@ -44,7 +44,7 @@ class RingSizeService {
 
     const [items, total] = await Promise.all([
       RingSize.find(filter)
-        .sort({ name: 1, createdAt: -1 })
+        .sort({ name: 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

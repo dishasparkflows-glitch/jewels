@@ -67,7 +67,7 @@ class SideDiamondPriceService {
     }
 
     let findQuery = SideDiamondPrice.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ 'meta.createdAt': -1 })
       .skip(skip)
       .limit(limit);
 

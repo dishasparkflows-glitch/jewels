@@ -91,7 +91,7 @@ class DiamondService {
     }
 
     let findQuery = Diamond.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ 'meta.createdAt': -1 })
       .skip(skip)
       .limit(limit);
 

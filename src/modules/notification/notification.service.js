@@ -10,7 +10,7 @@ class NotificationService {
     if (query.isRead !== undefined) filter.isRead = query.isRead === 'true';
 
     const [notifications, total] = await Promise.all([
-      Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Notification.find(filter).sort({ 'meta.createdAt': -1 }).skip(skip).limit(limit).lean(),
       Notification.countDocuments(filter),
     ]);
 

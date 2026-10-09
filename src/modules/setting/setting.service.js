@@ -59,7 +59,7 @@ class SettingService {
 
     const [items, total] = await Promise.all([
       Setting.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

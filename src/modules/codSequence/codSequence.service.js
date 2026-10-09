@@ -37,7 +37,7 @@ class CodSequenceService {
 
     const [items, total] = await Promise.all([
       CodSequence.find(filter)
-        .sort({ uptoAmount: 1, createdAt: -1 })
+        .sort({ uptoAmount: 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

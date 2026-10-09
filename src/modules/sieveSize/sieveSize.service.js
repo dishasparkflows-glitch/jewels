@@ -46,7 +46,7 @@ class SieveSizeService {
 
     const [items, total] = await Promise.all([
       SieveSize.find(filter)
-        .sort({ name: 1, createdAt: -1 })
+        .sort({ name: 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

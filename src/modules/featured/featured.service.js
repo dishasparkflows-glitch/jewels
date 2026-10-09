@@ -73,7 +73,7 @@ class FeaturedService {
 
     const [items, total] = await Promise.all([
       Featured.find(filter)
-        .sort({ order: 1, createdAt: -1 })
+        .sort({ order: 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

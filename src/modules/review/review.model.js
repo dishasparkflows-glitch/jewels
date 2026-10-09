@@ -3,34 +3,46 @@ const metaPlugin = require('../../utils/metaPlugin');
 
 const reviewSchema = new mongoose.Schema(
   {
-    clientName: {
-      type: String,
-      required: [true, 'Client name is required'],
-      trim: true,
+    // 1. Customer Details
+    customer: {
+      name: {
+        type: String,
+        required: [true, 'Please provide customer name'],
+        trim: true,
+      },
+      email: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: '',
+      },
     },
-    email: {
-      type: String,
-      trim: true,
-      lowercase: true,
-      default: '',
+
+    // 2. Review Details
+    review: {
+      title: {
+        type: String,
+        trim: true,
+        default: '',
+      },
+      rating: {
+        type: Number,
+        required: [true, 'Rating is required'],
+        min: 1,
+        max: 5,
+        default: 5,
+      },
+      comment: {
+        type: String,
+        required: [true, 'Comment is required'],
+        trim: true,
+      },
+      reviewDate: {
+        type: Date,
+        default: Date.now,
+      },
     },
-    title: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    rating: {
-      type: Number,
-      required: [true, 'Rating is required'],
-      min: 1,
-      max: 5,
-      default: 5,
-    },
-    comment: {
-      type: String,
-      required: [true, 'Comment is required'],
-      trim: true,
-    },
+
     image: {
       url: {
         type: String,
@@ -47,10 +59,6 @@ const reviewSchema = new mongoose.Schema(
       default: 'approved',
       index: true,
     },
-    reviewDate: {
-      type: Date,
-      default: Date.now,
-    },
     isDeleted: {
       type: Boolean,
       default: false,
@@ -63,6 +71,8 @@ const reviewSchema = new mongoose.Schema(
 );
 
 reviewSchema.index({ status: 1, 'meta.createdAt': -1 });
+reviewSchema.index({ 'customer.email': 1 });
+reviewSchema.index({ 'review.reviewDate': -1 });
 
 reviewSchema.plugin(metaPlugin);
 

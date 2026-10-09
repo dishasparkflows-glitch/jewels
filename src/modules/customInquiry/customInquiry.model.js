@@ -3,52 +3,56 @@ const metaPlugin = require('../../utils/metaPlugin');
 
 const customInquirySchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: [true, 'Please provide your name'],
-      trim: true,
-    },
-    email: {
-      type: String,
-      required: [true, 'Please provide your email address'],
-      trim: true,
-      lowercase: true,
-      index: true,
-    },
-    phoneNumberCountryCode: {
-      type: String,
-      default: '91',
-    },
-    phoneNumber: {
-      type: String,
-      trim: true,
-    },
-    stoneType: {
-      type: String,
-      required: [true, 'Please provide a stone type'],
-      trim: true,
-    },
-    jewelryType: [
-      {
+    // 1. Customer Details
+    customer: {
+      name: {
         type: String,
+        required: [true, 'Please provide your name'],
         trim: true,
       },
-    ],
-    metalType: {
-      type: String,
-      required: [true, 'Please provide a metal type'],
-      trim: true,
+      email: {
+        type: String,
+        required: [true, 'Please provide your email address'],
+        trim: true,
+        lowercase: true,
+      },
+      phone: {
+        countryCode: {
+          type: String,
+          default: '91',
+        },
+        number: {
+          type: String,
+          trim: true,
+        },
+      },
     },
-    budget: {
-      type: String,
-      required: [true, 'Please provide a budget range'],
-      trim: true,
+
+    // 2. Jewellery Requirements
+    requirements: {
+      stoneType: {
+        type: String,
+        required: [true, 'Please provide a stone type'],
+        trim: true,
+      },
+      jewelryTypes: [
+        {
+          type: String,
+          trim: true,
+        },
+      ],
+      metalType: {
+        type: String,
+        required: [true, 'Please provide a metal type'],
+        trim: true,
+      },
+      comments: {
+        type: String,
+        trim: true,
+        default: '',
+      },
     },
-    comments: {
-      type: String,
-      trim: true,
-      default: '',
-    },
+
     referenceImages: [
       {
         url: String,
@@ -72,6 +76,7 @@ const customInquirySchema = new mongoose.Schema(
   }
 );
 
+customInquirySchema.index({ 'customer.email': 1 });
 customInquirySchema.index({ 'meta.createdAt': -1 });
 customInquirySchema.index({ status: 1, 'meta.createdAt': -1 });
 

@@ -29,6 +29,7 @@ const footerSettingsRoutes = require('../modules/footerSettings/footerSettings.r
 const instagramPostRoutes = require('../modules/instagramPost/instagramPost.routes');
 const menuItemRoutes = require('../modules/menuItem/menuItem.routes');
 const menuSectionRoutes = require('../modules/menuSection/menuSection.routes');
+const navigationMenuRoutes = require('../modules/navigationMenu/navigationMenu.routes');
 const metalColorRoutes = require('../modules/metalColor/metalColor.routes');
 const metalPurityRoutes = require('../modules/metalPurity/metalPurity.routes');
 const metalTypeRoutes = require('../modules/metalType/metalType.routes');
@@ -82,6 +83,7 @@ router.use('/footer-settings', footerSettingsRoutes);
 router.use('/instagram-posts', instagramPostRoutes);
 router.use('/menu-items', menuItemRoutes);
 router.use('/menu-sections', menuSectionRoutes);
+router.use('/navigation-menus', navigationMenuRoutes);
 router.use('/metal-colors', metalColorRoutes);
 router.use('/metal-purities', metalPurityRoutes);
 router.use('/metal-types', metalTypeRoutes);

@@ -47,6 +47,7 @@ const vtoMasterSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'vto_masters',
   }
 );
 
@@ -54,4 +55,4 @@ vtoMasterSchema.index({ bodyPart: 1, isDeleted: 1 });
 
 vtoMasterSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('VTOMaster', vtoMasterSchema);
+module.exports = mongoose.model('VTOMaster', vtoMasterSchema, 'vto_masters');

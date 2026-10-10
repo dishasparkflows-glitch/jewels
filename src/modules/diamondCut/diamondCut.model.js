@@ -28,6 +28,7 @@ const diamondCutSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'diamond_cuts',
   }
 );
 
@@ -35,4 +36,5 @@ diamondCutSchema.index({ status: 1, isDeleted: 1 });
 
 diamondCutSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('DiamondCut', diamondCutSchema);
+module.exports = mongoose.model('DiamondCut', diamondCutSchema, 'diamond_cuts');
+

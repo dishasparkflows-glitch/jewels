@@ -37,9 +37,10 @@ const footerSettingsSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'footer_settings',
   }
 );
 
 footerSettingsSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('FooterSettings', footerSettingsSchema);
+module.exports = mongoose.model('FooterSettings', footerSettingsSchema, 'footer_settings');

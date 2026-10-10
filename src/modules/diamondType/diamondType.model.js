@@ -28,6 +28,7 @@ const diamondTypeSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'diamond_types',
   }
 );
 
@@ -35,4 +36,5 @@ diamondTypeSchema.index({ status: 1, isDeleted: 1 });
 
 diamondTypeSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('DiamondType', diamondTypeSchema);
+module.exports = mongoose.model('DiamondType', diamondTypeSchema, 'diamond_types');
+

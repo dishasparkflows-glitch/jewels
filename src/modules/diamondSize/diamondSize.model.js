@@ -34,6 +34,7 @@ const diamondSizeSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'diamond_sizes',
   }
 );
 
@@ -42,4 +43,5 @@ diamondSizeSchema.index({ sizeFrom: 1, sizeTo: 1 });
 
 diamondSizeSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('DiamondSize', diamondSizeSchema);
+module.exports = mongoose.model('DiamondSize', diamondSizeSchema, 'diamond_sizes');
+

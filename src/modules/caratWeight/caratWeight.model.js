@@ -38,6 +38,7 @@ const caratWeightSchema = new mongoose.Schema(
     versionKey: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    collection: 'carat_weights',
   }
 );
 
@@ -45,4 +46,4 @@ caratWeightSchema.index({ status: 1, isDeleted: 1 });
 
 caratWeightSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('CaratWeight', caratWeightSchema);
+module.exports = mongoose.model('CaratWeight', caratWeightSchema, 'carat_weights');

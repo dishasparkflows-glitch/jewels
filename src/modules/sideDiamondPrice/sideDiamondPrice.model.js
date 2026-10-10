@@ -59,6 +59,7 @@ const sideDiamondPriceSchema = new mongoose.Schema(
     strictPopulate: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    collection: 'side_diamond_prices',
   }
 );
 
@@ -76,4 +77,4 @@ sideDiamondPriceSchema.index(
 
 sideDiamondPriceSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('SideDiamondPrice', sideDiamondPriceSchema);
+module.exports = mongoose.model('SideDiamondPrice', sideDiamondPriceSchema, 'side_diamond_prices');

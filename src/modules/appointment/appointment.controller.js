@@ -43,6 +43,13 @@ class AppointmentController {
     const result = await appointmentService.delete(req.params.id);
     ApiResponse.success(res, { id: result.id }, result.message);
   });
+
+  // ------------------------------- bulk delete appointments ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const { ids } = req.body;
+    const result = await appointmentService.bulkDelete(ids);
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new AppointmentController();

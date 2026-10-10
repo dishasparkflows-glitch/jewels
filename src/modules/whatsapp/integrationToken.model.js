@@ -53,10 +53,11 @@ const integrationTokenSchema = new mongoose.Schema(
     versionKey: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    collection: 'integration_tokens',
   }
 );
 
 integrationTokenSchema.index({ provider: 1, accountKey: 1 }, { unique: true });
 integrationTokenSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('IntegrationToken', integrationTokenSchema);
+module.exports = mongoose.model('IntegrationToken', integrationTokenSchema, 'integration_tokens');

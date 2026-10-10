@@ -28,6 +28,7 @@ const diamondColorSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'diamond_colors',
   }
 );
 
@@ -35,4 +36,5 @@ diamondColorSchema.index({ status: 1, isDeleted: 1 });
 
 diamondColorSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('DiamondColor', diamondColorSchema);
+module.exports = mongoose.model('DiamondColor', diamondColorSchema, 'diamond_colors');
+

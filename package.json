@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "seed": "node src/seeds/index.js"
+    "seed": "node src/seeds/index.js",
+    "migrate:collections": "node src/scripts/migrateCollectionNames.js"
   },
   "keywords": [],
   "author": "",

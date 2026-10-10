@@ -35,6 +35,7 @@ const metalPuritySchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'metal_purities',
   }
 );
 
@@ -42,4 +43,5 @@ metalPuritySchema.index({ metalType: 1, status: 1, isDeleted: 1 });
 
 metalPuritySchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('MetalPurity', metalPuritySchema);
+module.exports = mongoose.model('MetalPurity', metalPuritySchema, 'metal_purities');
+

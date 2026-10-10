@@ -95,6 +95,7 @@ const whatsAppMessageSchema = new mongoose.Schema(
     versionKey: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    collection: 'whatsapp_messages',
   }
 );
 
@@ -103,4 +104,4 @@ whatsAppMessageSchema.index({ provider: 1, to: 1, status: 1 });
 
 whatsAppMessageSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('WhatsAppMessage', whatsAppMessageSchema);
+module.exports = mongoose.model('WhatsAppMessage', whatsAppMessageSchema, 'whatsapp_messages');

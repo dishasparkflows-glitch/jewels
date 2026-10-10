@@ -1384,10 +1384,16 @@ const seedAll = async () => {
     // ─── 20. SEED INSTAGRAM POSTS ───────────────────────────────────────
     console.log('📸 [20/24] Seeding Curated Instagram Feed...');
     const instagramPostsData = [
-      { url: 'https://instagram.com/p/DA_post1', isActive: true, position: '1' },
-      { url: 'https://instagram.com/p/DA_post2', isActive: true, position: '2' },
-      { url: 'https://instagram.com/p/DA_post3', isActive: true, position: '3' },
-      { url: 'https://instagram.com/p/DA_post4', isActive: true, position: '4' },
+      { title: 'Solitaire Ring Elegance', url: 'https://www.instagram.com/p/DePFzrmlIy7/?img_index=1', order: 1, isActive: true },
+      { title: 'Diamond Drop Earrings', url: 'https://www.instagram.com/p/DdorzL6EYJX/?img_index=1', order: 2, isActive: true },
+      { title: 'Timeless Diamond Pendant', url: 'https://www.instagram.com/p/DdoVXZ0kYVE/?img_index=1', order: 3, isActive: true },
+      { title: 'Classic Tennis Bracelet', url: 'https://www.instagram.com/p/DcvQUcREWXx/?img_index=1', order: 4, isActive: true },
+      { title: 'Everyday Diamond Ring', url: 'https://www.instagram.com/p/DA_ring5', order: 5, isActive: true },
+      { title: 'Modern Bangle Design', url: 'https://www.instagram.com/p/DA_bangle6', order: 6, isActive: true },
+      { title: 'Stud Earrings Collection', url: 'https://www.instagram.com/p/DA_stud7', order: 7, isActive: true },
+      { title: 'Stackable Rings', url: 'https://www.instagram.com/p/DA_stack8', order: 8, isActive: true },
+      { title: 'Luxury Pendant', url: 'https://www.instagram.com/p/DA_pendant9', order: 9, isActive: true },
+      { title: 'Elegant Hoop Earrings', url: 'https://www.instagram.com/p/DA_hoop10', order: 10, isActive: true },
     ];
     const seededInstagram = await InstagramPost.insertMany(instagramPostsData);
     console.log(`✅ Seeded ${seededInstagram.length} Instagram Posts.`);

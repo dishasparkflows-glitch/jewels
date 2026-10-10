@@ -28,6 +28,7 @@ const diamondClaritySchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'diamond_clarities',
   }
 );
 
@@ -35,4 +36,5 @@ diamondClaritySchema.index({ status: 1, isDeleted: 1 });
 
 diamondClaritySchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('DiamondClarity', diamondClaritySchema);
+module.exports = mongoose.model('DiamondClarity', diamondClaritySchema, 'diamond_clarities');
+

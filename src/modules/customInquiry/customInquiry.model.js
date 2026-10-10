@@ -73,6 +73,7 @@ const customInquirySchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'custom_inquiries',
   }
 );
 
@@ -82,4 +83,4 @@ customInquirySchema.index({ status: 1, 'meta.createdAt': -1 });
 
 customInquirySchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('CustomInquiry', customInquirySchema);
+module.exports = mongoose.model('CustomInquiry', customInquirySchema, 'custom_inquiries');

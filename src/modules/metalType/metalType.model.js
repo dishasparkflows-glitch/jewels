@@ -37,6 +37,7 @@ const metalTypeSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'metal_types',
   }
 );
 
@@ -44,4 +45,5 @@ metalTypeSchema.index({ status: 1, isDeleted: 1 });
 
 metalTypeSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('MetalType', metalTypeSchema);
+module.exports = mongoose.model('MetalType', metalTypeSchema, 'metal_types');
+

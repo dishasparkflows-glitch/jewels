@@ -5,7 +5,44 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class ProductService {
   // ------------------------------- create product ----------------------------
   async create(data) {
-    if (data.productType === 'ornate' || data.isOrnate || data.tagNo) {
+    // Sync structured blocks into root fields if provided
+    if (data.basicInfo) {
+      if (data.basicInfo.title && !data.title) data.title = data.basicInfo.title;
+      if (data.basicInfo.sku && !data.sku) data.sku = data.basicInfo.sku;
+      if (data.basicInfo.slug && !data.slug) data.slug = data.basicInfo.slug;
+      if (data.basicInfo.description && !data.description) data.description = data.basicInfo.description;
+      if (data.basicInfo.productType) data.productType = data.basicInfo.productType;
+      if (data.basicInfo.isOrnate !== undefined) data.isOrnate = Boolean(data.basicInfo.isOrnate);
+    }
+    if (data.pricing) {
+      if (data.pricing.mrp !== undefined && !data.mrp) data.mrp = data.pricing.mrp;
+      if (data.pricing.mrp !== undefined && !data.price) data.price = data.pricing.mrp;
+      if (data.pricing.salePrice !== undefined && !data.salePrice) data.salePrice = data.pricing.salePrice;
+      if (data.pricing.costPrice !== undefined && !data.costPrice) data.costPrice = data.pricing.costPrice;
+      if (data.pricing.displayPrice !== undefined && !data.displayPrice) data.displayPrice = data.pricing.displayPrice;
+      if (data.pricing.gstPercentage !== undefined && !data.gstPercentage) data.gstPercentage = data.pricing.gstPercentage;
+      if (data.pricing.markupPercentage !== undefined && !data.markupPercentage) data.markupPercentage = data.pricing.markupPercentage;
+    }
+    if (data.specifications) {
+      if (data.specifications.metalName && !data.metalName) data.metalName = data.specifications.metalName;
+      if (data.specifications.metalWeight !== undefined && !data.baseMetalWeight) data.baseMetalWeight = data.specifications.metalWeight;
+      if (data.specifications.metalPurity !== undefined && !data.purity) data.purity = data.specifications.metalPurity;
+      if (data.specifications.grossWeight !== undefined && !data.grossWt) data.grossWt = data.specifications.grossWeight;
+      if (data.specifications.netWeight !== undefined && !data.netWt) data.netWt = data.specifications.netWeight;
+      if (data.specifications.stoneWeight !== undefined && !data.stoneWt) data.stoneWt = data.specifications.stoneWeight;
+    }
+    if (data.ornate) {
+      if (data.ornate.tagNo && !data.tagNo) data.tagNo = data.ornate.tagNo;
+      if (data.ornate.barcode && !data.barcodeNo) data.barcodeNo = data.ornate.barcode;
+      if (data.ornate.itemCode && !data.itemCode) data.itemCode = data.ornate.itemCode;
+      if (data.ornate.goldAmt !== undefined && !data.goldAmt) data.goldAmt = data.ornate.goldAmt;
+      if (data.ornate.labourAmt !== undefined && !data.labourAmt) data.labourAmt = data.ornate.labourAmt;
+      if (data.ornate.diamondAmt !== undefined && !data.diamondAmt) data.diamondAmt = data.ornate.diamondAmt;
+      if (data.ornate.stockQty !== undefined && !data.stockQty) data.stockQty = data.ornate.stockQty;
+      if (data.ornate.isSold !== undefined && data.isSold === undefined) data.isSold = data.ornate.isSold;
+    }
+
+    if (data.productType === 'ornate' || data.isOrnate || (data.tagNo && data.tagNo.trim() !== '')) {
       data.isOrnate = true;
       data.productType = 'ornate';
       if (!data.sku && data.tagNo) data.sku = data.tagNo;
@@ -125,6 +162,42 @@ class ProductService {
 
   // ------------------------------- update product ----------------------------
   async update(id, data) {
+    if (data.basicInfo) {
+      if (data.basicInfo.title) data.title = data.basicInfo.title;
+      if (data.basicInfo.sku) data.sku = data.basicInfo.sku;
+      if (data.basicInfo.slug) data.slug = data.basicInfo.slug;
+      if (data.basicInfo.description) data.description = data.basicInfo.description;
+      if (data.basicInfo.productType) data.productType = data.basicInfo.productType;
+      if (data.basicInfo.isOrnate !== undefined) data.isOrnate = Boolean(data.basicInfo.isOrnate);
+    }
+    if (data.pricing) {
+      if (data.pricing.mrp !== undefined) data.mrp = data.pricing.mrp;
+      if (data.pricing.mrp !== undefined) data.price = data.pricing.mrp;
+      if (data.pricing.salePrice !== undefined) data.salePrice = data.pricing.salePrice;
+      if (data.pricing.costPrice !== undefined) data.costPrice = data.pricing.costPrice;
+      if (data.pricing.displayPrice !== undefined) data.displayPrice = data.pricing.displayPrice;
+      if (data.pricing.gstPercentage !== undefined) data.gstPercentage = data.pricing.gstPercentage;
+      if (data.pricing.markupPercentage !== undefined) data.markupPercentage = data.pricing.markupPercentage;
+    }
+    if (data.specifications) {
+      if (data.specifications.metalName) data.metalName = data.specifications.metalName;
+      if (data.specifications.metalWeight !== undefined) data.baseMetalWeight = data.specifications.metalWeight;
+      if (data.specifications.metalPurity !== undefined) data.purity = data.specifications.metalPurity;
+      if (data.specifications.grossWeight !== undefined) data.grossWt = data.specifications.grossWeight;
+      if (data.specifications.netWeight !== undefined) data.netWt = data.specifications.netWeight;
+      if (data.specifications.stoneWeight !== undefined) data.stoneWt = data.specifications.stoneWeight;
+    }
+    if (data.ornate) {
+      if (data.ornate.tagNo) data.tagNo = data.ornate.tagNo;
+      if (data.ornate.barcode) data.barcodeNo = data.ornate.barcode;
+      if (data.ornate.itemCode) data.itemCode = data.ornate.itemCode;
+      if (data.ornate.goldAmt !== undefined) data.goldAmt = data.ornate.goldAmt;
+      if (data.ornate.labourAmt !== undefined) data.labourAmt = data.ornate.labourAmt;
+      if (data.ornate.diamondAmt !== undefined) data.diamondAmt = data.ornate.diamondAmt;
+      if (data.ornate.stockQty !== undefined) data.stockQty = data.ornate.stockQty;
+      if (data.ornate.isSold !== undefined) data.isSold = data.ornate.isSold;
+    }
+
     if (data.sku) {
       const duplicate = await Product.findOne({
         sku: data.sku,

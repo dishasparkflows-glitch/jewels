@@ -34,6 +34,7 @@ const metalColorSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'metal_colors',
   }
 );
 
@@ -41,4 +42,5 @@ metalColorSchema.index({ status: 1, isDeleted: 1 });
 
 metalColorSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('MetalColor', metalColorSchema);
+module.exports = mongoose.model('MetalColor', metalColorSchema, 'metal_colors');
+

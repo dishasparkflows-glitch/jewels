@@ -13,8 +13,68 @@ const studdedDetailSchema = new mongoose.Schema({
   shape: { type: String },
 }, { _id: false });
 
+const basicInfoSchema = new mongoose.Schema({
+  title: { type: String, trim: true, default: '' },
+  sku: { type: String, trim: true, default: '' },
+  slug: { type: String, trim: true, default: '' },
+  description: { type: String, default: '' },
+  productType: {
+    type: String,
+    enum: ['jewelry', 'standard', 'ornate'],
+    default: 'jewelry',
+  },
+  isOrnate: { type: Boolean, default: false },
+}, { _id: false });
+
+const pricingSchema = new mongoose.Schema({
+  mrp: { type: Number, default: 0 },
+  salePrice: { type: Number, default: 0 },
+  costPrice: { type: Number, default: 0 },
+  displayPrice: { type: Number, default: 0 },
+  gstPercentage: { type: Number, default: 3 },
+  markupPercentage: { type: Number, default: 0 },
+}, { _id: false });
+
+const specificationsSchema = new mongoose.Schema({
+  metalName: { type: String, default: 'Gold' },
+  metalWeight: { type: Number, default: 0 },
+  metalPurity: { type: Number, default: 18 },
+  grossWeight: { type: Number, default: 0 },
+  netWeight: { type: Number, default: 0 },
+  stoneWeight: { type: Number, default: 0 },
+}, { _id: false });
+
+const ornateSchema = new mongoose.Schema({
+  tagNo: { type: String, default: '' },
+  barcode: { type: String, default: '' },
+  itemCode: { type: String, default: '' },
+  goldAmt: { type: Number, default: 0 },
+  labourAmt: { type: Number, default: 0 },
+  diamondAmt: { type: Number, default: 0 },
+  stockQty: { type: Number, default: 0 },
+  isSold: { type: Boolean, default: false },
+}, { _id: false });
+
 const productSchema = new mongoose.Schema(
   {
+    // ── Structured Product Blocks ─────────────────────────────
+    basicInfo: {
+      type: basicInfoSchema,
+      default: () => ({}),
+    },
+    pricing: {
+      type: pricingSchema,
+      default: () => ({}),
+    },
+    specifications: {
+      type: specificationsSchema,
+      default: () => ({}),
+    },
+    ornate: {
+      type: ornateSchema,
+      default: () => ({}),
+    },
+
     title: {
       type: String,
       required: [true, 'Please add a product title'],
@@ -76,7 +136,6 @@ const productSchema = new mongoose.Schema(
     category: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
-      required: [function () { return !this.isOrnate; }, 'Please add at least one category'],
     }],
     subType: {
       type: mongoose.Schema.Types.ObjectId,
@@ -327,7 +386,113 @@ productSchema.index({ displayPrice: 1 });
 productSchema.index({ salePrice: 1 });
 productSchema.index({ 'meta.createdAt': -1 });
 
-// Helper pre-save: sync tagNo with sku if ornate, auto-compute slug
+// Helper pre-validate & pre-save: sync basicInfo, pricing, specifications, ornate with root fields
+productSchema.pre('validate', function (next) {
+  // ── Sync basicInfo ──────────────────────────
+  if (this.basicInfo) {
+    if (!this.title && this.basicInfo.title) this.title = this.basicInfo.title;
+    if (!this.sku && this.basicInfo.sku) this.sku = this.basicInfo.sku;
+    if (!this.slug && this.basicInfo.slug) this.slug = this.basicInfo.slug;
+    if (!this.description && this.basicInfo.description) this.description = this.basicInfo.description;
+    if (this.basicInfo.productType) this.productType = this.basicInfo.productType;
+    if (this.basicInfo.isOrnate !== undefined) this.isOrnate = this.basicInfo.isOrnate;
+  } else {
+    this.basicInfo = {};
+  }
+  if (this.title && !this.basicInfo.title) this.basicInfo.title = this.title;
+  if (this.sku && !this.basicInfo.sku) this.basicInfo.sku = this.sku;
+  if (this.slug && !this.basicInfo.slug) this.basicInfo.slug = this.slug;
+  if (this.description && !this.basicInfo.description) this.basicInfo.description = this.description;
+  if (this.productType && !this.basicInfo.productType) this.basicInfo.productType = this.productType;
+  if (this.isOrnate !== undefined) this.basicInfo.isOrnate = Boolean(this.isOrnate);
+
+  // ── Sync pricing ────────────────────────────
+  if (this.pricing) {
+    if (this.pricing.mrp !== undefined && (this.price === undefined || this.price === 0)) this.price = this.pricing.mrp;
+    if (this.pricing.mrp !== undefined && (this.mrp === undefined || this.mrp === 0)) this.mrp = this.pricing.mrp;
+    if (this.pricing.salePrice !== undefined && (this.salePrice === undefined || this.salePrice === 0)) this.salePrice = this.pricing.salePrice;
+    if (this.pricing.costPrice !== undefined && (this.costPrice === undefined || this.costPrice === 0)) this.costPrice = this.pricing.costPrice;
+    if (this.pricing.displayPrice !== undefined && (this.displayPrice === undefined || this.displayPrice === 0)) this.displayPrice = this.pricing.displayPrice;
+    if (this.pricing.gstPercentage !== undefined) this.gstPercentage = this.pricing.gstPercentage;
+    if (this.pricing.markupPercentage !== undefined) this.markupPercentage = this.pricing.markupPercentage;
+  } else {
+    this.pricing = {};
+  }
+  if (this.pricing.mrp === undefined || this.pricing.mrp === 0) this.pricing.mrp = this.mrp || this.price || 0;
+  if (this.pricing.salePrice === undefined || this.pricing.salePrice === 0) this.pricing.salePrice = this.salePrice || this.price || 0;
+  if (this.pricing.costPrice === undefined || this.pricing.costPrice === 0) this.pricing.costPrice = this.costPrice || 0;
+  if (this.pricing.displayPrice === undefined || this.pricing.displayPrice === 0) this.pricing.displayPrice = this.displayPrice || this.salePrice || this.price || 0;
+  if (this.pricing.gstPercentage === undefined) this.pricing.gstPercentage = this.gstPercentage || 3;
+  if (this.pricing.markupPercentage === undefined) this.pricing.markupPercentage = this.markupPercentage || 0;
+
+  // ── Sync specifications ─────────────────────
+  if (this.specifications) {
+    if (this.specifications.metalName && !this.metalName) this.metalName = this.specifications.metalName;
+    if (this.specifications.metalWeight !== undefined && !this.baseMetalWeight) this.baseMetalWeight = this.specifications.metalWeight;
+    if (this.specifications.metalPurity !== undefined && !this.purity) this.purity = this.specifications.metalPurity;
+    if (this.specifications.grossWeight !== undefined && !this.grossWt) this.grossWt = this.specifications.grossWeight;
+    if (this.specifications.netWeight !== undefined && !this.netWt) this.netWt = this.specifications.netWeight;
+    if (this.specifications.stoneWeight !== undefined && !this.stoneWt) this.stoneWt = this.specifications.stoneWeight;
+  } else {
+    this.specifications = {};
+  }
+  if (!this.specifications.metalName) this.specifications.metalName = this.metalName || 'Gold';
+  if (this.specifications.metalWeight === undefined || this.specifications.metalWeight === 0) this.specifications.metalWeight = this.baseMetalWeight || this.netWt || 0;
+  if (this.specifications.metalPurity === undefined || this.specifications.metalPurity === 0) this.specifications.metalPurity = this.purity || 18;
+  if (this.specifications.grossWeight === undefined || this.specifications.grossWeight === 0) this.specifications.grossWeight = this.grossWt || 0;
+  if (this.specifications.netWeight === undefined || this.specifications.netWeight === 0) this.specifications.netWeight = this.netWt || 0;
+  if (this.specifications.stoneWeight === undefined || this.specifications.stoneWeight === 0) this.specifications.stoneWeight = this.stoneWt || 0;
+
+  // ── Sync ornate ─────────────────────────────
+  if (this.ornate) {
+    if (this.ornate.tagNo && !this.tagNo) this.tagNo = this.ornate.tagNo;
+    if (this.ornate.barcode && !this.barcode) this.barcode = this.ornate.barcode;
+    if (this.ornate.itemCode && !this.itemCode) this.itemCode = this.ornate.itemCode;
+    if (this.ornate.goldAmt !== undefined && !this.goldAmt) this.goldAmt = this.ornate.goldAmt;
+    if (this.ornate.labourAmt !== undefined && !this.labourAmt) this.labourAmt = this.ornate.labourAmt;
+    if (this.ornate.diamondAmt !== undefined && !this.diamondAmt) this.diamondAmt = this.ornate.diamondAmt;
+    if (this.ornate.stockQty !== undefined && !this.stockQty) this.stockQty = this.ornate.stockQty;
+    if (this.ornate.isSold !== undefined) this.isSold = this.ornate.isSold;
+  } else {
+    this.ornate = {};
+  }
+  if (!this.ornate.tagNo) this.ornate.tagNo = this.tagNo || '';
+  if (!this.ornate.barcode) this.ornate.barcode = this.barcode || this.barcodeNo || '';
+  if (!this.ornate.itemCode) this.ornate.itemCode = this.itemCode || '';
+  if (this.ornate.goldAmt === undefined) this.ornate.goldAmt = this.goldAmt || 0;
+  if (this.ornate.labourAmt === undefined) this.ornate.labourAmt = this.labourAmt || 0;
+  if (this.ornate.diamondAmt === undefined) this.ornate.diamondAmt = this.diamondAmt || 0;
+  if (this.ornate.stockQty === undefined) this.ornate.stockQty = this.stockQty || this.inStock || 0;
+  if (this.ornate.isSold === undefined) this.ornate.isSold = Boolean(this.isSold);
+
+  // Ornate tags and SKU handling
+  if ((this.isOrnate || this.basicInfo?.isOrnate) && (this.tagNo || this.ornate?.tagNo) && !this.sku) {
+    this.sku = this.tagNo || this.ornate?.tagNo;
+    if (this.basicInfo) this.basicInfo.sku = this.sku;
+  }
+  if (this.isOrnate && !this.productType) {
+    this.productType = 'ornate';
+    if (this.basicInfo) this.basicInfo.productType = 'ornate';
+  } else if (this.productType === 'ornate') {
+    this.isOrnate = true;
+    if (this.basicInfo) this.basicInfo.isOrnate = true;
+  }
+
+  // Slug generation
+  const activeTitle = this.title || this.basicInfo?.title;
+  if (!this.slug && activeTitle) {
+    this.slug = activeTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+  if (this.basicInfo && !this.basicInfo.slug && this.slug) {
+    this.basicInfo.slug = this.slug;
+  }
+
+  next();
+});
+
 productSchema.pre('save', function (next) {
   if (this.isOrnate && this.tagNo && !this.sku) {
     this.sku = this.tagNo;
@@ -342,6 +507,9 @@ productSchema.pre('save', function (next) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+  if (this.basicInfo && !this.basicInfo.slug && this.slug) {
+    this.basicInfo.slug = this.slug;
   }
   next();
 });

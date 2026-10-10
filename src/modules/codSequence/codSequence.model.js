@@ -36,6 +36,7 @@ const codSequenceSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'cod_sequences',
   }
 );
 
@@ -44,4 +45,4 @@ codSequenceSchema.index({ uptoAmount: 1, status: 1, isDeleted: 1 });
 
 codSequenceSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('CodSequence', codSequenceSchema);
+module.exports = mongoose.model('CodSequence', codSequenceSchema, 'cod_sequences');

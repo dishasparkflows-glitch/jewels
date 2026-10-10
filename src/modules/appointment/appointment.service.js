@@ -89,6 +89,24 @@ class AppointmentService {
 
     return { message: 'Appointment deleted successfully', id };
   }
+
+  // ------------------------------- bulk delete appointments ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of appointment IDs to delete');
+    }
+
+    const result = await Appointment.updateMany(
+      { _id: { $in: ids }, isDeleted: false },
+      { $set: { isDeleted: true } }
+    );
+
+    return {
+      message: `${result.modifiedCount} appointment(s) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new AppointmentService();

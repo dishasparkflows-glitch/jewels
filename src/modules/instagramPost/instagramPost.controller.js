@@ -38,10 +38,23 @@ class InstagramPostController {
     ApiResponse.success(res, item, 'Instagram post updated successfully');
   });
 
+  // ------------------------------- reorder instagram posts ----------------------------
+  reorder = catchAsync(async (req, res) => {
+    const result = await instagramPostService.reorder(req.body.items);
+    ApiResponse.success(res, result, 'Instagram posts reordered successfully');
+  });
+
   // ------------------------------- delete instagram post ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await instagramPostService.delete(req.params.id);
     ApiResponse.success(res, { id: result.id }, result.message);
+  });
+
+  // ------------------------------- bulk delete instagram posts ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const { ids } = req.body;
+    const result = await instagramPostService.bulkDelete(ids);
+    ApiResponse.success(res, result, result.message);
   });
 }
 

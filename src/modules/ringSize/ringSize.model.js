@@ -24,6 +24,7 @@ const ringSizeSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'ring_sizes',
   }
 );
 
@@ -31,4 +32,4 @@ ringSizeSchema.index({ status: 1, isDeleted: 1 });
 
 ringSizeSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('RingSize', ringSizeSchema);
+module.exports = mongoose.model('RingSize', ringSizeSchema, 'ring_sizes');

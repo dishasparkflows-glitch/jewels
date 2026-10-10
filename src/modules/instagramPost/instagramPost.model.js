@@ -8,14 +8,19 @@ const instagramPostSchema = new mongoose.Schema(
       required: [true, 'Please provide Instagram post URL'],
       trim: true,
     },
+    title: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    order: {
+      type: Number,
+      default: 0,
+    },
     isActive: {
       type: Boolean,
       default: true,
       index: true,
-    },
-    position: {
-      type: String,
-      default: 'none',
     },
     isDeleted: {
       type: Boolean,
@@ -25,6 +30,7 @@ const instagramPostSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'instagram_posts',
   }
 );
 
@@ -32,4 +38,4 @@ instagramPostSchema.index({ isActive: 1, isDeleted: 1 });
 
 instagramPostSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('InstagramPost', instagramPostSchema);
+module.exports = mongoose.model('InstagramPost', instagramPostSchema, 'instagram_posts');

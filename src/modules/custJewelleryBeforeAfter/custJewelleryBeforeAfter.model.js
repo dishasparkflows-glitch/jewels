@@ -47,9 +47,10 @@ const custJewelleryBeforAfterSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'cust_jewellery_before_afters',
   }
 );
 
 custJewelleryBeforAfterSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('CustJewelleryBeforAfter', custJewelleryBeforAfterSchema);
+module.exports = mongoose.model('CustJewelleryBeforAfter', custJewelleryBeforAfterSchema, 'cust_jewellery_before_afters');

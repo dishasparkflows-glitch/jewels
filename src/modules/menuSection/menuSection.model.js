@@ -31,6 +31,7 @@ const menuSectionSchema = new mongoose.Schema(
     versionKey: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    collection: 'menu_sections',
   }
 );
 
@@ -38,4 +39,4 @@ menuSectionSchema.index({ categoryId: 1, status: 1, isDeleted: 1 });
 
 menuSectionSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('MenuSection', menuSectionSchema);
+module.exports = mongoose.model('MenuSection', menuSectionSchema, 'menu_sections');

@@ -59,6 +59,7 @@ const centerDiamondPriceSchema = new mongoose.Schema(
     strictPopulate: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    collection: 'center_diamond_prices',
   }
 );
 
@@ -76,4 +77,4 @@ centerDiamondPriceSchema.index(
 
 centerDiamondPriceSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('CenterDiamondPrice', centerDiamondPriceSchema);
+module.exports = mongoose.model('CenterDiamondPrice', centerDiamondPriceSchema, 'center_diamond_prices');

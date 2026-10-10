@@ -28,6 +28,7 @@ const diamondShapeSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    collection: 'diamond_shapes',
   }
 );
 
@@ -35,4 +36,5 @@ diamondShapeSchema.index({ status: 1, isDeleted: 1 });
 
 diamondShapeSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('DiamondShape', diamondShapeSchema);
+module.exports = mongoose.model('DiamondShape', diamondShapeSchema, 'diamond_shapes');
+

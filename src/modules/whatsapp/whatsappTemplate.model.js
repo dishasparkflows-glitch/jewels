@@ -161,6 +161,7 @@ const whatsAppTemplateSchema = new mongoose.Schema(
     versionKey: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
+    collection: 'whatsapp_templates',
   }
 );
 
@@ -170,4 +171,4 @@ whatsAppTemplateSchema.index({ 'meta.createdAt': -1 });
 
 whatsAppTemplateSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('WhatsAppTemplate', whatsAppTemplateSchema, 'whatsapptemplates');
+module.exports = mongoose.model('WhatsAppTemplate', whatsAppTemplateSchema, 'whatsapp_templates');

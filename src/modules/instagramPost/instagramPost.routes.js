@@ -18,10 +18,31 @@ router.post(
 );
 
 router.put(
+  '/reorder',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  instagramPostController.reorder
+);
+
+router.put(
   '/:id',
   authenticate,
   authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
   instagramPostController.update
+);
+
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  instagramPostController.bulkDelete
+);
+
+router.delete(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  instagramPostController.bulkDelete
 );
 
 router.delete(

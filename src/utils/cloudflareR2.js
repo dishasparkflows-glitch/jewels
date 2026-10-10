@@ -71,6 +71,51 @@ class CloudflareR2Service {
       provider: 'local-fallback',
     };
   }
+
+  // ------------------------------- upload buffer directly to R2 ----------------------------
+  async uploadBuffer(buffer, filename, folder = 'OrnateProducts', contentType = 'image/jpeg') {
+    const cleanFilename = (filename || 'asset.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
+    const key = `${folder}/${Date.now()}-${cleanFilename}`;
+
+    if (this.isConfigured() && this.client) {
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      });
+
+      await this.client.send(command);
+
+      const publicBase = this.publicDomain
+        ? this.publicDomain.replace(/\/$/, '')
+        : (process.env.CLOUDFLARE_R2_PUBLIC_URL
+            ? process.env.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/$/, '')
+            : `https://${this.bucketName}.${this.accountId}.r2.cloudflarestorage.com`);
+
+      const fileUrl = `${publicBase}/${key}`;
+
+      return {
+        url: fileUrl,
+        public_id: key,
+        key,
+      };
+    }
+
+    // Local Development Fallback
+    const fs = require('fs');
+    const path = require('path');
+    const dir = path.join(__dirname, '../../../uploads', folder);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const localFile = path.join(dir, `${Date.now()}-${cleanFilename}`);
+    fs.writeFileSync(localFile, buffer);
+    const relUrl = `/uploads/${folder}/${path.basename(localFile)}`;
+    return {
+      url: relUrl,
+      public_id: relUrl,
+      key: relUrl,
+    };
+  }
 }
 
 module.exports = new CloudflareR2Service();

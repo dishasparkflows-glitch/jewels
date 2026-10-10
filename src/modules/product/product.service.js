@@ -51,7 +51,10 @@ class ProductService {
         { title: searchRegex },
         { sku: searchRegex },
         { tagNo: searchRegex },
-        { 'ornateData.groupName': searchRegex },
+        { barcodeNo: searchRegex },
+        { uniqueLabelID: searchRegex },
+        { groupName: searchRegex },
+        { itemName: searchRegex },
       ];
     }
 

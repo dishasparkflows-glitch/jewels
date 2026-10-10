@@ -1,11 +1,15 @@
 require('dotenv').config();
 const app = require('./app');
 const connectDB = require('./config/db');
+const { startOrnateCron } = require('./modules/ornate/ornate.cron');
 
 const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB and start server
 connectDB().then(() => {
+  // Start recurring Ornate ERP 30-minute sync cron
+  startOrnateCron();
+
   app.listen(PORT, () => {
     console.log(`\n🚀 Jewels API Server running on port ${PORT}`);
     console.log(`📋 Environment: ${process.env.NODE_ENV}`);

@@ -44,11 +44,13 @@ const settingRoutes = require('../modules/setting/setting.routes');
 const wishlistRoutes = require('../modules/wishlist/wishlist.routes');
 const cartRoutes = require('../modules/cart/cart.routes');
 const whatsappRoutes = require('../modules/whatsapp/whatsapp.routes');
+const ornateRoutes = require('../modules/ornate/ornate.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/products', productRoutes);
+router.use('/ornate', ornateRoutes);
 router.use('/catalog/ornate-products', (req, res, next) => {
   req.query.isOrnate = 'true';
   return productRoutes(req, res, next);

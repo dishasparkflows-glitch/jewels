@@ -131,18 +131,23 @@ class ProductService {
 
   // ------------------------------- get product lookup ----------------------------
   async getLookup(queryParams = {}) {
+    const { page, limit, skip } = getPagination(queryParams);
     const filter = { isDeleted: false };
 
-    if (queryParams.productType) {
+    if (queryParams.productType && queryParams.productType !== 'all') {
       filter.productType = queryParams.productType;
     }
     if (queryParams.isOrnate !== undefined) {
       filter.isOrnate = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
     }
-    if (queryParams.status) {
+    if (queryParams.status && queryParams.status !== 'all') {
       filter.status = queryParams.status;
-    } else {
+    } else if (!queryParams.status) {
       filter.status = 'active';
+    }
+
+    if (queryParams.category) {
+      filter.category = queryParams.category;
     }
 
     if (queryParams.search) {
@@ -154,10 +159,43 @@ class ProductService {
       ];
     }
 
-    return await Product.find(filter)
-      .select('_id title sku tagNo price salePrice productType isOrnate images')
-      .limit(queryParams.limit ? Number(queryParams.limit) : 100)
-      .lean();
+    const [rawItems, total] = await Promise.all([
+      Product.find(filter)
+        .select('_id title category images colorImages ornateImages sku tagNo price salePrice productType isOrnate status')
+        .populate('category', 'name slug')
+        .sort({ 'meta.createdAt': -1, createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(filter),
+    ]);
+
+    const items = rawItems.map((p) => {
+      const thumb =
+        p.images?.[0]?.url ||
+        (typeof p.images?.[0] === 'string' ? p.images[0] : '') ||
+        p.colorImages?.[0]?.images?.[0]?.url ||
+        p.ornateImages?.[0]?.url ||
+        '';
+
+      return {
+        _id: p._id,
+        title: p.title,
+        sku: p.sku || p.tagNo || '',
+        tagNo: p.tagNo || '',
+        category: p.category || [],
+        price: p.price || 0,
+        salePrice: p.salePrice || 0,
+        productType: p.productType,
+        isOrnate: p.isOrnate || false,
+        status: p.status,
+        images: p.images || [],
+        colorImages: p.colorImages || [],
+        thumbnail: thumb,
+      };
+    });
+
+    return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
   // ------------------------------- update product ----------------------------

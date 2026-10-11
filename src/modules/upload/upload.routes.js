@@ -1,18 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const uploadController = require('./upload.controller');
-const upload = require('./upload.service');
-const { authenticate } = require('../../middleware/auth.middleware');
+const { optionalAuth, authenticate } = require('../../middleware/auth.middleware');
+
+// Stream / serve file from Cloudflare R2 (public GET, no auth required)
+router.get('/file/*', uploadController.serveFile);
 
 // Direct PUT stream upload endpoint (emulates Cloudflare R2 / S3 presigned PUT bucket URL)
 router.put('/direct-put', uploadController.directPut);
 
-router.use(authenticate);
+// Presigned URL generation for direct frontend image / video upload
+router.post('/presigned-url', optionalAuth, uploadController.getPresignedUrl);
 
-router.post('/single', upload.single('file'), uploadController.uploadSingle);
-router.post('/multiple', upload.array('files', 10), uploadController.uploadMultiple);
-router.post('/presigned-url', uploadController.getPresignedUrl);
-router.get('/presigned-url', uploadController.getPresignedUrl);
-router.delete('/', uploadController.deleteFile);
+// File deletion endpoint
+router.delete('/', authenticate, uploadController.deleteFile);
 
 module.exports = router;

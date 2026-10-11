@@ -22,8 +22,13 @@ class ProductController {
 
   // ------------------------------- get product lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {
-    const items = await productService.getLookup(req.query);
-    ApiResponse.success(res, items, 'Product lookup list retrieved');
+    const { items, pagination } = await productService.getLookup(req.query);
+    ApiResponse.paginated(
+      res,
+      items,
+      pagination,
+      'Product lookup list retrieved successfully'
+    );
   });
 
   // ------------------------------- get one product ----------------------------

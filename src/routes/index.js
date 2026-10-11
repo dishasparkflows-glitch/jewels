@@ -4,6 +4,7 @@ const router = express.Router();
 // Import module routes
 const authRoutes = require('../modules/auth/auth.routes');
 const userRoutes = require('../modules/user/user.routes');
+const addressRoutes = require('../modules/address/address.routes');
 const productRoutes = require('../modules/product/product.routes');
 const bannerRoutes = require('../modules/banner/banner.routes');
 const birthstoneRoutes = require('../modules/birthstone/birthstone.routes');
@@ -26,6 +27,7 @@ const diamondSizeRoutes = require('../modules/diamondSize/diamondSize.routes');
 const diamondTypeRoutes = require('../modules/diamondType/diamondType.routes');
 const featuredRoutes = require('../modules/featured/featured.routes');
 const footerSettingsRoutes = require('../modules/footerSettings/footerSettings.routes');
+const homeSectionRoutes = require('../modules/homeSection/homeSection.routes');
 const instagramPostRoutes = require('../modules/instagramPost/instagramPost.routes');
 const menuItemRoutes = require('../modules/menuItem/menuItem.routes');
 const menuSectionRoutes = require('../modules/menuSection/menuSection.routes');
@@ -38,6 +40,7 @@ const sideDiamondPriceRoutes = require('../modules/sideDiamondPrice/sideDiamondP
 const sieveSizeRoutes = require('../modules/sieveSize/sieveSize.routes');
 const sizeRoutes = require('../modules/size/size.routes');
 const vtoMasterRoutes = require('../modules/vtoMaster/vtoMaster.routes');
+const goldPriceRoutes = require('../modules/goldPrice/goldPrice.routes');
 const notificationRoutes = require('../modules/notification/notification.routes');
 const uploadRoutes = require('../modules/upload/upload.routes');
 const reviewRoutes = require('../modules/review/review.routes');
@@ -46,11 +49,14 @@ const wishlistRoutes = require('../modules/wishlist/wishlist.routes');
 const cartRoutes = require('../modules/cart/cart.routes');
 const whatsappRoutes = require('../modules/whatsapp/whatsapp.routes');
 const ornateRoutes = require('../modules/ornate/ornate.routes');
+const currencyRoutes = require('../modules/currency/currency.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
+router.use('/addresses', addressRoutes);
 router.use('/products', productRoutes);
+router.use('/product', productRoutes);
 router.use('/ornate', ornateRoutes);
 router.use('/catalog/ornate-products', (req, res, next) => {
   req.query.isOrnate = 'true';
@@ -67,6 +73,8 @@ router.use('/categories', categoryRoutes);
 router.use('/center-diamond-prices', centerDiamondPriceRoutes);
 router.use('/cod-sequences', codSequenceRoutes);
 router.use('/coupons', couponRoutes);
+router.use('/currencies', currencyRoutes);
+router.use('/currency', currencyRoutes);
 router.use('/cust-jewellery-before-after', custJewelleryBeforeAfterRoutes);
 router.use('/custom-inquiries', customInquiryRoutes);
 router.use('/diamonds', diamondRoutes);
@@ -80,6 +88,7 @@ router.use('/diamond-sizes', diamondSizeRoutes);
 router.use('/diamond-types', diamondTypeRoutes);
 router.use('/featured', featuredRoutes);
 router.use('/footer-settings', footerSettingsRoutes);
+router.use('/home-sections', homeSectionRoutes);
 router.use('/instagram-posts', instagramPostRoutes);
 router.use('/menu-items', menuItemRoutes);
 router.use('/menu-sections', menuSectionRoutes);
@@ -92,9 +101,21 @@ router.use('/side-diamond-prices', sideDiamondPriceRoutes);
 router.use('/sieve-sizes', sieveSizeRoutes);
 router.use('/sizes', sizeRoutes);
 router.use('/vto-masters', vtoMasterRoutes);
+router.use('/goldprice', goldPriceRoutes);
+router.use('/gold-price', goldPriceRoutes);
+const ApiResponse = require('../utils/ApiResponse');
+
 router.use('/notifications', notificationRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/settings', settingRoutes);
+
+router.use('/orders', (req, res) => {
+  return ApiResponse.paginated(res, [], { totalDocs: 0, totalPages: 0, page: 1, limit: 10 }, 'Orders retrieved successfully');
+});
+
+router.use('/returns', (req, res) => {
+  return ApiResponse.paginated(res, [], { totalDocs: 0, totalPages: 0, page: 1, limit: 10 }, 'Returns retrieved successfully');
+});
 
 module.exports = router;

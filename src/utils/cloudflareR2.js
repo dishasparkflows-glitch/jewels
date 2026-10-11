@@ -36,39 +36,35 @@ class CloudflareR2Service {
   // ------------------------------- generate presigned put url ----------------------------
   async getPresignedPutUrl({ filename, contentType = 'image/jpeg', folder = 'banners' }) {
     const cleanFilename = (filename || 'asset').replace(/[^a-zA-Z0-9.-]/g, '_');
-    const key = `${folder}/${Date.now()}-${cleanFilename}`;
+    const cleanFolder = (folder || 'general').replace(/^\/+|\/+$/g, '');
+    const key = `${cleanFolder}/${Date.now()}-${cleanFilename}`;
 
     // If Cloudflare R2 credentials are fully configured
-    if (this.isConfigured() && this.client) {
-      const command = new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-        ContentType: contentType,
-      });
-
-      const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: 3600 });
-      const publicBase = this.publicDomain
-        ? this.publicDomain.replace(/\/$/, '')
-        : `https://${this.bucketName}.${this.accountId}.r2.cloudflarestorage.com`;
-
-      const fileUrl = `${publicBase}/${key}`;
-
-      return {
-        uploadUrl,
-        fileUrl,
-        key,
-        method: 'PUT',
-        provider: 'cloudflare-r2',
-      };
+    if (!this.isConfigured() || !this.client) {
+      throw new Error('Cloudflare R2 is not configured. Please set CLOUDFLARE_R2 credentials in .env');
     }
 
-    // Local Development Fallback
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: 3600 });
+    const publicBase = this.publicDomain
+      ? this.publicDomain.replace(/\/$/, '')
+      : (process.env.NODE_ENV === 'development' || !process.env.BACKEND_URL
+          ? `/api/upload/file`
+          : `${process.env.BACKEND_URL.replace(/\/$/, '')}/api/upload/file`);
+
+    const fileUrl = `${publicBase}/${key}`;
+
     return {
-      uploadUrl: `/api/upload/direct-put?key=${encodeURIComponent(key)}&contentType=${encodeURIComponent(contentType)}`,
-      fileUrl: `/uploads/${key}`,
+      uploadUrl,
+      fileUrl,
       key,
       method: 'PUT',
-      provider: 'local-fallback',
+      provider: 'cloudflare-r2',
     };
   }
 
@@ -77,44 +73,56 @@ class CloudflareR2Service {
     const cleanFilename = (filename || 'asset.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
     const key = `${folder}/${Date.now()}-${cleanFilename}`;
 
-    if (this.isConfigured() && this.client) {
-      const command = new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType,
-      });
-
-      await this.client.send(command);
-
-      const publicBase = this.publicDomain
-        ? this.publicDomain.replace(/\/$/, '')
-        : (process.env.CLOUDFLARE_R2_PUBLIC_URL
-            ? process.env.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/$/, '')
-            : `https://${this.bucketName}.${this.accountId}.r2.cloudflarestorage.com`);
-
-      const fileUrl = `${publicBase}/${key}`;
-
-      return {
-        url: fileUrl,
-        public_id: key,
-        key,
-      };
+    if (!this.isConfigured() || !this.client) {
+      throw new Error('Cloudflare R2 is not configured. Please set CLOUDFLARE_R2 credentials in .env');
     }
 
-    // Local Development Fallback
-    const fs = require('fs');
-    const path = require('path');
-    const dir = path.join(__dirname, '../../../uploads', folder);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const localFile = path.join(dir, `${Date.now()}-${cleanFilename}`);
-    fs.writeFileSync(localFile, buffer);
-    const relUrl = `/uploads/${folder}/${path.basename(localFile)}`;
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    });
+
+    await this.client.send(command);
+
+    const publicBase = this.publicDomain
+      ? this.publicDomain.replace(/\/$/, '')
+      : (process.env.NODE_ENV === 'development' || !process.env.BACKEND_URL
+          ? `/api/upload/file`
+          : `${process.env.BACKEND_URL.replace(/\/$/, '')}/api/upload/file`);
+
+    const fileUrl = `${publicBase}/${key}`;
+
     return {
-      url: relUrl,
-      public_id: relUrl,
-      key: relUrl,
+      url: fileUrl,
+      public_id: key,
+      key,
     };
+  }
+
+  // ------------------------------- delete file from R2 ----------------------------
+  async deleteFile(key) {
+    if (!key) return;
+    if (!this.isConfigured() || !this.client) return;
+
+    let cleanKey = key;
+    if (cleanKey.includes('r2.cloudflarestorage.com/')) {
+      cleanKey = cleanKey.split('r2.cloudflarestorage.com/')[1];
+    } else if (cleanKey.includes('/api/upload/file/')) {
+      cleanKey = cleanKey.split('/api/upload/file/')[1];
+    } else if (this.publicDomain && cleanKey.includes(this.publicDomain)) {
+      cleanKey = cleanKey.replace(this.publicDomain, '');
+    }
+    cleanKey = cleanKey.replace(/^\/+/, '');
+
+    const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+    await this.client.send(
+      new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: cleanKey,
+      })
+    );
   }
 }
 

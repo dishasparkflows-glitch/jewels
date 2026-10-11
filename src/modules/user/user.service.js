@@ -47,6 +47,29 @@ class UserService {
   async getById(id) {
     const user = await User.findById(id).select('-auth.password -password').lean();
     if (!user) throw new ApiError(404, 'User not found');
+
+    // Attach addresses from dedicated Address collection
+    try {
+      const addressService = require('../address/address.service');
+      const userAddresses = await addressService.getUserAddresses(id);
+      user.addressesList = userAddresses;
+      if (userAddresses && userAddresses.length > 0) {
+        const shippingDefault =
+          userAddresses.find((a) => a.isShippingDefault || a.isDefault) || userAddresses[0];
+        const billingDefault =
+          userAddresses.find((a) => a.isBillingDefault) || shippingDefault;
+
+        if (!user.addresses) user.addresses = {};
+        user.addresses.billing = billingDefault;
+        user.addresses.shipping = shippingDefault;
+        user.addresses.saved = userAddresses;
+        user.billingAddress = billingDefault;
+        user.shippingAddress = shippingDefault;
+      }
+    } catch (e) {
+      // Gracefully continue if address lookup fails
+    }
+
     return user;
   }
 
@@ -99,6 +122,63 @@ class UserService {
     }).select('-auth.password -password');
 
     if (!user) throw new ApiError(404, 'User not found');
+
+    // Synchronize updates into Address collection
+    try {
+      const Address = require('../address/address.model');
+      if (data.shippingAddress && (data.shippingAddress.addressLine || data.shippingAddress.street)) {
+        const { fullName, title, ...shippingClean } = data.shippingAddress;
+        await Address.findOneAndUpdate(
+          { user: id, isShippingDefault: true, 'meta.isDeleted': { $ne: true } },
+          {
+            $set: {
+              ...shippingClean,
+              user: id,
+              addressType: 'home',
+              isDefault: true,
+              isShippingDefault: true,
+            },
+          },
+          { upsert: true, new: true }
+        );
+      }
+      if (data.billingAddress && (data.billingAddress.addressLine || data.billingAddress.street)) {
+        const { fullName, title, ...billingClean } = data.billingAddress;
+        await Address.findOneAndUpdate(
+          { user: id, isBillingDefault: true, 'meta.isDeleted': { $ne: true } },
+          {
+            $set: {
+              ...billingClean,
+              user: id,
+              addressType: 'office',
+              isBillingDefault: true,
+            },
+          },
+          { upsert: true, new: true }
+        );
+      }
+      if (Array.isArray(data.addresses)) {
+        for (const addr of data.addresses) {
+          if (addr.addressLine || addr.street) {
+            const { fullName, title, ...cleanAddr } = addr;
+            const addrType = (addr.addressType?.toLowerCase() === 'office' || (addr.title && addr.title.toLowerCase().includes('office'))) ? 'office' : 'home';
+            const addrId = addr._id || addr.id;
+            if (addrId && String(addrId).length === 24) {
+              await Address.findByIdAndUpdate(
+                addrId,
+                { ...cleanAddr, addressType: addrType, user: id, 'meta.isDeleted': false },
+                { upsert: true }
+              );
+            } else {
+              await Address.create({ ...cleanAddr, addressType: addrType, user: id });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[UserService] Notice: Syncing to Address collection skipped: ${err.message}`);
+    }
+
     return user;
   }
 

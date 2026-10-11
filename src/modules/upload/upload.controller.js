@@ -2,57 +2,11 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
 const path = require('path');
-const fs = require('fs');
-
-// ------------------------------- upload single file ----------------------------
-const uploadSingle = catchAsync(async (req, res) => {
-  if (!req.file) throw new ApiError(400, 'No file uploaded');
-
-  const fileUrl = `/uploads/${req.query.folder || 'general'}/${req.file.filename}`;
-  return ApiResponse.success(res, {
-    filename: req.file.filename,
-    originalName: req.file.originalname,
-    mimetype: req.file.mimetype,
-    size: req.file.size,
-    url: fileUrl,
-  }, 'File uploaded successfully');
-});
-
-// ------------------------------- upload multiple files ----------------------------
-const uploadMultiple = catchAsync(async (req, res) => {
-  if (!req.files || req.files.length === 0) throw new ApiError(400, 'No files uploaded');
-
-  const files = req.files.map((file) => ({
-    filename: file.filename,
-    originalName: file.originalname,
-    mimetype: file.mimetype,
-    size: file.size,
-    url: `/uploads/${req.query.folder || 'general'}/${file.filename}`,
-  }));
-
-  return ApiResponse.success(res, files, 'Files uploaded successfully');
-});
-
-// ------------------------------- delete file ----------------------------
-const deleteFile = catchAsync(async (req, res) => {
-  const { filepath } = req.body;
-  if (!filepath) throw new ApiError(400, 'File path is required');
-
-  const fullPath = path.join(__dirname, '../../../', filepath);
-  if (fs.existsSync(fullPath)) {
-    fs.unlinkSync(fullPath);
-  }
-
-  return ApiResponse.success(res, null, 'File deleted successfully');
-});
-
-// ------------------------------- get presigned url ----------------------------
 const cloudflareR2 = require('../../utils/cloudflareR2');
 
+// ------------------------------- get presigned url ----------------------------
 const getPresignedUrl = catchAsync(async (req, res) => {
-  const filename = req.body.filename || req.query.filename || 'asset.jpg';
-  const contentType = req.body.contentType || req.query.contentType || 'image/jpeg';
-  const folder = req.body.folder || req.query.folder || 'banners';
+  const { filename = 'asset.jpg', contentType = 'image/jpeg', folder = 'general' } = req.body;
 
   const result = await cloudflareR2.getPresignedPutUrl({
     filename,
@@ -67,28 +21,102 @@ const getPresignedUrl = catchAsync(async (req, res) => {
 const directPut = catchAsync(async (req, res) => {
   const key = req.query.key;
   if (!key) throw new ApiError(400, 'Upload key is required');
+  const contentType = req.headers['content-type'] || req.query.contentType || 'image/jpeg';
 
-  const fullPath = path.join(__dirname, '../../../uploads', key);
-  const dir = path.dirname(fullPath);
-
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  let buffer;
+  if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+    buffer = req.body;
+  } else {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    buffer = Buffer.concat(chunks);
   }
 
-  const writeStream = fs.createWriteStream(fullPath);
-  req.pipe(writeStream);
+  // Upload strictly to Cloudflare R2
+  if (!cloudflareR2.isConfigured() || !cloudflareR2.client) {
+    throw new ApiError(500, 'Cloudflare R2 storage is not configured');
+  }
 
-  writeStream.on('finish', () => {
-    return ApiResponse.success(
-      res,
-      { url: `/uploads/${key}`, key },
-      'File uploaded directly via PUT successfully'
-    );
-  });
+  const { PutObjectCommand } = require('@aws-sdk/client-s3');
+  await cloudflareR2.client.send(
+    new PutObjectCommand({
+      Bucket: cloudflareR2.bucketName,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    })
+  );
 
-  writeStream.on('error', (err) => {
-    throw new ApiError(500, `Direct upload failed: ${err.message}`);
-  });
+  const publicBase = cloudflareR2.publicDomain
+    ? cloudflareR2.publicDomain.replace(/\/$/, '')
+    : (process.env.NODE_ENV === 'development' || !process.env.BACKEND_URL
+        ? `/api/upload/file`
+        : `${process.env.BACKEND_URL.replace(/\/$/, '')}/api/upload/file`);
+  const fileUrl = `${publicBase}/${key}`;
+
+  return ApiResponse.success(
+    res,
+    { url: fileUrl, fileUrl, key },
+    'File uploaded to Cloudflare R2 successfully'
+  );
 });
 
-module.exports = { uploadSingle, uploadMultiple, deleteFile, getPresignedUrl, directPut };
+// ------------------------------- delete file ----------------------------
+const deleteFile = catchAsync(async (req, res) => {
+  const { filepath, key } = req.body;
+  const target = filepath || key;
+  if (!target) throw new ApiError(400, 'File path or key is required');
+
+  await cloudflareR2.deleteFile(target);
+
+  return ApiResponse.success(res, null, 'File deleted from Cloudflare R2 successfully');
+});
+
+// ------------------------------- serve / stream file from Cloudflare R2 ----------------------------
+const serveFile = catchAsync(async (req, res) => {
+  const rawKey = req.params[0] || req.query.key || '';
+  const key = rawKey.replace(/^\/+/, '');
+  if (!key) throw new ApiError(400, 'File key is required');
+
+  // Stream directly from Cloudflare R2
+  if (cloudflareR2.isConfigured() && cloudflareR2.client) {
+    try {
+      const { GetObjectCommand } = require('@aws-sdk/client-s3');
+      const command = new GetObjectCommand({
+        Bucket: cloudflareR2.bucketName,
+        Key: key,
+      });
+      const data = await cloudflareR2.client.send(command);
+
+      const ext = path.extname(key).toLowerCase();
+      const mimeTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+        '.gif': 'image/gif',
+        '.mp4': 'video/mp4',
+        '.pdf': 'application/pdf',
+      };
+      const contentType = data.ContentType || mimeTypes[ext] || 'image/jpeg';
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      if (data.ContentLength) {
+        res.setHeader('Content-Length', data.ContentLength);
+      }
+      return data.Body.pipe(res);
+    } catch (r2Err) {
+      console.error(`Failed to stream "${key}" from Cloudflare R2:`, r2Err.message);
+      return res.status(404).json({ success: false, message: 'File not found in storage' });
+    }
+  }
+
+  return res.status(500).json({ success: false, message: 'Cloudflare R2 storage is not configured' });
+});
+
+module.exports = { getPresignedUrl, directPut, deleteFile, serveFile };

@@ -204,7 +204,7 @@ async function getOrnateErpCategories() {
   };
 }
 
-// ------------------------------- resolve or create category ----------------------------
+// ------------------------------- resolve existing category (DO NOT auto-create) ----------------------------
 async function resolveCategory(groupName, categoryCache) {
   if (!groupName || typeof groupName !== 'string') return null;
   const name = groupName.trim();
@@ -215,30 +215,27 @@ async function resolveCategory(groupName, categoryCache) {
     return categoryCache.get(cacheKey);
   }
 
+  // Only match existing categories in our catalog - NEVER auto-create new categories
   let cat = await Category.findOne({
     name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
     isDeleted: false,
   });
 
   if (!cat) {
-    try {
-      cat = await Category.create({
-        name,
-        type: 'category',
-        status: 'active',
-      });
-      console.log(`[Ornate NX] Auto-created category for "${name}"`);
-    } catch {
-      cat = await Category.findOne({
-        name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-      });
-    }
+    // Optional plural match (e.g. "Ring" -> "Rings")
+    cat = await Category.findOne({
+      name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?$`, 'i') },
+      isDeleted: false,
+    });
   }
 
   if (cat?._id) {
     categoryCache.set(cacheKey, cat._id);
     return cat._id;
   }
+
+  // Do not add category into our categories table
+  categoryCache.set(cacheKey, null);
   return null;
 }
 
@@ -505,6 +502,8 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
 
       if (categoryId) {
         setFields.category = [categoryId];
+      } else {
+        setFields.category = [];
       }
 
       if (newlyUploadedImages.length > 0) {

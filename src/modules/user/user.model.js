@@ -172,6 +172,13 @@ userSchema.virtual('shippingAddress')
   .get(function () { return this.addresses?.shipping; })
   .set(function (val) { if (!this.addresses) this.addresses = {}; this.addresses.shipping = val; });
 
+// Virtual populate for Address collection
+userSchema.virtual('addressesList', {
+  ref: 'Address',
+  localField: '_id',
+  foreignField: 'user',
+});
+
 userSchema.virtual('ordersCount')
   .get(function () { return this.statistics?.ordersCount ?? 0; })
   .set(function (val) { if (!this.statistics) this.statistics = {}; this.statistics.ordersCount = val; });

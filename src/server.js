@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 5000;
 // Connect to MongoDB and start server
 connectDB().then(() => {
   // Start recurring Ornate ERP 30-minute sync cron
-  startOrnateCron();
+  // startOrnateCron();
 
   app.listen(PORT, () => {
     console.log(`\n🚀 Jewels API Server running on port ${PORT}`);

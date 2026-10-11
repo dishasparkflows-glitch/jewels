@@ -4,11 +4,6 @@ const metaPlugin = require('../../utils/metaPlugin');
 const menuItemItemSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
-    linkType: {
-      type: String,
-      enum: ['Category', 'Custom Link', 'Collection', 'Page'],
-      default: 'Category',
-    },
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
@@ -49,11 +44,6 @@ const menuBannerSchema = new mongoose.Schema(
       url: String,
       public_id: String,
     },
-    linkType: {
-      type: String,
-      enum: ['Category', 'Custom Link', 'Collection', 'Page'],
-      default: 'Category',
-    },
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
@@ -83,11 +73,6 @@ const navigationMenuSchema = new mongoose.Schema(
       enum: ['main', 'footer', 'utility', 'settings'],
       default: 'main',
       index: true,
-    },
-    type: {
-      type: String,
-      enum: ['Category', 'Custom Link', 'Collection', 'Page'],
-      default: 'Category',
     },
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,

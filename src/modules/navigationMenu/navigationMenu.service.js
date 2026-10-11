@@ -18,7 +18,6 @@ class NavigationMenuService {
       {
         title: 'Rings',
         navType: 'main',
-        type: 'Category',
         categoryId: catMap['rings'] || null,
         status: 'active',
         order: 1,
@@ -31,10 +30,10 @@ class NavigationMenuService {
             order: 1,
             status: 'active',
             items: [
-              { title: 'Best Sellers', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'New Arrivals', linkType: 'Category', order: 2, status: 'active' },
-              { title: 'Solitaire Rings', linkType: 'Category', order: 3, status: 'active' },
-              { title: 'Engagement Rings', linkType: 'Category', order: 4, status: 'active' },
+              { title: 'Best Sellers', order: 1, status: 'active' },
+              { title: 'New Arrivals', order: 2, status: 'active' },
+              { title: 'Solitaire Rings', order: 3, status: 'active' },
+              { title: 'Engagement Rings', order: 4, status: 'active' },
             ],
           },
           {
@@ -43,11 +42,11 @@ class NavigationMenuService {
             order: 2,
             status: 'active',
             items: [
-              { title: 'Classic Solitaire', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Halo Solitaire', linkType: 'Category', order: 2, status: 'active' },
-              { title: 'Six-Prong Crown', linkType: 'Category', order: 3, status: 'active' },
-              { title: 'Cathedral Setting', linkType: 'Category', order: 4, status: 'active' },
-              { title: 'Bezel Set Solitaire', linkType: 'Category', order: 5, status: 'active' },
+              { title: 'Classic Solitaire', order: 1, status: 'active' },
+              { title: 'Halo Solitaire', order: 2, status: 'active' },
+              { title: 'Six-Prong Crown', order: 3, status: 'active' },
+              { title: 'Cathedral Setting', order: 4, status: 'active' },
+              { title: 'Bezel Set Solitaire', order: 5, status: 'active' },
             ],
           },
           {
@@ -56,10 +55,10 @@ class NavigationMenuService {
             order: 3,
             status: 'active',
             items: [
-              { title: 'Trilogy Diamonds', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Round & Baguettes', linkType: 'Category', order: 2, status: 'active' },
-              { title: 'Emerald Center Trilogy', linkType: 'Category', order: 3, status: 'active' },
-              { title: 'Vintage Past Present Future', linkType: 'Category', order: 4, status: 'active' },
+              { title: 'Trilogy Diamonds', order: 1, status: 'active' },
+              { title: 'Round & Baguettes', order: 2, status: 'active' },
+              { title: 'Emerald Center Trilogy', order: 3, status: 'active' },
+              { title: 'Vintage Past Present Future', order: 4, status: 'active' },
             ],
           },
           {
@@ -68,11 +67,11 @@ class NavigationMenuService {
             order: 4,
             status: 'active',
             items: [
-              { title: 'Classic Gold Bands', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Diamond Pavé Bands', linkType: 'Category', order: 2, status: 'active' },
-              { title: 'Full Eternity Bands', linkType: 'Category', order: 3, status: 'active' },
-              { title: 'Curved Stacking Bands', linkType: 'Category', order: 4, status: 'active' },
-              { title: 'Men’s Platinum Bands', linkType: 'Category', order: 5, status: 'active' },
+              { title: 'Classic Gold Bands', order: 1, status: 'active' },
+              { title: 'Diamond Pavé Bands', order: 2, status: 'active' },
+              { title: 'Full Eternity Bands', order: 3, status: 'active' },
+              { title: 'Curved Stacking Bands', order: 4, status: 'active' },
+              { title: 'Men’s Platinum Bands', order: 5, status: 'active' },
             ],
           },
           {
@@ -81,12 +80,12 @@ class NavigationMenuService {
             order: 5,
             status: 'active',
             items: [
-              { title: 'Royal Cluster Rings', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Art Deco Statement', linkType: 'Category', order: 2, status: 'active' },
-              { title: 'Floral Diamond Rings', linkType: 'Category', order: 3, status: 'active' },
-              { title: 'Geometric Baguette Bands', linkType: 'Category', order: 4, status: 'active' },
-              { title: 'Halo Cushion Cocktails', linkType: 'Category', order: 5, status: 'active' },
-              { title: 'High Jewelry Specials', linkType: 'Category', order: 6, status: 'active' },
+              { title: 'Royal Cluster Rings', order: 1, status: 'active' },
+              { title: 'Art Deco Statement', order: 2, status: 'active' },
+              { title: 'Floral Diamond Rings', order: 3, status: 'active' },
+              { title: 'Geometric Baguette Bands', order: 4, status: 'active' },
+              { title: 'Halo Cushion Cocktails', order: 5, status: 'active' },
+              { title: 'High Jewelry Specials', order: 6, status: 'active' },
             ],
           },
         ],
@@ -95,7 +94,6 @@ class NavigationMenuService {
             title: 'Diamond Rings',
             subtitle: 'Timeless Brilliance',
             image: { url: '/products/ring_catalog.jpg' },
-            linkType: 'Category',
             categoryId: catMap['rings'] || null,
             categoryName: 'Diamond Rings',
             status: 'active',
@@ -105,7 +103,6 @@ class NavigationMenuService {
             title: 'Wedding Bands',
             subtitle: 'For Every Story',
             image: { url: '/products/ring_side.jpg' },
-            linkType: 'Category',
             categoryId: catMap['rings'] || null,
             categoryName: 'Wedding Bands',
             status: 'active',
@@ -116,7 +113,6 @@ class NavigationMenuService {
       {
         title: 'Earrings',
         navType: 'main',
-        type: 'Category',
         categoryId: catMap['earrings'] || null,
         status: 'active',
         order: 2,
@@ -129,9 +125,9 @@ class NavigationMenuService {
             order: 1,
             status: 'active',
             items: [
-              { title: 'Solitaire Studs', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Floral Studs', linkType: 'Category', order: 2, status: 'active' },
-              { title: 'Halo Diamond Studs', linkType: 'Category', order: 3, status: 'active' },
+              { title: 'Solitaire Studs', order: 1, status: 'active' },
+              { title: 'Floral Studs', order: 2, status: 'active' },
+              { title: 'Halo Diamond Studs', order: 3, status: 'active' },
             ],
           },
           {
@@ -140,9 +136,9 @@ class NavigationMenuService {
             order: 2,
             status: 'active',
             items: [
-              { title: 'Diamond Huggies', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Inside-Out Diamond Hoops', linkType: 'Category', order: 2, status: 'active' },
-              { title: 'Mini Gold Everyday Hoops', linkType: 'Category', order: 3, status: 'active' },
+              { title: 'Diamond Huggies', order: 1, status: 'active' },
+              { title: 'Inside-Out Diamond Hoops', order: 2, status: 'active' },
+              { title: 'Mini Gold Everyday Hoops', order: 3, status: 'active' },
             ],
           },
           {
@@ -151,9 +147,9 @@ class NavigationMenuService {
             order: 3,
             status: 'active',
             items: [
-              { title: 'Chandelier Drop Earrings', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Tassel Diamond Drops', linkType: 'Category', order: 2, status: 'active' },
-              { title: 'Pear-Shaped Solitaire Danglers', linkType: 'Category', order: 3, status: 'active' },
+              { title: 'Chandelier Drop Earrings', order: 1, status: 'active' },
+              { title: 'Tassel Diamond Drops', order: 2, status: 'active' },
+              { title: 'Pear-Shaped Solitaire Danglers', order: 3, status: 'active' },
             ],
           },
           {
@@ -162,8 +158,8 @@ class NavigationMenuService {
             order: 4,
             status: 'active',
             items: [
-              { title: 'Diamond Ear Climbers', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Cartilage Diamond Cuffs', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Diamond Ear Climbers', order: 1, status: 'active' },
+              { title: 'Cartilage Diamond Cuffs', order: 2, status: 'active' },
             ],
           },
         ],
@@ -172,7 +168,6 @@ class NavigationMenuService {
             title: 'Solitaire Studs',
             subtitle: 'Iconic Elegance',
             image: { url: '/featured/earring.jpg' },
-            linkType: 'Category',
             status: 'active',
             order: 1,
           },
@@ -181,7 +176,6 @@ class NavigationMenuService {
       {
         title: 'Pendant',
         navType: 'main',
-        type: 'Category',
         categoryId: catMap['pendant & necklaces'] || null,
         status: 'active',
         order: 3,
@@ -194,9 +188,9 @@ class NavigationMenuService {
             order: 1,
             status: 'active',
             items: [
-              { title: 'Round Brilliant Pendants', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Heart Solitaire Pendants', linkType: 'Category', order: 2, status: 'active' },
-              { title: 'Emerald Cut Pendants', linkType: 'Category', order: 3, status: 'active' },
+              { title: 'Round Brilliant Pendants', order: 1, status: 'active' },
+              { title: 'Heart Solitaire Pendants', order: 2, status: 'active' },
+              { title: 'Emerald Cut Pendants', order: 3, status: 'active' },
             ],
           },
           {
@@ -205,8 +199,8 @@ class NavigationMenuService {
             order: 2,
             status: 'active',
             items: [
-              { title: 'Tennis Necklaces', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Bridal Diamond Chokers', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Tennis Necklaces', order: 1, status: 'active' },
+              { title: 'Bridal Diamond Chokers', order: 2, status: 'active' },
             ],
           },
           {
@@ -215,8 +209,8 @@ class NavigationMenuService {
             order: 3,
             status: 'active',
             items: [
-              { title: 'Everyday Diamond Mangalsutra', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Solitaire Drop Mangalsutra', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Everyday Diamond Mangalsutra', order: 1, status: 'active' },
+              { title: 'Solitaire Drop Mangalsutra', order: 2, status: 'active' },
             ],
           },
           {
@@ -225,8 +219,8 @@ class NavigationMenuService {
             order: 4,
             status: 'active',
             items: [
-              { title: 'Diamond Initial Charms', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Constellation Pendants', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Diamond Initial Charms', order: 1, status: 'active' },
+              { title: 'Constellation Pendants', order: 2, status: 'active' },
             ],
           },
         ],
@@ -235,7 +229,6 @@ class NavigationMenuService {
             title: 'Tennis Necklaces',
             subtitle: 'Red Carpet Statement',
             image: { url: '/featured/necklace.jpg' },
-            linkType: 'Category',
             status: 'active',
             order: 1,
           },
@@ -244,7 +237,6 @@ class NavigationMenuService {
       {
         title: 'Bangles & Bracelets',
         navType: 'main',
-        type: 'Category',
         categoryId: catMap['bangles & bracelets'] || null,
         status: 'active',
         order: 4,
@@ -257,8 +249,8 @@ class NavigationMenuService {
             order: 1,
             status: 'active',
             items: [
-              { title: 'Classic Round Tennis', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Baguette Diamond Tennis', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Classic Round Tennis', order: 1, status: 'active' },
+              { title: 'Baguette Diamond Tennis', order: 2, status: 'active' },
             ],
           },
           {
@@ -267,8 +259,8 @@ class NavigationMenuService {
             order: 2,
             status: 'active',
             items: [
-              { title: 'Diamond Open Cuffs', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Handcrafted Heritage Bangles', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Diamond Open Cuffs', order: 1, status: 'active' },
+              { title: 'Handcrafted Heritage Bangles', order: 2, status: 'active' },
             ],
           },
           {
@@ -277,8 +269,8 @@ class NavigationMenuService {
             order: 3,
             status: 'active',
             items: [
-              { title: 'Delicate Evil Eye Bracelets', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Stackable Gold Bracelets', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Delicate Evil Eye Bracelets', order: 1, status: 'active' },
+              { title: 'Stackable Gold Bracelets', order: 2, status: 'active' },
             ],
           },
           {
@@ -287,8 +279,8 @@ class NavigationMenuService {
             order: 4,
             status: 'active',
             items: [
-              { title: 'Platinum & Gold Kadas', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Heavy Diamond Curb Links', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Platinum & Gold Kadas', order: 1, status: 'active' },
+              { title: 'Heavy Diamond Curb Links', order: 2, status: 'active' },
             ],
           },
         ],
@@ -297,7 +289,6 @@ class NavigationMenuService {
             title: 'Tennis Bracelets',
             subtitle: 'Continuous Luxury',
             image: { url: '/featured/bangles.jpg' },
-            linkType: 'Category',
             status: 'active',
             order: 1,
           },
@@ -318,7 +309,6 @@ class NavigationMenuService {
       {
         title: 'Silver Collection',
         navType: 'main',
-        type: 'Category',
         categoryId: catMap['silver collection'] || null,
         status: 'active',
         order: 6,
@@ -331,8 +321,8 @@ class NavigationMenuService {
             order: 1,
             status: 'active',
             items: [
-              { title: 'Solitaire Silver Rings', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Adjustable Silver Bands', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Solitaire Silver Rings', order: 1, status: 'active' },
+              { title: 'Adjustable Silver Bands', order: 2, status: 'active' },
             ],
           },
           {
@@ -341,8 +331,8 @@ class NavigationMenuService {
             order: 2,
             status: 'active',
             items: [
-              { title: 'Minimalist Neckpieces', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Oxidised Silver Chokers', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Minimalist Neckpieces', order: 1, status: 'active' },
+              { title: 'Oxidised Silver Chokers', order: 2, status: 'active' },
             ],
           },
           {
@@ -351,8 +341,8 @@ class NavigationMenuService {
             order: 3,
             status: 'active',
             items: [
-              { title: 'Silver Studs & Hoops', linkType: 'Category', order: 1, status: 'active' },
-              { title: 'Silver Anklets & Bracelets', linkType: 'Category', order: 2, status: 'active' },
+              { title: 'Silver Studs & Hoops', order: 1, status: 'active' },
+              { title: 'Silver Anklets & Bracelets', order: 2, status: 'active' },
             ],
           },
         ],
@@ -362,7 +352,6 @@ class NavigationMenuService {
       {
         title: 'Engagement & Bridal',
         navType: 'footer',
-        type: 'Category',
         status: 'active',
         order: 1,
         isMegaMenu: false,

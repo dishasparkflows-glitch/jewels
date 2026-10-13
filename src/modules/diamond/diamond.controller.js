@@ -9,6 +9,12 @@ class DiamondController {
     ApiResponse.created(res, item, 'Diamond created successfully');
   });
 
+  bulkCreate = catchAsync(async (req, res) => {
+    const items = req.body.items || req.body;
+    const result = await diamondService.bulkCreate(items);
+    ApiResponse.created(res, result, `Successfully created ${result.length} diamond variants`);
+  });
+
   // ------------------------------- get all diamonds ----------------------------
 
   getAll = catchAsync(async (req, res) => {
@@ -26,6 +32,13 @@ class DiamondController {
   getLookup = catchAsync(async (req, res) => {
     const items = await diamondService.getLookup(req.query);
     ApiResponse.success(res, items, 'Diamond lookup list retrieved');
+  });
+
+  // ------------------------------- get diamond options & attributes (combined api) ----------------------------
+
+  getDiamondOptions = catchAsync(async (req, res) => {
+    const options = await diamondService.getDiamondOptions();
+    ApiResponse.success(res, options, 'Diamond options and attributes retrieved successfully');
   });
 
   getBySku = catchAsync(async (req, res) => {

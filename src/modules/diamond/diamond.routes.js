@@ -5,12 +5,20 @@ const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
 // Public or storefront endpoints
+router.get('/attributes', diamondController.getDiamondOptions);
 router.get('/lookup', diamondController.getLookup);
 router.get('/sku/:sku', diamondController.getBySku);
 router.get('/', diamondController.getAll);
 router.get('/:id', diamondController.getOne);
 
 // Protected Admin endpoints
+router.post(
+  '/bulk',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  diamondController.bulkCreate
+);
+
 router.post(
   '/',
   authenticate,

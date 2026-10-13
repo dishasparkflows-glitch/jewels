@@ -3,10 +3,14 @@ const metaPlugin = require('../../utils/metaPlugin');
 
 const addressSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'User ID is required'],
       index: true,
     },
     addressType: {
@@ -94,6 +98,15 @@ addressSchema.virtual('title')
 
 // Synchronize street with addressLine if street not explicitly provided
 addressSchema.pre('validate', function (next) {
+  if (this.userId && !this.user) {
+    this.user = this.userId;
+  }
+  if (this.user && !this.userId) {
+    this.userId = this.user;
+  }
+  if (!this.user && !this.userId) {
+    return next(new Error('User ID is required'));
+  }
   if (this.addressLine && !this.street) {
     this.street = this.addressLine;
   }

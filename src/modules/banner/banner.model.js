@@ -21,14 +21,19 @@ const bannerSchema = new mongoose.Schema(
       },
     },
     display: {
+      categoryId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category',
+        required: false,
+      },
       category: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Category',
-        required: [true, 'Please link a category to this banner'],
+        required: false,
       },
       type: {
         type: String,
-        enum: ['herobanner', 'collectionbanner'],
+        enum: ['herobanner', 'collectionbanner', 'websitebanner'],
         default: 'herobanner',
         required: [true, 'Please specify the banner type'],
       },
@@ -39,6 +44,10 @@ const bannerSchema = new mongoose.Schema(
       order: {
         type: Number,
         default: 0,
+      },
+      bannerKey: {
+        type: String,
+        default: 'custom_jewellery',
       },
     },
     link: {

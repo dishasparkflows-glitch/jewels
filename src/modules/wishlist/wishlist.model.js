@@ -48,6 +48,12 @@ const wishlistItemSchema = new mongoose.Schema(
 
 const wishlistSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

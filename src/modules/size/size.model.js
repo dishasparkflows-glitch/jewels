@@ -9,10 +9,19 @@ const sizeSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    categoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      index: true,
+    },
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
-      required: [true, 'Please select a category for this size'],
+      index: true,
+    },
+    subTypeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
       index: true,
     },
     subType: {
@@ -39,7 +48,19 @@ const sizeSchema = new mongoose.Schema(
   }
 );
 
+sizeSchema.pre('validate', function (next) {
+  if (!this.categoryId && this.category) this.categoryId = this.category;
+  if (!this.category && this.categoryId) this.category = this.categoryId;
+  if (!this.subTypeId && this.subType) this.subTypeId = this.subType;
+  if (!this.subType && this.subTypeId) this.subType = this.subTypeId;
+  if (!this.categoryId && !this.category) {
+    return next(new Error('Please select a category for this size'));
+  }
+  next();
+});
+
 sizeSchema.index({ category: 1, subType: 1, status: 1, isDeleted: 1 });
+sizeSchema.index({ categoryId: 1, subTypeId: 1, status: 1, isDeleted: 1 });
 
 sizeSchema.plugin(metaPlugin);
 

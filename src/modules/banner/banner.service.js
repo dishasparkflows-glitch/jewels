@@ -17,6 +17,7 @@ class BannerService {
       category: data.display?.category !== undefined ? data.display.category : data.category,
       type: data.display?.type !== undefined ? data.display.type : (data.type || 'herobanner'),
       position: data.display?.position !== undefined ? data.display.position : (data.position || 'none'),
+      bannerKey: data.display?.bannerKey !== undefined ? data.display.bannerKey : (data.bannerKey || 'custom_jewellery'),
       order:
         data.display?.order !== undefined
           ? Number(data.display.order)
@@ -32,6 +33,7 @@ class BannerService {
     delete payload.category;
     delete payload.type;
     delete payload.position;
+    delete payload.bannerKey;
     delete payload.order;
 
     return payload;

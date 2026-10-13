@@ -38,25 +38,25 @@ const diamondSchema = new mongoose.Schema(
       min: [0, 'Carat cannot be negative'],
       index: true,
     },
-    color: {
+    colorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'DiamondColor',
       required: [true, 'Please select Diamond Color'],
       index: true,
     },
-    clarity: {
+    clarityId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'DiamondClarity',
       required: [true, 'Please select Diamond Clarity'],
       index: true,
     },
-    shape: {
+    shapeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'DiamondShape',
       required: [true, 'Please select Diamond Shape'],
       index: true,
     },
-    type: {
+    typeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'DiamondType',
       required: [true, 'Please select Diamond Type (Lab/Natural)'],
@@ -88,6 +88,19 @@ const diamondSchema = new mongoose.Schema(
 
 diamondSchema.index({ status: 1, isDeleted: 1 });
 diamondSchema.index({ carat: 1, price: 1 });
+
+diamondSchema.virtual('color').get(function () { return this.colorId; }).set(function (v) { this.colorId = v; });
+diamondSchema.virtual('clarity').get(function () { return this.clarityId; }).set(function (v) { this.clarityId = v; });
+diamondSchema.virtual('shape').get(function () { return this.shapeId; }).set(function (v) { this.shapeId = v; });
+diamondSchema.virtual('type').get(function () { return this.typeId; }).set(function (v) { this.typeId = v; });
+
+diamondSchema.pre('validate', function (next) {
+  if (!this.colorId && this.color) this.colorId = this.color;
+  if (!this.clarityId && this.clarity) this.clarityId = this.clarity;
+  if (!this.shapeId && this.shape) this.shapeId = this.shape;
+  if (!this.typeId && this.type) this.typeId = this.type;
+  next();
+});
 
 diamondSchema.plugin(metaPlugin);
 

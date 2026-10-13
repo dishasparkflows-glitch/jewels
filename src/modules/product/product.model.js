@@ -137,7 +137,19 @@ const productSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
     }],
+    categoryId: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+    }],
+    categoryIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+    }],
     subType: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    subTypeId: {
       type: mongoose.Schema.Types.ObjectId,
       default: null,
     },
@@ -145,7 +157,23 @@ const productSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Featured',
     }],
+    featuredId: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Featured',
+    }],
+    featuredIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Featured',
+    }],
     menuItem: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MenuItem',
+    }],
+    menuItemId: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MenuItem',
+    }],
+    menuItemIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'MenuItem',
     }],
@@ -153,13 +181,29 @@ const productSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Size',
     }],
+    sizeId: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Size',
+    }],
+    sizeIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Size',
+    }],
     metalColors: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MetalColor',
+    }],
+    metalColorIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'MetalColor',
     }],
 
     // ── Media & Color Images ──────────────────────────────────
     colorImages: [{
+      metalColorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MetalColor',
+      },
       metalColor: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'MetalColor',
@@ -200,6 +244,10 @@ const productSchema = new mongoose.Schema(
 
     // ── Diamond Configurations ────────────────────────────────
     centerDiamondRows: [{
+      diamondTypeId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType' },
+      diamondShapeId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape' },
+      diamondColorId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondColor' },
+      diamondClarityId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondClarity' },
       diamondType: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType' },
       diamondShape: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape' },
       diamondColor: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondColor' },
@@ -208,6 +256,10 @@ const productSchema = new mongoose.Schema(
       pricePerCarat: Number,
     }],
     sideDiamondRows: [{
+      diamondTypeId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType' },
+      diamondShapeId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape' },
+      diamondColorId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondColor' },
+      diamondClarityId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondClarity' },
       diamondType: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType' },
       diamondShape: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape' },
       diamondColor: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondColor' },
@@ -225,13 +277,25 @@ const productSchema = new mongoose.Schema(
       sku: String,
       price: Number,
       stock: Number,
+      metalPurityId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MetalPurity',
+      },
       metalPurity: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'MetalPurity',
       },
+      diamondTypeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DiamondType',
+      },
       diamondType: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DiamondType',
+      },
+      diamondShapeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DiamondShape',
       },
       diamondShape: {
         type: mongoose.Schema.Types.ObjectId,
@@ -250,9 +314,17 @@ const productSchema = new mongoose.Schema(
       diamondCost: Number,
       computedMakingCharge: Number,
       computedGst: Number,
+      diamondClarityId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DiamondClarity',
+      },
       diamondClarity: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DiamondClarity',
+      },
+      diamondColorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DiamondColor',
       },
       diamondColor: {
         type: mongoose.Schema.Types.ObjectId,

@@ -11,47 +11,37 @@ class CategoryService {
     if (typeof payload.banner === 'string') {
       payload.banner = { url: payload.banner.trim(), public_id: '' };
     }
-    // Also if slug is not given, generate it from name
-    if (!payload.slug && payload.name) {
-      payload.slug = payload.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-    }
-    // Handle promoBanners / prompbanners array
-    const promoList = payload.promoBanners || payload.prompbanners || payload.promoBanner;
+    const promoList = payload.promoBanner || payload.promoBanners || payload.prompbanners;
     if (Array.isArray(promoList)) {
       const normalizedPromos = promoList.map((item) => {
         if (typeof item === 'string') {
           return {
             title: '',
             image: { url: item.trim(), public_id: '' },
+            url: item.trim(),
+            link: '',
+            subtitle: '',
+            status: 'active',
+            order: 0,
           };
         }
+        const itemUrl = item.image?.url || item.url || '';
         return {
           title: item.title || '',
-          image:
-            typeof item.image === 'string'
-              ? { url: item.image.trim(), public_id: '' }
-              : item.image?.url
-              ? { url: item.image.url.trim(), public_id: item.image.public_id || '' }
-              : { url: item.url || '', public_id: item.public_id || '' },
+          image: {
+            url: typeof item.image === 'string' ? item.image.trim() : (item.image?.url || itemUrl || ''),
+            public_id: item.image?.public_id || item.public_id || '',
+          },
+          url: itemUrl,
           link: item.link || '',
           subtitle: item.subtitle || '',
           status: item.status || 'active',
           order: Number(item.order) || 0,
         };
       });
+      payload.promoBanner = normalizedPromos;
       payload.promoBanners = normalizedPromos;
       payload.prompbanners = normalizedPromos;
-    }
-    // Keep images array in sync for backward compatibility
-    if (!payload.images || payload.images.length === 0) {
-      if (payload.banner?.url) {
-        payload.images = [{ url: payload.banner.url, title: payload.name || 'Banner' }];
-      } else if (payload.icon?.url) {
-        payload.images = [{ url: payload.icon.url, title: payload.name || 'Icon' }];
-      }
     }
     return payload;
   }
@@ -107,7 +97,7 @@ class CategoryService {
     }
 
     return await Category.find(filter)
-      .select('_id name banner icon images promoBanners prompbanners type slug')
+      .select('_id name banner icon images subTypes promoBanner promoBanners type slug')
       .sort({ name: 1 })
       .lean();
   }

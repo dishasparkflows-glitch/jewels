@@ -24,6 +24,11 @@ const promoBannerSchema = new mongoose.Schema(
       url: { type: String, trim: true, default: '' },
       public_id: { type: String, trim: true, default: '' },
     },
+    url: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     link: {
       type: String,
       trim: true,
@@ -97,6 +102,7 @@ const categorySchema = new mongoose.Schema(
       index: true,
     },
     subTypes: [subTypeSchema],
+    promoBanner: [promoBannerSchema],
     promoBanners: [promoBannerSchema],
     prompbanners: [promoBannerSchema],
   },
@@ -116,12 +122,20 @@ categorySchema.pre('save', function (next) {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
   }
-  // Sync promoBanners and prompbanners
-  if (this.promoBanners && this.promoBanners.length > 0 && (!this.prompbanners || this.prompbanners.length === 0)) {
-    this.prompbanners = this.promoBanners;
-  } else if (this.prompbanners && this.prompbanners.length > 0 && (!this.promoBanners || this.promoBanners.length === 0)) {
-    this.promoBanners = this.prompbanners;
+
+  // Sync promoBanner, promoBanners, and prompbanners
+  const promos =
+    (this.promoBanner && this.promoBanner.length > 0 && this.promoBanner) ||
+    (this.promoBanners && this.promoBanners.length > 0 && this.promoBanners) ||
+    (this.prompbanners && this.prompbanners.length > 0 && this.prompbanners) ||
+    [];
+
+  if (promos.length > 0) {
+    if (!this.promoBanner || this.promoBanner.length === 0) this.promoBanner = promos;
+    if (!this.promoBanners || this.promoBanners.length === 0) this.promoBanners = promos;
+    if (!this.prompbanners || this.prompbanners.length === 0) this.prompbanners = promos;
   }
+
   next();
 });
 

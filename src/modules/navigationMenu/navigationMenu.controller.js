@@ -73,22 +73,6 @@ class NavigationMenuController {
     );
     ApiResponse.success(res, menu, 'Menu item deleted successfully');
   });
-
-  // Banner handlers
-  addBanner = catchAsync(async (req, res) => {
-    const menu = await navigationMenuService.addBanner(req.params.id, req.body);
-    ApiResponse.created(res, menu, 'Menu banner added successfully');
-  });
-
-  updateBanner = catchAsync(async (req, res) => {
-    const menu = await navigationMenuService.updateBanner(req.params.id, req.params.bannerId, req.body);
-    ApiResponse.success(res, menu, 'Menu banner updated successfully');
-  });
-
-  deleteBanner = catchAsync(async (req, res) => {
-    const menu = await navigationMenuService.deleteBanner(req.params.id, req.params.bannerId);
-    ApiResponse.success(res, menu, 'Menu banner deleted successfully');
-  });
 }
 
 module.exports = new NavigationMenuController();

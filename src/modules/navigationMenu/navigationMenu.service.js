@@ -168,41 +168,6 @@ class NavigationMenuService {
     await menu.save();
     return menu;
   }
-
-  // ------------------------------- banners management ----------------------------
-  async addBanner(menuId, bannerData) {
-    const menu = await NavigationMenu.findOne({ _id: menuId, isDeleted: false });
-    if (!menu) throw new ApiError(404, 'Navigation menu not found');
-
-    if (!bannerData.order) {
-      bannerData.order = (menu.banners?.length || 0) + 1;
-    }
-
-    menu.banners.push(bannerData);
-    await menu.save();
-    return menu;
-  }
-
-  async updateBanner(menuId, bannerId, bannerData) {
-    const menu = await NavigationMenu.findOne({ _id: menuId, isDeleted: false });
-    if (!menu) throw new ApiError(404, 'Navigation menu not found');
-
-    const banner = menu.banners.id(bannerId);
-    if (!banner) throw new ApiError(404, 'Banner not found');
-
-    Object.assign(banner, bannerData);
-    await menu.save();
-    return menu;
-  }
-
-  async deleteBanner(menuId, bannerId) {
-    const menu = await NavigationMenu.findOne({ _id: menuId, isDeleted: false });
-    if (!menu) throw new ApiError(404, 'Navigation menu not found');
-
-    menu.banners.pull({ _id: bannerId });
-    await menu.save();
-    return menu;
-  }
 }
 
 module.exports = new NavigationMenuService();

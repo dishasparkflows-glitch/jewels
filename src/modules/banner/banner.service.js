@@ -26,6 +26,9 @@ class BannerService {
           : 0,
     };
 
+    if (data.appStoreUrl !== undefined) payload.appStoreUrl = data.appStoreUrl;
+    if (data.googlePlayUrl !== undefined) payload.googlePlayUrl = data.googlePlayUrl;
+
     // Remove legacy top-level duplicate keys to keep database documents clean
     delete payload.title;
     delete payload.subtitle;
@@ -101,6 +104,12 @@ class BannerService {
       filter.$or = [
         { 'display.type': queryParams.type },
         { type: queryParams.type },
+      ];
+    }
+    if (queryParams.bannerKey) {
+      filter.$or = [
+        { 'display.bannerKey': queryParams.bannerKey },
+        { bannerKey: queryParams.bannerKey },
       ];
     }
     if (queryParams.status) {

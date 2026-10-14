@@ -33,7 +33,7 @@ const bannerSchema = new mongoose.Schema(
       },
       type: {
         type: String,
-        enum: ['herobanner', 'collectionbanner', 'websitebanner'],
+        enum: ['herobanner', 'collectionbanner', 'websitebanner', 'mobileappbanner', 'bookappointbanner'],
         default: 'herobanner',
         required: [true, 'Please specify the banner type'],
       },
@@ -51,6 +51,14 @@ const bannerSchema = new mongoose.Schema(
       },
     },
     link: {
+      type: String,
+      default: '',
+    },
+    appStoreUrl: {
+      type: String,
+      default: '',
+    },
+    googlePlayUrl: {
       type: String,
       default: '',
     },

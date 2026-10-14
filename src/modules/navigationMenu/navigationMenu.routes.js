@@ -36,14 +36,4 @@ router
   .put(navigationMenuController.updateMenuItem)
   .delete(navigationMenuController.deleteMenuItem);
 
-// Banners under a menu
-router
-  .route('/:id/banners')
-  .post(navigationMenuController.addBanner);
-
-router
-  .route('/:id/banners/:bannerId')
-  .put(navigationMenuController.updateBanner)
-  .delete(navigationMenuController.deleteBanner);
-
 module.exports = router;

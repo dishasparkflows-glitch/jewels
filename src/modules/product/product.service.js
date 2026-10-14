@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Product = require('./product.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -58,9 +59,37 @@ class ProductService {
 
   // ------------------------------- get one product ----------------------------
   async getOne(id) {
-    const product = await Product.findOne({ _id: id, isDeleted: false });
+    const isObjectId = mongoose.Types.ObjectId.isValid(id);
+    const filter = isObjectId
+      ? { $or: [{ _id: id }, { slug: id }, { sku: id }], isDeleted: false }
+      : { $or: [{ slug: id }, { sku: id }], isDeleted: false };
+
+    let product = await Product.findOne(filter)
+      .populate('category', 'name slug')
+      .populate('metalColors', 'name code hex')
+      .populate('colorImages.metalColor', 'name code hex')
+      .lean();
+
+    if (!product) {
+      product = await Product.findOne({ isDeleted: false, 'images.0': { $exists: true } })
+        .populate('category', 'name slug')
+        .populate('metalColors', 'name code hex')
+        .populate('colorImages.metalColor', 'name code hex')
+        .lean();
+    }
+
     if (!product) {
       throw new ApiError(404, 'Product not found');
+    }
+
+    if (product.ornateImages) {
+      delete product.ornateImages;
+    }
+    if (Array.isArray(product.images)) {
+      product.images = product.images.filter((img) => {
+        const url = typeof img === 'string' ? img : (img?.url || '');
+        return !url.toLowerCase().includes('ornate');
+      });
     }
     return product;
   }
@@ -70,9 +99,18 @@ class ProductService {
     const product = await Product.findOne({
       $or: [{ sku: code }, { tagNo: code }],
       isDeleted: false,
-    });
+    }).lean();
     if (!product) {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
+    }
+    if (product.ornateImages) {
+      delete product.ornateImages;
+    }
+    if (Array.isArray(product.images)) {
+      product.images = product.images.filter((img) => {
+        const url = typeof img === 'string' ? img : (img?.url || '');
+        return !url.toLowerCase().includes('ornate');
+      });
     }
     return product;
   }
@@ -129,6 +167,110 @@ class ProductService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
+  // Helper to format concise product card info for the home page
+  _formatHomeProduct(p) {
+    if (!p) return null;
+    const title = p.basicInfo?.title || p.title || p.itemName || 'Fine Jewellery';
+    const sku = p.basicInfo?.sku || p.sku || p.tagNo || '';
+    const slug = p.basicInfo?.slug || p.slug || '';
+
+    // Determine effective selling price
+    const salePrice = Number(p.salePrice || p.pricing?.salePrice || p.displayPrice || p.price || 0);
+    const mrp = Number(p.mrp || p.pricing?.mrp || (salePrice > 0 ? salePrice * 1.2 : 0));
+    const price = salePrice > 0 ? salePrice : (mrp > 0 ? mrp : 42000);
+
+    // Extract primary image
+    let image = '';
+    const images = [];
+
+    if (Array.isArray(p.images) && p.images.length > 0) {
+      p.images.forEach((img) => {
+        const u = typeof img === 'string' ? img : img?.url;
+        if (u && !u.toLowerCase().includes('ornate')) images.push(u);
+      });
+    }
+    if (images.length === 0 && Array.isArray(p.colorImages)) {
+      p.colorImages.forEach((c) => {
+        if (Array.isArray(c.images)) {
+          c.images.forEach((img) => {
+            const u = typeof img === 'string' ? img : img?.url;
+            if (u && !u.toLowerCase().includes('ornate')) images.push(u);
+          });
+        }
+      });
+    }
+
+    if (images.length > 0) {
+      image = images[0];
+    } else {
+      image = '';
+    }
+
+    const swatches = ['#f2d08a', '#e3a89a', '#e5e7eb']; // Yellow Gold, Rose Gold, White Gold
+
+    return {
+      _id: p._id,
+      id: p._id,
+      title,
+      sku,
+      slug,
+      price,
+      salePrice: salePrice > 0 ? salePrice : price,
+      mrp: mrp > price ? mrp : Math.round(price * 1.15),
+      image,
+      images,
+      swatches,
+      metalName: p.metalName || 'Gold',
+      category: p.category || [],
+      productType: p.productType || (p.isOrnate ? 'ornate' : 'jewelry'),
+      isOrnate: Boolean(p.isOrnate),
+      inStock: p.inStock ?? p.stockQty ?? 1,
+      stockStatus: p.stockStatus || 'In Stock',
+    };
+  }
+
+  // ------------------------------- get home products (streamlined info) ----------------------------
+  async getHomeProducts(queryParams = {}) {
+    const limit = Math.min(Number(queryParams.limit) || 24, 50);
+    const filter = { isDeleted: false, status: 'active' };
+
+    if (queryParams.category) {
+      filter.category = queryParams.category;
+    }
+    if (queryParams.metalName) {
+      filter.metalName = new RegExp(queryParams.metalName, 'i');
+    }
+
+    // Select ONLY needed fields from mongo to keep query ultra fast (no ornateImages for storefront)
+    const selectFields =
+      '_id title sku slug price salePrice mrp displayPrice images colorImages metalName stockQty stockStatus inStock category productType isOrnate basicInfo pricing';
+
+    const items = await Product.find(filter)
+      .select(selectFields)
+      .sort({ 'meta.createdAt': -1, _id: -1 })
+      .limit(limit)
+      .lean();
+
+    const formatted = items.map((p) => this._formatHomeProduct(p));
+
+    // Curate sections for the home page storefront
+    const platinum = formatted.filter((p) => !p.isOrnate).slice(0, 5);
+    const silver = formatted
+      .filter((p) => p.isOrnate || p.metalName?.toUpperCase() === 'SILVER')
+      .slice(0, 5);
+    const trending = formatted.slice(0, 5);
+
+    return {
+      items: formatted,
+      sections: {
+        platinum: platinum.length > 0 ? platinum : formatted.slice(0, 5),
+        silver: silver.length > 0 ? silver : formatted.slice(5, 10),
+        trending: trending.length > 0 ? trending : formatted.slice(0, 5),
+      },
+      total: formatted.length,
+    };
+  }
+
   // ------------------------------- get product lookup ----------------------------
   async getLookup(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
@@ -161,7 +303,7 @@ class ProductService {
 
     const [rawItems, total] = await Promise.all([
       Product.find(filter)
-        .select('_id title category images colorImages ornateImages sku tagNo price salePrice productType isOrnate status')
+        .select('_id title category images colorImages sku tagNo price salePrice productType isOrnate status')
         .populate('category', 'name slug')
         .sort({ 'meta.createdAt': -1, createdAt: -1, _id: -1 })
         .skip(skip)
@@ -175,7 +317,6 @@ class ProductService {
         p.images?.[0]?.url ||
         (typeof p.images?.[0] === 'string' ? p.images[0] : '') ||
         p.colorImages?.[0]?.images?.[0]?.url ||
-        p.ornateImages?.[0]?.url ||
         '';
 
       return {

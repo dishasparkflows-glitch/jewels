@@ -9,6 +9,12 @@ class ProductController {
     ApiResponse.created(res, product, 'Product created successfully');
   });
 
+  // ------------------------------- get home products (streamlined info) ----------------------------
+  getHomeProducts = catchAsync(async (req, res) => {
+    const data = await productService.getHomeProducts(req.query);
+    ApiResponse.success(res, data, 'Home products retrieved successfully');
+  });
+
   // ------------------------------- get all products ----------------------------
   getAll = catchAsync(async (req, res) => {
     const { items, pagination } = await productService.getAll(req.query);

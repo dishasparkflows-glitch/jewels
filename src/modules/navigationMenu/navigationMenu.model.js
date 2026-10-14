@@ -36,29 +36,6 @@ const menuSectionSchema = new mongoose.Schema(
   { _id: true }
 );
 
-const menuBannerSchema = new mongoose.Schema(
-  {
-    title: { type: String, default: '', trim: true },
-    subtitle: { type: String, default: '', trim: true },
-    image: {
-      url: String,
-      public_id: String,
-    },
-    categoryId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Category',
-    },
-    categoryName: { type: String, default: '' },
-    url: { type: String, default: '' },
-    order: { type: Number, default: 1 },
-    status: {
-      type: String,
-      enum: ['active', 'inactive'],
-      default: 'active',
-    },
-  },
-  { _id: true }
-);
 
 const navigationMenuSchema = new mongoose.Schema(
   {
@@ -111,7 +88,6 @@ const navigationMenuSchema = new mongoose.Schema(
       public_id: String,
     },
     sections: [menuSectionSchema],
-    banners: [menuBannerSchema],
     isDeleted: {
       type: Boolean,
       default: false,

@@ -70,7 +70,6 @@ class HomeSectionController {
 
   // ------------------------------- Reset / Seed Defaults ----------------------------
   seed = catchAsync(async (req, res) => {
-    await homeSectionService.seedDefaults();
     const { items, pagination } = await homeSectionService.getAll({});
     ApiResponse.success(res, items, 'Default home sections seeded successfully');
   });

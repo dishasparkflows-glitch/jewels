@@ -89,11 +89,6 @@ class TopAnnouncementService {
 
   // ─── Get All (Admin) ───────────────────────────────────────
   async getAll(queryParams = {}) {
-    const totalCount = await TopAnnouncement.countDocuments({ isDeleted: false });
-    if (totalCount === 0) {
-      // Auto-populate initial 5 items from screenshot if database is empty
-      await TopAnnouncement.insertMany(DEFAULT_ANNOUNCEMENTS);
-    }
 
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { isDeleted: false };

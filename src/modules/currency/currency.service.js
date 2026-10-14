@@ -3,65 +3,13 @@ const Currency = require('./currency.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
-// Default initial currencies matching the luxury admin portal screenshot
-const DEFAULT_CURRENCIES = [
-  {
-    currencyInfo: { code: 'INR', name: 'Indian Rupee', symbol: '₹', countryCode: 'IN' },
-    exchangeRate: { baseCurrency: 'INR', rate: 1, inrRate: 1, lastFetchedAt: new Date() },
-    settings: { isBaseCurrency: true, useLiveRate: false, isActive: true, sortOrder: 1 },
-    metadata: { isDeleted: false },
-  },
-  {
-    currencyInfo: { code: 'USD', name: 'US Dollar', symbol: '$', countryCode: 'US' },
-    exchangeRate: { baseCurrency: 'INR', rate: 0.0103, inrRate: 96.83, lastFetchedAt: new Date() },
-    settings: { isBaseCurrency: false, useLiveRate: true, isActive: true, sortOrder: 2 },
-    metadata: { isDeleted: false },
-  },
-  {
-    currencyInfo: { code: 'EUR', name: 'Euro', symbol: '€', countryCode: 'EU' },
-    exchangeRate: { baseCurrency: 'INR', rate: 0.0092, inrRate: 108.5538, lastFetchedAt: new Date() },
-    settings: { isBaseCurrency: false, useLiveRate: true, isActive: true, sortOrder: 3 },
-    metadata: { isDeleted: false },
-  },
-  {
-    currencyInfo: { code: 'GBP', name: 'British Pound', symbol: '£', countryCode: 'GB' },
-    exchangeRate: { baseCurrency: 'INR', rate: 0.0078, inrRate: 128.082, lastFetchedAt: new Date() },
-    settings: { isBaseCurrency: false, useLiveRate: true, isActive: true, sortOrder: 4 },
-    metadata: { isDeleted: false },
-  },
-  {
-    currencyInfo: { code: 'AED', name: 'UAE Dirham', symbol: 'AED', countryCode: 'AE' },
-    exchangeRate: { baseCurrency: 'INR', rate: 0.0379, inrRate: 26.3842, lastFetchedAt: new Date() },
-    settings: { isBaseCurrency: false, useLiveRate: true, isActive: true, sortOrder: 5 },
-    metadata: { isDeleted: false },
-  },
-  {
-    currencyInfo: { code: 'CAD', name: 'Canadian Dollar', symbol: 'CA$', countryCode: 'CA' },
-    exchangeRate: { baseCurrency: 'INR', rate: 0.0148, inrRate: 67.7133, lastFetchedAt: new Date() },
-    settings: { isBaseCurrency: false, useLiveRate: true, isActive: true, sortOrder: 6 },
-    metadata: { isDeleted: false },
-  },
-  {
-    currencyInfo: { code: 'AUD', name: 'Australian Dollar', symbol: 'AU$', countryCode: 'AU' },
-    exchangeRate: { baseCurrency: 'INR', rate: 0.0148, inrRate: 67.7133, lastFetchedAt: new Date() },
-    settings: { isBaseCurrency: false, useLiveRate: true, isActive: true, sortOrder: 7 },
-    metadata: { isDeleted: false },
-  },
-  {
-    currencyInfo: { code: 'JPY', name: 'Japanese Yen', symbol: '¥', countryCode: 'JP' },
-    exchangeRate: { baseCurrency: 'INR', rate: 1.6347, inrRate: 0.6117, lastFetchedAt: new Date() },
-    settings: { isBaseCurrency: false, useLiveRate: true, isActive: true, sortOrder: 8 },
-    metadata: { isDeleted: false },
-  },
-];
-
 /**
- * Fetch external forex rates using native https
+ * Fetch external forex rates from ExchangeRate-API (base USD)
  */
-function fetchForexRates(base = 'INR') {
-  return new Promise((resolve, reject) => {
-    const url = `https://open.er-api.com/v6/latest/${base}`;
-    https.get(url, { timeout: 5000 }, (res) => {
+function fetchForexRates() {
+  return new Promise((resolve) => {
+    const url = 'https://api.exchangerate-api.com/v4/latest/USD';
+    https.get(url, { timeout: 8000 }, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
@@ -72,7 +20,7 @@ function fetchForexRates(base = 'INR') {
           } else {
             resolve(null);
           }
-        } catch (e) {
+        } catch {
           resolve(null);
         }
       });
@@ -83,27 +31,11 @@ function fetchForexRates(base = 'INR') {
 }
 
 class CurrencyService {
-  /**
-   * Seed default currencies if database collection is empty
-   */
-  async seedIfEmpty() {
-    const count = await Currency.countDocuments({ 'metadata.isDeleted': false });
-    if (count === 0) {
-      for (const cur of DEFAULT_CURRENCIES) {
-        await Currency.findOneAndUpdate(
-          { 'currencyInfo.code': cur.currencyInfo.code },
-          { $setOnInsert: cur },
-          { upsert: true, new: true }
-        );
-      }
-    }
-  }
 
   /**
    * Get all currencies with search, filter, and pagination
    */
   async getAll(queryParams = {}) {
-    await this.seedIfEmpty();
 
     const filter = { 'metadata.isDeleted': false };
 
@@ -319,12 +251,18 @@ class CurrencyService {
    * Sync real-time live rates for all currencies where useLiveRate is true
    */
   async syncLiveRates() {
-    await this.seedIfEmpty();
-
-    const liveRates = await fetchForexRates('INR');
+    const liveRates = await fetchForexRates();
     if (!liveRates) {
       throw new ApiError(503, 'Forex rates provider temporarily unreachable');
     }
+
+    // Determine the base currency and its rate against USD
+    const baseCurDoc = await Currency.findOne({
+      'metadata.isDeleted': false,
+      'settings.isBaseCurrency': true,
+    }).lean();
+    const baseCode = (baseCurDoc?.currencyInfo?.code || 'INR').toUpperCase();
+    const basePerUsd = liveRates[baseCode] || liveRates['INR'] || 1;
 
     const currencies = await Currency.find({
       'metadata.isDeleted': false,
@@ -337,10 +275,20 @@ class CurrencyService {
 
     for (const cur of currencies) {
       const code = cur.currencyInfo.code.toUpperCase();
-      const ratePerInr = liveRates[code];
+      if (code === baseCode) {
+        cur.exchangeRate.rate = 1;
+        cur.exchangeRate.inrRate = 1;
+        cur.exchangeRate.lastFetchedAt = now;
+        await cur.save();
+        updatedCount++;
+        continue;
+      }
 
-      if (ratePerInr && ratePerInr > 0) {
-        const inrPerUnit = 1 / ratePerInr;
+      const ratePerUsd = liveRates[code];
+      if (ratePerUsd && ratePerUsd > 0) {
+        const inrPerUnit = basePerUsd / ratePerUsd;
+        const ratePerInr = ratePerUsd / basePerUsd;
+
         cur.exchangeRate.rate = Number(ratePerInr.toFixed(6));
         cur.exchangeRate.inrRate = Number(inrPerUnit.toFixed(4));
         cur.exchangeRate.lastFetchedAt = now;
@@ -368,15 +316,31 @@ class CurrencyService {
       return currency;
     }
 
-    const liveRates = await fetchForexRates('INR');
+    const liveRates = await fetchForexRates();
     if (!liveRates) {
       throw new ApiError(503, 'Forex rates provider temporarily unreachable');
     }
 
+    const baseCurDoc = await Currency.findOne({
+      'metadata.isDeleted': false,
+      'settings.isBaseCurrency': true,
+    }).lean();
+    const baseCode = (baseCurDoc?.currencyInfo?.code || 'INR').toUpperCase();
+    const basePerUsd = liveRates[baseCode] || liveRates['INR'] || 1;
+
     const code = currency.currencyInfo.code.toUpperCase();
-    const ratePerInr = liveRates[code];
-    if (ratePerInr && ratePerInr > 0) {
-      const inrPerUnit = 1 / ratePerInr;
+    if (code === baseCode) {
+      currency.exchangeRate.rate = 1;
+      currency.exchangeRate.inrRate = 1;
+      currency.exchangeRate.lastFetchedAt = new Date();
+      await currency.save();
+      return currency;
+    }
+
+    const ratePerUsd = liveRates[code];
+    if (ratePerUsd && ratePerUsd > 0) {
+      const inrPerUnit = basePerUsd / ratePerUsd;
+      const ratePerInr = ratePerUsd / basePerUsd;
       currency.exchangeRate.rate = Number(ratePerInr.toFixed(6));
       currency.exchangeRate.inrRate = Number(inrPerUnit.toFixed(4));
       currency.exchangeRate.lastFetchedAt = new Date();

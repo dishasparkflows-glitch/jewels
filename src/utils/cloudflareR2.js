@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 class CloudflareR2Service {
@@ -9,18 +9,18 @@ class CloudflareR2Service {
     this.bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME;
     this.publicDomain = process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_URL;
 
-    if (this.isConfigured()) {
-      this.client = new S3Client({
-        region: 'auto',
-        endpoint: `https://${this.accountId}.r2.cloudflarestorage.com`,
-        credentials: {
-          accessKeyId: this.accessKeyId,
-          secretAccessKey: this.secretAccessKey,
-        },
-      });
-    } else {
-      this.client = null;
-    }
+    const endpoint =
+      process.env.CLOUDFLARE_R2_ENDPOINT ||
+      (this.accountId ? `https://${this.accountId}.r2.cloudflarestorage.com` : undefined);
+
+    this.client = new S3Client({
+      region: 'auto',
+      endpoint,
+      credentials: {
+        accessKeyId: this.accessKeyId,
+        secretAccessKey: this.secretAccessKey,
+      },
+    });
   }
 
   // ------------------------------- check cloudflare r2 configuration ----------------------------
@@ -33,16 +33,39 @@ class CloudflareR2Service {
     );
   }
 
+  // ------------------------------------------------------------- [ getMediaUrl ]
+  async getMediaUrl(key) {
+    if (!key) return null;
+
+    let cleanKey = key;
+    if (typeof cleanKey === 'string') {
+      if (cleanKey.includes('r2.cloudflarestorage.com/')) {
+        cleanKey = cleanKey.split('r2.cloudflarestorage.com/')[1];
+      } else if (cleanKey.includes('/api/upload/file/')) {
+        cleanKey = cleanKey.split('/api/upload/file/')[1];
+      } else if (this.publicDomain && cleanKey.includes(this.publicDomain)) {
+        cleanKey = cleanKey.replace(this.publicDomain, '');
+      }
+      cleanKey = cleanKey.replace(/^\/+/, '');
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: cleanKey,
+    });
+
+    const downloadUrl = await getSignedUrl(this.client, command, {
+      expiresIn: 86400,
+    });
+
+    return downloadUrl;
+  }
+
   // ------------------------------- generate presigned put url ----------------------------
   async getPresignedPutUrl({ filename, contentType = 'image/jpeg', folder = 'banners' }) {
     const cleanFilename = (filename || 'asset').replace(/[^a-zA-Z0-9.-]/g, '_');
     const cleanFolder = (folder || 'general').replace(/^\/+|\/+$/g, '');
     const key = `${cleanFolder}/${Date.now()}-${cleanFilename}`;
-
-    // If Cloudflare R2 credentials are fully configured
-    if (!this.isConfigured() || !this.client) {
-      throw new Error('Cloudflare R2 is not configured. Please set CLOUDFLARE_R2 credentials in .env');
-    }
 
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
@@ -72,10 +95,6 @@ class CloudflareR2Service {
   async uploadBuffer(buffer, filename, folder = 'OrnateProducts', contentType = 'image/jpeg') {
     const cleanFilename = (filename || 'asset.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
     const key = `${folder}/${Date.now()}-${cleanFilename}`;
-
-    if (!this.isConfigured() || !this.client) {
-      throw new Error('Cloudflare R2 is not configured. Please set CLOUDFLARE_R2 credentials in .env');
-    }
 
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
@@ -126,4 +145,8 @@ class CloudflareR2Service {
   }
 }
 
-module.exports = new CloudflareR2Service();
+const cloudflareR2Service = new CloudflareR2Service();
+cloudflareR2Service.getMediaUrl = cloudflareR2Service.getMediaUrl.bind(cloudflareR2Service);
+
+module.exports = cloudflareR2Service;
+module.exports.CloudflareR2Service = CloudflareR2Service;

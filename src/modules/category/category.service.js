@@ -53,7 +53,7 @@ class CategoryService {
     }
 
     return await Category.find(filter)
-      .select('_id name type slug subTypes images')
+      .select('_id name')
       .sort({ name: 1 })
       .lean();
   }

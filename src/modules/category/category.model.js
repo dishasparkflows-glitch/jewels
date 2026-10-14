@@ -13,6 +13,40 @@ const subTypeSchema = new mongoose.Schema(
   { _id: true }
 );
 
+const promoBannerSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    image: {
+      url: { type: String, trim: true, default: '' },
+      public_id: { type: String, trim: true, default: '' },
+    },
+    link: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    subtitle: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'active',
+    },
+    order: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { _id: true }
+);
+
 const categorySchema = new mongoose.Schema(
   {
     name: {
@@ -33,6 +67,14 @@ const categorySchema = new mongoose.Schema(
         title: String,
       },
     ],
+    icon: {
+      url: { type: String, trim: true, default: '' },
+      public_id: { type: String, trim: true, default: '' },
+    },
+    banner: {
+      url: { type: String, trim: true, default: '' },
+      public_id: { type: String, trim: true, default: '' },
+    },
     sizeChart: {
       url: String,
       public_id: String,
@@ -55,6 +97,8 @@ const categorySchema = new mongoose.Schema(
       index: true,
     },
     subTypes: [subTypeSchema],
+    promoBanners: [promoBannerSchema],
+    prompbanners: [promoBannerSchema],
   },
   {
     versionKey: false,
@@ -71,6 +115,12 @@ categorySchema.pre('save', function (next) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+  // Sync promoBanners and prompbanners
+  if (this.promoBanners && this.promoBanners.length > 0 && (!this.prompbanners || this.prompbanners.length === 0)) {
+    this.prompbanners = this.promoBanners;
+  } else if (this.prompbanners && this.prompbanners.length > 0 && (!this.promoBanners || this.promoBanners.length === 0)) {
+    this.promoBanners = this.prompbanners;
   }
   next();
 });

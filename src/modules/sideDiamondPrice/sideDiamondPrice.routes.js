@@ -9,6 +9,9 @@ router.get('/lookup', sideDiamondPriceController.getLookup);
 router.get('/', sideDiamondPriceController.getAll);
 router.get('/:id', sideDiamondPriceController.getOne);
 
+// Bulk save endpoint
+router.post('/bulk', sideDiamondPriceController.bulkSave);
+
 // Protected Admin endpoints
 router.post(
   '/',

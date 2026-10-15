@@ -60,6 +60,15 @@ class SideDiamondPriceController {
     );
   });
 
+  // ------------------------------- bulk save side diamond prices ------------------------
+
+  bulkSave = catchAsync(async (req, res) => {
+    const userId = req.user?._id || null;
+    const items = req.body?.items || req.body;
+    const result = await sideDiamondPriceService.bulkSave(items, userId);
+    ApiResponse.success(res, result, 'Side diamond prices saved successfully');
+  });
+
   // ------------------------------- delete side diamond price ----------------------------
 
   delete = catchAsync(async (req, res) => {

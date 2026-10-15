@@ -121,6 +121,69 @@ class SideDiamondPriceService {
     return item;
   }
 
+  // ------------------------------- bulk save side diamond prices ------------------------
+
+  async bulkSave(items = [], userId = null) {
+    if (!Array.isArray(items)) return { count: 0, items: [] };
+    const saved = [];
+    for (const item of items) {
+      const id = item._id || item.id;
+      const data = {
+        diamondTypeId: item.diamondTypeId?._id || item.diamondTypeId,
+        diamondShapeId: item.diamondShapeId?._id || item.diamondShapeId,
+        diamondColorId: item.diamondColorId?._id || item.diamondColorId,
+        diamondClarityId: item.diamondClarityId?._id || item.diamondClarityId,
+        sizeFrom: Number(item.sizeFrom) || 0,
+        sizeTo: Number(item.sizeTo) || 0,
+        priceINR: Number(item.priceINR) || 0,
+        priceUSD: Number(item.priceUSD) || 0,
+        updatedBy: userId || null,
+        isDeleted: Boolean(item.isDeleted),
+      };
+
+      if (!data.diamondTypeId || !data.diamondShapeId || !data.diamondColorId || !data.diamondClarityId) {
+        continue;
+      }
+
+      if (item.isDeleted && id && !String(id).startsWith('new_')) {
+        await SideDiamondPrice.findByIdAndUpdate(id, { $set: { isDeleted: true } });
+        continue;
+      }
+
+      if (id && !String(id).startsWith('new_')) {
+        const updated = await SideDiamondPrice.findByIdAndUpdate(
+          id,
+          { $set: data },
+          { new: true, runValidators: true }
+        );
+        if (updated) saved.push(updated);
+      } else {
+        const existing = await SideDiamondPrice.findOne({
+          diamondTypeId: data.diamondTypeId,
+          diamondShapeId: data.diamondShapeId,
+          diamondColorId: data.diamondColorId,
+          diamondClarityId: data.diamondClarityId,
+          sizeFrom: data.sizeFrom,
+          sizeTo: data.sizeTo,
+          isDeleted: false,
+        });
+
+        if (existing) {
+          const updated = await SideDiamondPrice.findByIdAndUpdate(
+            existing._id,
+            { $set: data },
+            { new: true }
+          );
+          if (updated) saved.push(updated);
+        } else {
+          const created = await SideDiamondPrice.create(data);
+          if (created) saved.push(created);
+        }
+      }
+    }
+    return { count: saved.length, items: saved };
+  }
+
   // ------------------------------- delete side diamond price ----------------------------
 
   async delete(id) {

@@ -9,6 +9,9 @@ router.get('/lookup', centerDiamondPriceController.getLookup);
 router.get('/', centerDiamondPriceController.getAll);
 router.get('/:id', centerDiamondPriceController.getOne);
 
+// Bulk save endpoint
+router.post('/bulk', centerDiamondPriceController.bulkSave);
+
 // Protected Admin endpoints
 router.post(
   '/',

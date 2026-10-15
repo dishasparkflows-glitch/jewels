@@ -48,6 +48,15 @@ class CenterDiamondPriceController {
     ApiResponse.success(res, item, 'Center diamond price updated successfully');
   });
 
+  // ------------------------------- bulk save center diamond prices ------------------------
+
+  bulkSave = catchAsync(async (req, res) => {
+    const userId = req.user?._id || null;
+    const items = req.body?.items || req.body;
+    const result = await centerDiamondPriceService.bulkSave(items, userId);
+    ApiResponse.success(res, result, 'Center diamond prices saved successfully');
+  });
+
   // ------------------------------- delete center diamond price ----------------------------
 
   delete = catchAsync(async (req, res) => {

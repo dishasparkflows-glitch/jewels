@@ -24,13 +24,8 @@ class ProductService {
       if (data.pricing.gstPercentage !== undefined && !data.gstPercentage) data.gstPercentage = data.pricing.gstPercentage;
       if (data.pricing.markupPercentage !== undefined && !data.markupPercentage) data.markupPercentage = data.pricing.markupPercentage;
     }
-    if (data.specifications) {
-      if (data.specifications.metalName && !data.metalName) data.metalName = data.specifications.metalName;
-      if (data.specifications.metalWeight !== undefined && !data.baseMetalWeight) data.baseMetalWeight = data.specifications.metalWeight;
-      if (data.specifications.metalPurity !== undefined && !data.purity) data.purity = data.specifications.metalPurity;
-      if (data.specifications.grossWeight !== undefined && !data.grossWt) data.grossWt = data.specifications.grossWeight;
-      if (data.specifications.netWeight !== undefined && !data.netWt) data.netWt = data.specifications.netWeight;
-      if (data.specifications.stoneWeight !== undefined && !data.stoneWt) data.stoneWt = data.specifications.stoneWeight;
+    if (data.specifications?.metalWeight !== undefined && !data.baseMetalWeight) {
+      data.baseMetalWeight = data.specifications.metalWeight;
     }
     if (data.ornate) {
       if (data.ornate.tagNo && !data.tagNo) data.tagNo = data.ornate.tagNo;
@@ -65,18 +60,15 @@ class ProductService {
       : { $or: [{ slug: id }, { sku: id }], isDeleted: false };
 
     let product = await Product.findOne(filter)
-      .populate('category', 'name slug')
+      .populate('category', 'name slug sizeChart subTypes')
       .populate('metalColors', 'name code hex')
       .populate('colorImages.metalColor', 'name code hex')
+      .populate('variants.metalPurity', 'name karat metalType')
+      .populate('variants.diamondType', 'name')
+      .populate('variants.diamondShape', 'name')
+      .populate('variants.diamondColor', 'name')
+      .populate('variants.diamondClarity', 'name')
       .lean();
-
-    if (!product) {
-      product = await Product.findOne({ isDeleted: false, 'images.0': { $exists: true } })
-        .populate('category', 'name slug')
-        .populate('metalColors', 'name code hex')
-        .populate('colorImages.metalColor', 'name code hex')
-        .lean();
-    }
 
     if (!product) {
       throw new ApiError(404, 'Product not found');
@@ -177,14 +169,13 @@ class ProductService {
   // Helper to format concise product card info for the home page
   _formatHomeProduct(p) {
     if (!p) return null;
-    const title = p.basicInfo?.title || p.title || p.itemName || 'Fine Jewellery';
+    const title = p.basicInfo?.title || p.title || p.itemName || '';
     const sku = p.basicInfo?.sku || p.sku || p.tagNo || '';
     const slug = p.basicInfo?.slug || p.slug || '';
 
-    // Determine effective selling price
     const salePrice = Number(p.salePrice || p.pricing?.salePrice || p.displayPrice || p.price || 0);
-    const mrp = Number(p.mrp || p.pricing?.mrp || (salePrice > 0 ? salePrice * 1.2 : 0));
-    const price = salePrice > 0 ? salePrice : (mrp > 0 ? mrp : 42000);
+    const mrp = Number(p.mrp || p.pricing?.mrp || 0);
+    const price = salePrice > 0 ? salePrice : (mrp > 0 ? mrp : null);
 
     // Extract primary image
     let image = '';
@@ -213,8 +204,6 @@ class ProductService {
       image = '';
     }
 
-    const swatches = ['#f2d08a', '#e3a89a', '#e5e7eb']; // Yellow Gold, Rose Gold, White Gold
-
     return {
       _id: p._id,
       id: p._id,
@@ -222,17 +211,16 @@ class ProductService {
       sku,
       slug,
       price,
-      salePrice: salePrice > 0 ? salePrice : price,
-      mrp: mrp > price ? mrp : Math.round(price * 1.15),
+      salePrice: salePrice > 0 ? salePrice : (mrp > 0 ? mrp : null),
+      mrp: mrp > 0 ? mrp : null,
       image,
       images,
-      swatches,
-      metalName: p.metalName || 'Gold',
+      metalName: p.metalName || '',
       category: p.category || [],
-      productType: p.productType || (p.isOrnate ? 'ornate' : 'jewelry'),
+      productType: p.productType || '',
       isOrnate: Boolean(p.isOrnate),
-      inStock: p.inStock ?? p.stockQty ?? 1,
-      stockStatus: p.stockStatus || 'In Stock',
+      inStock: p.inStock ?? p.stockQty,
+      stockStatus: p.stockStatus || '',
     };
   }
 
@@ -370,7 +358,7 @@ class ProductService {
       return {
         _id: p._id,
         id: p._id,
-        title: p.title || p.basicInfo?.title || 'Fine Jewellery',
+        title: p.title || p.basicInfo?.title || '',
         sku: p.sku || p.tagNo || p.basicInfo?.sku || '',
         tagNo: p.tagNo || '',
         category: p.category || [],
@@ -379,7 +367,7 @@ class ProductService {
         mrp: p.mrp || 0,
         productType: p.productType,
         isOrnate: Boolean(p.isOrnate),
-        metalName: p.specifications?.metalName || p.metalName || (p.isOrnate ? 'Silver' : 'Gold'),
+        metalName: p.metalName || '',
         status: p.status,
         images: p.images || [],
         colorImages: p.colorImages || [],
@@ -409,13 +397,8 @@ class ProductService {
       if (data.pricing.gstPercentage !== undefined) data.gstPercentage = data.pricing.gstPercentage;
       if (data.pricing.markupPercentage !== undefined) data.markupPercentage = data.pricing.markupPercentage;
     }
-    if (data.specifications) {
-      if (data.specifications.metalName) data.metalName = data.specifications.metalName;
-      if (data.specifications.metalWeight !== undefined) data.baseMetalWeight = data.specifications.metalWeight;
-      if (data.specifications.metalPurity !== undefined) data.purity = data.specifications.metalPurity;
-      if (data.specifications.grossWeight !== undefined) data.grossWt = data.specifications.grossWeight;
-      if (data.specifications.netWeight !== undefined) data.netWt = data.specifications.netWeight;
-      if (data.specifications.stoneWeight !== undefined) data.stoneWt = data.specifications.stoneWeight;
+    if (data.specifications?.metalWeight !== undefined) {
+      data.baseMetalWeight = data.specifications.metalWeight;
     }
     if (data.ornate) {
       if (data.ornate.tagNo) data.tagNo = data.ornate.tagNo;

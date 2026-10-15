@@ -62,9 +62,7 @@ class CategoryService {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { isDeleted: false };
 
-    if (queryParams.type) {
-      filter.type = queryParams.type;
-    }
+
     if (queryParams.status) {
       filter.status = queryParams.status;
     }
@@ -88,12 +86,10 @@ class CategoryService {
   async getLookup(queryParams = {}) {
     const filter = { isDeleted: false, status: 'active' };
 
-    if (queryParams.type) {
-      filter.type = queryParams.type;
-    }
+
 
     return await Category.find(filter)
-      .select('_id name banner icon images subTypes promoBanners type slug')
+      .select('_id name banner icon images subTypes promoBanners slug')
       .sort({ name: 1 })
       .lean();
   }

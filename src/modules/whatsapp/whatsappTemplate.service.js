@@ -77,7 +77,7 @@ class WhatsAppTemplateService {
         } else if (v.source === 'appointment.time') {
           val = context.appointment?.preferredTime || context.appointment?.time || context.preferredTime || context.time;
         } else if (v.source === 'appointment.location') {
-          val = context.appointment?.location || context.location || 'Neirah Jewels Atelier';
+          val = context.appointment?.location || context.location;
         } else if (v.source === 'order.orderNumber') {
           val = context.order?.orderNumber || context.order?.id || context.orderId;
         } else if (v.source === 'order.totalAmount') {
@@ -364,24 +364,7 @@ class WhatsAppTemplateService {
   async previewTemplate(id, customContext = null) {
     const template = await this.getTemplateById(id);
 
-    const sampleContext = customContext || {
-      customer: { name: 'Prit' },
-      appointment: {
-        customerName: 'Prit',
-        date: 'Monday, 12 October 2026',
-        time: '04:00 PM',
-        location: 'Neirah Jewels Atelier, Gandhinagar, Gujarat',
-      },
-      order: {
-        orderNumber: 'NJ-8921',
-        totalAmount: 18450,
-        items: [{ name: 'Solitaire Diamond Ring', quantity: 1, price: 18450 }],
-      },
-      inquiry: {
-        customerName: 'Prit',
-        jewelryType: 'Custom Solitaire Ring',
-      },
-    };
+    const sampleContext = { ...(customContext || {}), __strictNoDefaults: true };
 
     const parameters = this.resolveTemplateVariables(template, sampleContext);
     const renderedText = this.renderTemplatePreview(template, parameters);

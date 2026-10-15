@@ -43,7 +43,7 @@ const cartItemSchema = new mongoose.Schema(
     },
     selectedMetal: {
       type: String,
-      default: '18K Yellow Gold',
+      default: '',
     },
     selectedSize: {
       type: String,

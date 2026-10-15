@@ -5,25 +5,7 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class SettingService {
   // ------------------------------- get settings ----------------------------
   async getSettings() {
-    let settings = await Setting.findOne({ isDeleted: false }).lean();
-    if (!settings) {
-      settings = await Setting.create({
-        companyName: 'Neirah',
-        emailAddress: 'info@neirah.in',
-        mobileNumber: '+91 84600-91955',
-        storeAddress:
-          'Sanskrut - 1 GH Road G-1. 1/2 Sector 3D plot no.1182 G-1, near Hi-Tech hospital, Gandhinagar',
-        gstCode: '24AAAAA0000A1Z5',
-        panCode: 'ABCDE1234F',
-        returnPeriodDays: 10,
-        returnPolicy: 'Easy 15-Day Returns & Refund',
-        shippingPolicy: '',
-        bankName: 'HDFC BANK',
-        bankAccountNumber: '50200012345678',
-        ifscCode: 'HDFC0000451',
-      });
-    }
-    return settings;
+    return (await Setting.findOne({ isDeleted: false }).lean()) || {};
   }
 
   // ------------------------------- update settings ----------------------------

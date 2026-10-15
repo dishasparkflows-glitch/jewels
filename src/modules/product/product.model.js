@@ -21,7 +21,6 @@ const basicInfoSchema = new mongoose.Schema({
   productType: {
     type: String,
     enum: ['gold', 'silver', 'jewelry', 'standard', 'ornate'],
-    default: 'gold',
   },
   isOrnate: { type: Boolean, default: false },
 }, { _id: false });
@@ -31,17 +30,12 @@ const pricingSchema = new mongoose.Schema({
   salePrice: { type: Number, default: 0 },
   costPrice: { type: Number, default: 0 },
   displayPrice: { type: Number, default: 0 },
-  gstPercentage: { type: Number, default: 3 },
+  gstPercentage: { type: Number },
   markupPercentage: { type: Number, default: 0 },
 }, { _id: false });
 
 const specificationsSchema = new mongoose.Schema({
-  metalName: { type: String, default: 'Gold' },
   metalWeight: { type: Number, default: 0 },
-  metalPurity: { type: Number, default: 18 },
-  grossWeight: { type: Number, default: 0 },
-  netWeight: { type: Number, default: 0 },
-  stoneWeight: { type: Number, default: 0 },
 }, { _id: false });
 
 const ornateSchema = new mongoose.Schema({
@@ -87,7 +81,6 @@ const productSchema = new mongoose.Schema(
     productType: {
       type: String,
       enum: ['gold', 'silver', 'jewelry', 'standard', 'ornate'],
-      default: 'gold',
       index: true,
     },
     // Flag to distinguish ornate products in single collection
@@ -105,7 +98,6 @@ const productSchema = new mongoose.Schema(
     },
     gstPercentage: {
       type: Number,
-      default: 3,
     },
     baseMetalWeight: {
       type: Number,
@@ -361,7 +353,7 @@ const productSchema = new mongoose.Schema(
     stonePcs: { type: Number, default: 0 },
     diamondWt: { type: Number, default: 0 },
     diamondPcs: { type: Number, default: 0 },
-    pcs: { type: Number, default: 1 },
+    pcs: { type: Number },
     goldRate: { type: Number, default: 0 },
     metalRate: { type: Number, default: 0 },
     goldAmt: { type: Number, default: 0 },
@@ -374,14 +366,14 @@ const productSchema = new mongoose.Schema(
     totalAmt: { type: Number, default: 0 },
     totalCostAmt: { type: Number, default: 0 },
     gstAmt: { type: Number, default: 0 },
-    gstPer: { type: Number, default: 3 },
+    gstPer: { type: Number },
     salesPrice: { type: Number, default: 0 },
     salesAmt: { type: Number, default: 0 },
     mrp: { type: Number, default: 0 },
-    inStock: { type: Number, default: 1 },
+    inStock: { type: Number },
     isSold: { type: Boolean, default: false },
-    inapp: { type: Boolean, default: true },
-    inweb: { type: Boolean, default: true },
+    inapp: { type: Boolean },
+    inweb: { type: Boolean },
     customGroupName: { type: String, default: '' },
     labelOrgDate: { type: Date, default: null },
     labelCreationDate: { type: Date, default: null },
@@ -391,14 +383,13 @@ const productSchema = new mongoose.Schema(
       mediaType: { type: String, default: 'image' },
     }],
     studdedDetails: { type: [studdedDetailSchema], default: [] },
-    lastSyncedAt: { type: Date, default: Date.now },
+    lastSyncedAt: { type: Date },
     sessionId: { type: String, default: '' },
 
     // ── Status & Metadata ─────────────────────────────────────
     stockStatus: {
       type: String,
       enum: ['In Stock', 'Out of Stock', 'Made to Order'],
-      default: 'In Stock',
     },
     displayPrice: {
       type: Number,
@@ -407,7 +398,6 @@ const productSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ['active', 'inactive', 'draft', 'approved'],
-      default: 'active',
       index: true,
     },
     isDeleted: {
@@ -494,26 +484,19 @@ productSchema.pre('validate', function (next) {
   if (this.pricing.salePrice === undefined || this.pricing.salePrice === 0) this.pricing.salePrice = this.salePrice || this.price || 0;
   if (this.pricing.costPrice === undefined || this.pricing.costPrice === 0) this.pricing.costPrice = this.costPrice || 0;
   if (this.pricing.displayPrice === undefined || this.pricing.displayPrice === 0) this.pricing.displayPrice = this.displayPrice || this.salePrice || this.price || 0;
-  if (this.pricing.gstPercentage === undefined) this.pricing.gstPercentage = this.gstPercentage || 3;
+  if (this.pricing.gstPercentage === undefined && this.gstPercentage !== undefined) {
+    this.pricing.gstPercentage = this.gstPercentage;
+  }
   if (this.pricing.markupPercentage === undefined) this.pricing.markupPercentage = this.markupPercentage || 0;
 
-  // ── Sync specifications ─────────────────────
-  if (this.specifications) {
-    if (this.specifications.metalName && !this.metalName) this.metalName = this.specifications.metalName;
-    if (this.specifications.metalWeight !== undefined && !this.baseMetalWeight) this.baseMetalWeight = this.specifications.metalWeight;
-    if (this.specifications.metalPurity !== undefined && !this.purity) this.purity = this.specifications.metalPurity;
-    if (this.specifications.grossWeight !== undefined && !this.grossWt) this.grossWt = this.specifications.grossWeight;
-    if (this.specifications.netWeight !== undefined && !this.netWt) this.netWt = this.specifications.netWeight;
-    if (this.specifications.stoneWeight !== undefined && !this.stoneWt) this.stoneWt = this.specifications.stoneWeight;
-  } else {
-    this.specifications = {};
+  // ── Sync the retained Metal Weight specification ──
+  if (this.specifications?.metalWeight !== undefined && !this.baseMetalWeight) {
+    this.baseMetalWeight = this.specifications.metalWeight;
   }
-  if (!this.specifications.metalName) this.specifications.metalName = this.metalName || 'Gold';
-  if (this.specifications.metalWeight === undefined || this.specifications.metalWeight === 0) this.specifications.metalWeight = this.baseMetalWeight || this.netWt || 0;
-  if (this.specifications.metalPurity === undefined || this.specifications.metalPurity === 0) this.specifications.metalPurity = this.purity || 18;
-  if (this.specifications.grossWeight === undefined || this.specifications.grossWeight === 0) this.specifications.grossWeight = this.grossWt || 0;
-  if (this.specifications.netWeight === undefined || this.specifications.netWeight === 0) this.specifications.netWeight = this.netWt || 0;
-  if (this.specifications.stoneWeight === undefined || this.specifications.stoneWeight === 0) this.specifications.stoneWeight = this.stoneWt || 0;
+  if (!this.specifications) this.specifications = {};
+  if (this.specifications.metalWeight === undefined || this.specifications.metalWeight === 0) {
+    this.specifications.metalWeight = this.baseMetalWeight || 0;
+  }
 
   // ── Sync ornate ─────────────────────────────
   if (this.ornate) {

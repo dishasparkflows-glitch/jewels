@@ -2,55 +2,6 @@ const { TopAnnouncement, TopAnnouncementSetting } = require('./topAnnouncement.m
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
-// 5 default announcements matching user screenshot exactly
-const DEFAULT_ANNOUNCEMENTS = [
-  {
-    message: 'BIS Hallmarked & Certified Jewellery ✨',
-    link: '/about-bis',
-    isActive: true,
-    order: 1,
-    startDate: new Date('2026-10-13T00:00:00.000Z'),
-    endDate: null,
-    hasNoEndDate: true,
-  },
-  {
-    message: 'Free Secure Shipping on All Orders 🚚',
-    link: '/shipping-policy',
-    isActive: true,
-    order: 2,
-    startDate: new Date('2026-10-13T00:00:00.000Z'),
-    endDate: null,
-    hasNoEndDate: true,
-  },
-  {
-    message: '📱 Neirah Mobile App Available on iOS & Android — Download Now ✨',
-    link: '/mobile-app',
-    isActive: true,
-    order: 3,
-    startDate: new Date('2026-10-13T00:00:00.000Z'),
-    endDate: null,
-    hasNoEndDate: true,
-  },
-  {
-    message: 'Festive Season Sale — Up to 20% Off on Selected Pieces 🎁',
-    link: '/collections/festive',
-    isActive: false,
-    order: 4,
-    startDate: new Date('2026-10-20T00:00:00.000Z'),
-    endDate: new Date('2026-10-30T23:59:59.000Z'),
-    hasNoEndDate: false,
-  },
-  {
-    message: 'Custom Jewellery? Talk to Our Experts 💬',
-    link: '/contact-us',
-    isActive: true,
-    order: 5,
-    startDate: new Date('2026-10-13T00:00:00.000Z'),
-    endDate: null,
-    hasNoEndDate: true,
-  },
-];
-
 class TopAnnouncementService {
   // ─── Global Settings ───────────────────────────────────────
   async getSettings() {
@@ -77,14 +28,6 @@ class TopAnnouncementService {
       await settings.save();
     }
     return settings;
-  }
-
-  // ─── Auto-seed / Defaults ──────────────────────────────────
-  async seedDefaults() {
-    await TopAnnouncement.deleteMany({});
-    const created = await TopAnnouncement.insertMany(DEFAULT_ANNOUNCEMENTS);
-    await this.updateSettings({ isEnabled: true });
-    return created;
   }
 
   // ─── Get All (Admin) ───────────────────────────────────────
@@ -159,13 +102,6 @@ class TopAnnouncementService {
       .select('_id message link order startDate endDate hasNoEndDate')
       .lean();
 
-    // Fallback: If no scheduled items are active right now, check for default active items
-    if (items.length === 0) {
-      items = await TopAnnouncement.find({ isDeleted: false, isActive: true })
-        .sort({ order: 1 })
-        .select('_id message link order startDate endDate hasNoEndDate')
-        .lean();
-    }
 
     return {
       isEnabled: settings.isEnabled,

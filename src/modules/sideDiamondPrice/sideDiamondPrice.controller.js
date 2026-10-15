@@ -1,6 +1,7 @@
 const sideDiamondPriceService = require('./sideDiamondPrice.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const { importDiamondPriceWorkbook } = require('../../utils/diamondPriceExcelImport');
 
 class SideDiamondPriceController {
   // ------------------------------- create side diamond price ----------------------------
@@ -58,6 +59,18 @@ class SideDiamondPriceController {
       item,
       'Side diamond price entry updated successfully'
     );
+  });
+
+  // Import an Excel workbook and persist its rows through the existing upsert service.
+  importExcel = catchAsync(async (req, res) => {
+    const items = await importDiamondPriceWorkbook({
+      buffer: req.body,
+      filename: req.headers['x-file-name'] || req.query.filename || '',
+      diamondTypeId: req.query.diamondTypeId || req.body?.diamondTypeId,
+      userId: req.user?._id || null,
+    });
+    const result = await sideDiamondPriceService.bulkSave(items, req.user?._id || null);
+    ApiResponse.success(res, result, 'Side diamond prices imported successfully');
   });
 
   // ------------------------------- bulk save side diamond prices ------------------------

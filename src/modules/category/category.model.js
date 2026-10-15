@@ -95,12 +95,6 @@ const categorySchema = new mongoose.Schema(
       default: false,
       index: true,
     },
-    type: {
-      type: String,
-      enum: ['category', 'collection'],
-      default: 'category',
-      index: true,
-    },
     subTypes: [subTypeSchema],
     promoBanners: [promoBannerSchema],
   },

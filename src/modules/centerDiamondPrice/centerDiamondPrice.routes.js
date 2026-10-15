@@ -9,6 +9,9 @@ router.get('/lookup', centerDiamondPriceController.getLookup);
 router.get('/', centerDiamondPriceController.getAll);
 router.get('/:id', centerDiamondPriceController.getOne);
 
+// Authenticated workbook import
+router.post('/import', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), centerDiamondPriceController.importExcel);
+
 // Bulk save endpoint
 router.post('/bulk', centerDiamondPriceController.bulkSave);
 

@@ -9,6 +9,9 @@ router.get('/lookup', sideDiamondPriceController.getLookup);
 router.get('/', sideDiamondPriceController.getAll);
 router.get('/:id', sideDiamondPriceController.getOne);
 
+// Authenticated workbook import
+router.post('/import', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), sideDiamondPriceController.importExcel);
+
 // Bulk save endpoint
 router.post('/bulk', sideDiamondPriceController.bulkSave);
 

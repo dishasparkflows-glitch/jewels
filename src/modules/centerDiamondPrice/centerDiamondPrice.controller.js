@@ -1,6 +1,7 @@
 const centerDiamondPriceService = require('./centerDiamondPrice.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const { importDiamondPriceWorkbook } = require('../../utils/diamondPriceExcelImport');
 
 class CenterDiamondPriceController {
   // ------------------------------- create center diamond price ----------------------------
@@ -46,6 +47,18 @@ class CenterDiamondPriceController {
     }
     const item = await centerDiamondPriceService.update(req.params.id, req.body);
     ApiResponse.success(res, item, 'Center diamond price updated successfully');
+  });
+
+  // Import an Excel workbook and persist its rows through the existing upsert service.
+  importExcel = catchAsync(async (req, res) => {
+    const items = await importDiamondPriceWorkbook({
+      buffer: req.body,
+      filename: req.headers['x-file-name'] || req.query.filename || '',
+      diamondTypeId: req.query.diamondTypeId || req.body?.diamondTypeId,
+      userId: req.user?._id || null,
+    });
+    const result = await centerDiamondPriceService.bulkSave(items, req.user?._id || null);
+    ApiResponse.success(res, result, 'Center diamond prices imported successfully');
   });
 
   // ------------------------------- bulk save center diamond prices ------------------------

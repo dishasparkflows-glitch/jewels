@@ -1,4 +1,5 @@
 const Size = require('./size.model');
+require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 

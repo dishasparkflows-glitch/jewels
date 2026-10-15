@@ -34,12 +34,6 @@ router.put(
   topAnnouncementController.reorder
 );
 
-router.post(
-  '/seed',
-  authenticate,
-  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
-  topAnnouncementController.seedDefaults
-);
 
 router.post(
   '/:id/duplicate',

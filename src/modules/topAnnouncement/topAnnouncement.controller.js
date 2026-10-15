@@ -69,11 +69,6 @@ class TopAnnouncementController {
     ApiResponse.success(res, result, 'Announcements reordered successfully');
   });
 
-  // Seed defaults
-  seedDefaults = catchAsync(async (req, res) => {
-    const items = await topAnnouncementService.seedDefaults();
-    ApiResponse.success(res, items, 'Default announcements seeded successfully');
-  });
 
   // Delete
   delete = catchAsync(async (req, res) => {

@@ -139,7 +139,7 @@ class CartService {
 
     const productIdStr = String(productData.productId).trim();
     const parsedQty = Math.max(1, parseInt(quantity, 10) || 1);
-    const selectedMetal = options.selectedMetal || productData.selectedMetal || '18K Yellow Gold';
+    const selectedMetal = options.selectedMetal || productData.selectedMetal || '';
     const selectedSize = options.selectedSize || productData.selectedSize || '';
 
     const cart = await this.findOrCreateCart(userId, sessionId);
@@ -170,7 +170,7 @@ class CartService {
       cart.items.push({
         product: productRef,
         productId: productIdStr,
-        title: productData.title || productData.name || 'Fine Jewellery Piece',
+        title: productData.title || productData.name || '',
         price: Number(productData.price) || 0,
         originalPrice: productData.originalPrice ? Number(productData.originalPrice) : null,
         image: productData.image || '',

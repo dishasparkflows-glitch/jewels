@@ -386,7 +386,7 @@ const seedAll = async () => {
         ],
       },
       {
-        name: 'Pendant & Necklaces',
+        name: 'Pendant',
         slug: 'pendant',
         type: 'category',
         images: [{ url: '/featured/necklace.jpg', title: 'Fine Pendants' }],
@@ -481,29 +481,22 @@ const seedAll = async () => {
     const seededDiamondTypes = await DiamondType.insertMany(diamondTypesData);
 
     const diamondShapesData = [
-      { name: 'Round Brilliant' },
-      { name: 'Oval' },
-      { name: 'Emerald' },
-      { name: 'Princess' },
-      { name: 'Cushion' },
-      { name: 'Pear' },
-      { name: 'Radiant' },
-      { name: 'Marquise' },
-      { name: 'Asscher' },
-      { name: 'Heart' },
+      { name: 'Round' },
+      { name: 'Fancy' },
     ];
     const seededDiamondShapes = await DiamondShape.insertMany(diamondShapesData);
 
     const diamondColorsData = [
-      { name: 'D' }, { name: 'E' }, { name: 'F' },
-      { name: 'G' }, { name: 'H' }, { name: 'I' }, { name: 'J' },
+      { name: 'D-E' },
+      { name: 'E-F' },
+      { name: 'F-G' },
+      { name: 'G-H' },
     ];
     const seededDiamondColors = await DiamondColor.insertMany(diamondColorsData);
 
     const diamondClaritiesData = [
-      { name: 'FL' }, { name: 'IF' }, { name: 'VVS1' },
-      { name: 'VVS2' }, { name: 'VS1' }, { name: 'VS2' },
-      { name: 'SI1' }, { name: 'SI2' },
+      { name: 'VS' },
+      { name: 'VVS' },
     ];
     const seededDiamondClarities = await DiamondClarity.insertMany(diamondClaritiesData);
 
@@ -564,20 +557,41 @@ const seedAll = async () => {
     const pendantCat = catMap['pendant'];
 
     const sizesData = [
-      // Ring Sizes
-      ...[10, 12, 14, 16, 18, 20].map((s) => ({
-        name: `Ring Size ${s}`,
+      // Rings: 3 to 12 (10/06/2026)
+      ...['3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map((s, idx) => ({
+        name: s,
+        categoryId: ringCat._id,
         category: ringCat._id,
+        status: 'active',
+        isDeleted: false,
+        meta: { createdAt: new Date(`2026-06-10T10:0${idx}:00.000Z`), updatedAt: new Date(`2026-06-10T10:0${idx}:00.000Z`) },
       })),
-      // Bangle / Bracelet Sizes
-      ...['2.2 (54mm)', '2.4 (57mm)', '2.6 (60mm)', '2.8 (64mm)', '7.0 Inch', '7.5 Inch'].map((s) => ({
-        name: `Bangle Size ${s}`,
+      // Bangles & Bracelets: 6 In to 8.5 In (10/06/2026)
+      ...['6 In', '6.5 In', '7 In', '7.5 In', '8 In', '8.5 In'].map((s, idx) => ({
+        name: s,
+        categoryId: bangleCat._id,
         category: bangleCat._id,
+        status: 'active',
+        isDeleted: false,
+        meta: { createdAt: new Date(`2026-06-10T11:0${idx}:00.000Z`), updatedAt: new Date(`2026-06-10T11:0${idx}:00.000Z`) },
       })),
-      // Pendant Chains
-      ...['16 Inch (Choker)', '18 Inch (Princess)', '20 Inch (Matinee)', '22 Inch (Opera)'].map((s) => ({
-        name: `Chain Length ${s}`,
+      // Bangles & Bracelets: mm sizes (12/06/2026)
+      ...['2.2 (54.0 mm)', '2.4 (57.00 mm)', '2.6 (60.0 mm)', '2-8 (63.5 mm)'].map((s, idx) => ({
+        name: s,
+        categoryId: bangleCat._id,
+        category: bangleCat._id,
+        status: 'active',
+        isDeleted: false,
+        meta: { createdAt: new Date(`2026-06-12T10:0${idx}:00.000Z`), updatedAt: new Date(`2026-06-12T10:0${idx}:00.000Z`) },
+      })),
+      // Pendants: 14 to 24 inch (12/06/2026)
+      ...['14 inch', '16 inch', '18 inch', '20 inch', '22 inch', '24 inch'].map((s, idx) => ({
+        name: s,
+        categoryId: pendantCat._id,
         category: pendantCat._id,
+        status: 'active',
+        isDeleted: false,
+        meta: { createdAt: new Date(`2026-06-12T11:0${idx}:00.000Z`), updatedAt: new Date(`2026-06-12T11:0${idx}:00.000Z`) },
       })),
     ];
     const seededSizes = await Size.insertMany(sizesData);
@@ -769,13 +783,12 @@ const seedAll = async () => {
     const p18k = seededMetalPurities.find((p) => p.name === '18KT Gold');
     const natDia = seededDiamondTypes.find((d) => d.name === 'Natural Diamond');
     const labDia = seededDiamondTypes.find((d) => d.name === 'Lab Grown Diamond');
-    const roundShape = seededDiamondShapes.find((s) => s.name === 'Round Brilliant');
-    const ovalShape = seededDiamondShapes.find((s) => s.name === 'Oval');
-    const emeraldShape = seededDiamondShapes.find((s) => s.name === 'Emerald');
-    const dColor = seededDiamondColors.find((c) => c.name === 'D');
-    const eColor = seededDiamondColors.find((c) => c.name === 'E');
-    const vvs1Clarity = seededDiamondClarities.find((c) => c.name === 'VVS1');
-    const vs1Clarity = seededDiamondClarities.find((c) => c.name === 'VS1');
+    const roundShape = seededDiamondShapes.find((s) => s.name === 'Round');
+    const fancyShape = seededDiamondShapes.find((s) => s.name === 'Fancy');
+    const deColor = seededDiamondColors.find((c) => c.name === 'D-E');
+    const efColor = seededDiamondColors.find((c) => c.name === 'E-F');
+    const vvsClarity = seededDiamondClarities.find((c) => c.name === 'VVS');
+    const vsClarity = seededDiamondClarities.find((c) => c.name === 'VS');
 
     const productsData = [
       {
@@ -796,26 +809,26 @@ const seedAll = async () => {
         ],
         centerDiamondRows: [{
           diamondType: natDia._id,
-          diamondShape: ovalShape._id,
-          diamondColor: eColor._id,
-          diamondClarity: vvs1Clarity._id,
+          diamondShape: fancyShape._id,
+          diamondColor: efColor._id,
+          diamondClarity: vvsClarity._id,
           caratWeight: 1.5,
           pricePerCarat: 200000,
         }],
         variants: [{
-          combination: '18K Yellow Gold / 1.50ct Oval / E VVS1',
+          combination: '18K Yellow Gold / 1.50ct Oval / E-F VVS',
           sku: 'NJ-RNG-001-YG',
           price: 345000,
           stock: 4,
           metalPurity: p18k._id,
           diamondType: natDia._id,
-          diamondShape: ovalShape._id,
-          diamondColor: eColor._id,
-          diamondClarity: vvs1Clarity._id,
+          diamondShape: fancyShape._id,
+          diamondColor: efColor._id,
+          diamondClarity: vvsClarity._id,
         }],
         productSpecifications: [
           { key: 'Center Stone', value: '1.50 Carat Oval Cut Natural Diamond' },
-          { key: 'Diamond Color & Clarity', value: 'E / VVS1 (GIA Certified)' },
+          { key: 'Diamond Color & Clarity', value: 'E-F / VVS (GIA Certified)' },
           { key: 'Gold Purity', value: '18KT Hallmarked Purity (750)' },
           { key: 'Gross Weight', value: '4.85 grams' },
         ],
@@ -1070,8 +1083,8 @@ const seedAll = async () => {
         price: 385000,
         rate: 381188,
         carat: 1.01,
-        color: dColor._id,
-        clarity: vvs1Clarity._id,
+        color: deColor._id,
+        clarity: vvsClarity._id,
         shape: roundShape._id,
         type: natDia._id,
         image: { url: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=800&q=80' },
@@ -1083,9 +1096,9 @@ const seedAll = async () => {
         price: 520000,
         rate: 342105,
         carat: 1.52,
-        color: eColor._id,
-        clarity: vs1Clarity._id,
-        shape: ovalShape._id,
+        color: efColor._id,
+        clarity: vsClarity._id,
+        shape: fancyShape._id,
         type: natDia._id,
         image: { url: '/featured/ring.jpg' },
       },
@@ -1096,9 +1109,9 @@ const seedAll = async () => {
         price: 890000,
         rate: 434146,
         carat: 2.05,
-        color: dColor._id,
-        clarity: vvs1Clarity._id,
-        shape: emeraldShape._id,
+        color: deColor._id,
+        clarity: vvsClarity._id,
+        shape: fancyShape._id,
         type: natDia._id,
         image: { url: '/featured/ring.jpg' },
       },
@@ -1109,8 +1122,8 @@ const seedAll = async () => {
         price: 95000,
         rate: 79166,
         carat: 1.20,
-        color: eColor._id,
-        clarity: vvs1Clarity._id,
+        color: efColor._id,
+        clarity: vvsClarity._id,
         shape: roundShape._id,
         type: labDia._id,
         image: { url: '/featured/ring.jpg' },
@@ -1127,15 +1140,15 @@ const seedAll = async () => {
     const diamondPricesNewData = [];
 
     // Seed matrix entries for common shape + color + clarity
-    const shapesToPrice = [roundShape, ovalShape, emeraldShape];
-    const colorsToPrice = [dColor, eColor];
+    const shapesToPrice = [roundShape, fancyShape];
+    const colorsToPrice = [deColor, efColor];
 
     shapesToPrice.forEach((shape) => {
       colorsToPrice.forEach((col) => {
         centerPricesData.push({
           diamondTypeId: natDia._id,
           diamondShapeId: shape._id,
-          diamondClarityId: vvs1Clarity._id,
+          diamondClarityId: vvsClarity._id,
           diamondColorId: col._id,
           sizeFrom: 0.50,
           sizeTo: 0.99,
@@ -1147,7 +1160,7 @@ const seedAll = async () => {
         sidePricesData.push({
           diamondTypeId: natDia._id,
           diamondShapeId: shape._id,
-          diamondClarityId: vvs1Clarity._id,
+          diamondClarityId: vvsClarity._id,
           diamondColorId: col._id,
           sizeFrom: 0.01,
           sizeTo: 0.05,
@@ -1159,7 +1172,7 @@ const seedAll = async () => {
         diamondPricesData.push({
           diamondTypeId: natDia._id,
           diamondShapeId: shape._id,
-          diamondClarityId: vvs1Clarity._id,
+          diamondClarityId: vvsClarity._id,
           diamondColorId: col._id,
           sizeFrom: 0.50,
           sizeTo: 0.99,
@@ -1172,7 +1185,7 @@ const seedAll = async () => {
         diamondPricesNewData.push({
           diamondTypeId: natDia._id,
           diamondShapeId: shape._id,
-          diamondClarityId: vvs1Clarity._id,
+          diamondClarityId: vvsClarity._id,
           diamondColorId: col._id,
           centerDiamond: { priceUSD: 1800, priceINR: 155000 },
           sideDiamonds: [
@@ -1241,23 +1254,37 @@ const seedAll = async () => {
     console.log(`✅ Seeded ${seededCod.length} COD Sequence Thresholds.`);
 
     // ─── 16. SEED APPOINTMENTS ──────────────────────────────────────────
-    console.log('📅 [16/24] Seeding Appointments (12 Pending, 2 Cancelled - Screenshot 3)...');
+    console.log('📅 [16/24] Seeding Appointments (25 records — mixed statuses)...');
     const appointmentsData = [
-      { fullName: 'Krushnakant Jayswal', email: 'jayswalkrushnikant4444@gmail.com', phoneNumber: '6353516141', appointmentDate: new Date('2026-09-28'), preferredTime: '06:00 PM', status: 'pending' },
-      { fullName: 'Krushnakant Jayswal', email: 'jayswalkrushnikant4444@gmail.com', phoneNumber: '6353516141', appointmentDate: new Date('2026-09-26'), preferredTime: '06:00 PM', status: 'pending' },
-      { fullName: 'Krushnakant Jayswal', email: 'jayswalkrushnikant4444@gmail.com', phoneNumber: '6353516141', appointmentDate: new Date('2026-09-26'), preferredTime: '06:00 PM', status: 'pending' },
-      { fullName: 'Test mobile', email: 'testi@gmail.com', phoneNumber: '9848484848', appointmentDate: new Date('2026-09-24'), preferredTime: '05:00 PM', status: 'pending' },
-      { fullName: 'Test Demo', email: 'testi@gmail.com', phoneNumber: '9193838388', appointmentDate: new Date('2026-09-25'), preferredTime: '05:00 PM', status: 'pending' },
-      { fullName: 'Priya Sharma', email: 'priya.sharma@luxury.com', phoneNumber: '9820199881', appointmentDate: new Date('2026-09-29'), preferredTime: '02:00 PM', status: 'pending' },
-      { fullName: 'Vikram Malhotra', email: 'vikram.m@gmail.com', phoneNumber: '9820299882', appointmentDate: new Date('2026-09-29'), preferredTime: '04:00 PM', status: 'pending' },
-      { fullName: 'Ananya Birla', email: 'ananya.b@gmail.com', phoneNumber: '9820399883', appointmentDate: new Date('2026-09-30'), preferredTime: '11:00 AM', status: 'pending' },
-      { fullName: 'Rohan Mehra', email: 'rohan.m@gmail.com', phoneNumber: '9820499884', appointmentDate: new Date('2026-09-30'), preferredTime: '01:00 PM', status: 'pending' },
-      { fullName: 'Devika Singhania', email: 'devika.s@gmail.com', phoneNumber: '9820599885', appointmentDate: new Date('2026-10-01'), preferredTime: '03:00 PM', status: 'pending' },
-      { fullName: 'Karan Johar', email: 'karan.j@gmail.com', phoneNumber: '9820699886', appointmentDate: new Date('2026-10-02'), preferredTime: '05:00 PM', status: 'pending' },
-      { fullName: 'Ritu Kumar', email: 'ritu.k@gmail.com', phoneNumber: '9820799887', appointmentDate: new Date('2026-10-03'), preferredTime: '04:30 PM', status: 'pending' },
-      // 2 Cancelled
-      { fullName: 'Harsh Vardhan', email: 'harsh.v@gmail.com', phoneNumber: '9820899888', appointmentDate: new Date('2026-09-21'), preferredTime: '03:00 PM', status: 'cancelled' },
-      { fullName: 'Sunita Rao', email: 'sunita.rao@gmail.com', phoneNumber: '9820999889', appointmentDate: new Date('2026-09-22'), preferredTime: '12:00 PM', status: 'cancelled' },
+      // Pending appointments (upcoming)
+      { fullName: 'Krushnakant Jayswal', email: 'jayswalkrushnikant4444@gmail.com', phoneNumber: '6353516141', appointmentDate: new Date('2026-10-20'), preferredTime: '06:00 PM', serviceType: 'Jewellery Viewing', status: 'pending' },
+      { fullName: 'Krushnakant Jayswal', email: 'jayswalkrushnikant4444@gmail.com', phoneNumber: '6353516141', appointmentDate: new Date('2026-10-22'), preferredTime: '04:00 PM', serviceType: 'Custom Design Consultation', status: 'pending' },
+      { fullName: 'Test Mobile', email: 'testi@gmail.com', phoneNumber: '9848484848', appointmentDate: new Date('2026-10-18'), preferredTime: '05:00 PM', serviceType: 'Jewellery Viewing', status: 'pending' },
+      { fullName: 'Priya Sharma', email: 'priya.sharma@luxury.com', phoneNumber: '9820199881', appointmentDate: new Date('2026-10-19'), preferredTime: '02:00 PM', serviceType: 'Engagement Ring Selection', status: 'pending' },
+      { fullName: 'Vikram Malhotra', email: 'vikram.m@gmail.com', phoneNumber: '9820299882', appointmentDate: new Date('2026-10-21'), preferredTime: '11:00 AM', serviceType: 'Diamond Grading Session', status: 'pending' },
+      { fullName: 'Ananya Birla', email: 'ananya.b@gmail.com', phoneNumber: '9820399883', appointmentDate: new Date('2026-10-23'), preferredTime: '03:00 PM', serviceType: 'Bridal Collection Preview', status: 'pending' },
+      { fullName: 'Rohan Mehra', email: 'rohan.m@gmail.com', phoneNumber: '9820499884', appointmentDate: new Date('2026-10-24'), preferredTime: '01:00 PM', serviceType: 'Jewellery Viewing', status: 'pending' },
+      { fullName: 'Devika Singhania', email: 'devika.s@gmail.com', phoneNumber: '9820599885', appointmentDate: new Date('2026-10-25'), preferredTime: '10:00 AM', serviceType: 'Anniversary Gift Consultation', status: 'pending' },
+      { fullName: 'Natasha Poonawalla', email: 'natasha.p@gmail.com', phoneNumber: '9877788996', appointmentDate: new Date('2026-10-26'), preferredTime: '04:30 PM', serviceType: 'Heritage Collection Viewing', status: 'pending' },
+      { fullName: 'Gauri Khan', email: 'gauri.design@gmail.com', phoneNumber: '9840444522', appointmentDate: new Date('2026-10-27'), preferredTime: '12:00 PM', serviceType: 'Custom Design Consultation', status: 'pending' },
+      // Confirmed appointments
+      { fullName: 'Aarav Singhania', email: 'aarav.singhania@heritage.in', phoneNumber: '9820011223', appointmentDate: new Date('2026-10-16'), preferredTime: '02:00 PM', serviceType: 'Solitaire Selection', status: 'confirmed', adminNotes: 'VIP client — prepare private consultation room. Interested in 2ct+ oval solitaires.' },
+      { fullName: 'Meera Shah', email: 'meera.shah@gmail.com', phoneNumber: '9819922334', appointmentDate: new Date('2026-10-17'), preferredTime: '11:30 AM', serviceType: 'Jewellery Viewing', status: 'confirmed', adminNotes: 'Repeat customer. Looking at rose gold tennis bracelets.' },
+      { fullName: 'Manish Malhotra', email: 'manish.couture@gmail.com', phoneNumber: '9850555623', appointmentDate: new Date('2026-10-18'), preferredTime: '05:00 PM', serviceType: 'Custom Design Consultation', status: 'confirmed', adminNotes: 'Discussing bespoke choker necklace for fashion show.' },
+      { fullName: 'Diya Merchant', email: 'diya.merchant@gmail.com', phoneNumber: '9855566774', appointmentDate: new Date('2026-10-19'), preferredTime: '03:30 PM', serviceType: 'Engagement Ring Selection', status: 'confirmed', adminNotes: 'Budget range 2-3L. Prefers lab grown diamonds.' },
+      { fullName: 'Kavita Krishnan', email: 'kavita.k@gmail.com', phoneNumber: '9899900118', appointmentDate: new Date('2026-10-20'), preferredTime: '10:00 AM', serviceType: 'Bridal Collection Preview', status: 'confirmed', adminNotes: 'December wedding. Needs full bridal set — necklace, earrings, bangles.' },
+      // Completed appointments (past)
+      { fullName: 'Vikramaditya Rathore', email: 'rathore.vikram@regal.in', phoneNumber: '9821133445', appointmentDate: new Date('2026-10-05'), preferredTime: '01:00 PM', serviceType: 'Heritage Collection Viewing', status: 'completed', adminNotes: 'Purchased heritage kundan necklace set. ₹4,82,000 order placed.' },
+      { fullName: 'Rhea Sen', email: 'rhea.sen@gmail.com', phoneNumber: '9866677889', appointmentDate: new Date('2026-10-03'), preferredTime: '04:00 PM', serviceType: 'Jewellery Viewing', status: 'completed', adminNotes: 'Viewed earring collection. Will return next week to finalize.' },
+      { fullName: 'Ishaan Nanda', email: 'ishaan.nanda@gmail.com', phoneNumber: '9811122330', appointmentDate: new Date('2026-10-01'), preferredTime: '11:00 AM', serviceType: 'Anniversary Gift Consultation', status: 'completed', adminNotes: 'Ordered custom pendant with wife initials. Delivery by Oct 20.' },
+      { fullName: 'Devansh Kapoor', email: 'devansh.kapoor@outlook.com', phoneNumber: '9844455667', appointmentDate: new Date('2026-09-28'), preferredTime: '02:30 PM', serviceType: 'Diamond Grading Session', status: 'completed', adminNotes: 'Reviewed 4 loose diamonds. Selected 1.2ct E-VS1 round brilliant.' },
+      { fullName: 'Pooja Vora', email: 'pooja.vora@gmail.com', phoneNumber: '9855566778', appointmentDate: new Date('2026-09-25'), preferredTime: '03:00 PM', serviceType: 'Jewellery Viewing', status: 'completed', adminNotes: 'First-time visitor. Interested in daily-wear diamond studs.' },
+      { fullName: 'Varun Dhawan', email: 'varun.d@gmail.com', phoneNumber: '9810111219', appointmentDate: new Date('2026-09-22'), preferredTime: '05:30 PM', serviceType: 'Engagement Ring Selection', status: 'completed', adminNotes: 'Selected cushion-cut solitaire in platinum. ₹3,45,000.' },
+      // Cancelled appointments
+      { fullName: 'Harsh Vardhan', email: 'harsh.v@gmail.com', phoneNumber: '9820899888', appointmentDate: new Date('2026-09-21'), preferredTime: '03:00 PM', serviceType: 'Jewellery Viewing', status: 'cancelled', adminNotes: 'Client rescheduled due to travel conflict.' },
+      { fullName: 'Sunita Rao', email: 'sunita.rao@gmail.com', phoneNumber: '9820999889', appointmentDate: new Date('2026-09-22'), preferredTime: '12:00 PM', serviceType: 'Custom Design Consultation', status: 'cancelled', adminNotes: 'No show. Called — will book again next month.' },
+      { fullName: 'Kabir Bhatia', email: 'kabir.b@gmail.com', phoneNumber: '9877788990', appointmentDate: new Date('2026-09-19'), preferredTime: '10:30 AM', serviceType: 'Jewellery Viewing', status: 'cancelled', adminNotes: 'Cancelled via phone. Budget concerns.' },
+      { fullName: 'Siddharth Malhotra', email: 'sid.malhotra@gmail.com', phoneNumber: '9860666724', appointmentDate: new Date('2026-09-15'), preferredTime: '04:00 PM', serviceType: 'Solitaire Selection', status: 'cancelled', adminNotes: 'Postponed indefinitely.' },
     ];
     const seededAppointments = await Appointment.insertMany(appointmentsData);
     console.log(`✅ Seeded ${seededAppointments.length} Appointments.`);
@@ -1330,35 +1357,83 @@ const seedAll = async () => {
     console.log(`✅ Seeded ${seededInquiries.length} Custom Inquiries.`);
 
     // ─── 18. SEED CUSTOMER REVIEWS ──────────────────────────────────────
-    console.log('⭐ [18/24] Seeding Verified Customer Reviews (Screenshot 5)...');
+    console.log('⭐ [18/24] Seeding Verified Customer Reviews (15 reviews)...');
     const reviewsData = [
       {
-        clientName: 'Disha',
-        rating: 5,
+        customer: { name: 'Disha Radadiya', email: 'disharadadiya13@gmail.com' },
+        review: { title: 'Absolutely Stunning!', rating: 5, comment: 'I was looking for a budget-friendly jewellery set and this completely exceeded my expectations. The finishing is top-notch and it is the best handcrafted set I have ever bought. The diamond sparkle is mesmerizing!', reviewDate: new Date('2026-10-12') },
         status: 'approved',
-        reviewDate: new Date('2026-09-24'),
-        comment: 'I was looking for a budget-friendly jewellery set and this completely exceeded my expectations. The finishing is top-notch and it is the best handcrafted set I have ever bought.',
       },
       {
-        clientName: 'Krushnakant Jayswal',
-        rating: 5,
+        customer: { name: 'Krushnakant Jayswal', email: 'jayswalkrushnikant4444@gmail.com' },
+        review: { title: 'Exquisite Diamond Quality', rating: 5, comment: 'The solitaire ring I purchased is breathtaking. The diamond clarity is outstanding and the 18KT gold band feels premium. Neirah truly delivers luxury at its finest. Highly recommended for engagement rings!', reviewDate: new Date('2026-10-10') },
         status: 'approved',
-        reviewDate: new Date('2026-09-22'),
-        comment: 'I was looking for a budget-friendly jewellery set and this completely exceeded my expectations. The finishing is top-notch and it is the most exquisite diamond piece in my collection.',
       },
       {
-        clientName: 'Ananya Deshmukh',
-        rating: 5,
+        customer: { name: 'Ananya Deshmukh', email: 'ananya.d@gmail.com' },
+        review: { title: 'World-Class Atelier Service', rating: 5, comment: 'The private consultation experience was truly world-class. The gemologist patiently explained every detail about the natural diamond solitaire. The sparkle is unmatched and the certificate gives total peace of mind.', reviewDate: new Date('2026-10-08') },
         status: 'approved',
-        reviewDate: new Date('2026-09-19'),
-        comment: 'The atelier service and private consultation were truly world-class. The sparkle on the natural diamond solitaire is unmatched.',
       },
       {
-        clientName: 'Vikramaditya Rathore',
-        rating: 5,
+        customer: { name: 'Vikramaditya Rathore', email: 'rathore.vikram@regal.in' },
+        review: { title: 'Heritage Collection is Magnificent', rating: 5, comment: 'Prompt delivery, insured packaging, and certified hallmarked purity. The heritage kundan choker is a masterpiece. Highly recommend Neirah Jewellers for fine heritage and bridal collections.', reviewDate: new Date('2026-10-05') },
         status: 'approved',
-        reviewDate: new Date('2026-09-15'),
-        comment: 'Prompt delivery, insured packaging, and certified hallmarked purity. Highly recommend Neirah Jewellers for fine heritage collections.',
+      },
+      {
+        customer: { name: 'Meera Shah', email: 'meera.shah@gmail.com' },
+        review: { title: 'Beautiful Rose Gold Tennis Bracelet', rating: 5, comment: 'The rose gold tennis bracelet is absolutely gorgeous. Each diamond is perfectly set and the clasp mechanism is secure yet elegant. I wear it daily and receive compliments every single time.', reviewDate: new Date('2026-10-03') },
+        status: 'approved',
+      },
+      {
+        customer: { name: 'Aarav Singhania', email: 'aarav.singhania@heritage.in' },
+        review: { title: 'Exceptional Bridal Necklace', rating: 5, comment: 'Ordered a custom bridal choker for my wife and Neirah exceeded every expectation. The craftsmanship is impeccable, the diamonds are brilliant, and the design is timeless. Worth every rupee.', reviewDate: new Date('2026-09-30') },
+        status: 'approved',
+      },
+      {
+        customer: { name: 'Natasha Poonawalla', email: 'natasha.p@gmail.com' },
+        review: { title: 'Luxury Redefined', rating: 4, comment: 'The chandelier earrings are stunning and photograph beautifully. Only reason for 4 stars is the delivery took slightly longer than expected. But the quality and packaging more than make up for it.', reviewDate: new Date('2026-09-28') },
+        status: 'approved',
+      },
+      {
+        customer: { name: 'Devansh Kapoor', email: 'devansh.kapoor@outlook.com' },
+        review: { title: 'Perfect Anniversary Gift', rating: 5, comment: 'Bought a diamond pendant for our 10th anniversary. My wife was in tears of joy when she opened the Neirah box. The presentation, the quality, the brilliance — everything was perfect. Thank you, Neirah!', reviewDate: new Date('2026-09-25') },
+        status: 'approved',
+      },
+      {
+        customer: { name: 'Gauri Khan', email: 'gauri.design@gmail.com' },
+        review: { title: 'Design Consultation was Amazing', rating: 5, comment: 'Had a custom design consultation for a statement necklace. The design team understood my vision perfectly and the 3D rendering they showed was exactly what I wanted. Cannot wait for the final piece!', reviewDate: new Date('2026-09-22') },
+        status: 'approved',
+      },
+      {
+        customer: { name: 'Rhea Sen', email: 'rhea.sen@gmail.com' },
+        review: { title: 'Great Selection of Lab Grown Diamonds', rating: 4, comment: 'Love that Neirah offers both natural and lab grown options. The lab grown diamond studs I purchased are indistinguishable from natural ones. Great value for money and eco-friendly too!', reviewDate: new Date('2026-09-20') },
+        status: 'approved',
+      },
+      {
+        customer: { name: 'Manish Malhotra', email: 'manish.couture@gmail.com' },
+        review: { title: 'Couture-Level Craftsmanship', rating: 5, comment: 'As someone in the fashion industry, I appreciate fine craftsmanship. Neirah delivers couture-level jewellery that rivals international luxury houses. The attention to detail in their platinum pieces is extraordinary.', reviewDate: new Date('2026-09-18') },
+        status: 'approved',
+      },
+      {
+        customer: { name: 'Pooja Vora', email: 'pooja.vora@gmail.com' },
+        review: { title: 'Lovely Daily Wear Studs', rating: 4, comment: 'Bought a pair of small diamond studs for daily wear. They are dainty, elegant, and very comfortable. The push-back is secure. Only wish they had more options in the ₹15K-20K range.', reviewDate: new Date('2026-09-15') },
+        status: 'approved',
+      },
+      {
+        customer: { name: 'Ishaan Nanda', email: 'ishaan.nanda@gmail.com' },
+        review: { title: 'Custom Initial Pendant — Perfect!', rating: 5, comment: 'Got a custom pendant with my wife\'s initials in diamonds. The team was responsive throughout the process, sent progress photos, and delivered on time. She absolutely loved it!', reviewDate: new Date('2026-09-12') },
+        status: 'approved',
+      },
+      // Pending reviews (awaiting admin approval)
+      {
+        customer: { name: 'Kabir Bhatia', email: 'kabir.b@gmail.com' },
+        review: { title: 'Good but Pricey', rating: 3, comment: 'The quality is undeniably good but I feel the pricing is a bit steep compared to some competitors. The ring itself is beautiful and well-made. Would love to see more mid-range options.', reviewDate: new Date('2026-10-14') },
+        status: 'pending',
+      },
+      {
+        customer: { name: 'Tara Sutaria', email: 'tara.sutaria@outlook.com' },
+        review: { title: 'Gorgeous Halo Ring!', rating: 5, comment: 'My fiancé proposed with a Neirah halo ring and I cannot stop staring at it! The center stone catches light from every angle. Best engagement ring I have ever seen. Truly magical!', reviewDate: new Date('2026-10-13') },
+        status: 'pending',
       },
     ];
     const seededReviews = await Review.insertMany(reviewsData);

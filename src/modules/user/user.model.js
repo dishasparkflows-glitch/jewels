@@ -94,6 +94,8 @@ const userSchema = new mongoose.Schema(
         minlength: 6,
         select: false,
       },
+      passwordResetTokenHash: { type: String, select: false },
+      passwordResetExpires: { type: Date, select: false },
       lastLogin: {
         type: Date,
         default: null,

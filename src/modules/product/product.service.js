@@ -134,7 +134,14 @@ class ProductService {
     }
 
     if (queryParams.productType) {
-      filter.productType = queryParams.productType;
+      const pt = String(queryParams.productType).toLowerCase();
+      if (pt === 'jewelry' || pt === 'gold') {
+        filter.productType = { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] };
+      } else if (pt === 'silver' || pt === 'standard') {
+        filter.productType = { $in: ['silver', 'standard', 'Silver', 'Standard'] };
+      } else {
+        filter.productType = queryParams.productType;
+      }
     }
 
     if (queryParams.isOrnate !== undefined) {
@@ -274,36 +281,75 @@ class ProductService {
   // ------------------------------- get product lookup ----------------------------
   async getLookup(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const conditions = [{ isDeleted: false }];
+
+    if (queryParams.status && queryParams.status !== 'all') {
+      conditions.push({ status: queryParams.status });
+    } else if (!queryParams.status) {
+      conditions.push({ status: 'active' });
+    }
 
     if (queryParams.productType && queryParams.productType !== 'all') {
-      filter.productType = queryParams.productType;
+      const pt = String(queryParams.productType).toLowerCase();
+      if (pt === 'gold' || pt === 'jewelry') {
+        conditions.push({
+          $and: [
+            {
+              $or: [
+                { productType: { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] } },
+                { 'specifications.metalName': new RegExp('gold', 'i') },
+                { metalName: new RegExp('gold', 'i') },
+                { title: new RegExp('gold', 'i') },
+              ],
+            },
+            { isOrnate: { $ne: true } },
+          ],
+        });
+      } else if (pt === 'silver' || pt === 'standard') {
+        conditions.push({
+          $or: [
+            { productType: { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
+            { 'specifications.metalName': new RegExp('silver', 'i') },
+            { metalName: new RegExp('silver', 'i') },
+            { title: new RegExp('silver|925', 'i') },
+          ],
+        });
+      } else if (pt === 'ornate') {
+        conditions.push({
+          $or: [{ isOrnate: true }, { productType: 'ornate' }],
+        });
+      } else {
+        conditions.push({ productType: queryParams.productType });
+      }
     }
+
     if (queryParams.isOrnate !== undefined) {
-      filter.isOrnate = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
-    }
-    if (queryParams.status && queryParams.status !== 'all') {
-      filter.status = queryParams.status;
-    } else if (!queryParams.status) {
-      filter.status = 'active';
+      const isO = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
+      conditions.push({ isOrnate: isO });
     }
 
     if (queryParams.category) {
-      filter.category = queryParams.category;
+      conditions.push({ category: queryParams.category });
     }
 
     if (queryParams.search) {
       const searchRegex = new RegExp(queryParams.search, 'i');
-      filter.$or = [
-        { title: searchRegex },
-        { sku: searchRegex },
-        { tagNo: searchRegex },
-      ];
+      conditions.push({
+        $or: [
+          { title: searchRegex },
+          { sku: searchRegex },
+          { tagNo: searchRegex },
+          { barcodeNo: searchRegex },
+          { itemName: searchRegex },
+        ],
+      });
     }
+
+    const filter = conditions.length === 1 ? conditions[0] : { $and: conditions };
 
     const [rawItems, total] = await Promise.all([
       Product.find(filter)
-        .select('_id title category images colorImages sku tagNo price salePrice productType isOrnate status')
+        .select('_id title category images colorImages sku tagNo price salePrice mrp displayPrice productType isOrnate specifications metalName status')
         .populate('category', 'name slug')
         .sort({ 'meta.createdAt': -1, createdAt: -1, _id: -1 })
         .skip(skip)
@@ -319,16 +365,21 @@ class ProductService {
         p.colorImages?.[0]?.images?.[0]?.url ||
         '';
 
+      const effectivePrice = Number(p.salePrice || p.displayPrice || p.price || p.pricing?.salePrice || p.mrp || 0);
+
       return {
         _id: p._id,
-        title: p.title,
-        sku: p.sku || p.tagNo || '',
+        id: p._id,
+        title: p.title || p.basicInfo?.title || 'Fine Jewellery',
+        sku: p.sku || p.tagNo || p.basicInfo?.sku || '',
         tagNo: p.tagNo || '',
         category: p.category || [],
-        price: p.price || 0,
-        salePrice: p.salePrice || 0,
+        price: effectivePrice,
+        salePrice: p.salePrice || p.displayPrice || p.price || 0,
+        mrp: p.mrp || 0,
         productType: p.productType,
-        isOrnate: p.isOrnate || false,
+        isOrnate: Boolean(p.isOrnate),
+        metalName: p.specifications?.metalName || p.metalName || (p.isOrnate ? 'Silver' : 'Gold'),
         status: p.status,
         images: p.images || [],
         colorImages: p.colorImages || [],

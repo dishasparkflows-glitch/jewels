@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../config/constants');
 const User = require('../modules/user/user.model');
+const { setRequestContext } = require('../utils/context');
 
 /**
  * Authenticate JWT token from Authorization header
@@ -35,7 +36,6 @@ const authenticate = async (req, res, next) => {
     }
 
     req.user = user;
-    const { setRequestContext } = require('../utils/context');
     setRequestContext('userId', user._id);
     next();
   } catch (error) {
@@ -88,7 +88,6 @@ const optionalAuth = async (req, res, next) => {
       const user = await User.findById(decoded.id).select('-auth.password -password');
       if (user && user.isActive) {
         req.user = user;
-        const { setRequestContext } = require('../utils/context');
         setRequestContext('userId', user._id);
       }
     }

@@ -47,6 +47,20 @@ const homeSectionItemSchema = new mongoose.Schema(
       ref: 'Product',
       default: null,
     },
+    sku: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    price: {
+      type: Number,
+      default: 0,
+    },
+    productType: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
@@ -156,6 +170,10 @@ const homeSectionSchema = new mongoose.Schema(
       enum: ['active', 'inactive'],
       default: 'active',
       index: true,
+    },
+    visibility: {
+      website: { type: Boolean, default: true },
+      mobileApp: { type: Boolean, default: true },
     },
     settings: {
       backgroundColor: { type: String, default: '' },

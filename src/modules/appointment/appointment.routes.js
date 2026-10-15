@@ -36,6 +36,14 @@ router.put(
   appointmentController.update
 );
 
+router.patch(
+  '/:id/status',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  appointmentController.updateStatus
+);
+
+
 router.post(
   '/bulk-delete',
   authenticate,

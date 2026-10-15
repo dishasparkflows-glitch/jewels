@@ -2,6 +2,7 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
 const path = require('path');
+const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const cloudflareR2 = require('../../utils/cloudflareR2');
 
 // ------------------------------- get presigned url ----------------------------
@@ -39,7 +40,6 @@ const directPut = catchAsync(async (req, res) => {
     throw new ApiError(500, 'Cloudflare R2 storage is not configured');
   }
 
-  const { PutObjectCommand } = require('@aws-sdk/client-s3');
   await cloudflareR2.client.send(
     new PutObjectCommand({
       Bucket: cloudflareR2.bucketName,
@@ -83,7 +83,6 @@ const serveFile = catchAsync(async (req, res) => {
   // Stream directly from Cloudflare R2
   if (cloudflareR2.isConfigured() && cloudflareR2.client) {
     try {
-      const { GetObjectCommand } = require('@aws-sdk/client-s3');
       const command = new GetObjectCommand({
         Bucket: cloudflareR2.bucketName,
         Key: key,

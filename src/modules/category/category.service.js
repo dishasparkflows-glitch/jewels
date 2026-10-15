@@ -11,9 +11,8 @@ class CategoryService {
     if (typeof payload.banner === 'string') {
       payload.banner = { url: payload.banner.trim(), public_id: '' };
     }
-    const promoList = payload.promoBanner || payload.promoBanners || payload.prompbanners;
-    if (Array.isArray(promoList)) {
-      const normalizedPromos = promoList.map((item) => {
+    if (Array.isArray(payload.promoBanners)) {
+      payload.promoBanners = payload.promoBanners.map((item) => {
         if (typeof item === 'string') {
           return {
             title: '',
@@ -39,9 +38,6 @@ class CategoryService {
           order: Number(item.order) || 0,
         };
       });
-      payload.promoBanner = normalizedPromos;
-      payload.promoBanners = normalizedPromos;
-      payload.prompbanners = normalizedPromos;
     }
     return payload;
   }
@@ -97,7 +93,7 @@ class CategoryService {
     }
 
     return await Category.find(filter)
-      .select('_id name banner icon images subTypes promoBanner promoBanners type slug')
+      .select('_id name banner icon images subTypes promoBanners type slug')
       .sort({ name: 1 })
       .lean();
   }

@@ -102,9 +102,7 @@ const categorySchema = new mongoose.Schema(
       index: true,
     },
     subTypes: [subTypeSchema],
-    promoBanner: [promoBannerSchema],
     promoBanners: [promoBannerSchema],
-    prompbanners: [promoBannerSchema],
   },
   {
     versionKey: false,
@@ -121,19 +119,6 @@ categorySchema.pre('save', function (next) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
-  }
-
-  // Sync promoBanner, promoBanners, and prompbanners
-  const promos =
-    (this.promoBanner && this.promoBanner.length > 0 && this.promoBanner) ||
-    (this.promoBanners && this.promoBanners.length > 0 && this.promoBanners) ||
-    (this.prompbanners && this.prompbanners.length > 0 && this.prompbanners) ||
-    [];
-
-  if (promos.length > 0) {
-    if (!this.promoBanner || this.promoBanner.length === 0) this.promoBanner = promos;
-    if (!this.promoBanners || this.promoBanners.length === 0) this.promoBanners = promos;
-    if (!this.prompbanners || this.prompbanners.length === 0) this.prompbanners = promos;
   }
 
   next();

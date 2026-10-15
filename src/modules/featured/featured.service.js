@@ -1,4 +1,5 @@
 const Featured = require('./featured.model');
+const Product = require('../product/product.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -24,7 +25,6 @@ class FeaturedService {
     const item = await Featured.create(data);
 
     if (Array.isArray(productIds) && productIds.length > 0) {
-      const Product = require('../product/product.model');
       await Product.updateMany(
         { _id: { $in: productIds } },
         { $addToSet: { featured: item._id } }
@@ -41,7 +41,6 @@ class FeaturedService {
     if (!item) {
       throw new ApiError(404, 'Featured item not found');
     }
-    const Product = require('../product/product.model');
     const matchingProducts = await Product.find({
       featured: id,
       isDeleted: false,
@@ -80,7 +79,6 @@ class FeaturedService {
       Featured.countDocuments(filter),
     ]);
 
-    const Product = require('../product/product.model');
     const itemsWithCounts = await Promise.all(
       items.map(async (item) => {
         const matchingProducts = await Product.find({
@@ -130,7 +128,6 @@ class FeaturedService {
     const productIds = data.products;
     if (Array.isArray(productIds)) {
       data.productCount = productIds.length;
-      const Product = require('../product/product.model');
       await Product.updateMany(
         { featured: id, _id: { $nin: productIds } },
         { $pull: { featured: id } }
@@ -183,7 +180,6 @@ class FeaturedService {
       throw new ApiError(404, 'Featured item not found');
     }
 
-    const Product = require('../product/product.model');
     await Product.updateMany({ featured: id }, { $pull: { featured: id } });
 
     return { message: 'Featured item deleted successfully', id };

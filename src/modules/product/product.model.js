@@ -20,8 +20,8 @@ const basicInfoSchema = new mongoose.Schema({
   description: { type: String, default: '' },
   productType: {
     type: String,
-    enum: ['jewelry', 'standard', 'ornate'],
-    default: 'jewelry',
+    enum: ['gold', 'silver', 'jewelry', 'standard', 'ornate'],
+    default: 'gold',
   },
   isOrnate: { type: Boolean, default: false },
 }, { _id: false });
@@ -86,8 +86,8 @@ const productSchema = new mongoose.Schema(
     },
     productType: {
       type: String,
-      enum: ['jewelry', 'standard', 'ornate'],
-      default: 'jewelry',
+      enum: ['gold', 'silver', 'jewelry', 'standard', 'ornate'],
+      default: 'gold',
       index: true,
     },
     // Flag to distinguish ornate products in single collection

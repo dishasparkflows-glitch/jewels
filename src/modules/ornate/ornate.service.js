@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const axios = require('axios');
 const ftp = require('basic-ftp');
 const { Writable } = require('stream');
@@ -984,7 +985,6 @@ async function testOrnateConnection() {
 // ------------------------------- push order to ornate ----------------------------
 async function pushOrderToOrnate(orderId) {
   try {
-    const mongoose = require('mongoose');
     let OrderModel;
     try {
       OrderModel = mongoose.model('Order');

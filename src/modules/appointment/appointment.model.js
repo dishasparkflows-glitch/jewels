@@ -3,16 +3,46 @@ const metaPlugin = require('../../utils/metaPlugin');
 
 const appointmentSchema = new mongoose.Schema(
   {
-    // 1. Customer Details
+    // Direct top-level fields (as stored in DB)
+    fullName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: '',
+    },
+    phoneNumber: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    appointmentDate: {
+      type: Date,
+      default: null,
+    },
+    preferredTime: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    serviceType: {
+      type: String,
+      trim: true,
+      default: 'Jewellery Viewing',
+    },
+
+    // 1. Nested Customer Details (for compatibility)
     customer: {
       name: {
         type: String,
-        required: [true, 'Please provide your name'],
         trim: true,
       },
       email: {
         type: String,
-        required: [true, 'Please provide your email address'],
         trim: true,
         lowercase: true,
       },
@@ -23,21 +53,22 @@ const appointmentSchema = new mongoose.Schema(
         },
         number: {
           type: String,
-          required: [true, 'Please provide your phone number'],
           trim: true,
         },
       },
     },
 
-    // 2. Appointment Details
+    // 2. Nested Appointment Details (for compatibility)
     appointment: {
       date: {
         type: Date,
-        required: [true, 'Please select an appointment date'],
       },
       preferredTime: {
         type: String,
-        required: [true, 'Please select a preferred time slot'],
+        trim: true,
+      },
+      serviceType: {
+        type: String,
         trim: true,
       },
     },
@@ -61,9 +92,13 @@ const appointmentSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    strict: false,
   }
 );
 
+appointmentSchema.index({ appointmentDate: 1 });
+appointmentSchema.index({ email: 1 });
+appointmentSchema.index({ phoneNumber: 1 });
 appointmentSchema.index({ 'appointment.date': 1 });
 appointmentSchema.index({ 'customer.email': 1 });
 appointmentSchema.index({ 'customer.phone.number': 1 });
@@ -72,3 +107,4 @@ appointmentSchema.index({ status: 1, 'meta.createdAt': -1 });
 appointmentSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Appointment', appointmentSchema);
+

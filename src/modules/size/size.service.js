@@ -5,12 +5,15 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class SizeService {
   // ------------------------------- create size ----------------------------
   async create(data) {
-    if (data.name && data.category) {
+    const categoryId = data.categoryId || data.category;
+    const subTypeId = data.subTypeId || data.subType || null;
+
+    if (data.name && categoryId) {
       data.name = data.name.trim();
       const existing = await Size.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
-        category: data.category,
-        subType: data.subType || null,
+        categoryId,
+        subTypeId,
         isDeleted: false,
       });
       if (existing) {
@@ -20,6 +23,12 @@ class SizeService {
         );
       }
     }
+
+    if (categoryId) data.categoryId = categoryId;
+    if (subTypeId) data.subTypeId = subTypeId;
+    delete data.category;
+    delete data.subType;
+
     return await Size.create(data);
   }
 
@@ -27,7 +36,7 @@ class SizeService {
 
   async getOne(id) {
     const item = await Size.findOne({ _id: id, isDeleted: false })
-      .populate('category', 'name slug type')
+      .populate('categoryId', 'name slug type')
       .lean();
 
     if (!item) {
@@ -45,11 +54,13 @@ class SizeService {
     if (queryParams.status) {
       filter.status = queryParams.status;
     }
-    if (queryParams.category) {
-      filter.category = queryParams.category;
+    const categoryId = queryParams.categoryId || queryParams.category;
+    if (categoryId) {
+      filter.categoryId = categoryId;
     }
-    if (queryParams.subType) {
-      filter.subType = queryParams.subType;
+    const subTypeId = queryParams.subTypeId || queryParams.subType;
+    if (subTypeId) {
+      filter.subTypeId = subTypeId;
     }
     if (queryParams.search) {
       filter.name = new RegExp(queryParams.search, 'i');
@@ -57,7 +68,7 @@ class SizeService {
 
     const [items, total] = await Promise.all([
       Size.find(filter)
-        .populate('category', 'name slug type')
+        .populate('categoryId', 'name slug type')
         .sort({ 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
@@ -72,29 +83,34 @@ class SizeService {
 
   async getLookup(queryParams = {}) {
     const filter = { isDeleted: false, status: 'active' };
-    if (queryParams.category) {
-      filter.category = queryParams.category;
+    const categoryId = queryParams.categoryId || queryParams.category;
+    if (categoryId) {
+      filter.categoryId = categoryId;
     }
-    if (queryParams.subType) {
-      filter.subType = queryParams.subType;
+    const subTypeId = queryParams.subTypeId || queryParams.subType;
+    if (subTypeId) {
+      filter.subTypeId = subTypeId;
     }
 
     return await Size.find(filter)
-      .populate('category', 'name slug type')
+      .populate('categoryId', 'name slug type')
       .sort({ name: 1 })
-      .select('_id name category subType status')
+      .select('_id name categoryId subTypeId status')
       .lean();
   }
 
   // ------------------------------- update size ----------------------------
 
   async update(id, data) {
-    if (data.name && data.category) {
+    const categoryId = data.categoryId || data.category;
+    const subTypeId = data.subTypeId !== undefined ? data.subTypeId : data.subType;
+
+    if (data.name && categoryId) {
       data.name = data.name.trim();
       const existing = await Size.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
-        category: data.category,
-        subType: data.subType || null,
+        categoryId,
+        subTypeId: subTypeId || null,
         _id: { $ne: id },
         isDeleted: false,
       });
@@ -106,11 +122,16 @@ class SizeService {
       }
     }
 
+    if (categoryId) data.categoryId = categoryId;
+    if (subTypeId !== undefined) data.subTypeId = subTypeId;
+    delete data.category;
+    delete data.subType;
+
     const item = await Size.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: data },
       { new: true, runValidators: true }
-    ).populate('category', 'name slug type');
+    ).populate('categoryId', 'name slug type');
 
     if (!item) {
       throw new ApiError(404, 'Size not found');

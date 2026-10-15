@@ -5,11 +5,20 @@ const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
 // Public or storefront lookup endpoints
+router.get('/category-display', bannerController.getCategoryDisplayBanner);
+router.get('/display', bannerController.getCategoryDisplayBanner);
 router.get('/lookup', bannerController.getLookup);
 router.get('/', bannerController.getAll);
 router.get('/:id', bannerController.getOne);
 
 // Protected admin mutation endpoints
+router.post(
+  '/cleanup-expired-offers',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  bannerController.cleanupExpiredOffers
+);
+
 router.post(
   '/',
   authenticate,

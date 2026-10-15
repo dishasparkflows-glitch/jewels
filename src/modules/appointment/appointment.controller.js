@@ -38,6 +38,14 @@ class AppointmentController {
     ApiResponse.success(res, item, 'Appointment updated successfully');
   });
 
+  // ------------------------------- update status ----------------------------
+  updateStatus = catchAsync(async (req, res) => {
+    const { status } = req.body;
+    const item = await appointmentService.updateStatus(req.params.id, status);
+    ApiResponse.success(res, item, `Appointment status updated to ${status}`);
+  });
+
+
   // ------------------------------- delete appointment ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await appointmentService.delete(req.params.id);

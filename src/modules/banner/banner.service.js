@@ -1,94 +1,57 @@
 const Banner = require('./banner.model');
+const Category = require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class BannerService {
-  // Helper to normalize payload supporting both nested ({ content, display }) and legacy flat payloads
   _normalizePayload(data = {}) {
     const payload = { ...data };
 
-    payload.content = {
-      title: data.content?.title !== undefined ? data.content.title : (data.title || ''),
-      subtitle: data.content?.subtitle !== undefined ? data.content.subtitle : (data.subtitle || ''),
-      description: data.content?.description !== undefined ? data.content.description : (data.description || ''),
-    };
+    if (!payload.content) {
+      payload.content = {};
+    }
+    if (payload.content.title !== undefined) payload.content.title = String(payload.content.title).trim();
+    if (payload.content.subtitle !== undefined) payload.content.subtitle = String(payload.content.subtitle).trim();
+    if (payload.content.description !== undefined) payload.content.description = String(payload.content.description).trim();
 
-    payload.display = {
-      category: data.display?.category !== undefined ? data.display.category : data.category,
-      type: data.display?.type !== undefined ? data.display.type : (data.type || 'herobanner'),
-      position: data.display?.position !== undefined ? data.display.position : (data.position || 'none'),
-      bannerKey: data.display?.bannerKey !== undefined ? data.display.bannerKey : (data.bannerKey || 'custom_jewellery'),
-      order:
-        data.display?.order !== undefined
-          ? Number(data.display.order)
-          : data.order !== undefined
-          ? Number(data.order)
-          : 0,
-    };
+    if (!payload.display) {
+      payload.display = {};
+    }
 
-    if (data.appStoreUrl !== undefined) payload.appStoreUrl = data.appStoreUrl;
-    if (data.googlePlayUrl !== undefined) payload.googlePlayUrl = data.googlePlayUrl;
+    const catId = payload.display.categoryId || payload.display.category || null;
+    const validCatId = catId && catId !== '' && catId !== 'null' ? catId : null;
+    payload.display.categoryId = validCatId;
+    if (payload.display.category !== undefined) {
+      delete payload.display.category;
+    }
 
-    // Remove legacy top-level duplicate keys to keep database documents clean
-    delete payload.title;
-    delete payload.subtitle;
-    delete payload.description;
-    delete payload.category;
-    delete payload.type;
-    delete payload.position;
-    delete payload.bannerKey;
-    delete payload.order;
+    if (payload.display.type === undefined) payload.display.type = 'herobanner';
+    if (payload.display.position === undefined) payload.display.position = 'none';
+    if (payload.display.bannerKey === undefined) payload.display.bannerKey = 'custom_jewellery';
+    if (payload.display.order !== undefined) payload.display.order = Number(payload.display.order) || 0;
+
+    if (payload.startDate) payload.startDate = new Date(payload.startDate);
+    if (payload.endDate) payload.endDate = new Date(payload.endDate);
 
     return payload;
   }
 
-  // Format banner document ensuring both nested { content, display } and top-level fallbacks exist
   _formatBanner(banner) {
     if (!banner) return null;
-    const doc = banner.toObject ? banner.toObject({ virtuals: true }) : { ...banner };
-    const title = doc.content?.title || doc.title || '';
-    const subtitle = doc.content?.subtitle || doc.subtitle || '';
-    const description = doc.content?.description || doc.description || '';
-    const category = doc.display?.category || doc.category;
-    const type = doc.display?.type || doc.type || 'herobanner';
-    const position = doc.display?.position || doc.position || 'none';
-    const order = doc.display?.order ?? doc.order ?? 0;
-
-    return {
-      ...doc,
-      content: {
-        title,
-        subtitle,
-        description,
-      },
-      display: {
-        category,
-        type,
-        position,
-        order,
-      },
-      // Top-level fallbacks for storefront backward compatibility
-      title,
-      subtitle,
-      description,
-      category,
-      type,
-      position,
-      order,
-    };
+    return banner.toObject ? banner.toObject() : banner;
   }
 
   // ------------------------------- create banner ----------------------------
   async create(data) {
     const normalized = this._normalizePayload(data);
     const created = await Banner.create(normalized);
-    const populated = await Banner.findById(created._id).populate('display.category', 'name slug');
+    const populated = await Banner.findById(created._id).populate('display.categoryId', 'name slug');
     return this._formatBanner(populated);
   }
 
   // ------------------------------- get one banner ----------------------------
   async getOne(id) {
-    const banner = await Banner.findOne({ _id: id, isDeleted: false }).populate('display.category', 'name slug');
+    const banner = await Banner.findOne({ _id: id, isDeleted: false }).populate('display.categoryId', 'name slug');
     if (!banner) {
       throw new ApiError(404, 'Banner not found');
     }
@@ -98,50 +61,72 @@ class BannerService {
   // ------------------------------- get all banners ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const now = new Date();
+    const andConditions = [{ isDeleted: false }];
 
-    if (queryParams.type) {
-      filter.$or = [
-        { 'display.type': queryParams.type },
-        { type: queryParams.type },
-      ];
-    }
-    if (queryParams.bannerKey) {
-      filter.$or = [
-        { 'display.bannerKey': queryParams.bannerKey },
-        { bannerKey: queryParams.bannerKey },
-      ];
-    }
     if (queryParams.status) {
-      filter.status = queryParams.status;
+      andConditions.push({ status: queryParams.status });
     }
+
+    // 1. Exclude expired offer banners unless explicitly included
+    if (queryParams.includeExpired !== 'true' && queryParams.includeExpired !== true) {
+      andConditions.push({
+        $nor: [
+          {
+            'display.type': 'offerbanner',
+            endDate: { $ne: null, $lt: now },
+          },
+        ],
+      });
+    }
+
+    // 2. Filter by banner type
+    if (queryParams.type) {
+      andConditions.push({ 'display.type': queryParams.type });
+
+      if (queryParams.type === 'offerbanner' && queryParams.status === 'active') {
+        andConditions.push({
+          $or: [{ endDate: null }, { endDate: { $gte: now } }],
+        });
+        andConditions.push({
+          $or: [{ startDate: null }, { startDate: { $lte: now } }],
+        });
+      }
+    }
+
+    // 3. Filter by category
     if (queryParams.category) {
-      filter.$or = [
-        { 'display.category': queryParams.category },
-        { category: queryParams.category },
-      ];
+      andConditions.push({ 'display.categoryId': queryParams.category });
     }
+
+    // 4. Filter by bannerKey
+    if (queryParams.bannerKey) {
+      andConditions.push({ 'display.bannerKey': queryParams.bannerKey });
+    }
+
+    // 5. Filter by position
     if (queryParams.position && queryParams.position !== 'all') {
-      filter.$or = [
-        { 'display.position': queryParams.position },
-        { position: queryParams.position },
-      ];
+      andConditions.push({ 'display.position': queryParams.position });
     }
+
+    // 6. Search query
     if (queryParams.search) {
       const searchRegex = new RegExp(queryParams.search, 'i');
-      filter.$or = [
-        { 'content.title': searchRegex },
-        { 'content.subtitle': searchRegex },
-        { title: searchRegex },
-        { 'display.position': searchRegex },
-        { position: searchRegex },
-      ];
+      andConditions.push({
+        $or: [
+          { 'content.title': searchRegex },
+          { 'content.subtitle': searchRegex },
+          { 'display.position': searchRegex },
+        ],
+      });
     }
+
+    const filter = andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
 
     const [items, total] = await Promise.all([
       Banner.find(filter)
-        .populate('display.category', 'name slug')
-        .sort({ 'display.order': 1, order: 1, 'meta.createdAt': -1 })
+        .populate('display.categoryId', 'name slug')
+        .sort({ 'display.order': 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -156,20 +141,163 @@ class BannerService {
 
   // ------------------------------- get banner lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const now = new Date();
+    const andConditions = [
+      { isDeleted: false },
+      { status: 'active' },
+      {
+        $nor: [
+          {
+            'display.type': 'offerbanner',
+            endDate: { $ne: null, $lt: now },
+          },
+        ],
+      },
+    ];
 
     if (queryParams.type) {
-      filter.$or = [
-        { 'display.type': queryParams.type },
-        { type: queryParams.type },
-      ];
+      andConditions.push({ 'display.type': queryParams.type });
     }
 
+    if (queryParams.category) {
+      andConditions.push({ 'display.categoryId': queryParams.category });
+    }
+
+    const filter = andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
+
     const items = await Banner.find(filter)
-      .populate('display.category', 'name slug')
+      .populate('display.categoryId', 'name slug')
+      .sort({ 'display.order': 1, 'meta.createdAt': -1 })
       .lean();
 
     return items.map((item) => this._formatBanner(item));
+  }
+
+  // ----------------------- get category display banner -----------------------
+  async getCategoryDisplayBanner(categoryId = null) {
+    const now = new Date();
+
+    const baseOfferConds = [
+      { isDeleted: false },
+      { status: 'active' },
+      { 'display.type': 'offerbanner' },
+      { $or: [{ endDate: null }, { endDate: { $gte: now } }] },
+      { $or: [{ startDate: null }, { startDate: { $lte: now } }] },
+    ];
+
+    if (categoryId) {
+      const categorySpecificOffer = await Banner.findOne({
+        $and: [
+          ...baseOfferConds,
+          { 'display.categoryId': categoryId },
+        ],
+      })
+        .populate('display.categoryId', 'name slug')
+        .sort({ 'display.order': 1, 'meta.createdAt': -1 })
+        .lean();
+
+      if (categorySpecificOffer) {
+        return {
+          banner: this._formatBanner(categorySpecificOffer),
+          source: 'offerbanner',
+          isOffer: true,
+          type: 'offerbanner',
+        };
+      }
+    }
+
+    const generalOffer = await Banner.findOne({
+      $and: baseOfferConds,
+    })
+      .populate('display.categoryId', 'name slug')
+      .sort({ 'display.order': 1, 'meta.createdAt': -1 })
+      .lean();
+
+    if (generalOffer) {
+      return {
+        banner: this._formatBanner(generalOffer),
+        source: 'offerbanner',
+        isOffer: true,
+        type: 'offerbanner',
+      };
+    }
+
+    if (categoryId) {
+      const categoryBanner = await Banner.findOne({
+        $and: [
+          { isDeleted: false },
+          { status: 'active' },
+          { 'display.type': 'categorybanner' },
+          { 'display.categoryId': categoryId },
+        ],
+      })
+        .populate('display.categoryId', 'name slug')
+        .sort({ 'display.order': 1, 'meta.createdAt': -1 })
+        .lean();
+
+      if (categoryBanner) {
+        return {
+          banner: this._formatBanner(categoryBanner),
+          source: 'categorybanner',
+          isOffer: false,
+          type: 'categorybanner',
+        };
+      }
+
+      try {
+        const categoryDoc = await Category.findOne({
+          _id: categoryId,
+          isDeleted: false,
+        }).lean();
+
+        if (categoryDoc) {
+          const bannerUrl =
+            categoryDoc.banner?.url ||
+            (typeof categoryDoc.banner === 'string' ? categoryDoc.banner : null) ||
+            (Array.isArray(categoryDoc.images) && categoryDoc.images[0]?.url);
+
+          if (bannerUrl) {
+            return {
+              banner: {
+                _id: `category-banner-${categoryDoc._id}`,
+                content: {
+                  title: categoryDoc.name || 'Category Banner',
+                  subtitle: '',
+                  description: '',
+                },
+                image: {
+                  url: bannerUrl,
+                  public_id: categoryDoc.banner?.public_id || '',
+                },
+                mediaType: 'image',
+                display: {
+                  type: 'categorybanner',
+                  categoryId: {
+                    _id: categoryDoc._id,
+                    name: categoryDoc.name,
+                    slug: categoryDoc.slug,
+                  },
+                  order: 0,
+                  position: 'none',
+                },
+              },
+              source: 'category_model',
+              isOffer: false,
+              type: 'categorybanner',
+            };
+          }
+        }
+      } catch (catErr) {
+        console.warn('Failed to fetch category model banner fallback:', catErr.message);
+      }
+    }
+
+    return {
+      banner: null,
+      source: 'none',
+      isOffer: false,
+      type: null,
+    };
   }
 
   // ------------------------------- update banner ----------------------------
@@ -179,7 +307,7 @@ class BannerService {
       { _id: id, isDeleted: false },
       { $set: normalized },
       { new: true, runValidators: true }
-    ).populate('display.category', 'name slug');
+    ).populate('display.categoryId', 'name slug');
 
     if (!banner) {
       throw new ApiError(404, 'Banner not found');
@@ -201,6 +329,40 @@ class BannerService {
     }
 
     return { message: 'Banner deleted successfully', id };
+  }
+
+  // ----------------------- auto delete expired offers (cron) -----------------
+  async autoDeleteExpiredOffers() {
+    const now = new Date();
+    const filter = {
+      isDeleted: false,
+      'display.type': 'offerbanner',
+      endDate: { $ne: null, $lt: now },
+    };
+
+    const expiredOffers = await Banner.find(filter)
+      .select('_id content.title display.type endDate')
+      .lean();
+
+    if (!expiredOffers || expiredOffers.length === 0) {
+      return { deletedCount: 0, expiredIds: [] };
+    }
+
+    const expiredIds = expiredOffers.map((b) => b._id);
+    const result = await Banner.updateMany(
+      { _id: { $in: expiredIds } },
+      { $set: { isDeleted: true, status: 'inactive' } }
+    );
+
+    console.log(
+      `[Banner Cron] 🕒 Auto-deleted ${result.modifiedCount} expired offer banner(s):`,
+      expiredOffers.map((o) => `[ID: ${o._id}, Title: "${o.content?.title || 'Offer'}", EndDate: ${o.endDate}]`).join(', ')
+    );
+
+    return {
+      deletedCount: result.modifiedCount,
+      expiredIds,
+    };
   }
 }
 

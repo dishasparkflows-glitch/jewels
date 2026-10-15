@@ -26,14 +26,17 @@ const bannerSchema = new mongoose.Schema(
         ref: 'Category',
         required: false,
       },
-      category: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Category',
-        required: false,
-      },
       type: {
         type: String,
-        enum: ['herobanner', 'collectionbanner', 'websitebanner', 'mobileappbanner', 'bookappointbanner'],
+        enum: [
+          'herobanner',
+          'collectionbanner',
+          'categorybanner',
+          'offerbanner',
+          'websitebanner',
+          'mobileappbanner',
+          'bookappointbanner',
+        ],
         default: 'herobanner',
         required: [true, 'Please specify the banner type'],
       },
@@ -75,6 +78,15 @@ const bannerSchema = new mongoose.Schema(
       enum: ['image', 'video'],
       default: 'image',
     },
+    startDate: {
+      type: Date,
+      default: null,
+    },
+    endDate: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     status: {
       type: String,
       enum: ['active', 'inactive'],
@@ -94,79 +106,8 @@ const bannerSchema = new mongoose.Schema(
   }
 );
 
-// Virtual getters/setters for backward compatibility
-bannerSchema
-  .virtual('title')
-  .get(function () {
-    return this.content?.title || '';
-  })
-  .set(function (val) {
-    if (!this.content) this.content = {};
-    this.content.title = val;
-  });
-
-bannerSchema
-  .virtual('subtitle')
-  .get(function () {
-    return this.content?.subtitle || '';
-  })
-  .set(function (val) {
-    if (!this.content) this.content = {};
-    this.content.subtitle = val;
-  });
-
-bannerSchema
-  .virtual('description')
-  .get(function () {
-    return this.content?.description || '';
-  })
-  .set(function (val) {
-    if (!this.content) this.content = {};
-    this.content.description = val;
-  });
-
-bannerSchema
-  .virtual('category')
-  .get(function () {
-    return this.display?.category;
-  })
-  .set(function (val) {
-    if (!this.display) this.display = {};
-    this.display.category = val;
-  });
-
-bannerSchema
-  .virtual('type')
-  .get(function () {
-    return this.display?.type || 'herobanner';
-  })
-  .set(function (val) {
-    if (!this.display) this.display = {};
-    this.display.type = val;
-  });
-
-bannerSchema
-  .virtual('position')
-  .get(function () {
-    return this.display?.position || 'none';
-  })
-  .set(function (val) {
-    if (!this.display) this.display = {};
-    this.display.position = val;
-  });
-
-bannerSchema
-  .virtual('order')
-  .get(function () {
-    return this.display?.order ?? 0;
-  })
-  .set(function (val) {
-    if (!this.display) this.display = {};
-    this.display.order = val;
-  });
-
 bannerSchema.index({ 'display.type': 1, status: 1, isDeleted: 1 });
-bannerSchema.index({ 'display.category': 1, status: 1 });
+bannerSchema.index({ 'display.categoryId': 1, status: 1 });
 bannerSchema.index({ 'display.order': 1 });
 
 bannerSchema.plugin(metaPlugin);

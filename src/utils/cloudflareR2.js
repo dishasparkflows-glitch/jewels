@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 class CloudflareR2Service {
@@ -135,7 +135,6 @@ class CloudflareR2Service {
     }
     cleanKey = cleanKey.replace(/^\/+/, '');
 
-    const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
     await this.client.send(
       new DeleteObjectCommand({
         Bucket: this.bucketName,

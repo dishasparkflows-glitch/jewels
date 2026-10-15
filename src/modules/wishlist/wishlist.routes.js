@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const wishlistController = require('./wishlist.controller');
-const { optionalAuth } = require('../../middleware/auth.middleware');
+const { authenticate } = require('../../middleware/auth.middleware');
 
-// Optional authentication applies to all wishlist routes
-// Allows both authenticated users and guest sessions to use wishlist
-router.use(optionalAuth);
+// All wishlist routes require authentication
+router.use(authenticate);
 
 // Wishlist endpoints
 router.get('/', wishlistController.getWishlist);

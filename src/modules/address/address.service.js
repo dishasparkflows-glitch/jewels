@@ -10,7 +10,7 @@ class AddressService {
   async syncUserDoc(userId) {
     try {
       const addresses = await Address.find({
-        user: userId,
+        userId,
         'meta.isDeleted': { $ne: true },
       }).sort({ isDefault: -1, isShippingDefault: -1, 'meta.createdAt': -1 });
 
@@ -61,7 +61,7 @@ class AddressService {
   async migrateFromUserDocIfNeeded(userId) {
     try {
       const count = await Address.countDocuments({
-        user: userId,
+        userId,
         'meta.isDeleted': { $ne: true },
       });
       if (count > 0) return;
@@ -74,15 +74,14 @@ class AddressService {
       // Check shipping
       if (user.addresses.shipping?.fullName && user.addresses.shipping?.addressLine) {
         toCreate.push({
-          user: userId,
-          title: 'Default Shipping',
+          userId,
           fullName: user.addresses.shipping.fullName,
           phone: user.addresses.shipping.phone || user.profile?.phone || '9999999999',
           addressLine: user.addresses.shipping.addressLine,
           city: user.addresses.shipping.city || 'Gandhinagar',
           state: user.addresses.shipping.state || 'Gujarat',
           pincode: user.addresses.shipping.pincode || '382006',
-          addressType: 'shipping',
+          addressType: 'home',
           isDefault: true,
           isShippingDefault: true,
           isBillingDefault: !user.addresses.billing?.fullName,
@@ -96,15 +95,14 @@ class AddressService {
         user.addresses.billing.addressLine !== user.addresses.shipping?.addressLine
       ) {
         toCreate.push({
-          user: userId,
-          title: 'Default Billing',
+          userId,
           fullName: user.addresses.billing.fullName,
           phone: user.addresses.billing.phone || user.profile?.phone || '9999999999',
           addressLine: user.addresses.billing.addressLine,
           city: user.addresses.billing.city || 'Gandhinagar',
           state: user.addresses.billing.state || 'Gujarat',
           pincode: user.addresses.billing.pincode || '382006',
-          addressType: 'billing',
+          addressType: 'office',
           isDefault: toCreate.length === 0,
           isShippingDefault: false,
           isBillingDefault: true,
@@ -116,15 +114,14 @@ class AddressService {
         for (const s of user.addresses.saved) {
           if (s?.fullName && s?.addressLine) {
             toCreate.push({
-              user: userId,
-              title: s.title || `Address ${toCreate.length + 1}`,
+              userId,
               fullName: s.fullName,
               phone: s.phone || user.profile?.phone || '9999999999',
               addressLine: s.addressLine,
               city: s.city || 'Gandhinagar',
               state: s.state || 'Gujarat',
               pincode: s.pincode || '382006',
-              addressType: 'other',
+              addressType: 'home',
               isDefault: toCreate.length === 0,
               isShippingDefault: toCreate.length === 0,
               isBillingDefault: toCreate.length === 0,
@@ -148,7 +145,7 @@ class AddressService {
     await this.migrateFromUserDocIfNeeded(userId);
 
     const addresses = await Address.find({
-      user: userId,
+      userId,
       'meta.isDeleted': { $ne: true },
     }).sort({ isDefault: -1, isShippingDefault: -1, 'meta.createdAt': -1 });
 
@@ -164,7 +161,7 @@ class AddressService {
       'meta.isDeleted': { $ne: true },
     };
     if (!isAdmin) {
-      query.user = userId;
+      query.userId = userId;
     }
 
     const address = await Address.findOne(query);
@@ -179,7 +176,7 @@ class AddressService {
    */
   async createAddress(userId, data) {
     const existingCount = await Address.countDocuments({
-      user: userId,
+      userId,
       'meta.isDeleted': { $ne: true },
     });
 
@@ -190,14 +187,14 @@ class AddressService {
     // If making default, reset existing defaults
     if (shouldBeDefault) {
       await Address.updateMany(
-        { user: userId, 'meta.isDeleted': { $ne: true } },
+        { userId, 'meta.isDeleted': { $ne: true } },
         { isDefault: false, isShippingDefault: false }
       );
     }
 
     if (shouldBeBillingDefault) {
       await Address.updateMany(
-        { user: userId, 'meta.isDeleted': { $ne: true } },
+        { userId, 'meta.isDeleted': { $ne: true } },
         { isBillingDefault: false }
       );
     }
@@ -215,7 +212,7 @@ class AddressService {
     const address = await Address.create({
       ...cleanData,
       addressType: resolvedType,
-      user: userId,
+      userId,
       isDefault: shouldBeDefault,
       isShippingDefault: shouldBeDefault,
       isBillingDefault: shouldBeBillingDefault,
@@ -234,7 +231,7 @@ class AddressService {
       'meta.isDeleted': { $ne: true },
     };
     if (!isAdmin) {
-      query.user = userId;
+      query.userId = userId;
     }
 
     const address = await Address.findOne(query);
@@ -255,7 +252,7 @@ class AddressService {
     // Reset other defaults if this address is being set as default
     if (data.isDefault || data.isShippingDefault) {
       await Address.updateMany(
-        { user: address.user, _id: { $ne: addressId }, 'meta.isDeleted': { $ne: true } },
+        { userId: address.userId, _id: { $ne: addressId }, 'meta.isDeleted': { $ne: true } },
         { isDefault: false, isShippingDefault: false }
       );
       data.isDefault = true;
@@ -264,7 +261,7 @@ class AddressService {
 
     if (data.isBillingDefault) {
       await Address.updateMany(
-        { user: address.user, _id: { $ne: addressId }, 'meta.isDeleted': { $ne: true } },
+        { userId: address.userId, _id: { $ne: addressId }, 'meta.isDeleted': { $ne: true } },
         { isBillingDefault: false }
       );
     }
@@ -272,7 +269,7 @@ class AddressService {
     Object.assign(address, data);
     await address.save();
 
-    await this.syncUserDoc(address.user);
+    await this.syncUserDoc(address.userId);
     return address;
   }
 
@@ -285,7 +282,7 @@ class AddressService {
       'meta.isDeleted': { $ne: true },
     };
     if (!isAdmin) {
-      query.user = userId;
+      query.userId = userId;
     }
 
     const address = await Address.findOne(query);
@@ -301,7 +298,7 @@ class AddressService {
     // If deleted address was default, promote another address to default
     if (address.isDefault || address.isShippingDefault || address.isBillingDefault) {
       const fallback = await Address.findOne({
-        user: address.user,
+        userId: address.userId,
         'meta.isDeleted': { $ne: true },
       }).sort({ 'meta.createdAt': -1 });
 
@@ -317,7 +314,7 @@ class AddressService {
       }
     }
 
-    await this.syncUserDoc(address.user);
+    await this.syncUserDoc(address.userId);
     return { success: true, message: 'Address removed successfully' };
   }
 
@@ -327,7 +324,7 @@ class AddressService {
   async setDefault(userId, addressId, type = 'both') {
     const address = await Address.findOne({
       _id: addressId,
-      user: userId,
+      userId,
       'meta.isDeleted': { $ne: true },
     });
 
@@ -337,7 +334,7 @@ class AddressService {
 
     if (type === 'shipping' || type === 'both') {
       await Address.updateMany(
-        { user: userId, 'meta.isDeleted': { $ne: true } },
+        { userId, 'meta.isDeleted': { $ne: true } },
         { isDefault: false, isShippingDefault: false }
       );
       address.isDefault = true;
@@ -346,7 +343,7 @@ class AddressService {
 
     if (type === 'billing' || type === 'both') {
       await Address.updateMany(
-        { user: userId, 'meta.isDeleted': { $ne: true } },
+        { userId, 'meta.isDeleted': { $ne: true } },
         { isBillingDefault: false }
       );
       address.isBillingDefault = true;

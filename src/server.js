@@ -2,6 +2,7 @@ require('dotenv').config();
 const app = require('./app');
 const connectDB = require('./config/db');
 const { startOrnateCron } = require('./modules/ornate/ornate.cron');
+const { startBannerCron } = require('./modules/banner/banner.cron');
 
 const PORT = process.env.PORT || 5000;
 
@@ -9,6 +10,9 @@ const PORT = process.env.PORT || 5000;
 connectDB().then(() => {
   // Start recurring Ornate ERP 30-minute sync cron
   // startOrnateCron();
+
+  // Start recurring banner offer auto-cleanup cron
+  startBannerCron();
 
   app.listen(PORT, () => {
     console.log(`\n🚀 Jewels API Server running on port ${PORT}`);

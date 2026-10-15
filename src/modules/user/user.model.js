@@ -58,6 +58,11 @@ const userSchema = new mongoose.Schema(
         default: '',
         trim: true,
       },
+      themeColor: {
+        type: String,
+        default: 'default',
+        trim: true,
+      },
     },
 
     addresses: {
@@ -160,6 +165,10 @@ userSchema.virtual('avatar')
   .get(function () { return this.profile?.avatar; })
   .set(function (val) { if (!this.profile) this.profile = {}; this.profile.avatar = val; });
 
+userSchema.virtual('themeColor')
+  .get(function () { return this.profile?.themeColor || 'default'; })
+  .set(function (val) { if (!this.profile) this.profile = {}; this.profile.themeColor = val; });
+
 userSchema.virtual('lastLogin')
   .get(function () { return this.auth?.lastLogin; })
   .set(function (val) { if (!this.auth) this.auth = {}; this.auth.lastLogin = val; });
@@ -176,7 +185,7 @@ userSchema.virtual('shippingAddress')
 userSchema.virtual('addressesList', {
   ref: 'Address',
   localField: '_id',
-  foreignField: 'user',
+  foreignField: 'userId',
 });
 
 userSchema.virtual('ordersCount')

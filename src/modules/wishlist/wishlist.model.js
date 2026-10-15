@@ -3,11 +3,6 @@ const metaPlugin = require('../../utils/metaPlugin');
 
 const wishlistItemSchema = new mongoose.Schema(
   {
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      default: null,
-    },
     productId: {
       type: String,
       required: [true, 'Product ID is required'],
@@ -54,26 +49,12 @@ const wishlistSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      default: null,
-      index: true,
-    },
-    sessionId: {
-      type: String,
-      default: null,
-      index: true,
-    },
     items: [wishlistItemSchema],
   },
   {
     versionKey: false,
   }
 );
-
-// Indexes
-wishlistSchema.index({ user: 1, sessionId: 1 });
 
 wishlistSchema.plugin(metaPlugin);
 

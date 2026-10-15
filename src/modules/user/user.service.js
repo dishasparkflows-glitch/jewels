@@ -1,4 +1,5 @@
 const User = require('./user.model');
+const addressService = require('../address/address.service');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -50,7 +51,6 @@ class UserService {
 
     // Attach addresses from dedicated Address collection
     try {
-      const addressService = require('../address/address.service');
       const userAddresses = await addressService.getUserAddresses(id);
       user.addressesList = userAddresses;
       if (userAddresses && userAddresses.length > 0) {
@@ -94,91 +94,12 @@ class UserService {
     delete data.password;
     if (data.auth) delete data.auth.password;
 
-    // Handle flat updates for profile if passed
-    const updateData = { ...data };
-    if (data.firstName || data.lastName || data.phone || data.bio || data.location || data.avatar) {
-      if (!updateData.profile) updateData.profile = {};
-      if (data.firstName) updateData.profile.firstName = data.firstName;
-      if (data.lastName) updateData.profile.lastName = data.lastName;
-      if (data.phone) updateData.profile.phone = data.phone;
-      if (data.bio !== undefined) updateData.profile.bio = data.bio;
-      if (data.location !== undefined) updateData.profile.location = data.location;
-      if (data.avatar !== undefined) updateData.profile.avatar = data.avatar;
-    }
-
-    // Handle flat address updates if passed
-    if (data.billingAddress) {
-      if (!updateData.addresses) updateData.addresses = {};
-      updateData.addresses.billing = data.billingAddress;
-    }
-    if (data.shippingAddress) {
-      if (!updateData.addresses) updateData.addresses = {};
-      updateData.addresses.shipping = data.shippingAddress;
-    }
-
-    const user = await User.findByIdAndUpdate(id, updateData, {
+    const user = await User.findByIdAndUpdate(id, data, {
       new: true,
       runValidators: true,
     }).select('-auth.password -password');
 
     if (!user) throw new ApiError(404, 'User not found');
-
-    // Synchronize updates into Address collection
-    try {
-      const Address = require('../address/address.model');
-      if (data.shippingAddress && (data.shippingAddress.addressLine || data.shippingAddress.street)) {
-        const { fullName, title, ...shippingClean } = data.shippingAddress;
-        await Address.findOneAndUpdate(
-          { user: id, isShippingDefault: true, 'meta.isDeleted': { $ne: true } },
-          {
-            $set: {
-              ...shippingClean,
-              user: id,
-              addressType: 'home',
-              isDefault: true,
-              isShippingDefault: true,
-            },
-          },
-          { upsert: true, new: true }
-        );
-      }
-      if (data.billingAddress && (data.billingAddress.addressLine || data.billingAddress.street)) {
-        const { fullName, title, ...billingClean } = data.billingAddress;
-        await Address.findOneAndUpdate(
-          { user: id, isBillingDefault: true, 'meta.isDeleted': { $ne: true } },
-          {
-            $set: {
-              ...billingClean,
-              user: id,
-              addressType: 'office',
-              isBillingDefault: true,
-            },
-          },
-          { upsert: true, new: true }
-        );
-      }
-      if (Array.isArray(data.addresses)) {
-        for (const addr of data.addresses) {
-          if (addr.addressLine || addr.street) {
-            const { fullName, title, ...cleanAddr } = addr;
-            const addrType = (addr.addressType?.toLowerCase() === 'office' || (addr.title && addr.title.toLowerCase().includes('office'))) ? 'office' : 'home';
-            const addrId = addr._id || addr.id;
-            if (addrId && String(addrId).length === 24) {
-              await Address.findByIdAndUpdate(
-                addrId,
-                { ...cleanAddr, addressType: addrType, user: id, 'meta.isDeleted': false },
-                { upsert: true }
-              );
-            } else {
-              await Address.create({ ...cleanAddr, addressType: addrType, user: id });
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.warn(`[UserService] Notice: Syncing to Address collection skipped: ${err.message}`);
-    }
-
     return user;
   }
 

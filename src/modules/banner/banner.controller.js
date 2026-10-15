@@ -26,6 +26,13 @@ class BannerController {
     ApiResponse.success(res, items, 'Banner lookup list retrieved');
   });
 
+  // ----------------------- get category display banner ----------------------
+  getCategoryDisplayBanner = catchAsync(async (req, res) => {
+    const categoryId = req.query.category || req.query.categoryId || req.params.categoryId;
+    const result = await bannerService.getCategoryDisplayBanner(categoryId);
+    ApiResponse.success(res, result, 'Display banner retrieved successfully');
+  });
+
   // ------------------------------- get one banner ----------------------------
   getOne = catchAsync(async (req, res) => {
     const banner = await bannerService.getOne(req.params.id);
@@ -42,6 +49,16 @@ class BannerController {
   delete = catchAsync(async (req, res) => {
     const result = await bannerService.delete(req.params.id);
     ApiResponse.success(res, { id: result.id }, result.message);
+  });
+
+  // ----------------------- manual trigger offer cleanup ---------------------
+  cleanupExpiredOffers = catchAsync(async (req, res) => {
+    const result = await bannerService.autoDeleteExpiredOffers();
+    ApiResponse.success(
+      res,
+      result,
+      `Expired offers cleanup completed. ${result.deletedCount} offers deleted.`
+    );
   });
 }
 

@@ -1,5 +1,6 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const connectDB = require('../config/db');
 
 const CodSequence = require('../modules/codSequence/codSequence.model');
@@ -498,7 +499,6 @@ const seedScreenshotModules = async () => {
 
     // 2. Seed Customers (retain super_admin and admin users, update or add customer users)
     await User.deleteMany({ role: 'user' });
-    const bcrypt = require('bcryptjs');
     const hashedCustomers = await Promise.all(
       customers.map(async (c) => ({
         role: c.role || 'user',

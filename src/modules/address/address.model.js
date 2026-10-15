@@ -6,11 +6,7 @@ const addressSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      index: true,
-    },
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      required: [true, 'User ID is required'],
       index: true,
     },
     addressType: {
@@ -75,52 +71,11 @@ const addressSchema = new mongoose.Schema(
   }
 );
 
-// Virtual aliases for compatibility
-addressSchema.virtual('zipCode')
-  .get(function () { return this.pincode; })
-  .set(function (val) { this.pincode = val; });
-
-// Virtual title mapped to addressType ('Home' / 'Office')
-addressSchema.virtual('title')
-  .get(function () {
-    return this.addressType === 'office' ? 'Office' : 'Home';
-  })
-  .set(function (val) {
-    if (val && typeof val === 'string') {
-      const lower = val.toLowerCase().trim();
-      if (lower.includes('office') || lower.includes('work')) {
-        this.addressType = 'office';
-      } else if (lower.includes('home')) {
-        this.addressType = 'home';
-      }
-    }
-  });
-
-// Synchronize street with addressLine if street not explicitly provided
-addressSchema.pre('validate', function (next) {
-  if (this.userId && !this.user) {
-    this.user = this.userId;
-  }
-  if (this.user && !this.userId) {
-    this.userId = this.user;
-  }
-  if (!this.user && !this.userId) {
-    return next(new Error('User ID is required'));
-  }
-  if (this.addressLine && !this.street) {
-    this.street = this.addressLine;
-  }
-  if (this.street && !this.addressLine) {
-    this.addressLine = this.street;
-  }
-  next();
-});
-
 // Indexes for fast lookup
-addressSchema.index({ user: 1, isDefault: -1 });
-addressSchema.index({ user: 1, addressType: 1 });
-addressSchema.index({ user: 1, isShippingDefault: -1 });
-addressSchema.index({ user: 1, isBillingDefault: -1 });
+addressSchema.index({ userId: 1, isDefault: -1 });
+addressSchema.index({ userId: 1, addressType: 1 });
+addressSchema.index({ userId: 1, isShippingDefault: -1 });
+addressSchema.index({ userId: 1, isBillingDefault: -1 });
 
 addressSchema.plugin(metaPlugin);
 

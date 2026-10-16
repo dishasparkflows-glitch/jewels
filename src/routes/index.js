@@ -32,7 +32,6 @@ const homeSectionRoutes = require('../modules/homeSection/homeSection.routes');
 const instagramPostRoutes = require('../modules/instagramPost/instagramPost.routes');
 const menuItemRoutes = require('../modules/menuItem/menuItem.routes');
 const menuSectionRoutes = require('../modules/menuSection/menuSection.routes');
-const navigationMenuRoutes = require('../modules/navigationMenu/navigationMenu.routes');
 const metalColorRoutes = require('../modules/metalColor/metalColor.routes');
 const metalPurityRoutes = require('../modules/metalPurity/metalPurity.routes');
 const metalTypeRoutes = require('../modules/metalType/metalType.routes');
@@ -96,7 +95,6 @@ router.use('/home-sections', homeSectionRoutes);
 router.use('/instagram-posts', instagramPostRoutes);
 router.use('/menu-items', menuItemRoutes);
 router.use('/menu-sections', menuSectionRoutes);
-router.use('/navigation-menus', navigationMenuRoutes);
 router.use('/metal-colors', metalColorRoutes);
 router.use('/metal-purities', metalPurityRoutes);
 router.use('/metal-types', metalTypeRoutes);
@@ -107,19 +105,10 @@ router.use('/sizes', sizeRoutes);
 router.use('/vto-masters', vtoMasterRoutes);
 router.use('/goldprice', goldPriceRoutes);
 router.use('/gold-price', goldPriceRoutes);
-const ApiResponse = require('../utils/ApiResponse');
 
 router.use('/notifications', notificationRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/settings', settingRoutes);
-
-router.use('/orders', (req, res) => {
-  return ApiResponse.paginated(res, [], { totalDocs: 0, totalPages: 0, page: 1, limit: 10 }, 'Orders retrieved successfully');
-});
-
-router.use('/returns', (req, res) => {
-  return ApiResponse.paginated(res, [], { totalDocs: 0, totalPages: 0, page: 1, limit: 10 }, 'Returns retrieved successfully');
-});
 
 module.exports = router;

@@ -110,7 +110,7 @@ class ProductService {
   // ------------------------------- get all products ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     if (queryParams.search) {
       const searchRegex = new RegExp(queryParams.search, 'i');

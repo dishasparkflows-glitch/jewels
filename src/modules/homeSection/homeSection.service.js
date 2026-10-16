@@ -53,7 +53,7 @@ class HomeSectionService {
   async getAll(queryParams = {}) {
 
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     if (queryParams.status && queryParams.status !== 'all') {
       filter.status = queryParams.status;
@@ -228,11 +228,6 @@ class HomeSectionService {
     );
 
     return { success: true, count: ids.length };
-  }
-
-  // ------------------------------- Seed Defaults (Disabled) ----------------------------
-  async seedDefaults() {
-    return [];
   }
 }
 

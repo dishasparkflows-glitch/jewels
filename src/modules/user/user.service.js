@@ -7,7 +7,7 @@ class UserService {
   // ------------------------------- get all users ----------------------------
   async getAll(query) {
     const { page, limit, skip } = getPagination(query);
-    const filter = { };
+    const filter = { 'meta.deletedAt': null };
 
     // Search by name or email
     if (query.search) {

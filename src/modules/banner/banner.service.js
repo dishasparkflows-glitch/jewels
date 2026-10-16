@@ -29,7 +29,7 @@ class BannerService {
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const now = new Date();
-    const andConditions = [];
+    const andConditions = [{ 'meta.deletedAt': null }];
 
     if (queryParams.status) {
       andConditions.push({ status: queryParams.status });

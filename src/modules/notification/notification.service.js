@@ -6,7 +6,7 @@ class NotificationService {
   // ------------------------------- get all notifications ----------------------------
   async getAll(userId, query) {
     const { page, limit, skip } = getPagination(query);
-    const filter = { userId };
+    const filter = { userId, 'meta.deletedAt': null };
     if (query.isRead !== undefined) filter.isRead = query.isRead === 'true';
 
     const [notifications, total] = await Promise.all([

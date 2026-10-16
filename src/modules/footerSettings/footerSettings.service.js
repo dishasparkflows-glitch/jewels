@@ -5,19 +5,7 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class FooterSettingsService {
   // ------------------------------- get footer settings ----------------------------
   async getSettings() {
-    let settings = await FooterSettings.findOne({ isDeleted: false }).lean();
-    if (!settings) {
-      settings = await FooterSettings.create({
-        shopItems: [],
-        socialLinks: [
-          { platform: 'Instagram', url: 'https://instagram.com' },
-          { platform: 'Facebook', url: 'https://facebook.com' },
-          { platform: 'Pinterest', url: 'https://pinterest.com' },
-        ],
-        copyright: 'Neirah Jewellers Private Limited All Rights Reserved',
-      });
-    }
-    return settings;
+    return (await FooterSettings.findOne({ isDeleted: false }).lean()) || {};
   }
 
   // ------------------------------- update footer settings ----------------------------
@@ -49,7 +37,7 @@ class FooterSettingsService {
   // ------------------------------- get all footer settings ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     const [items, total] = await Promise.all([
       FooterSettings.find(filter)

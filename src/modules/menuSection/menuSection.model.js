@@ -15,6 +15,7 @@ const menuSectionSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    order: { type: Number, default: 0, min: 0 },
     status: {
       type: String,
       enum: ['active', 'inactive'],

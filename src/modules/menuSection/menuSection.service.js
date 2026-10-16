@@ -1,3 +1,6 @@
+const MenuItem = require('../menuItem/menuItem.model');
+const Category = require('../category/category.model');
+const requireParent = require('../../utils/menuParents');
 const MenuSection = require('./menuSection.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -5,6 +8,7 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class MenuSectionService {
   // ------------------------------- create menu section ----------------------------
   async create(data) {
+    await requireParent(Category, data.categoryId, 'Category');
     return await MenuSection.create(data);
   }
 
@@ -23,7 +27,7 @@ class MenuSectionService {
   // ------------------------------- get all menu sections ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     if (queryParams.status) {
       filter.status = queryParams.status;
@@ -38,7 +42,7 @@ class MenuSectionService {
     const [items, total] = await Promise.all([
       MenuSection.find(filter)
         .populate('categoryId', 'name slug type')
-        .sort({ 'meta.createdAt': -1 })
+        .sort({ order: 1, 'meta.createdAt': 1, _id: 1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -57,13 +61,14 @@ class MenuSectionService {
 
     return await MenuSection.find(filter)
       .populate('categoryId', 'name slug type')
-      .sort({ title: 1 })
+      .sort({ order: 1, title: 1 })
       .select('_id title categoryId status')
       .lean();
   }
 
   // ------------------------------- update menu section ----------------------------
   async update(id, data) {
+    if (data.categoryId !== undefined) await requireParent(Category, data.categoryId, 'Category');
     const item = await MenuSection.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: data },
@@ -89,6 +94,7 @@ class MenuSectionService {
       throw new ApiError(404, 'Menu section not found');
     }
 
+    await MenuItem.updateMany({ menuSectionId: id, 'meta.deletedAt': null }, { $set: { isDeleted: true, status: 'inactive' } });
     return { message: 'Menu section deleted successfully', id };
   }
 }

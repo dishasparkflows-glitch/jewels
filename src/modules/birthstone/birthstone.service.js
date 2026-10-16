@@ -48,7 +48,7 @@ class BirthstoneService {
   // ------------------------------- get all birthstones ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     if (queryParams.month) {
       filter.month = new RegExp(queryParams.month, 'i');

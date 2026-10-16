@@ -60,7 +60,7 @@ class CategoryService {
   // ------------------------------- get all categories ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = {};
+    const filter = { 'meta.deletedAt': null };
 
 
     if (queryParams.status) {
@@ -84,7 +84,7 @@ class CategoryService {
 
   // ------------------------------- get category lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = {};
+    const filter = { 'meta.deletedAt': null };
     if (queryParams.status) {
       filter.status = queryParams.status;
     }

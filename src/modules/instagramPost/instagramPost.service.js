@@ -20,7 +20,7 @@ class InstagramPostService {
   // ------------------------------- get all instagram posts ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     if (queryParams.isActive !== undefined && queryParams.isActive !== '' && queryParams.isActive !== 'all') {
       filter.isActive = queryParams.isActive === 'true' || queryParams.isActive === true;

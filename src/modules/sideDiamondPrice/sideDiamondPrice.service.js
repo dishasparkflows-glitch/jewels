@@ -53,7 +53,7 @@ class SideDiamondPriceService {
 
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     if (queryParams.diamondTypeId) filter.diamondTypeId = queryParams.diamondTypeId;
     if (queryParams.diamondShapeId) filter.diamondShapeId = queryParams.diamondShapeId;

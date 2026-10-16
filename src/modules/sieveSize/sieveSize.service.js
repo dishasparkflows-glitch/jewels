@@ -34,7 +34,7 @@ class SieveSizeService {
 
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     if (queryParams.status) {
       filter.status = queryParams.status;

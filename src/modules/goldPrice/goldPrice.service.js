@@ -3,15 +3,7 @@ const GoldPrice = require('./goldPrice.model');
 class GoldPriceService {
   // ------------------------------- get latest gold / metal price ----------------------------
   async getLatest() {
-    let price = await GoldPrice.findOne().sort({ updatedAt: -1 }).populate('updatedBy', 'name email');
-    if (!price) {
-      price = await GoldPrice.create({
-        base24KRate: 15700,
-        platinumRate: 3500,
-        silverRate: 95,
-      });
-    }
-    return price;
+    return await GoldPrice.findOne().sort({ 'meta.updatedAt': -1 }).populate('updatedBy', 'name email');
   }
 
   // ------------------------------- update metal rates ----------------------------

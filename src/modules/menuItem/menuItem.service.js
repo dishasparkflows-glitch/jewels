@@ -1,3 +1,5 @@
+const MenuSection = require('../menuSection/menuSection.model');
+const requireParent = require('../../utils/menuParents');
 const MenuItem = require('./menuItem.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -5,6 +7,7 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class MenuItemService {
   // ------------------------------- create menu item ----------------------------
   async create(data) {
+    await requireParent(MenuSection, data.menuSectionId, 'Menu section');
     return await MenuItem.create(data);
   }
 
@@ -25,7 +28,7 @@ class MenuItemService {
 
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     if (queryParams.status) {
       filter.status = queryParams.status;
@@ -40,7 +43,7 @@ class MenuItemService {
     const [items, total] = await Promise.all([
       MenuItem.find(filter)
         .populate('menuSectionId', 'title categoryId')
-        .sort({ 'meta.createdAt': -1 })
+        .sort({ order: 1, 'meta.createdAt': 1, _id: 1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -60,14 +63,15 @@ class MenuItemService {
 
     return await MenuItem.find(filter)
       .populate('menuSectionId', 'title categoryId')
-      .sort({ title: 1 })
-      .select('_id title icon menuSectionId status')
+      .sort({ order: 1, title: 1 })
+      .select('_id title icon menuSectionId order status')
       .lean();
   }
 
   // ------------------------------- update menu item ----------------------------
 
   async update(id, data) {
+    if (data.menuSectionId !== undefined) await requireParent(MenuSection, data.menuSectionId, 'Menu section');
     const item = await MenuItem.findOneAndUpdate(
       { _id: id, isDeleted: false },
       { $set: data },

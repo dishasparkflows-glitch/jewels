@@ -37,7 +37,7 @@ class SettingService {
   // ------------------------------- get all settings ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     const [items, total] = await Promise.all([
       Setting.find(filter)

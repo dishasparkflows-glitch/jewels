@@ -19,6 +19,7 @@ const menuItemSchema = new mongoose.Schema(
       url: String,
       key: String,
     },
+    order: { type: Number, default: 0, min: 0 },
     status: {
       type: String,
       enum: ['active', 'inactive'],

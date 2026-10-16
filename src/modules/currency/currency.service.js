@@ -37,7 +37,7 @@ class CurrencyService {
    */
   async getAll(queryParams = {}) {
 
-    const filter = { 'metadata.isDeleted': false };
+    const filter = { 'metadata.isDeleted': false, 'meta.deletedAt': null };
 
     if (queryParams.activeOnly === 'true' || queryParams.status === 'active') {
       filter['settings.isActive'] = true;

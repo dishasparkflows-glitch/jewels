@@ -95,7 +95,7 @@ class UserService {
     if (data.auth) delete data.auth.password;
 
     const user = await User.findByIdAndUpdate(id, data, {
-      new: true,
+      returnDocument: 'after',
       runValidators: true,
     }).select('-auth.password -password');
 

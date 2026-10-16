@@ -14,7 +14,7 @@ class MenuItemService {
   // ------------------------------- get one menu item ----------------------------
 
   async getOne(id) {
-    const item = await MenuItem.findOne({ _id: id, isDeleted: false })
+    const item = await MenuItem.findOne({ _id: id, 'meta.deletedAt': null })
       .populate('menuSectionId', 'title categoryId')
       .lean();
 
@@ -56,7 +56,7 @@ class MenuItemService {
   // ------------------------------- get menu item lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     if (queryParams.menuSectionId) {
       filter.menuSectionId = queryParams.menuSectionId;
     }
@@ -73,9 +73,9 @@ class MenuItemService {
   async update(id, data) {
     if (data.menuSectionId !== undefined) await requireParent(MenuSection, data.menuSectionId, 'Menu section');
     const item = await MenuItem.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).populate('menuSectionId', 'title categoryId');
 
     if (!item) {
@@ -85,13 +85,34 @@ class MenuItemService {
     return item;
   }
 
+  // ------------------------------- reorder menu items ----------------------------
+  async reorder(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new ApiError(400, 'Items array is required for reordering');
+    }
+
+    const bulkOps = items.map((item, index) => {
+      const id = typeof item === 'string' ? item : item.id || item._id;
+      const order = typeof item === 'object' && item.order !== undefined ? item.order : index + 1;
+      return {
+        updateOne: {
+          filter: { _id: id },
+          update: { $set: { order } },
+        },
+      };
+    });
+
+    await MenuItem.bulkWrite(bulkOps);
+    return { success: true, count: items.length };
+  }
+
   // ------------------------------- delete menu item ----------------------------
 
   async delete(id) {
     const item = await MenuItem.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

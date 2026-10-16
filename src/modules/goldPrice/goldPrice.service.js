@@ -20,7 +20,7 @@ class GoldPriceService {
 
     let price = await GoldPrice.findOne().sort({ updatedAt: -1 });
     if (price) {
-      price = await GoldPrice.findByIdAndUpdate(price._id, { $set: updateData }, { new: true }).populate('updatedBy', 'name email');
+      price = await GoldPrice.findByIdAndUpdate(price._id, { $set: updateData }, { returnDocument: 'after' }).populate('updatedBy', 'name email');
     } else {
       price = await GoldPrice.create(updateData);
     }

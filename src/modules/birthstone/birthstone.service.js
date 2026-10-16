@@ -8,7 +8,7 @@ class BirthstoneService {
    */
   // ------------------------------- create birthstone ----------------------------
   async create(data) {
-    const existing = await Birthstone.findOne({ month: data.month, isDeleted: false });
+    const existing = await Birthstone.findOne({ month: data.month });
     if (existing) {
       throw new ApiError(409, `A birthstone for ${data.month} already exists`);
     }
@@ -20,7 +20,7 @@ class BirthstoneService {
    */
   // ------------------------------- get one birthstone ----------------------------
   async getOne(id) {
-    const item = await Birthstone.findOne({ _id: id, isDeleted: false });
+    const item = await Birthstone.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Birthstone not found');
     }
@@ -34,7 +34,6 @@ class BirthstoneService {
   async getByMonth(month) {
     const item = await Birthstone.findOne({
       month: new RegExp(`^${month}$`, 'i'),
-      isDeleted: false,
     });
     if (!item) {
       throw new ApiError(404, `Birthstone for month "${month}" not found`);
@@ -78,7 +77,7 @@ class BirthstoneService {
    */
   // ------------------------------- get birthstone lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
 
     return await Birthstone.find(filter)
       .select('_id month stoneName image color')
@@ -94,7 +93,6 @@ class BirthstoneService {
       const duplicate = await Birthstone.findOne({
         month: data.month,
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (duplicate) {
         throw new ApiError(409, `A birthstone for ${data.month} already exists`);
@@ -102,9 +100,9 @@ class BirthstoneService {
     }
 
     const item = await Birthstone.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -120,9 +118,9 @@ class BirthstoneService {
   // ------------------------------- delete birthstone ----------------------------
   async delete(id) {
     const item = await Birthstone.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

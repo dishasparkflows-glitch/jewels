@@ -31,7 +31,6 @@ class HomeSectionService {
     // Check for duplicate active key
     const existing = await HomeSection.findOne({
       sectionKey: data.sectionKey,
-      isDeleted: false,
     });
     if (existing) {
       data.sectionKey = `${data.sectionKey}-${Date.now().toString().slice(-4)}`;
@@ -39,7 +38,7 @@ class HomeSectionService {
 
     // Auto calculate order if not specified
     if (data.order === undefined || data.order === null || isNaN(data.order)) {
-      const highest = await HomeSection.findOne({ isDeleted: false })
+      const highest = await HomeSection.findOne({ 'meta.deletedAt': null })
         .sort({ order: -1 })
         .select('order')
         .lean();
@@ -96,7 +95,7 @@ class HomeSectionService {
 
   // ------------------------------- Get Public (Storefront API) ----------------------------
   async getPublic(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
 
     if (queryParams.placement && queryParams.placement !== 'all') {
       filter.placement = { $in: [queryParams.placement, 'all'] };
@@ -119,7 +118,6 @@ class HomeSectionService {
   async getByKey(key) {
     const section = await HomeSection.findOne({
       sectionKey: key.toLowerCase().trim(),
-      isDeleted: false,
     })
       .populate('items.productId', 'title sku price images slug')
       .populate('items.categoryId', 'name slug')
@@ -133,7 +131,7 @@ class HomeSectionService {
 
   // ------------------------------- Get One By ID ----------------------------
   async getOne(id) {
-    const section = await HomeSection.findOne({ _id: id, isDeleted: false })
+    const section = await HomeSection.findOne({ _id: id })
       .populate('items.productId', 'title sku price images')
       .populate('items.categoryId', 'name slug')
       .lean();
@@ -146,7 +144,7 @@ class HomeSectionService {
 
   // ------------------------------- Update ----------------------------
   async update(id, data) {
-    const section = await HomeSection.findOne({ _id: id, isDeleted: false });
+    const section = await HomeSection.findOne({ _id: id });
     if (!section) {
       throw new ApiError(404, 'Home section not found');
     }
@@ -160,7 +158,6 @@ class HomeSectionService {
       const duplicate = await HomeSection.findOne({
         _id: { $ne: id },
         sectionKey: data.sectionKey,
-        isDeleted: false,
       });
       if (duplicate) {
         throw new ApiError(409, `Section key "${data.sectionKey}" is already used by another section`);
@@ -174,7 +171,7 @@ class HomeSectionService {
 
   // ------------------------------- Toggle Status ----------------------------
   async toggleStatus(id) {
-    const section = await HomeSection.findOne({ _id: id, isDeleted: false });
+    const section = await HomeSection.findOne({ _id: id });
     if (!section) {
       throw new ApiError(404, 'Home section not found');
     }
@@ -203,12 +200,12 @@ class HomeSectionService {
 
   // ------------------------------- Delete (Soft Delete) ----------------------------
   async delete(id) {
-    const section = await HomeSection.findOne({ _id: id, isDeleted: false });
+    const section = await HomeSection.findOne({ _id: id });
     if (!section) {
       throw new ApiError(404, 'Home section not found');
     }
 
-    section.isDeleted = true;
+    section.meta = section.meta || {}; section.meta.deletedAt = new Date();
     if (section.meta) {
       section.meta.deletedAt = new Date();
     }
@@ -224,7 +221,7 @@ class HomeSectionService {
 
     await HomeSection.updateMany(
       { _id: { $in: ids } },
-      { $set: { isDeleted: true, 'meta.deletedAt': new Date() } }
+      { $set: { 'meta.deletedAt': new Date() } }
     );
 
     return { success: true, count: ids.length };

@@ -22,7 +22,6 @@ class DiamondPriceService {
       diamondColorId: data.diamondColorId,
       sizeFrom: data.sizeFrom,
       sizeTo: data.sizeTo,
-      isDeleted: false,
     });
 
     if (existing) {
@@ -38,7 +37,7 @@ class DiamondPriceService {
   // ------------------------------- get one diamond price ----------------------------
 
   async getOne(id) {
-    let query = DiamondPrice.findOne({ _id: id, isDeleted: false });
+    let query = DiamondPrice.findOne({ _id: id });
     const populates = getSafePopulates();
     if (populates.length > 0) query = query.populate(populates);
     const item = await query.lean();
@@ -85,7 +84,7 @@ class DiamondPriceService {
   // ------------------------------- get diamond price lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     if (queryParams.diamondTypeId) filter.diamondTypeId = queryParams.diamondTypeId;
     if (queryParams.diamondShapeId) filter.diamondShapeId = queryParams.diamondShapeId;
@@ -104,9 +103,9 @@ class DiamondPriceService {
 
   async update(id, data) {
     let updateQuery = DiamondPrice.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     const populates = getSafePopulates();
@@ -125,9 +124,9 @@ class DiamondPriceService {
 
   async delete(id) {
     const item = await DiamondPrice.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true } },
-      { new: true }
+      { _id: id },
+      { $set: { 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

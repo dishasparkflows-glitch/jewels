@@ -10,7 +10,7 @@ class ReviewService {
 
   // ------------------------------- get one review ----------------------------
   async getOne(id) {
-    const item = await Review.findOne({ _id: id, isDeleted: false });
+    const item = await Review.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Review not found');
     }
@@ -49,7 +49,7 @@ class ReviewService {
 
   // ------------------------------- get review lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'approved' };
+    const filter = { 'meta.deletedAt': null, status: 'approved' };
     return await Review.find(filter)
       .sort({ 'review.reviewDate': -1 })
       .select('_id customer review image status meta')
@@ -59,7 +59,7 @@ class ReviewService {
   // ------------------------------- update review ----------------------------
   async update(id, data) {
     const item = await Review.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
     );
@@ -74,8 +74,8 @@ class ReviewService {
   // ------------------------------- delete review ----------------------------
   async delete(id) {
     const item = await Review.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true } },
+      { _id: id },
+      { $set: { 'meta.deletedAt': new Date() } },
       { returnDocument: 'after' }
     );
 

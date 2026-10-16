@@ -10,7 +10,6 @@ class FeaturedService {
       data.name = data.name.trim();
       const existing = await Featured.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Featured item "${data.name}" already exists`);
@@ -37,13 +36,12 @@ class FeaturedService {
   // ------------------------------- get one featured item ----------------------------
 
   async getOne(id) {
-    const item = await Featured.findOne({ _id: id, isDeleted: false }).lean();
+    const item = await Featured.findOne({ _id: id }).lean();
     if (!item) {
       throw new ApiError(404, 'Featured item not found');
     }
     const matchingProducts = await Product.find({
       featured: id,
-      isDeleted: false,
     }).select('_id title sku price images').lean();
 
     return {
@@ -83,7 +81,6 @@ class FeaturedService {
       items.map(async (item) => {
         const matchingProducts = await Product.find({
           featured: item._id,
-          isDeleted: false,
         }).select('_id').lean();
         return {
           ...item,
@@ -99,7 +96,7 @@ class FeaturedService {
   // ------------------------------- get featured item lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     if (queryParams.placement) {
       filter.placement = new RegExp(`^${queryParams.placement}$`, 'i');
     }
@@ -118,7 +115,6 @@ class FeaturedService {
       const existing = await Featured.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Featured item "${data.name}" already exists`);
@@ -139,9 +135,9 @@ class FeaturedService {
     }
 
     const item = await Featured.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -171,9 +167,9 @@ class FeaturedService {
 
   async delete(id) {
     const item = await Featured.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

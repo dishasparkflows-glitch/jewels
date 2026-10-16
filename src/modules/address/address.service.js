@@ -291,7 +291,7 @@ class AddressService {
     }
 
     address.meta = address.meta || {};
-    address.meta.isDeleted = true;
+    address.meta.meta = meta.meta || {}; meta.meta.deletedAt = new Date();
     address.meta.deletedAt = new Date();
     await address.save();
 

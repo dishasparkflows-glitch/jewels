@@ -10,7 +10,7 @@ class AppointmentService {
 
   // ------------------------------- get one appointment ----------------------------
   async getOne(id) {
-    const item = await Appointment.findOne({ _id: id, isDeleted: false });
+    const item = await Appointment.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Appointment not found');
     }
@@ -38,54 +38,21 @@ class AppointmentService {
       ];
     }
 
-    const [rawItems, total] = await Promise.all([
+    const [items, total] = await Promise.all([
       Appointment.find(filter)
-        .sort({ appointmentDate: -1, 'appointment.date': -1, 'meta.createdAt': -1, createdAt: -1 })
+        .sort({ appointmentDate: -1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
       Appointment.countDocuments(filter),
     ]);
 
-    const items = rawItems.map((a) => {
-      const name = a.fullName || a.customer?.name || 'Client';
-      const email = a.email || a.customer?.email || '—';
-      const phoneNum = a.phoneNumber || a.customer?.phone?.number || '';
-      const countryCode = a.customer?.phone?.countryCode || '91';
-      const date = a.appointmentDate || a.appointment?.date || null;
-      const time = a.preferredTime || a.appointment?.preferredTime || '12:00 PM';
-      const service = a.serviceType || a.appointment?.serviceType || 'Jewellery Viewing';
-
-      return {
-        ...a,
-        fullName: name,
-        email,
-        phoneNumber: phoneNum,
-        appointmentDate: date,
-        preferredTime: time,
-        serviceType: service,
-        customer: {
-          name,
-          email,
-          phone: {
-            countryCode,
-            number: phoneNum,
-          },
-        },
-        appointment: {
-          date,
-          preferredTime: time,
-          serviceType: service,
-        },
-      };
-    });
-
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
   // ------------------------------- get appointment lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
     if (queryParams.status && queryParams.status !== 'all') {
       filter.status = queryParams.status;
     }
@@ -98,7 +65,7 @@ class AppointmentService {
   // ------------------------------- update appointment ----------------------------
   async update(id, data) {
     const item = await Appointment.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
       { returnDocument: 'after', runValidators: false }
     );
@@ -118,7 +85,7 @@ class AppointmentService {
     }
 
     const item = await Appointment.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: { status } },
       { returnDocument: 'after' }
     );
@@ -133,8 +100,8 @@ class AppointmentService {
   // ------------------------------- delete appointment ----------------------------
   async delete(id) {
     const item = await Appointment.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true } },
+      { _id: id },
+      { $set: { 'meta.deletedAt': new Date() } },
       { returnDocument: 'after' }
     );
 
@@ -152,8 +119,8 @@ class AppointmentService {
     }
 
     const result = await Appointment.updateMany(
-      { _id: { $in: ids }, isDeleted: false },
-      { $set: { isDeleted: true } }
+      { _id: { $in: ids } },
+      { $set: { 'meta.deletedAt': new Date() } }
     );
 
     return {

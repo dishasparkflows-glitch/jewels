@@ -9,7 +9,6 @@ class CouponService {
       data.coupon.code = data.coupon.code.trim().toUpperCase();
       const existing = await Coupon.findOne({
         'coupon.code': data.coupon.code,
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Coupon with code "${data.coupon.code}" already exists`);
@@ -20,7 +19,7 @@ class CouponService {
 
   // ------------------------------- get one coupon ----------------------------
   async getOne(id) {
-    const coupon = await Coupon.findOne({ _id: id, isDeleted: false });
+    const coupon = await Coupon.findOne({ _id: id });
     if (!coupon) {
       throw new ApiError(404, 'Coupon not found');
     }
@@ -31,7 +30,6 @@ class CouponService {
   async getByCode(code) {
     const coupon = await Coupon.findOne({
       'coupon.code': code.trim().toUpperCase(),
-      isDeleted: false,
     });
     if (!coupon) {
       throw new ApiError(404, 'Coupon not found');
@@ -72,7 +70,7 @@ class CouponService {
 
   // ------------------------------- get coupon lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     const now = new Date();
 
     // Only return currently valid coupons in active lookup
@@ -95,7 +93,6 @@ class CouponService {
 
     const coupon = await Coupon.findOne({
       'coupon.code': code.trim().toUpperCase(),
-      isDeleted: false,
     });
 
     if (!coupon) {
@@ -159,7 +156,6 @@ class CouponService {
       const existing = await Coupon.findOne({
         'coupon.code': data.coupon.code,
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Coupon with code "${data.coupon.code}" already exists`);
@@ -167,7 +163,7 @@ class CouponService {
     }
 
     const coupon = await Coupon.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
     );
@@ -182,8 +178,8 @@ class CouponService {
   // ------------------------------- delete coupon ----------------------------
   async delete(id) {
     const coupon = await Coupon.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
       { returnDocument: 'after' }
     );
 

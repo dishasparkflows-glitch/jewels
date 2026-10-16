@@ -22,7 +22,6 @@ class SideDiamondPriceService {
       diamondColorId: data.diamondColorId,
       sizeFrom: data.sizeFrom,
       sizeTo: data.sizeTo,
-      isDeleted: false,
     });
 
     if (existing) {
@@ -38,7 +37,7 @@ class SideDiamondPriceService {
   // ------------------------------- get one side diamond price ----------------------------
 
   async getOne(id) {
-    let query = SideDiamondPrice.findOne({ _id: id, isDeleted: false });
+    let query = SideDiamondPrice.findOne({ _id: id });
     const populates = getSafePopulates();
     if (populates.length > 0) query = query.populate(populates);
     const item = await query.lean();
@@ -85,7 +84,7 @@ class SideDiamondPriceService {
   // ------------------------------- get side diamond price lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
 
     if (queryParams.diamondTypeId) filter.diamondTypeId = queryParams.diamondTypeId;
     if (queryParams.diamondShapeId) filter.diamondShapeId = queryParams.diamondShapeId;
@@ -104,9 +103,9 @@ class SideDiamondPriceService {
 
   async update(id, data) {
     let updateQuery = SideDiamondPrice.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     const populates = getSafePopulates();
@@ -138,7 +137,7 @@ class SideDiamondPriceService {
         priceINR: Number(item.priceINR) || 0,
         priceUSD: Number(item.priceUSD) || 0,
         updatedBy: userId || null,
-        isDeleted: Boolean(item.isDeleted),
+        
       };
 
       if (!data.diamondTypeId || !data.diamondShapeId || !data.diamondColorId || !data.diamondClarityId) {
@@ -146,7 +145,7 @@ class SideDiamondPriceService {
       }
 
       if (item.isDeleted && id && !String(id).startsWith('new_')) {
-        await SideDiamondPrice.findByIdAndUpdate(id, { $set: { isDeleted: true } });
+        await SideDiamondPrice.findByIdAndUpdate(id, { $set: { 'meta.deletedAt': new Date() } });
         continue;
       }
 
@@ -154,7 +153,7 @@ class SideDiamondPriceService {
         const updated = await SideDiamondPrice.findByIdAndUpdate(
           id,
           { $set: data },
-          { new: true, runValidators: true }
+          { returnDocument: 'after', runValidators: true }
         );
         if (updated) saved.push(updated);
       } else {
@@ -165,14 +164,13 @@ class SideDiamondPriceService {
           diamondClarityId: data.diamondClarityId,
           sizeFrom: data.sizeFrom,
           sizeTo: data.sizeTo,
-          isDeleted: false,
         });
 
         if (existing) {
           const updated = await SideDiamondPrice.findByIdAndUpdate(
             existing._id,
             { $set: data },
-            { new: true }
+            { returnDocument: 'after' }
           );
           if (updated) saved.push(updated);
         } else {
@@ -188,9 +186,9 @@ class SideDiamondPriceService {
 
   async delete(id) {
     const item = await SideDiamondPrice.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true } },
-      { new: true }
+      { _id: id },
+      { $set: { 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

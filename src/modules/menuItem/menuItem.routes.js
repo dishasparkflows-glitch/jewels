@@ -18,6 +18,13 @@ router.post(
 );
 
 router.put(
+  '/reorder',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  menuItemController.reorder
+);
+
+router.put(
   '/:id',
   authenticate,
   authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),

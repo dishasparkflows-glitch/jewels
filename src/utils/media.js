@@ -15,7 +15,10 @@ function keyFromUrl(url) {
 
 function publicUrl(key) {
   const base = publicBase();
-  if (!/^https?:\/\//i.test(base)) throw new Error('Configure CLOUDFLARE_R2_PUBLIC_DOMAIN with the full public CDN URL');
+  if (!/^https?:\/\//i.test(base)) {
+    const backend = (process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 9900}`).replace(/\/+$/, '');
+    return `${backend}/api/upload/file/${key.split('/').map(encodeURIComponent).join('/')}`;
+  }
   return `${base}/${key.split('/').map(encodeURIComponent).join('/')}`;
 }
 

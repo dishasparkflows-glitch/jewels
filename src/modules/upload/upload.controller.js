@@ -2,9 +2,8 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
 const path = require('path');
-const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const cloudflareR2 = require('../../utils/cloudflareR2');
-const { publicUrl } = require('../../utils/media');
 
 // ------------------------------- get presigned url ----------------------------
 const getPresignedUrl = catchAsync(async (req, res) => {
@@ -17,46 +16,6 @@ const getPresignedUrl = catchAsync(async (req, res) => {
   });
 
   return ApiResponse.success(res, result, 'Presigned upload URL generated successfully', 200, { includeMediaKeys: true });
-});
-
-// ------------------------------- direct put upload ----------------------------
-const directPut = catchAsync(async (req, res) => {
-  const key = req.query.key;
-  if (!key) throw new ApiError(400, 'Upload key is required');
-  const contentType = req.headers['content-type'] || req.query.contentType || 'image/jpeg';
-
-  let buffer;
-  if (Buffer.isBuffer(req.body) && req.body.length > 0) {
-    buffer = req.body;
-  } else {
-    const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
-    buffer = Buffer.concat(chunks);
-  }
-
-  // Upload strictly to Cloudflare R2
-  if (!cloudflareR2.isConfigured() || !cloudflareR2.client) {
-    throw new ApiError(500, 'Cloudflare R2 storage is not configured');
-  }
-
-  const fileUrl = publicUrl(key);
-  await cloudflareR2.client.send(
-    new PutObjectCommand({
-      Bucket: cloudflareR2.bucketName,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-    })
-  );
-
-
-  return ApiResponse.success(
-    res,
-    { url: fileUrl, fileUrl, key },
-    'File uploaded to Cloudflare R2 successfully', 200, { includeMediaKeys: true }
-  );
 });
 
 // ------------------------------- delete file ----------------------------
@@ -77,7 +36,7 @@ const serveFile = catchAsync(async (req, res) => {
   if (!key) throw new ApiError(400, 'File key is required');
 
   // Stream directly from Cloudflare R2
-  if (cloudflareR2.isConfigured() && cloudflareR2.client) {
+  if (cloudflareR2.client) {
     try {
       const command = new GetObjectCommand({
         Bucket: cloudflareR2.bucketName,
@@ -114,4 +73,4 @@ const serveFile = catchAsync(async (req, res) => {
   return res.status(500).json({ success: false, message: 'Cloudflare R2 storage is not configured' });
 });
 
-module.exports = { getPresignedUrl, directPut, deleteFile, serveFile };
+module.exports = { getPresignedUrl, deleteFile, serveFile };

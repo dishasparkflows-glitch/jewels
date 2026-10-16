@@ -10,7 +10,7 @@ class InstagramPostService {
 
   // ------------------------------- get one instagram post ----------------------------
   async getOne(id) {
-    const item = await InstagramPost.findOne({ _id: id, isDeleted: false });
+    const item = await InstagramPost.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Instagram post not found');
     }
@@ -52,7 +52,7 @@ class InstagramPostService {
 
   // ------------------------------- get instagram post lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, isActive: true };
+    const filter = { 'meta.deletedAt': null, isActive: true };
     return await InstagramPost.find(filter)
       .sort({ 'meta.createdAt': -1 })
       .select('_id url order isActive')
@@ -62,9 +62,9 @@ class InstagramPostService {
   // ------------------------------- update instagram post ----------------------------
   async update(id, data) {
     const item = await InstagramPost.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -97,9 +97,9 @@ class InstagramPostService {
   // ------------------------------- delete instagram post ----------------------------
   async delete(id) {
     const item = await InstagramPost.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, isActive: false } },
-      { new: true }
+      { _id: id },
+      { $set: { isActive: false, 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {
@@ -116,8 +116,8 @@ class InstagramPostService {
     }
 
     const result = await InstagramPost.updateMany(
-      { _id: { $in: ids }, isDeleted: false },
-      { $set: { isDeleted: true, isActive: false } }
+      { _id: { $in: ids } },
+      { $set: { isActive: false, 'meta.deletedAt': new Date() } }
     );
 
     return {

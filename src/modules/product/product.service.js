@@ -44,7 +44,7 @@ class ProductService {
       if (!data.sku && data.tagNo) data.sku = data.tagNo;
     }
 
-    const existingSku = await Product.findOne({ sku: data.sku, isDeleted: false });
+    const existingSku = await Product.findOne({ sku: data.sku });
     if (existingSku) {
       throw new ApiError(409, `Product with SKU/Tag "${data.sku}" already exists`);
     }
@@ -56,8 +56,8 @@ class ProductService {
   async getOne(id) {
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const filter = isObjectId
-      ? { $or: [{ _id: id }, { slug: id }, { sku: id }], isDeleted: false }
-      : { $or: [{ slug: id }, { sku: id }], isDeleted: false };
+      ? { $or: [{ _id: id }, { slug: id }, { sku: id }] }
+      : { $or: [{ slug: id }, { sku: id }] };
 
     let product = await Product.findOne(filter)
       .populate('category', 'name slug sizeChart')
@@ -90,7 +90,6 @@ class ProductService {
   async getBySkuOrTag(code) {
     const product = await Product.findOne({
       $or: [{ sku: code }, { tagNo: code }],
-      isDeleted: false,
     }).lean();
     if (!product) {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
@@ -227,7 +226,7 @@ class ProductService {
   // ------------------------------- get home products (streamlined info) ----------------------------
   async getHomeProducts(queryParams = {}) {
     const limit = Math.min(Number(queryParams.limit) || 24, 50);
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
 
     if (queryParams.category) {
       filter.category = queryParams.category;
@@ -269,7 +268,7 @@ class ProductService {
   // ------------------------------- get product lookup ----------------------------
   async getLookup(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const conditions = [{ isDeleted: false }];
+    const conditions = [{ 'meta.deletedAt': null }];
 
     if (queryParams.status && queryParams.status !== 'all') {
       conditions.push({ status: queryParams.status });
@@ -339,7 +338,7 @@ class ProductService {
       Product.find(filter)
         .select('_id title category images colorImages sku tagNo price salePrice mrp displayPrice productType isOrnate specifications metalName status')
         .populate('category', 'name slug')
-        .sort({ 'meta.createdAt': -1, createdAt: -1, _id: -1 })
+        .sort({ 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -415,7 +414,6 @@ class ProductService {
       const duplicate = await Product.findOne({
         sku: data.sku,
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (duplicate) {
         throw new ApiError(409, `Product with SKU "${data.sku}" already exists`);
@@ -423,9 +421,9 @@ class ProductService {
     }
 
     const product = await Product.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!product) {
@@ -438,9 +436,9 @@ class ProductService {
   // ------------------------------- delete product ----------------------------
   async delete(id) {
     const product = await Product.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!product) {

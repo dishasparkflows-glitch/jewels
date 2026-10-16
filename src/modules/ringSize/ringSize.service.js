@@ -9,7 +9,6 @@ class RingSizeService {
       data.name = data.name.trim();
       const existing = await RingSize.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Ring size "${data.name}" already exists`);
@@ -21,7 +20,7 @@ class RingSizeService {
   // ------------------------------- get one ring size ----------------------------
 
   async getOne(id) {
-    const item = await RingSize.findOne({ _id: id, isDeleted: false });
+    const item = await RingSize.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Ring size not found');
     }
@@ -57,7 +56,7 @@ class RingSizeService {
   // ------------------------------- get ring size lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     return await RingSize.find(filter)
       .sort({ name: 1 })
       .select('_id name status')
@@ -72,7 +71,6 @@ class RingSizeService {
       const existing = await RingSize.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Ring size "${data.name}" already exists`);
@@ -80,9 +78,9 @@ class RingSizeService {
     }
 
     const item = await RingSize.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -96,9 +94,9 @@ class RingSizeService {
 
   async delete(id) {
     const item = await RingSize.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

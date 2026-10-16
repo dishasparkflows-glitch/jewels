@@ -42,6 +42,13 @@ class MenuItemController {
     ApiResponse.success(res, item, 'Menu item updated successfully');
   });
 
+  // ------------------------------- reorder menu items ----------------------------
+  reorder = catchAsync(async (req, res) => {
+    const items = req.body.items || req.body;
+    const result = await menuItemService.reorder(items);
+    ApiResponse.success(res, result, 'Menu items reordered successfully');
+  });
+
   // ------------------------------- delete menu item ----------------------------
 
   delete = catchAsync(async (req, res) => {

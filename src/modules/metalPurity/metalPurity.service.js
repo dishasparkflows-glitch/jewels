@@ -9,7 +9,6 @@ class MetalPurityService {
       data.name = data.name.trim();
       const existing = await MetalPurity.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Metal purity "${data.name}" already exists`);
@@ -20,7 +19,7 @@ class MetalPurityService {
 
   // ------------------------------- get one metal purity ----------------------------
   async getOne(id) {
-    const item = await MetalPurity.findOne({ _id: id, isDeleted: false });
+    const item = await MetalPurity.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Metal purity not found');
     }
@@ -56,7 +55,7 @@ class MetalPurityService {
 
   // ------------------------------- get metal purity lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     if (queryParams.metalType) {
       filter.metalType = queryParams.metalType;
     }
@@ -74,7 +73,6 @@ class MetalPurityService {
       const existing = await MetalPurity.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Metal purity "${data.name}" already exists`);
@@ -82,9 +80,9 @@ class MetalPurityService {
     }
 
     const item = await MetalPurity.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -97,9 +95,9 @@ class MetalPurityService {
   // ------------------------------- delete metal purity ----------------------------
   async delete(id) {
     const item = await MetalPurity.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

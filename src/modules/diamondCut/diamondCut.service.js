@@ -9,7 +9,6 @@ class DiamondCutService {
       data.name = data.name.trim();
       const existing = await DiamondCut.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Diamond cut "${data.name}" already exists`);
@@ -21,7 +20,7 @@ class DiamondCutService {
   // ------------------------------- get one diamond cut ----------------------------
 
   async getOne(id) {
-    const item = await DiamondCut.findOne({ _id: id, isDeleted: false });
+    const item = await DiamondCut.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Diamond cut not found');
     }
@@ -57,7 +56,7 @@ class DiamondCutService {
   // ------------------------------- get diamond cut lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     return await DiamondCut.find(filter)
       .sort({ name: 1 })
       .select('_id name image status')
@@ -72,7 +71,6 @@ class DiamondCutService {
       const existing = await DiamondCut.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Diamond cut "${data.name}" already exists`);
@@ -80,9 +78,9 @@ class DiamondCutService {
     }
 
     const item = await DiamondCut.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -96,9 +94,9 @@ class DiamondCutService {
 
   async delete(id) {
     const item = await DiamondCut.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

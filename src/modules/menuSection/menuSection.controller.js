@@ -38,6 +38,13 @@ class MenuSectionController {
     ApiResponse.success(res, item, 'Menu section updated successfully');
   });
 
+  // ------------------------------- reorder menu sections ----------------------------
+  reorder = catchAsync(async (req, res) => {
+    const items = req.body.items || req.body;
+    const result = await menuSectionService.reorder(items);
+    ApiResponse.success(res, result, 'Menu sections reordered successfully');
+  });
+
   // ------------------------------- delete menu section ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await menuSectionService.delete(req.params.id);

@@ -10,7 +10,7 @@ class CustJewelleryBeforeAfterService {
 
   // ------------------------------- get one cust jewellery before after ----------------------------
   async getOne(id) {
-    const item = await CustJewelleryBeforAfter.findOne({ _id: id, isDeleted: false });
+    const item = await CustJewelleryBeforAfter.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Before/After showcase entry not found');
     }
@@ -44,7 +44,7 @@ class CustJewelleryBeforeAfterService {
 
   // ------------------------------- get cust jewellery before after lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     return await CustJewelleryBeforAfter.find(filter)
       .sort({ position: 1, 'meta.createdAt': -1 })
       .select('_id beforeImage afterImage alt position')
@@ -54,9 +54,9 @@ class CustJewelleryBeforeAfterService {
   // ------------------------------- update cust jewellery before after ----------------------------
   async update(id, data) {
     const item = await CustJewelleryBeforAfter.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -69,9 +69,9 @@ class CustJewelleryBeforeAfterService {
   // ------------------------------- delete cust jewellery before after ----------------------------
   async delete(id) {
     const item = await CustJewelleryBeforAfter.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { publicUrl } = require('./media');
 
@@ -22,44 +22,6 @@ class CloudflareR2Service {
         secretAccessKey: this.secretAccessKey,
       },
     });
-  }
-
-  // ------------------------------- check cloudflare r2 configuration ----------------------------
-  isConfigured() {
-    return Boolean(
-      this.accountId &&
-      this.accessKeyId &&
-      this.secretAccessKey &&
-      this.bucketName
-    );
-  }
-
-  // ------------------------------------------------------------- [ getMediaUrl ]
-  async getMediaUrl(key) {
-    if (!key) return null;
-
-    let cleanKey = key;
-    if (typeof cleanKey === 'string') {
-      if (cleanKey.includes('r2.cloudflarestorage.com/')) {
-        cleanKey = cleanKey.split('r2.cloudflarestorage.com/')[1];
-      } else if (cleanKey.includes('/api/upload/file/')) {
-        cleanKey = cleanKey.split('/api/upload/file/')[1];
-      } else if (this.publicDomain && cleanKey.includes(this.publicDomain)) {
-        cleanKey = cleanKey.replace(this.publicDomain, '');
-      }
-      cleanKey = cleanKey.replace(/^\/+/, '');
-    }
-
-    const command = new GetObjectCommand({
-      Bucket: this.bucketName,
-      Key: cleanKey,
-    });
-
-    const downloadUrl = await getSignedUrl(this.client, command, {
-      expiresIn: 86400,
-    });
-
-    return downloadUrl;
   }
 
   // ------------------------------- generate presigned put url ----------------------------
@@ -112,29 +74,17 @@ class CloudflareR2Service {
   // ------------------------------- delete file from R2 ----------------------------
   async deleteFile(key) {
     if (!key) return;
-    if (!this.isConfigured() || !this.client) return;
-
-    let cleanKey = key;
-    if (cleanKey.includes('r2.cloudflarestorage.com/')) {
-      cleanKey = cleanKey.split('r2.cloudflarestorage.com/')[1];
-    } else if (cleanKey.includes('/api/upload/file/')) {
-      cleanKey = cleanKey.split('/api/upload/file/')[1];
-    } else if (this.publicDomain && cleanKey.includes(this.publicDomain)) {
-      cleanKey = cleanKey.replace(this.publicDomain, '');
-    }
-    cleanKey = cleanKey.replace(/^\/+/, '');
 
     await this.client.send(
       new DeleteObjectCommand({
         Bucket: this.bucketName,
-        Key: cleanKey,
+        Key: key,
       })
     );
   }
 }
 
 const cloudflareR2Service = new CloudflareR2Service();
-cloudflareR2Service.getMediaUrl = cloudflareR2Service.getMediaUrl.bind(cloudflareR2Service);
 
 module.exports = cloudflareR2Service;
 module.exports.CloudflareR2Service = CloudflareR2Service;

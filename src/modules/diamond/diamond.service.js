@@ -31,7 +31,7 @@ class DiamondService {
 
     if (data.sku) {
       data.sku = data.sku.trim();
-      const existing = await Diamond.findOne({ sku: data.sku, isDeleted: false });
+      const existing = await Diamond.findOne({ sku: data.sku });
       if (existing) {
         throw new ApiError(409, `Diamond with SKU "${data.sku}" already exists`);
       }
@@ -54,7 +54,7 @@ class DiamondService {
 
       if (item.sku) {
         item.sku = item.sku.trim();
-        const existing = await Diamond.findOne({ sku: item.sku, isDeleted: false });
+        const existing = await Diamond.findOne({ sku: item.sku });
         if (existing) {
           item.sku = `${item.sku}-${Date.now().toString().slice(-4)}`;
         }
@@ -71,7 +71,7 @@ class DiamondService {
   // ------------------------------- get one diamond ----------------------------
 
   async getOne(id) {
-    let query = Diamond.findOne({ _id: id, isDeleted: false });
+    let query = Diamond.findOne({ _id: id });
     const populates = getSafePopulates();
     if (populates.length > 0) {
       query = query.populate(populates);
@@ -87,7 +87,6 @@ class DiamondService {
   async getBySku(sku) {
     let query = Diamond.findOne({
       sku: sku.trim(),
-      isDeleted: false,
     });
     const populates = getSafePopulates();
     if (populates.length > 0) {
@@ -159,7 +158,7 @@ class DiamondService {
   // ------------------------------- get diamond lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
 
     const resolvedColorId = queryParams.colorId || queryParams.color;
     const resolvedClarityId = queryParams.clarityId || queryParams.clarity;
@@ -190,7 +189,6 @@ class DiamondService {
       const existing = await Diamond.findOne({
         sku: data.sku,
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Diamond with SKU "${data.sku}" already exists`);
@@ -198,9 +196,9 @@ class DiamondService {
     }
 
     let updateQuery = Diamond.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     const populates = getSafePopulates();
@@ -221,9 +219,9 @@ class DiamondService {
 
   async delete(id) {
     const item = await Diamond.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {
@@ -236,7 +234,7 @@ class DiamondService {
   // ------------------------------- get diamond options & attributes (combined lookup) ----------------------------
 
   async getDiamondOptions() {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
 
     const [
       colors,

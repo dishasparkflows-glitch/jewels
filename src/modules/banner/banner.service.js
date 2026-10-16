@@ -268,7 +268,7 @@ class BannerService {
     const banner = await Banner.findOneAndUpdate(
       { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).populate('display.categoryId', 'name slug');
 
     if (!banner) {
@@ -283,7 +283,7 @@ class BannerService {
     const banner = await Banner.findOneAndUpdate(
       { _id: id },
       { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!banner) {

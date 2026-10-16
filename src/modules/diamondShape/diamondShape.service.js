@@ -9,7 +9,6 @@ class DiamondShapeService {
       data.name = data.name.trim();
       const existing = await DiamondShape.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Diamond shape "${data.name}" already exists`);
@@ -20,7 +19,7 @@ class DiamondShapeService {
 
   // ------------------------------- get one diamond shape ----------------------------
   async getOne(id) {
-    const item = await DiamondShape.findOne({ _id: id, isDeleted: false });
+    const item = await DiamondShape.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Diamond shape not found');
     }
@@ -54,7 +53,7 @@ class DiamondShapeService {
 
   // ------------------------------- get diamond shape lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     return await DiamondShape.find(filter)
       .sort({ name: 1 })
       .select('_id name image status')
@@ -68,7 +67,6 @@ class DiamondShapeService {
       const existing = await DiamondShape.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Diamond shape "${data.name}" already exists`);
@@ -76,9 +74,9 @@ class DiamondShapeService {
     }
 
     const item = await DiamondShape.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -91,9 +89,9 @@ class DiamondShapeService {
   // ------------------------------- delete diamond shape ----------------------------
   async delete(id) {
     const item = await DiamondShape.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

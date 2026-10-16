@@ -5,13 +5,13 @@ const ApiResponse = require('../../utils/ApiResponse');
 class VTOMasterController {
   // ------------------------------- create vto master ----------------------------
   create = catchAsync(async (req, res) => {
-    const item = await vtoMasterService.create(req.body, req);
+    const item = await vtoMasterService.create(req.body);
     ApiResponse.created(res, item, 'VTO configuration created successfully');
   });
 
   // ------------------------------- get all vto masters ----------------------------
   getAll = catchAsync(async (req, res) => {
-    const { items, pagination } = await vtoMasterService.getAll(req.query, req);
+    const { items, pagination } = await vtoMasterService.getAll(req.query);
     ApiResponse.paginated(
       res,
       items,
@@ -22,25 +22,25 @@ class VTOMasterController {
 
   // ------------------------------- get vto master lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {
-    const items = await vtoMasterService.getLookup(req.query, req);
+    const items = await vtoMasterService.getLookup(req.query);
     ApiResponse.success(res, items, 'VTO lookup list retrieved');
   });
 
   // ------------------------------- get vto master by body part ----------------------------
   getByBodyPart = catchAsync(async (req, res) => {
-    const item = await vtoMasterService.getByBodyPart(req.params.bodyPart, req);
+    const item = await vtoMasterService.getByBodyPart(req.params.bodyPart);
     ApiResponse.success(res, item, 'VTO configuration retrieved successfully');
   });
 
   // ------------------------------- get one vto master ----------------------------
   getOne = catchAsync(async (req, res) => {
-    const item = await vtoMasterService.getOne(req.params.id, req);
+    const item = await vtoMasterService.getOne(req.params.id);
     ApiResponse.success(res, item, 'VTO configuration retrieved successfully');
   });
 
   // ------------------------------- update vto master ----------------------------
   update = catchAsync(async (req, res) => {
-    const item = await vtoMasterService.update(req.params.id, req.body, req);
+    const item = await vtoMasterService.update(req.params.id, req.body);
     ApiResponse.success(res, item, 'VTO configuration updated successfully');
   });
 

@@ -1,22 +1,15 @@
 const VTOMaster = require('./vtoMaster.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
-const { normalizeAssets } = require('../../utils/media');
 
 class VTOMasterService {
-  // Public CDN URLs are stable and do not need temporary signed download URLs.
-  async formatMedia(item) {
-    if (!item) return item;
-    return normalizeAssets(item.toObject ? item.toObject() : item);
-  }
-
   // ------------------------------- create vto master ----------------------------
-  async create(data, req = null) {
+  async create(data) {
     if (data.bodyPart) {
       data.bodyPart = data.bodyPart.toLowerCase().trim();
       const existing = await VTOMaster.findOne({
         bodyPart: data.bodyPart,
-        isDeleted: false,
+        'meta.deletedAt': null,
       });
       if (existing) {
         throw new ApiError(
@@ -25,33 +18,32 @@ class VTOMasterService {
         );
       }
     }
-    const created = await VTOMaster.create(data);
-    return await this.formatMedia(created, req);
+    return await VTOMaster.create(data);
   }
 
   // ------------------------------- get one vto master ----------------------------
-  async getOne(id, req = null) {
-    const item = await VTOMaster.findOne({ _id: id, isDeleted: false }).lean();
+  async getOne(id) {
+    const item = await VTOMaster.findOne({ _id: id, 'meta.deletedAt': null }).lean();
     if (!item) {
       throw new ApiError(404, 'VTO configuration not found');
     }
-    return await this.formatMedia(item, req);
+    return item;
   }
 
   // ------------------------------- get vto master by body part ----------------------------
-  async getByBodyPart(bodyPart, req = null) {
+  async getByBodyPart(bodyPart) {
     const item = await VTOMaster.findOne({
       bodyPart: bodyPart.toLowerCase().trim(),
-      isDeleted: false,
+      'meta.deletedAt': null,
     }).lean();
     if (!item) {
       throw new ApiError(404, `VTO configuration for "${bodyPart}" not found`);
     }
-    return await this.formatMedia(item, req);
+    return item;
   }
 
   // ------------------------------- get all vto masters ----------------------------
-  async getAll(queryParams = {}, req = null) {
+  async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
@@ -64,35 +56,34 @@ class VTOMasterService {
 
     const [items, total] = await Promise.all([
       VTOMaster.find(filter)
-        .sort({ bodyPart: 1 })
+        .sort({ 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
       VTOMaster.countDocuments(filter),
     ]);
 
-    const formattedItems = await Promise.all(items.map((item) => this.formatMedia(item, req)));
-    return { items: formattedItems, pagination: getPaginationMeta(total, page, limit) };
+    return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
   // ------------------------------- get vto master lookup ----------------------------
-  async getLookup(queryParams = {}, req = null) {
-    const filter = { isDeleted: false, status: 'active' };
+  async getLookup(queryParams = {}) {
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     const items = await VTOMaster.find(filter)
-      .sort({ bodyPart: 1 })
+      .sort({ 'meta.createdAt': -1 })
       .select('_id bodyPart lightImage darkImage status')
       .lean();
-    return await Promise.all(items.map((item) => this.formatMedia(item, req)));
+    return items;
   }
 
   // ------------------------------- update vto master ----------------------------
-  async update(id, data, req = null) {
+  async update(id, data) {
     if (data.bodyPart) {
       data.bodyPart = data.bodyPart.toLowerCase().trim();
       const existing = await VTOMaster.findOne({
         bodyPart: data.bodyPart,
         _id: { $ne: id },
-        isDeleted: false,
+        'meta.deletedAt': null,
       });
       if (existing) {
         throw new ApiError(
@@ -103,24 +94,24 @@ class VTOMasterService {
     }
 
     const item = await VTOMaster.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
       throw new ApiError(404, 'VTO configuration not found');
     }
 
-    return await this.formatMedia(item, req);
+    return item;
   }
 
   // ------------------------------- delete vto master ----------------------------
   async delete(id) {
     const item = await VTOMaster.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

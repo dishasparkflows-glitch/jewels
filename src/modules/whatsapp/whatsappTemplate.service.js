@@ -261,8 +261,8 @@ class WhatsAppTemplateService {
   async getTemplateById(id) {
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
     const template = isObjectId
-      ? await WhatsAppTemplate.findOne({ _id: id, isDeleted: false })
-      : await WhatsAppTemplate.findOne({ name: id.toLowerCase(), isDeleted: false });
+      ? await WhatsAppTemplate.findOne({ _id: id })
+      : await WhatsAppTemplate.findOne({ name: id.toLowerCase() });
 
     if (!template) {
       throw new ApiError(404, `WhatsApp template '${id}' not found`);
@@ -278,7 +278,7 @@ class WhatsAppTemplateService {
 
     this.validateTemplateConfig({ name, displayName, category, language, body, variables, header, buttons });
 
-    const existing = await WhatsAppTemplate.findOne({ name: name.trim().toLowerCase(), isDeleted: false });
+    const existing = await WhatsAppTemplate.findOne({ name: name.trim().toLowerCase() });
     if (existing) {
       throw new ApiError(400, `Template with name '${name}' already exists.`);
     }
@@ -308,7 +308,7 @@ class WhatsAppTemplateService {
    * Update template
    */
   async updateTemplate(id, data, userId) {
-    const template = await WhatsAppTemplate.findOne({ _id: id, isDeleted: false });
+    const template = await WhatsAppTemplate.findOne({ _id: id });
     if (!template) {
       throw new ApiError(404, 'Template not found');
     }
@@ -344,7 +344,7 @@ class WhatsAppTemplateService {
    * Update template status
    */
   async updateTemplateStatus(id, { isActive, status, providerStatus, providerTemplateId }, userId) {
-    const template = await WhatsAppTemplate.findOne({ _id: id, isDeleted: false });
+    const template = await WhatsAppTemplate.findOne({ _id: id });
     if (!template) {
       throw new ApiError(404, 'Template not found');
     }
@@ -384,7 +384,7 @@ class WhatsAppTemplateService {
    * Delete template (System templates protected)
    */
   async deleteTemplate(id) {
-    const template = await WhatsAppTemplate.findOne({ _id: id, isDeleted: false });
+    const template = await WhatsAppTemplate.findOne({ _id: id });
     if (!template) {
       throw new ApiError(404, 'Template not found');
     }
@@ -392,7 +392,7 @@ class WhatsAppTemplateService {
       throw new ApiError(403, 'System templates cannot be deleted.');
     }
 
-    template.isDeleted = true;
+    template.meta = template.meta || {}; template.meta.deletedAt = new Date();
     await template.save();
     return { id, message: 'Template deleted successfully' };
   }
@@ -425,7 +425,7 @@ class WhatsAppTemplateService {
 
       if (!remoteName) continue;
 
-      const local = await WhatsAppTemplate.findOne({ name: remoteName, isDeleted: false });
+      const local = await WhatsAppTemplate.findOne({ name: remoteName });
       if (local) {
         const prevStatus = local.provider?.status;
         local.provider.templateId = remoteId || local.provider.templateId;

@@ -11,7 +11,7 @@ class CustomInquiryService {
   // ------------------------------- get one custom inquiry ----------------------------
 
   async getOne(id) {
-    const item = await CustomInquiry.findOne({ _id: id, isDeleted: false });
+    const item = await CustomInquiry.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Custom inquiry not found');
     }
@@ -60,7 +60,7 @@ class CustomInquiryService {
   // ------------------------------- get custom inquiry lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
     if (queryParams.status) {
       filter.status = queryParams.status;
     }
@@ -75,7 +75,7 @@ class CustomInquiryService {
 
   async update(id, data) {
     const item = await CustomInquiry.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
     );
@@ -91,8 +91,8 @@ class CustomInquiryService {
 
   async delete(id) {
     const item = await CustomInquiry.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true } },
+      { _id: id },
+      { $set: { 'meta.deletedAt': new Date() } },
       { returnDocument: 'after' }
     );
 

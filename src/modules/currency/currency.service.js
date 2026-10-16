@@ -161,8 +161,7 @@ class CurrencyService {
         sortOrder: Number(data.settings?.sortOrder) || 0,
       },
       metadata: {
-        isDeleted: false,
-      },
+        'meta.deletedAt': null, },
     });
 
     return await doc.save();
@@ -242,7 +241,7 @@ class CurrencyService {
       throw new ApiError(400, 'Cannot delete the base currency');
     }
 
-    currency.metadata.isDeleted = true;
+    currency.metadata.meta = metadata.meta || {}; metadata.meta.deletedAt = new Date();
     await currency.save();
     return { id, message: `${currency.currencyInfo.code} deleted successfully` };
   }

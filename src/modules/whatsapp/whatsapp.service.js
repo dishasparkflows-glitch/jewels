@@ -81,7 +81,7 @@ class WhatsAppService {
         },
         $unset: { lastAuthError: 1 },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     return {
@@ -234,7 +234,6 @@ class WhatsAppService {
     // 1. Look up template
     const template = await WhatsAppTemplate.findOne({
       name: templateName.trim().toLowerCase(),
-      isDeleted: false,
     });
 
     if (!template) {
@@ -441,7 +440,6 @@ class WhatsAppService {
         name: status === 'confirmed' ? 'neirah_appointment_confirmed' : 'neirah_appointment_request',
         isActive: true,
         'provider.status': 'APPROVED',
-        isDeleted: false,
       });
 
       if (tmpl) {

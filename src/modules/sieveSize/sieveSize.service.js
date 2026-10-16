@@ -11,7 +11,6 @@ class SieveSizeService {
       const safePattern = escapeRegex(data.name);
       const existing = await SieveSize.findOne({
         name: new RegExp(`^${safePattern}$`, 'i'),
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Sieve size "${data.name}" already exists`);
@@ -23,7 +22,7 @@ class SieveSizeService {
   // ------------------------------- get one sieve size ----------------------------
 
   async getOne(id) {
-    const item = await SieveSize.findOne({ _id: id, isDeleted: false });
+    const item = await SieveSize.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Sieve size not found');
     }
@@ -59,7 +58,7 @@ class SieveSizeService {
   // ------------------------------- get sieve size lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     return await SieveSize.find(filter)
       .sort({ name: 1 })
       .select('_id name status')
@@ -75,7 +74,6 @@ class SieveSizeService {
       const existing = await SieveSize.findOne({
         name: new RegExp(`^${safePattern}$`, 'i'),
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(409, `Sieve size "${data.name}" already exists`);
@@ -83,9 +81,9 @@ class SieveSizeService {
     }
 
     const item = await SieveSize.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -99,9 +97,9 @@ class SieveSizeService {
 
   async delete(id) {
     const item = await SieveSize.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

@@ -5,12 +5,12 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class FooterSettingsService {
   // ------------------------------- get footer settings ----------------------------
   async getSettings() {
-    return (await FooterSettings.findOne({ isDeleted: false }).lean()) || {};
+    return (await FooterSettings.findOne({ 'meta.deletedAt': null }).lean()) || {};
   }
 
   // ------------------------------- update footer settings ----------------------------
   async updateSettings(data) {
-    let settings = await FooterSettings.findOne({ isDeleted: false });
+    let settings = await FooterSettings.findOne({ 'meta.deletedAt': null });
     if (!settings) {
       return await FooterSettings.create(data);
     }
@@ -27,7 +27,7 @@ class FooterSettingsService {
 
   // ------------------------------- get one footer settings ----------------------------
   async getOne(id) {
-    const item = await FooterSettings.findOne({ _id: id, isDeleted: false });
+    const item = await FooterSettings.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Footer settings not found');
     }
@@ -53,7 +53,7 @@ class FooterSettingsService {
 
   // ------------------------------- get footer settings lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
     return await FooterSettings.find(filter)
       .select('_id socialLinks shopItems copyright')
       .lean();
@@ -62,9 +62,9 @@ class FooterSettingsService {
   // ------------------------------- update footer settings record ----------------------------
   async update(id, data) {
     const item = await FooterSettings.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -77,9 +77,9 @@ class FooterSettingsService {
   // ------------------------------- delete footer settings ----------------------------
   async delete(id) {
     const item = await FooterSettings.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true } },
-      { new: true }
+      { _id: id },
+      { $set: { 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

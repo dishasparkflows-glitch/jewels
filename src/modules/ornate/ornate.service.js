@@ -219,14 +219,12 @@ async function resolveCategory(groupName, categoryCache) {
   // Only match existing categories in our catalog - NEVER auto-create new categories
   let cat = await Category.findOne({
     name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-    isDeleted: false,
   });
 
   if (!cat) {
     // Optional plural match (e.g. "Ring" -> "Rings")
     cat = await Category.findOne({
       name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?$`, 'i') },
-      isDeleted: false,
     });
   }
 
@@ -525,7 +523,6 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
           $setOnInsert: {
             slug: generatedSlug,
             status: 'active',
-            isDeleted: false,
             description: label.Remark || label.ItemName || '',
             customGroupName: label.ItemName || '',
           },
@@ -636,7 +633,6 @@ async function syncOrnateSoldLabels() {
           title: label.ItemName || `Ornate Item ${sku}`,
           sku,
           status: 'active',
-          isDeleted: false,
           ornateImages: [],
           images: [],
         },

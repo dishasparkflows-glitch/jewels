@@ -5,12 +5,12 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class SettingService {
   // ------------------------------- get settings ----------------------------
   async getSettings() {
-    return (await Setting.findOne({ isDeleted: false }).lean()) || {};
+    return (await Setting.findOne({ 'meta.deletedAt': null }).lean()) || {};
   }
 
   // ------------------------------- update settings ----------------------------
   async updateSettings(data) {
-    let settings = await Setting.findOne({ isDeleted: false });
+    let settings = await Setting.findOne({ 'meta.deletedAt': null });
     if (!settings) {
       return await Setting.create(data);
     }
@@ -27,7 +27,7 @@ class SettingService {
 
   // ------------------------------- get one setting ----------------------------
   async getOne(id) {
-    const item = await Setting.findOne({ _id: id, isDeleted: false });
+    const item = await Setting.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Setting not found');
     }
@@ -53,7 +53,7 @@ class SettingService {
 
   // ------------------------------- get setting lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false };
+    const filter = { 'meta.deletedAt': null };
     return await Setting.find(filter)
       .select('_id companyName emailAddress mobileNumber')
       .lean();
@@ -62,9 +62,9 @@ class SettingService {
   // ------------------------------- update setting ----------------------------
   async update(id, data) {
     const item = await Setting.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -77,9 +77,9 @@ class SettingService {
   // ------------------------------- delete setting ----------------------------
   async delete(id) {
     const item = await Setting.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true } },
-      { new: true }
+      { _id: id },
+      { $set: { 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

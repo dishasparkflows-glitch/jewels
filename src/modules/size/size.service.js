@@ -13,7 +13,6 @@ class SizeService {
       const existing = await Size.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
         categoryId,
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(
@@ -34,7 +33,7 @@ class SizeService {
   // ------------------------------- get one size ----------------------------
 
   async getOne(id) {
-    const item = await Size.findOne({ _id: id, isDeleted: false })
+    const item = await Size.findOne({ _id: id })
       .populate('categoryId', 'name slug type')
       .lean();
 
@@ -77,7 +76,7 @@ class SizeService {
   // ------------------------------- get size lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     const categoryId = queryParams.categoryId || queryParams.category;
     if (categoryId) {
       filter.categoryId = categoryId;
@@ -101,7 +100,6 @@ class SizeService {
         name: new RegExp(`^${data.name}$`, 'i'),
         categoryId,
         _id: { $ne: id },
-        isDeleted: false,
       });
       if (existing) {
         throw new ApiError(
@@ -117,9 +115,9 @@ class SizeService {
     delete data.subTypeId;
 
     const item = await Size.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).populate('categoryId', 'name slug type');
 
     if (!item) {
@@ -133,9 +131,9 @@ class SizeService {
 
   async delete(id) {
     const item = await Size.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
-      { new: true }
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

@@ -11,7 +11,7 @@ class CodSequenceService {
   // ------------------------------- get one cod sequence ----------------------------
 
   async getOne(id) {
-    const item = await CodSequence.findOne({ _id: id, isDeleted: false });
+    const item = await CodSequence.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'COD sequence tier not found');
     }
@@ -50,7 +50,7 @@ class CodSequenceService {
   // ------------------------------- get cod sequence lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'active' };
     return await CodSequence.find(filter)
       .sort({ uptoAmount: 1 })
       .select('_id uptoAmount chargeType chargeValue status')
@@ -65,8 +65,7 @@ class CodSequenceService {
 
     // Find the lowest tier where uptoAmount >= orderAmount
     const tier = await CodSequence.findOne({
-      isDeleted: false,
-      status: 'active',
+      'meta.deletedAt': null, status: 'active',
       uptoAmount: { $gte: amount },
     }).sort({ uptoAmount: 1 });
 
@@ -98,9 +97,9 @@ class CodSequenceService {
 
   async update(id, data) {
     const item = await CodSequence.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -114,9 +113,9 @@ class CodSequenceService {
 
   async delete(id) {
     const item = await CodSequence.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true } },
-      { new: true }
+      { _id: id },
+      { $set: { 'meta.deletedAt': new Date() } },
+      { returnDocument: 'after' }
     );
 
     if (!item) {

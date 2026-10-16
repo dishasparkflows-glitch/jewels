@@ -3,49 +3,9 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class CategoryService {
-  _normalizePayload(data) {
-    const payload = { ...data };
-    if (typeof payload.icon === 'string') {
-      payload.icon = { url: payload.icon.trim(), key: '' };
-    }
-    if (typeof payload.banner === 'string') {
-      payload.banner = { url: payload.banner.trim(), key: '' };
-    }
-    if (Array.isArray(payload.promoBanners)) {
-      payload.promoBanners = payload.promoBanners.map((item) => {
-        if (typeof item === 'string') {
-          return {
-            title: '',
-            image: { url: item.trim(), key: '' },
-            url: item.trim(),
-            link: '',
-            subtitle: '',
-            status: 'active',
-            order: 0,
-          };
-        }
-        const itemUrl = item.image?.url || item.url || '';
-        return {
-          title: item.title || '',
-          image: {
-            url: typeof item.image === 'string' ? item.image.trim() : (item.image?.url || itemUrl || ''),
-            key: item.image?.key || item.key || '',
-          },
-          url: itemUrl,
-          link: item.link || '',
-          subtitle: item.subtitle || '',
-          status: item.status || 'active',
-          order: Number(item.order) || 0,
-        };
-      });
-    }
-    return payload;
-  }
-
   // ------------------------------- create category ----------------------------
   async create(data) {
-    const payload = this._normalizePayload(data);
-    return await Category.create(payload);
+    return await Category.create(data);
   }
 
   // ------------------------------- get one category ----------------------------
@@ -97,11 +57,10 @@ class CategoryService {
 
   // ------------------------------- update category ----------------------------
   async update(id, data) {
-    const payload = this._normalizePayload(data);
     const item = await Category.findOneAndUpdate(
       { _id: id },
-      { $set: payload },
-      { new: true, runValidators: true }
+      { $set: data },
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!item) {
@@ -116,7 +75,7 @@ class CategoryService {
     const item = await Category.findOneAndUpdate(
       { _id: id },
       { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!item) {

@@ -1,6 +1,40 @@
 const Category = require('./category.model');
+const MenuSection = require('../menuSection/menuSection.model');
+const MenuItem = require('../menuItem/menuItem.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
+
+const id = (value) => String(value?._id || value);
+const active = (row) => row.status === 'active' && !row.meta?.deletedAt;
+const ordered = (rows) => [...rows].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+function buildNavigation(categories, sections, items) {
+  return ordered(categories.filter(active)).map((category) => ({
+    _id: category._id,
+    name: category.name,
+    slug: category.slug,
+    promoBanners: ordered((category.promoBanners || []).filter(active)).map((banner) => ({
+      _id: banner._id,
+      title: banner.title,
+      subtitle: banner.subtitle,
+      image: { url: banner.image?.url || banner.url || '' },
+      link: banner.link || '',
+    })),
+    menuSections: ordered(
+      sections.filter((section) => active(section) && id(section.categoryId) === id(category))
+    ).map((section) => ({
+      _id: section._id,
+      name: section.title,
+      menuItems: ordered(
+        items.filter((item) => active(item) && id(item.menuSectionId) === id(section))
+      ).map((item) => ({
+        _id: item._id,
+        name: item.title,
+        icon: { url: item.icon?.url || '' },
+      })),
+    })),
+  }));
+}
 
 class CategoryService {
   // ------------------------------- create category ----------------------------
@@ -84,6 +118,39 @@ class CategoryService {
 
     return { message: 'Category deleted successfully', id };
   }
+
+  // ------------------------------- get storefront navigation ----------------------------
+  async getNavigation() {
+    const categories = await Category.find({ status: 'active', 'meta.deletedAt': null })
+      .select('_id name slug promoBanners status meta.deletedAt')
+      .sort({ order: 1, _id: 1 })
+      .lean();
+
+    const sections = await MenuSection.find({
+      categoryId: { $in: categories.map((category) => category._id) },
+      status: 'active',
+      'meta.deletedAt': null,
+    })
+      .select('_id categoryId title order status')
+      .sort({ order: 1, _id: 1 })
+      .lean();
+
+    const items = await MenuItem.find({
+      menuSectionId: { $in: sections.map((section) => section._id) },
+      status: 'active',
+      'meta.deletedAt': null,
+    })
+      .select('_id menuSectionId title icon.url order status')
+      .sort({ order: 1, _id: 1 })
+      .lean();
+
+    return buildNavigation(categories, sections, items);
+  }
+
+  buildNavigation(categories, sections, items) {
+    return buildNavigation(categories, sections, items);
+  }
 }
 
 module.exports = new CategoryService();
+module.exports.buildNavigation = buildNavigation;

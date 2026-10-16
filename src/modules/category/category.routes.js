@@ -5,6 +5,7 @@ const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
 // Public or storefront lookup endpoints
+router.get('/navigation', categoryController.getNavigation);
 router.get('/lookup', categoryController.getLookup);
 router.get('/', categoryController.getAll);
 router.get('/:id', categoryController.getOne);

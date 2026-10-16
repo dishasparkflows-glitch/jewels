@@ -4,90 +4,28 @@ const ftp = require('basic-ftp');
 const { Writable } = require('stream');
 const path = require('path');
 const Product = require('../product/product.model');
-const Category = require('../category/category.model');
 const cloudflareR2 = require('../../utils/cloudflareR2');
+const ornateUtils = require('./ornate.utils');
 
-const ORNATE_BASE_URL = process.env.ORNATE_BASE_URL || 'http://142.79.228.244:2507/OnlineJewelleryShopping';
-const ORNATE_USERNAME = process.env.ORNATE_USERNAME || 'admin';
-const ORNATE_PASSWORD = process.env.ORNATE_PASSWORD || 'admin@123';
-const ORNATE_TIMEOUT = Number(process.env.ORNATE_TIMEOUT) || 45000;
-
-// ------------------------------- session tracker ----------------------------
-let lastSessionId = '0';
-
-// ------------------------------- token cache ----------------------------
-let cachedOrnateToken = null;
-let tokenExpiry = 0;
-
-// ------------------------------- clear cached ornate token ----------------------------
-function clearCachedOrnateToken() {
-  cachedOrnateToken = null;
-  tokenExpiry = 0;
-  console.log('[Ornate NX] Token cache cleared');
-}
-
-// ------------------------------- get or generate ornate token ----------------------------
-async function getOrnateToken(forceRefresh = false) {
-  const now = Date.now();
-
-  if (!forceRefresh && cachedOrnateToken && now < tokenExpiry) {
-    return cachedOrnateToken;
-  }
-
-  try {
-    console.log('[Ornate NX] Requesting auth token from ERP...');
-    const response = await axios.post(
-      `${ORNATE_BASE_URL}/GenerateToken_API`,
-      {
-        Token: [
-          {
-            UserName: ORNATE_USERNAME,
-            Password: ORNATE_PASSWORD,
-          },
-        ],
-      },
-      { headers: { 'Content-Type': 'application/json' }, timeout: ORNATE_TIMEOUT }
-    );
-
-    const status = response.data?.Status?.[0]?.Status;
-    const token = response.data?.Token?.[0]?.Token;
-
-    if (status === 'Sucess' && token) {
-      cachedOrnateToken = token;
-      tokenExpiry = now + 23 * 60 * 60 * 1000; // Cache for 23 hours
-      console.log('[Ornate NX] ✅ Token generated successfully:', token);
-      return token;
-    } else {
-      throw new Error(`Ornate ERP rejected token generation: ${JSON.stringify(response.data?.Status || response.data)}`);
-    }
-  } catch (err) {
-    clearCachedOrnateToken();
-    console.error('[Ornate NX] ❌ GenerateToken failed:', err.message);
-    throw new Error(`Ornate Token Generation Failed: ${err.message}`);
-  }
-}
-
-// ------------------------------- get active event list ----------------------------
-// EventId: 1 = Tag Added/Modified, 3 = Tag Sold, 4 = Metal Rate Changed
-async function getOrnateEvents() {
-  const token = await getOrnateToken();
-
-  const response = await axios.post(
-    `${ORNATE_BASE_URL}/GetEventData_API`,
-    {
-      EventList: [
-        {
-          UserName: ORNATE_USERNAME,
-          Password: ORNATE_PASSWORD,
-          Token: token,
-        },
-      ],
-    },
-    { headers: { 'Content-Type': 'application/json' }, timeout: ORNATE_TIMEOUT }
-  );
-
-  return response.data;
-}
+const {
+  ORNATE_BASE_URL,
+  ORNATE_USERNAME,
+  ORNATE_PASSWORD,
+  ORNATE_TIMEOUT,
+  getLastSessionId,
+  setLastSessionId,
+  getOrnateToken,
+  clearCachedOrnateToken,
+  callOrnateApi,
+  fetchOrnateLabelData,
+  getOrnateEvents,
+  resolveCategory,
+  extractLabelIdentifiers,
+  calculateLabelPrice,
+  mapStuddedDetails,
+  generateProductSlug,
+  buildProductPayloadFromLabel,
+} = ornateUtils;
 
 // ------------------------------- get ornate erp categories ----------------------------
 /**
@@ -95,56 +33,15 @@ async function getOrnateEvents() {
  * Returns distinct categories with product counts, metals, and sample item types.
  */
 async function getOrnateErpCategories() {
-  let token = await getOrnateToken();
+  const data = await fetchOrnateLabelData('0');
 
-  console.log('[Ornate NX] Fetching ERP labels to extract categories...');
-  let response;
-  try {
-    response = await axios.post(
-      `${ORNATE_BASE_URL}/GetLabelData_API`,
-      {
-        LabelDetail: [
-          {
-            UserName: ORNATE_USERNAME,
-            Password: ORNATE_PASSWORD,
-            Token: token,
-            LastSessionId: '0',
-          },
-        ],
-      },
-      { headers: { 'Content-Type': 'application/json' }, timeout: 60000 }
-    );
-  } catch (err) {
-    const isTokenErr = err.response?.status === 401 || (err.message && err.message.toLowerCase().includes('token'));
-    if (isTokenErr) {
-      console.warn('[Ornate NX] Token may be expired/rejected, refreshing token and retrying category fetch...');
-      token = await getOrnateToken(true);
-      response = await axios.post(
-        `${ORNATE_BASE_URL}/GetLabelData_API`,
-        {
-          LabelDetail: [
-            {
-              UserName: ORNATE_USERNAME,
-              Password: ORNATE_PASSWORD,
-              Token: token,
-              LastSessionId: '0',
-            },
-          ],
-        },
-        { headers: { 'Content-Type': 'application/json' }, timeout: 60000 }
-      );
-    } else {
-      throw err;
-    }
-  }
-
-  const status = response.data?.Status?.[0]?.Status;
+  const status = data?.Status?.[0]?.Status;
   if (status !== 'Sucess') {
     clearCachedOrnateToken();
-    throw new Error(`Ornate ERP failed to return label data: ${JSON.stringify(response.data?.Status || response.data)}`);
+    throw new Error(`Ornate ERP failed to return label data: ${JSON.stringify(data?.Status || data)}`);
   }
 
-  const labelDetails = response.data?.LabelDetail || [];
+  const labelDetails = data?.LabelDetail || [];
   const groupMap = new Map();
 
   for (const label of labelDetails) {
@@ -168,23 +65,18 @@ async function getOrnateErpCategories() {
       group.metals.add(label.MetalName.trim());
     }
 
-    const uniqueLabelID = label.UniqueLabelID || label.BarcodeNo || label.LabelNo || '';
-    const price =
-      label.TodaysSalesValue ||
-      label.TotalSalesAmt ||
-      label.GoldAmt ||
-      label.MRP ||
-      0;
+    const { uniqueLabelID, barcodeNo, labelNo } = extractLabelIdentifiers(label);
+    const { salePrice } = calculateLabelPrice(label);
 
     group.products.push({
       uniqueLabelID,
-      barcodeNo: label.BarcodeNo || '',
-      labelNo: label.LabelNo || '',
+      barcodeNo,
+      labelNo,
       itemName: label.ItemName || '',
       groupName,
       grossWt: label.GrossWt || 0,
       netWt: label.NetWt || 0,
-      price,
+      price: salePrice,
       metalName: label.MetalName || '',
       carat: label.Carat || '',
       inStock: label.InStock ?? 1,
@@ -205,84 +97,32 @@ async function getOrnateErpCategories() {
   };
 }
 
-// ------------------------------- resolve existing category (DO NOT auto-create) ----------------------------
-async function resolveCategory(groupName, categoryCache) {
-  if (!groupName || typeof groupName !== 'string') return null;
-  const name = groupName.trim();
-  if (!name) return null;
-  const cacheKey = name.toLowerCase();
-
-  if (categoryCache.has(cacheKey)) {
-    return categoryCache.get(cacheKey);
-  }
-
-  // Only match existing categories in our catalog - NEVER auto-create new categories
-  let cat = await Category.findOne({
-    name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-  });
-
-  if (!cat) {
-    // Optional plural match (e.g. "Ring" -> "Rings")
-    cat = await Category.findOne({
-      name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?$`, 'i') },
-    });
-  }
-
-  if (cat?._id) {
-    categoryCache.set(cacheKey, cat._id);
-    return cat._id;
-  }
-
-  // Do not add category into our categories table
-  categoryCache.set(cacheKey, null);
-  return null;
-}
-
 // ------------------------------- sync ornate labels ----------------------------
 /**
  * Syncs Ornate ERP labels directly into the main Product table with `isOrnate: true`.
  * Downloads & uploads images to Cloudflare R2 only if product doesn't already have images.
  */
 async function syncOrnateLabels(sessionIdOverride, options = null) {
-  const token = await getOrnateToken();
-  const sessionIdToPass = sessionIdOverride !== undefined ? sessionIdOverride : lastSessionId;
+  const sessionIdToPass = sessionIdOverride !== undefined ? sessionIdOverride : getLastSessionId();
+  const data = await fetchOrnateLabelData(sessionIdToPass);
 
-  console.log(`[Ornate NX] Syncing labels with LastSessionId: ${sessionIdToPass}...`);
-
-  const response = await axios.post(
-    `${ORNATE_BASE_URL}/GetLabelData_API`,
-    {
-      LabelDetail: [
-        {
-          UserName: ORNATE_USERNAME,
-          Password: ORNATE_PASSWORD,
-          Token: token,
-          LastSessionId: sessionIdToPass,
-        },
-      ],
-    },
-    { headers: { 'Content-Type': 'application/json' }, timeout: 60000 }
-  );
-
-  const status = response.data?.Status?.[0]?.Status;
+  const status = data?.Status?.[0]?.Status;
   if (status !== 'Sucess') {
     clearCachedOrnateToken();
-    console.error('[Ornate NX] GetLabelData_API returned failure:', response.data);
+    console.error('[Ornate NX] GetLabelData_API returned failure:', data);
     return { success: false, count: 0, message: 'Ornate API returned failure' };
   }
 
-  const labelDetails = response.data?.LabelDetail || [];
-  const studdedDetails = response.data?.StuddedDetail || [];
-  const newSessionId = response.data?.Session?.[0]?.SessionId;
+  const labelDetails = data?.LabelDetail || [];
+  const studdedDetails = data?.StuddedDetail || [];
+  const newSessionId = data?.Session?.[0]?.SessionId;
 
   if (newSessionId) {
-    lastSessionId = newSessionId;
-    console.log(`[Ornate NX] Updated LastSessionId to: ${lastSessionId}`);
+    setLastSessionId(newSessionId);
   }
 
   if (labelDetails.length === 0) {
-    console.log('[Ornate NX] No new labels to sync.');
-    return { success: true, count: 0, lastSessionId };
+    return { success: true, count: 0, lastSessionId: getLastSessionId() };
   }
 
   // Filter by productIds or categories if provided
@@ -307,16 +147,13 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
       const lNo = String(l.LabelNo || '').trim().toLowerCase();
       return (uId && idSet.has(uId)) || (bNo && idSet.has(bNo)) || (lNo && idSet.has(lNo));
     });
-    console.log(`[Ornate NX] Filtering by ${targetProductIds.length} product IDs: ${labelsToProcess.length} of ${labelDetails.length} match.`);
   } else if (Array.isArray(targetCategories) && targetCategories.length > 0) {
     const selectedNormalized = new Set(targetCategories.map(c => String(c).trim().toLowerCase()));
     labelsToProcess = labelDetails.filter(l => l.GroupName && selectedNormalized.has(String(l.GroupName).trim().toLowerCase()));
-    console.log(`[Ornate NX] Filtering by ${targetCategories.length} categories: ${labelsToProcess.length} of ${labelDetails.length} match.`);
   }
 
   if (labelsToProcess.length === 0) {
-    console.log('[Ornate NX] No labels matching the criteria to sync.');
-    return { success: true, count: 0, message: 'No labels matching the selected criteria', lastSessionId };
+    return { success: true, count: 0, message: 'No labels matching the selected criteria', lastSessionId: getLastSessionId() };
   }
 
   let upsertedCount = 0;
@@ -339,64 +176,37 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
       secure: false,
     });
     ftpConnected = true;
-    console.log('[Ornate NX] ✅ FTP Connected for image syncing.');
   } catch (err) {
-    console.error('[Ornate NX] ⚠️ FTP connection failed for image sync:', err.message);
+    console.error('[Ornate NX] FTP connection failed for image sync:', err.message);
   }
 
   for (const label of labelsToProcess) {
     try {
-      const uniqueLabelID = label.UniqueLabelID ? String(label.UniqueLabelID).trim() : '';
-      const barcodeNo = label.BarcodeNo ? String(label.BarcodeNo).trim() : '';
-      const labelNo = label.LabelNo ? String(label.LabelNo).trim() : '';
-      const sku = uniqueLabelID || barcodeNo || labelNo;
-
+      const { uniqueLabelID, barcodeNo, labelNo, sku, tagNo, barcode } = extractLabelIdentifiers(label);
       if (!sku) continue;
-
-      // Compute final salePrice (use first available price field)
-      const salePrice =
-        Number(label.TodaysSalesValue) ||
-        Number(label.TotalSalesAmt) ||
-        Number(label.GoldAmt) ||
-        Number(label.MRP) ||
-        0;
-
-      const mrp = Number(label.MRP) || salePrice;
-
-      // Match studded details for this label
-      const labelStudded = studdedDetails
-        .filter((s) => s.UniqueLabelId === uniqueLabelID || s.UniqueLabelId === barcodeNo)
-        .map((s) => ({
-          stoneName: s.StyleName || s.MetalName || 'Stone',
-          pieces: Number(s.Pcs) || 0,
-          caratWeight: Number(s.NetWt) || Number(s.GrossWt) || 0,
-          rate: Number(s.Rate) || 0,
-          amount: Number(s.Amount) || 0,
-          clarity: s.Clarity || '',
-          color: s.Colour || '',
-          cut: s.CutShape || '',
-          shape: s.CutShape || '',
-        }));
 
       // Check if product already exists in Product table and has images
       const matchCriteria = [];
+      if (sku) matchCriteria.push({ sku });
+      if (tagNo) matchCriteria.push({ tagNo });
+      if (tagNo) matchCriteria.push({ 'ornate.tagNo': tagNo });
+      if (barcode) matchCriteria.push({ 'ornate.barcode': barcode });
       if (uniqueLabelID) matchCriteria.push({ uniqueLabelID });
       if (barcodeNo) matchCriteria.push({ barcodeNo });
       if (labelNo) matchCriteria.push({ labelNo });
-      if (sku) matchCriteria.push({ sku });
 
       const existingProduct = await Product.findOne({ $or: matchCriteria })
-        .select('ornateImages images sku uniqueLabelID barcodeNo labelNo slug')
+        .select('images sku tagNo slug')
         .lean();
 
-      const hasOrnateImages =
+      const hasImages =
         existingProduct &&
-        ((Array.isArray(existingProduct.ornateImages) && existingProduct.ornateImages.length > 0) ||
-         (Array.isArray(existingProduct.images) && existingProduct.images.length > 0));
+        Array.isArray(existingProduct.images) &&
+        existingProduct.images.length > 0;
 
       // Download from FTP and upload to Cloudflare R2 only if NO images exist yet
       const newlyUploadedImages = [];
-      if (!hasOrnateImages && ftpConnected) {
+      if (!hasImages && ftpConnected) {
         const rawPaths = [
           label.ImagePath1,
           label.ImagePath2,
@@ -430,8 +240,8 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
                   mediaType: 'image',
                 });
               }
-            } catch (imgErr) {
-              console.warn(`[Ornate NX] FTP image skipped ${rawPath} (${sku}): ${imgErr.message}`);
+            } catch {
+              // Silently ignore skipped image
             }
           }
         }
@@ -440,80 +250,14 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
       // Resolve category
       const categoryId = await resolveCategory(label.GroupName, categoryCache);
 
-      const title = label.ItemName?.trim() || label.GroupName?.trim() || `Ornate Jewellery ${sku}`;
-      const inStockQty = (label.InStock ?? 1) > 0 ? (Number(label.Pcs) || 1) : 0;
-      const isSold = label.InStock === 0 || inStockQty === 0;
-
-      const setFields = {
-        title,
-        sku,
-        tagNo: labelNo || uniqueLabelID,
-        labelNo,
-        barcode: barcodeNo,
-        barcodeNo,
-        uniqueLabelID,
-        rfid: label.RFID || '',
-        huid: label.HUID || '',
-        companyCode: label.CompanyCode || '',
-        itemCode: label.ItemMstId ? String(label.ItemMstId) : '',
-        itemName: label.ItemName || '',
-        groupName: label.GroupName || '',
-        varietyName: label.VarietyName || '',
-        metalName: label.MetalName || '',
-        carat: label.Carat || '',
-        purity: Number(label.Purity) || 0,
-        grossWt: Number(label.GrossWt) || 0,
-        netWt: Number(label.NetWt) || 0,
-        fineWt: Number(label.FineWt) || 0,
-        wastageWt: Number(label.SalWastWt || label.WastageWt) || 0,
-        salesWastAmt: Number(label.SalesWastAmt) || 0,
-        stoneWt: Number(label.StoneWt) || 0,
-        stonePcs: Number(label.StonePcs) || 0,
-        diamondWt: Number(label.DiamondWt) || 0,
-        diamondPcs: Number(label.DiamondPcs) || 0,
-        pcs: Number(label.Pcs) || 1,
-        goldRate: Number(label.GoldRate) || 0,
-        metalRate: Number(label.MetalRate) || 0,
-        goldAmt: Number(label.GoldAmt) || 0,
-        labourAmt: Number(label.LabourAmt) || 0,
-        diamondAmt: Number(label.DiamondAmt) || 0,
-        stoneAmt: Number(label.StoneAmt) || 0,
-        gstPer: Number(label.GSTPer) || 3,
-        gstAmt: Number(label.GSTAmt) || 0,
-        totalSalesAmt: Number(label.TotalSalesAmt) || 0,
-        todaysSalesValue: Number(label.TodaysSalesValue) || 0,
-        mrp,
-        price: mrp || salePrice,
-        salePrice,
-        displayPrice: salePrice,
-        inStock: label.InStock ?? 1,
-        stockQty: inStockQty,
-        stockStatus: isSold ? 'Out of Stock' : 'In Stock',
-        isSold,
-        inapp: true,
-        inweb: true,
-        isOrnate: true,
-        productType: 'ornate',
-        studdedDetails: labelStudded,
-        lastSyncedAt: new Date(),
-        sessionId: newSessionId || lastSessionId,
-      };
-
-      if (categoryId) {
-        setFields.category = [categoryId];
-      } else {
-        setFields.category = [];
-      }
-
-      if (newlyUploadedImages.length > 0) {
-        setFields.ornateImages = newlyUploadedImages;
-        setFields.images = newlyUploadedImages;
-      }
-
-      const generatedSlug = (title + '-' + sku)
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
+      // Build product payload strictly matching product.model.js
+      const { generatedSlug, setFields } = buildProductPayloadFromLabel(label, {
+        studdedDetails,
+        existingProduct,
+        categoryId,
+        newlyUploadedImages,
+        sessionId: newSessionId || sessionIdToPass,
+      });
 
       // Upsert into Product collection with 1 flag: isOrnate: true
       await Product.findOneAndUpdate(
@@ -523,8 +267,6 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
           $setOnInsert: {
             slug: generatedSlug,
             status: 'active',
-            description: label.Remark || label.ItemName || '',
-            customGroupName: label.ItemName || '',
           },
         },
         { upsert: true, returnDocument: 'after', runValidators: false }
@@ -543,13 +285,12 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
     } catch {}
   }
 
-  console.log(`[Ornate NX] ✅ Label sync complete. Upserted: ${upsertedCount}, Errors: ${errorCount}`);
   return {
     success: true,
     count: upsertedCount,
     errorCount,
     errors: errors.slice(0, 20),
-    lastSessionId,
+    lastSessionId: getLastSessionId(),
   };
 }
 
@@ -558,37 +299,20 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
  * Marks physically sold items as unavailable/out of stock in the Product table.
  */
 async function syncOrnateSoldLabels() {
-  const token = await getOrnateToken();
+  const data = await callOrnateApi('GetSoldLabelData_API', 'SoldLabel', {
+    RecordType: 'All',
+    ReqBranchIssue: 'N',
+  });
 
-  console.log('[Ornate NX] Fetching sold labels from Ornate ERP...');
-
-  const response = await axios.post(
-    `${ORNATE_BASE_URL}/GetSoldLabelData_API`,
-    {
-      SoldLabel: [
-        {
-          UserName: ORNATE_USERNAME,
-          Password: ORNATE_PASSWORD,
-          Token: token,
-          RecordType: 'All',
-          ReqBranchIssue: 'N',
-        },
-      ],
-    },
-    { headers: { 'Content-Type': 'application/json' }, timeout: ORNATE_TIMEOUT }
-  );
-
-  const rawSoldList = response.data?.SoldLabel || [];
+  const rawSoldList = data?.SoldLabel || [];
   const soldList = rawSoldList.filter(
     (item) => item && !item.IsBlankTable && (item.UniqueLabelId || item.UniqueLabelID || item.BarcodeNo || item.LabelNo)
   );
 
-  const rawLabelDetail = response.data?.LabelDetail || [];
+  const rawLabelDetail = data?.LabelDetail || [];
   const labelDetails = rawLabelDetail.filter(
     (l) => l && !l.IsBlankTable && (l.UniqueLabelID || l.BarcodeNo || l.LabelNo)
   );
-
-  console.log(`[Ornate NX] Received ${soldList.length} sold labels, ${labelDetails.length} label details.`);
 
   let upsertedCount = 0;
   for (const label of labelDetails) {
@@ -596,44 +320,42 @@ async function syncOrnateSoldLabels() {
     if (!uniqueLabelID) continue;
 
     const sku = uniqueLabelID;
-    const salePrice =
-      Number(label.TodaysSalesValue) ||
-      Number(label.TotalSalesAmt) ||
-      Number(label.GoldAmt) ||
-      Number(label.MRP) ||
-      0;
+    const { salePrice } = calculateLabelPrice(label);
 
     await Product.findOneAndUpdate(
       {
         $or: [
+          { sku },
+          { tagNo: uniqueLabelID },
+          { 'ornate.tagNo': uniqueLabelID },
+          { 'ornate.barcode': label.BarcodeNo || uniqueLabelID },
           { uniqueLabelID },
           { barcodeNo: label.BarcodeNo || uniqueLabelID },
-          { sku },
         ],
       },
       {
         $set: {
-          uniqueLabelID,
-          labelNo: label.LabelNo || '',
-          barcodeNo: label.BarcodeNo || '',
-          itemName: label.ItemName || '',
-          groupName: label.GroupName || '',
-          grossWt: Number(label.GrossWt) || 0,
-          netWt: Number(label.NetWt) || 0,
+          price: salePrice,
           salePrice,
-          inStock: 0,
+          displayPrice: salePrice,
           stockQty: 0,
           stockStatus: 'Out of Stock',
-          isSold: true,
           isOrnate: true,
           productType: 'ornate',
-          lastSyncedAt: new Date(),
+          'pricing.salePrice': salePrice,
+          'pricing.displayPrice': salePrice,
+          'ornate.isSold': true,
+          'ornate.stockQty': 0,
         },
         $setOnInsert: {
-          title: label.ItemName || `Ornate Item ${sku}`,
+          'basicInfo.title': label.ItemName || `Ornate Item ${sku}`,
           sku,
+          tagNo: sku,
+          slug: (label.ItemName || `Ornate Item ${sku}` + '-' + sku)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, ''),
           status: 'active',
-          ornateImages: [],
           images: [],
         },
       },
@@ -661,11 +383,10 @@ async function syncOrnateSoldLabels() {
       },
       {
         $set: {
-          inStock: 0,
           stockQty: 0,
           stockStatus: 'Out of Stock',
-          isSold: true,
-          lastSyncedAt: new Date(),
+          'ornate.isSold': true,
+          'ornate.stockQty': 0,
         },
       }
     );
@@ -673,7 +394,6 @@ async function syncOrnateSoldLabels() {
   }
 
   const totalProcessed = Math.max(upsertedCount, modifiedCount);
-  console.log(`[Ornate NX] ✅ Marked/Upserted ${totalProcessed} items as sold.`);
   return {
     success: true,
     count: totalProcessed,
@@ -687,25 +407,13 @@ async function syncOrnateSoldLabels() {
 
 // ------------------------------- get ornate erp sold labels ----------------------------
 async function getOrnateErpSoldLabels() {
-  const token = await getOrnateToken();
-  const response = await axios.post(
-    `${ORNATE_BASE_URL}/GetSoldLabelData_API`,
-    {
-      SoldLabel: [
-        {
-          UserName: ORNATE_USERNAME,
-          Password: ORNATE_PASSWORD,
-          Token: token,
-          RecordType: 'All',
-          ReqBranchIssue: 'N',
-        },
-      ],
-    },
-    { headers: { 'Content-Type': 'application/json' }, timeout: ORNATE_TIMEOUT }
-  );
+  const data = await callOrnateApi('GetSoldLabelData_API', 'SoldLabel', {
+    RecordType: 'All',
+    ReqBranchIssue: 'N',
+  });
 
-  const rawSoldList = response.data?.SoldLabel || [];
-  const rawLabelDetail = response.data?.LabelDetail || [];
+  const rawSoldList = data?.SoldLabel || [];
+  const rawLabelDetail = data?.LabelDetail || [];
 
   const validSold = rawSoldList.filter(
     (s) => s && !s.IsBlankTable && (s.UniqueLabelId || s.UniqueLabelID || s.BarcodeNo || s.LabelNo)
@@ -722,6 +430,7 @@ async function getOrnateErpSoldLabels() {
     const id = d.UniqueLabelID || d.BarcodeNo || d.LabelNo;
     if (!id || allSoldIds.has(String(id).toLowerCase())) return;
     allSoldIds.add(String(id).toLowerCase());
+    const { salePrice } = calculateLabelPrice(d);
     combinedItems.push({
       uniqueLabelID: d.UniqueLabelID || id,
       labelNo: d.LabelNo || '',
@@ -730,7 +439,7 @@ async function getOrnateErpSoldLabels() {
       groupName: d.GroupName || '',
       grossWt: d.GrossWt || 0,
       netWt: d.NetWt || 0,
-      price: d.TodaysSalesValue || d.TotalSalesAmt || d.GoldAmt || d.MRP || 0,
+      price: salePrice,
       metalName: d.MetalName || '',
       carat: d.Carat || '',
     });
@@ -740,6 +449,7 @@ async function getOrnateErpSoldLabels() {
     const id = s.UniqueLabelId || s.UniqueLabelID || s.BarcodeNo || s.LabelNo;
     if (!id || allSoldIds.has(String(id).toLowerCase())) return;
     allSoldIds.add(String(id).toLowerCase());
+    const { salePrice } = calculateLabelPrice(s);
     combinedItems.push({
       uniqueLabelID: s.UniqueLabelId || s.UniqueLabelID || id,
       labelNo: s.LabelNo || '',
@@ -748,7 +458,7 @@ async function getOrnateErpSoldLabels() {
       groupName: s.GroupName || '',
       grossWt: s.GrossWt || 0,
       netWt: s.NetWt || 0,
-      price: s.TodaysSalesValue || s.TotalSalesAmt || s.GoldAmt || s.MRP || 0,
+      price: salePrice,
       metalName: s.MetalName || '',
       carat: s.Carat || '',
     });
@@ -758,31 +468,38 @@ async function getOrnateErpSoldLabels() {
   const dbMatch = await Product.find({
     isOrnate: true,
     $or: [
+      { sku: { $in: Array.from(allSoldIds) } },
+      { tagNo: { $in: Array.from(allSoldIds) } },
+      { 'ornate.tagNo': { $in: Array.from(allSoldIds) } },
+      { 'ornate.barcode': { $in: Array.from(allSoldIds) } },
       { uniqueLabelID: { $in: Array.from(allSoldIds) } },
       { barcodeNo: { $in: Array.from(allSoldIds) } },
       { labelNo: { $in: Array.from(allSoldIds) } },
-      { sku: { $in: Array.from(allSoldIds) } },
     ],
-  }).select('uniqueLabelID labelNo barcodeNo inStock isSold status salePrice sku').lean();
+  }).select('sku tagNo stockQty stockStatus status salePrice ornate uniqueLabelID barcodeNo labelNo').lean();
 
   const dbMap = new Map();
   dbMatch.forEach(p => {
+    if (p.sku) dbMap.set(p.sku.toLowerCase(), p);
+    if (p.tagNo) dbMap.set(p.tagNo.toLowerCase(), p);
+    if (p.ornate?.tagNo) dbMap.set(p.ornate.tagNo.toLowerCase(), p);
+    if (p.ornate?.barcode) dbMap.set(p.ornate.barcode.toLowerCase(), p);
     if (p.uniqueLabelID) dbMap.set(p.uniqueLabelID.toLowerCase(), p);
     if (p.barcodeNo) dbMap.set(p.barcodeNo.toLowerCase(), p);
     if (p.labelNo) dbMap.set(p.labelNo.toLowerCase(), p);
-    if (p.sku) dbMap.set(p.sku.toLowerCase(), p);
   });
 
   const enrichedItems = combinedItems.map(item => {
-    const dbProduct = dbMap.get((item.uniqueLabelID || '').toLowerCase()) ||
+    const dbProduct = dbMap.get((item.sku || '').toLowerCase()) ||
+                     dbMap.get((item.uniqueLabelID || '').toLowerCase()) ||
                      dbMap.get((item.barcodeNo || '').toLowerCase()) ||
                      dbMap.get((item.labelNo || '').toLowerCase());
     return {
       ...item,
       inDb: !!dbProduct,
       dbStatus: dbProduct ? dbProduct.status : 'not_synced',
-      currentInStock: dbProduct ? dbProduct.inStock : 0,
-      alreadySoldInDb: dbProduct ? dbProduct.isSold || dbProduct.inStock === 0 : false,
+      currentInStock: dbProduct ? (dbProduct.stockQty ?? 0) : 0,
+      alreadySoldInDb: dbProduct ? (dbProduct.ornate?.isSold || dbProduct.stockQty === 0 || dbProduct.stockStatus === 'Out of Stock') : false,
     };
   });
 
@@ -813,11 +530,10 @@ async function syncSpecificSoldLabels(productIds) {
     },
     {
       $set: {
-        inStock: 0,
         stockQty: 0,
         stockStatus: 'Out of Stock',
-        isSold: true,
-        lastSyncedAt: new Date(),
+        'ornate.isSold': true,
+        'ornate.stockQty': 0,
       },
     }
   );
@@ -831,26 +547,8 @@ async function syncSpecificSoldLabels(productIds) {
 
 // ------------------------------- sync ornate metal rate changes ----------------------------
 async function syncOrnateMetalRateChanges() {
-  const token = await getOrnateToken();
-
-  console.log('[Ornate NX] Fetching metal rate changes from Ornate ERP...');
-
-  const response = await axios.post(
-    `${ORNATE_BASE_URL}/GetLabelDataMetalRateChanges_API`,
-    {
-      MetalRateChanges: [
-        {
-          UserName: ORNATE_USERNAME,
-          Password: ORNATE_PASSWORD,
-          Token: token,
-        },
-      ],
-    },
-    { headers: { 'Content-Type': 'application/json' }, timeout: ORNATE_TIMEOUT }
-  );
-
-  const labelDetails = response.data?.LabelDetail || [];
-  console.log(`[Ornate NX] Received ${labelDetails.length} metal rate change labels.`);
+  const data = await callOrnateApi('GetLabelDataMetalRateChanges_API', 'MetalRateChanges');
+  const labelDetails = data?.LabelDetail || [];
 
   if (labelDetails.length === 0) {
     return { success: true, count: 0, message: 'No metal rate changes found' };
@@ -888,18 +586,14 @@ async function syncOrnateMetalRateChanges() {
           },
           {
             $set: {
-              todaysSalesValue,
-              totalSalesAmt,
-              goldAmt,
-              goldRate,
-              metalRate,
-              labourAmt,
-              gstAmt,
-              mrp,
               price: mrp || newSalePrice,
               salePrice: newSalePrice,
               displayPrice: newSalePrice,
-              lastSyncedAt: new Date(),
+              'pricing.mrp': mrp || newSalePrice,
+              'pricing.salePrice': newSalePrice,
+              'pricing.displayPrice': newSalePrice,
+              'ornate.goldAmt': goldAmt,
+              'ornate.labourAmt': labourAmt,
             },
           }
         );
@@ -908,47 +602,37 @@ async function syncOrnateMetalRateChanges() {
     } catch (err) {
       errorCount++;
       errors.push(`${label.UniqueLabelID || 'unknown'}: ${err.message}`);
-      console.error(`[Ornate NX] ❌ Error updating metal rate for ${label.UniqueLabelID}:`, err.message);
+      console.error(`[Ornate NX] Error updating metal rate for ${label.UniqueLabelID}:`, err.message);
     }
   }
 
-  console.log(`[Ornate NX] ✅ Metal rate sync complete. Updated: ${updatedCount}, Errors: ${errorCount}`);
   return { success: true, count: updatedCount, errorCount, errors: errors.slice(0, 20) };
 }
 
 // ------------------------------- run ornate full sync ----------------------------
 async function runOrnateFullSync() {
-  console.log('[Ornate NX] 🔄 Starting Ornate NX Full Sync...');
   const results = {};
 
   try {
     const eventRes = await getOrnateEvents();
     const eventList = eventRes?.EventList || [];
-
-    console.log(`[Ornate NX] Active events from ERP: ${JSON.stringify(eventList)}`);
     results.events = eventList;
 
     // Baseline: label sync (new/modified products)
-    console.log('[Ornate NX] Running label sync (EventId 1 / baseline)...');
     results.labelSync = await syncOrnateLabels();
 
     // Check & sync sold labels
-    console.log('[Ornate NX] Running sold label sync...');
     results.soldSync = await syncOrnateSoldLabels();
 
     // Check for metal rate changes
     const hasRateEvent = eventList.some((evt) => evt.EventId === 4 || evt.EventID === 4);
     if (hasRateEvent) {
-      console.log('[Ornate NX] EventId 4 detected — running metal rate change sync...');
       results.metalRateSync = await syncOrnateMetalRateChanges();
-    } else {
-      console.log('[Ornate NX] No EventId 4 detected, skipping metal rate sync.');
     }
 
-    console.log('[Ornate NX] ✅ Full sync complete.');
     return { success: true, results };
   } catch (err) {
-    console.error('[Ornate NX] ❌ Full Sync Error:', err.message);
+    console.error('[Ornate NX] Full Sync Error:', err.message);
     throw err;
   }
 }
@@ -985,7 +669,6 @@ async function pushOrderToOrnate(orderId) {
     try {
       OrderModel = mongoose.model('Order');
     } catch {
-      console.warn('[Ornate NX] Order model not registered yet in Mongoose');
       return null;
     }
 
@@ -1072,11 +755,10 @@ async function pushOrderToOrnate(orderId) {
       { headers: { 'Content-Type': 'application/json' }, timeout: ORNATE_TIMEOUT }
     );
 
-    console.log(`[Ornate NX] ✅ Pushed order ${order._id} to Ornate ERP:`, response.data);
     return response.data;
   } catch (err) {
     console.error(
-      `[Ornate NX] ❌ Failed to push order ${orderId} to Ornate ERP:`,
+      `[Ornate NX] Failed to push order ${orderId} to Ornate ERP:`,
       err?.response?.data || err.message
     );
     return null;
@@ -1084,16 +766,14 @@ async function pushOrderToOrnate(orderId) {
 }
 
 module.exports = {
-  getOrnateToken,
-  clearCachedOrnateToken,
-  testOrnateConnection,
-  getOrnateEvents,
+  ...ornateUtils,
   getOrnateErpCategories,
-  getOrnateErpSoldLabels,
-  syncSpecificSoldLabels,
   syncOrnateLabels,
   syncOrnateSoldLabels,
+  getOrnateErpSoldLabels,
+  syncSpecificSoldLabels,
   syncOrnateMetalRateChanges,
   runOrnateFullSync,
+  testOrnateConnection,
   pushOrderToOrnate,
 };

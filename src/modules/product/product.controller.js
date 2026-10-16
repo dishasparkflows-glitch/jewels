@@ -17,12 +17,13 @@ class ProductController {
 
   // ------------------------------- get all products ----------------------------
   getAll = catchAsync(async (req, res) => {
-    const { items, pagination } = await productService.getAll(req.query);
+    const { items, pagination, facets } = await productService.getAll(req.query);
     ApiResponse.paginated(
       res,
       items,
       pagination,
-      'Products retrieved successfully'
+      'Products retrieved successfully',
+      facets
     );
   });
 

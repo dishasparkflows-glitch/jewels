@@ -26,6 +26,12 @@ class CategoryController {
     ApiResponse.success(res, items, 'Category lookup list retrieved');
   });
 
+  // ------------------------------- get storefront navigation ----------------------------
+  getNavigation = catchAsync(async (req, res) => {
+    const data = await categoryService.getNavigation();
+    ApiResponse.success(res, data, 'Storefront navigation retrieved successfully');
+  });
+
   // ------------------------------- get one category ----------------------------
   getOne = catchAsync(async (req, res) => {
     const item = await categoryService.getOne(req.params.id);

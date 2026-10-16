@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const MenuSection = require('../menuSection/menuSection.model');
 const requireParent = require('../../utils/menuParents');
 const MenuItem = require('./menuItem.model');
@@ -5,6 +6,15 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class MenuItemService {
+  async applyCategoryFilter(filter, categoryId) {
+    if (!categoryId) return;
+    if (!mongoose.isValidObjectId(categoryId)) throw new ApiError(400, 'Valid categoryId is required');
+    const sectionFilter = { categoryId, 'meta.deletedAt': null };
+    if (filter.menuSectionId) sectionFilter._id = filter.menuSectionId;
+    const sectionIds = await MenuSection.find(sectionFilter).distinct('_id');
+    filter.menuSectionId = { $in: sectionIds };
+  }
+
   // ------------------------------- create menu item ----------------------------
   async create(data) {
     await requireParent(MenuSection, data.menuSectionId, 'Menu section');
@@ -40,6 +50,8 @@ class MenuItemService {
       filter.title = new RegExp(queryParams.search, 'i');
     }
 
+    await this.applyCategoryFilter(filter, queryParams.categoryId);
+
     const [items, total] = await Promise.all([
       MenuItem.find(filter)
         .populate('menuSectionId', 'title categoryId')
@@ -60,6 +72,8 @@ class MenuItemService {
     if (queryParams.menuSectionId) {
       filter.menuSectionId = queryParams.menuSectionId;
     }
+
+    await this.applyCategoryFilter(filter, queryParams.categoryId);
 
     return await MenuItem.find(filter)
       .populate('menuSectionId', 'title categoryId')

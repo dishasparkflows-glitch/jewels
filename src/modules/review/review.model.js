@@ -59,11 +59,6 @@ const reviewSchema = new mongoose.Schema(
       default: 'approved',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,

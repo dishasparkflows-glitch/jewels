@@ -137,14 +137,6 @@ const productSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
     }],
-    subType: {
-      type: mongoose.Schema.Types.ObjectId,
-      default: null,
-    },
-    subTypeId: {
-      type: mongoose.Schema.Types.ObjectId,
-      default: null,
-    },
     featured: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Featured',
@@ -202,16 +194,16 @@ const productSchema = new mongoose.Schema(
       },
       images: [{
         url: String,
-        public_id: String,
+        key: String,
         mediaType: { type: String, default: 'image' },
       }],
       vtoImage: {
         url: String,
-        public_id: String,
+        key: String,
       },
       variantIcon: {
         url: String,
-        public_id: String,
+        key: String,
       },
       vtoCategory: {
         type: String,
@@ -230,7 +222,7 @@ const productSchema = new mongoose.Schema(
     // General product images
     images: [{
       url: String,
-      public_id: String,
+      key: String,
       mediaType: { type: String, default: 'image' },
     }],
 
@@ -379,7 +371,7 @@ const productSchema = new mongoose.Schema(
     labelCreationDate: { type: Date, default: null },
     ornateImages: [{
       url: String,
-      public_id: String,
+      key: String,
       mediaType: { type: String, default: 'image' },
     }],
     studdedDetails: { type: [studdedDetailSchema], default: [] },
@@ -400,11 +392,7 @@ const productSchema = new mongoose.Schema(
       enum: ['active', 'inactive', 'draft', 'approved'],
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
+
     birthMonth: [{
       type: String,
       enum: [
@@ -442,7 +430,7 @@ const productSchema = new mongoose.Schema(
 
 // Indexes for high performance querying
 productSchema.index({ title: 'text', sku: 'text', tagNo: 'text' });
-productSchema.index({ status: 1, isDeleted: 1, isOrnate: 1 });
+productSchema.index({ status: 1, isOrnate: 1 });
 productSchema.index({ category: 1, status: 1 });
 productSchema.index({ displayPrice: 1 });
 productSchema.index({ salePrice: 1 });

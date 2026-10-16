@@ -60,7 +60,7 @@ class ProductService {
       : { $or: [{ slug: id }, { sku: id }], isDeleted: false };
 
     let product = await Product.findOne(filter)
-      .populate('category', 'name slug sizeChart subTypes')
+      .populate('category', 'name slug sizeChart')
       .populate('metalColors', 'name code hex')
       .populate('colorImages.metalColor', 'name code hex')
       .populate('variants.metalPurity', 'name karat metalType')

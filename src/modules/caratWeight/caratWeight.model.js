@@ -16,7 +16,7 @@ const caratWeightSchema = new mongoose.Schema(
     },
     image: {
       url: { type: String, default: '' },
-      public_id: { type: String, default: '' },
+      key: { type: String, default: '' },
     },
     order: {
       type: Number,
@@ -28,11 +28,6 @@ const caratWeightSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
@@ -41,8 +36,6 @@ const caratWeightSchema = new mongoose.Schema(
     collection: 'carat_weights',
   }
 );
-
-caratWeightSchema.index({ status: 1, isDeleted: 1 });
 
 caratWeightSchema.plugin(metaPlugin);
 

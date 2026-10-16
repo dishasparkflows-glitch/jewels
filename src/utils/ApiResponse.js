@@ -1,12 +1,13 @@
 /**
  * Standard API response helper
  */
+const { serializeMedia } = require('./media');
 class ApiResponse {
-  static success(res, data = null, message = 'Success', statusCode = 200) {
+  static success(res, data = null, message = 'Success', statusCode = 200, options = {}) {
     return res.status(statusCode).json({
       success: true,
       message,
-      data,
+      data: options.includeMediaKeys ? data : serializeMedia(data),
     });
   }
 
@@ -14,7 +15,7 @@ class ApiResponse {
     return res.status(201).json({
       success: true,
       message,
-      data,
+      data: serializeMedia(data),
     });
   }
 
@@ -22,7 +23,7 @@ class ApiResponse {
     return res.status(200).json({
       success: true,
       message,
-      data,
+      data: serializeMedia(data),
       pagination,
     });
   }

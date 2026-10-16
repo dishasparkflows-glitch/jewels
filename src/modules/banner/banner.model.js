@@ -67,11 +67,11 @@ const bannerSchema = new mongoose.Schema(
     },
     image: {
       url: String,
-      public_id: String,
+      key: String,
     },
     video: {
       url: String,
-      public_id: String,
+      key: String,
     },
     mediaType: {
       type: String,
@@ -93,11 +93,6 @@ const bannerSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
@@ -106,7 +101,7 @@ const bannerSchema = new mongoose.Schema(
   }
 );
 
-bannerSchema.index({ 'display.type': 1, status: 1, isDeleted: 1 });
+bannerSchema.index({ 'display.type': 1, status: 1 });
 bannerSchema.index({ 'display.categoryId': 1, status: 1 });
 bannerSchema.index({ 'display.order': 1 });
 

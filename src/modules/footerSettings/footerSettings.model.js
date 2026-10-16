@@ -30,10 +30,6 @@ const footerSettingsSchema = new mongoose.Schema(
       type: String,
       default: '© 2024 Neirah Jewellers. All rights reserved.',
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-    },
   },
   {
     versionKey: false,

@@ -17,17 +17,12 @@ const menuItemSchema = new mongoose.Schema(
     },
     icon: {
       url: String,
-      public_id: String,
+      key: String,
     },
     status: {
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
-      index: true,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
       index: true,
     },
   },
@@ -39,7 +34,7 @@ const menuItemSchema = new mongoose.Schema(
   }
 );
 
-menuItemSchema.index({ menuSectionId: 1, status: 1, isDeleted: 1 });
+menuItemSchema.index({ menuSectionId: 1, status: 1 });
 
 menuItemSchema.plugin(metaPlugin);
 

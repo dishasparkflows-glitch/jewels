@@ -357,84 +357,49 @@ const seedAll = async () => {
     const primaryAdmin = seededUsers.find((u) => u.role === 'super_admin');
     const primaryCustomer = seededUsers.find((u) => u.auth.email.includes('jayswalkrushn'));
 
-    // ─── 2. SEED CATEGORIES WITH SUBTYPES ───────────────────────────────
-    console.log('📁 [2/24] Seeding Categories & Sub-Types...');
+    // ─── 2. SEED CATEGORIES ─────────────────────────────────────────────
+    console.log('📁 [2/24] Seeding Categories...');
     const categoriesData = [
       {
         name: 'Rings',
         slug: 'rings',
         type: 'category',
         images: [{ url: '/featured/ring.jpg', title: 'Diamond Rings' }],
-        subTypes: [
-          { name: 'Solitaire Rings', code: 'SOLR' },
-          { name: 'Engagement Rings', code: 'ENGR' },
-          { name: 'Band Rings', code: 'BNDR' },
-          { name: 'Halo Rings', code: 'HALR' },
-          { name: 'Eternity Bands', code: 'ETNB' },
-        ],
       },
       {
         name: 'Earrings',
         slug: 'earrings',
         type: 'category',
         images: [{ url: '/featured/earring.jpg', title: 'Luxury Earrings' }],
-        subTypes: [
-          { name: 'Stud Earrings', code: 'STDE' },
-          { name: 'Drop Earrings', code: 'DRPE' },
-          { name: 'Hoop Earrings', code: 'HOPE' },
-          { name: 'Chandelier Earrings', code: 'CHDE' },
-        ],
       },
       {
         name: 'Pendant',
         slug: 'pendant',
         type: 'category',
         images: [{ url: '/featured/necklace.jpg', title: 'Fine Pendants' }],
-        subTypes: [
-          { name: 'Solitaire Pendants', code: 'SOLP' },
-          { name: 'Choker Necklaces', code: 'CHKN' },
-          { name: 'Tennis Necklaces', code: 'TNNN' },
-          { name: 'Mangalsutra', code: 'MGST' },
-        ],
       },
       {
         name: 'Bangles & Bracelets',
         slug: 'bangles-bracelets',
         type: 'category',
         images: [{ url: '/featured/bangles.jpg', title: 'Bracelets & Bangles' }],
-        subTypes: [
-          { name: 'Tennis Bracelets', code: 'TNBR' },
-          { name: 'Cuffs', code: 'CUFF' },
-          { name: 'Kada & Bangles', code: 'KDAB' },
-          { name: 'Charm Bracelets', code: 'CHMB' },
-        ],
       },
       {
         name: 'Collection',
         slug: 'collection',
         type: 'collection',
         images: [{ url: '/promos/essence_necklace.jpg', title: 'Curated Collection' }],
-        subTypes: [
-          { name: 'Solitaire Empress', code: 'SEMP' },
-          { name: 'Heritage Bridal', code: 'HBDL' },
-          { name: 'Contemporary Dailywear', code: 'CDLW' },
-        ],
       },
       {
         name: 'Silver Collection',
         slug: 'silver-collection',
         type: 'collection',
         images: [{ url: '/promos/bracelet_stone.jpg', title: '925 Silver Jewellery' }],
-        subTypes: [
-          { name: '925 Sterling Rings', code: 'STLR' },
-          { name: 'Silver Pendants', code: 'SLVP' },
-          { name: 'Silver Bracelets', code: 'SLVB' },
-        ],
       },
     ];
 
     const seededCategories = await Category.insertMany(categoriesData);
-    console.log(`✅ Seeded ${seededCategories.length} Categories with embedded Sub-Types.`);
+    console.log(`✅ Seeded ${seededCategories.length} Categories.`);
 
     const catMap = {};
     seededCategories.forEach((c) => {
@@ -796,7 +761,6 @@ const seedAll = async () => {
         slug: 'celestial-oval-solitaire-ring',
         sku: 'NJ-RNG-001',
         category: [ringCat._id],
-        subType: ringCat.subTypes[0]._id,
         price: 390000,
         salePrice: 345000,
         costPrice: 280000,
@@ -842,7 +806,6 @@ const seedAll = async () => {
         slug: 'verdant-empress-emerald-pendant',
         sku: 'NJ-PND-002',
         category: [pendantCat._id],
-        subType: pendantCat.subTypes[0]._id,
         price: 520000,
         salePrice: 480000,
         costPrice: 390000,
@@ -864,7 +827,6 @@ const seedAll = async () => {
         slug: 'midnight-royal-sapphire-earrings',
         sku: 'NJ-EAR-003',
         category: [catMap['earrings']._id],
-        subType: catMap['earrings'].subTypes[1]._id,
         price: 320000,
         salePrice: 289000,
         costPrice: 220000,
@@ -886,7 +848,6 @@ const seedAll = async () => {
         slug: 'starlight-diamond-tennis-bracelet',
         sku: 'NJ-BRC-004',
         category: [bangleCat._id],
-        subType: bangleCat.subTypes[0]._id,
         price: 680000,
         salePrice: 620000,
         costPrice: 490000,
@@ -908,7 +869,6 @@ const seedAll = async () => {
         slug: 'aura-vintage-diamond-band',
         sku: 'NJ-RNG-005',
         category: [ringCat._id],
-        subType: ringCat.subTypes[2]._id,
         price: 240000,
         salePrice: 215000,
         costPrice: 170000,
@@ -929,7 +889,6 @@ const seedAll = async () => {
         slug: 'south-sea-baroque-pearl-choker',
         sku: 'NJ-PND-006',
         category: [pendantCat._id],
-        subType: pendantCat.subTypes[1]._id,
         price: 220000,
         salePrice: 198000,
         costPrice: 150000,
@@ -950,7 +909,6 @@ const seedAll = async () => {
         slug: 'round-diamond-engagement-ring-with-diamond-accent',
         sku: 'NJ-RNG-007',
         category: [ringCat._id],
-        subType: ringCat.subTypes[1]._id,
         price: 92000,
         salePrice: 79644.18,
         costPrice: 62000,
@@ -968,7 +926,6 @@ const seedAll = async () => {
         slug: 'round-diamond-solitaire-ring-with-multi-diamond-band',
         sku: 'NJ-RNG-008',
         category: [ringCat._id],
-        subType: ringCat.subTypes[0]._id,
         price: 52000,
         salePrice: 44117.40,
         costPrice: 35000,
@@ -982,7 +939,6 @@ const seedAll = async () => {
         slug: 'round-diamond-solitaire-ring-with-multi-sculpted-gold-band',
         sku: 'NJ-RNG-009',
         category: [ringCat._id],
-        subType: ringCat.subTypes[0]._id,
         price: 49000,
         salePrice: 41833.62,
         costPrice: 32000,
@@ -996,7 +952,6 @@ const seedAll = async () => {
         slug: 'round-diamond-solitaire-ring-with-multi-band-design',
         sku: 'NJ-RNG-010',
         category: [ringCat._id],
-        subType: ringCat.subTypes[2]._id,
         price: 50000,
         salePrice: 42738.43,
         costPrice: 33000,
@@ -1010,7 +965,6 @@ const seedAll = async () => {
         slug: 'round-diamond-solitaire-ring-with-half-diamond-gold-band',
         sku: 'NJ-RNG-011',
         category: [ringCat._id],
-        subType: ringCat.subTypes[0]._id,
         price: 58000,
         salePrice: 50556.40,
         costPrice: 38000,
@@ -1024,7 +978,6 @@ const seedAll = async () => {
         slug: 'light-weight-fancy-cut-stone-curve-pendant-dokiya',
         sku: 'NJ-SLV-012',
         category: [catMap['silver-collection']._id],
-        subType: catMap['silver-collection'].subTypes[1]._id,
         price: 8989,
         salePrice: 4080,
         costPrice: 2800,
@@ -1042,7 +995,6 @@ const seedAll = async () => {
         slug: '92-5-sterling-silver-heritage-tennis-bracelet',
         sku: 'NJ-SLV-013',
         category: [catMap['silver-collection']._id],
-        subType: catMap['silver-collection'].subTypes[2]._id,
         price: 6500,
         salePrice: 4529,
         costPrice: 3100,
@@ -1056,7 +1008,6 @@ const seedAll = async () => {
         slug: 'the-empress-heritage-diamond-choker',
         sku: 'NJ-COL-014',
         category: [catMap['collection']._id, pendantCat._id],
-        subType: catMap['collection'].subTypes[1]._id,
         price: 1250000,
         salePrice: 1120000,
         costPrice: 850000,
@@ -1515,15 +1466,15 @@ const seedAll = async () => {
     console.log('🔄 [21/24] Seeding Custom Jewellery Before & After Showcases...');
     const beforeAfterData = [
       {
-        beforeImage: { url: '/promos/essence_necklace.jpg', public_id: 'sample_before_1' },
-        afterImage: { url: '/banners/hero_timeless.jpg', public_id: 'sample_after_1' },
+        beforeImage: { url: '/promos/essence_necklace.jpg', key: 'sample_before_1' },
+        afterImage: { url: '/banners/hero_timeless.jpg', key: 'sample_after_1' },
         alt: 'Vintage Ancestral Polki redesigned into Contemporary Solitaire Choker',
         status: 'active',
         position: 1,
       },
       {
-        beforeImage: { url: '/promos/bracelet_stone.jpg', public_id: 'sample_before_2' },
-        afterImage: { url: '/featured/bangles.jpg', public_id: 'sample_after_2' },
+        beforeImage: { url: '/promos/bracelet_stone.jpg', key: 'sample_before_2' },
+        afterImage: { url: '/featured/bangles.jpg', key: 'sample_after_2' },
         alt: 'Traditional Gold Kada transformed into Art Deco Diamond Cuff',
         status: 'active',
         position: 2,

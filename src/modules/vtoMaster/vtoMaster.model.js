@@ -18,7 +18,7 @@ const vtoMasterSchema = new mongoose.Schema(
         type: String,
         default: '',
       },
-      public_id: {
+      key: {
         type: String,
         default: '',
       },
@@ -28,7 +28,7 @@ const vtoMasterSchema = new mongoose.Schema(
         type: String,
         default: '',
       },
-      public_id: {
+      key: {
         type: String,
         default: '',
       },
@@ -39,11 +39,7 @@ const vtoMasterSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
+
   },
   {
     versionKey: false,
@@ -51,7 +47,7 @@ const vtoMasterSchema = new mongoose.Schema(
   }
 );
 
-vtoMasterSchema.index({ bodyPart: 1, isDeleted: 1 });
+
 
 vtoMasterSchema.plugin(metaPlugin);
 

@@ -49,6 +49,11 @@ class NavigationMenuController {
     ApiResponse.success(res, menu, 'Menu section deleted successfully');
   });
 
+  reorderSections = catchAsync(async (req, res) => {
+    const menu = await navigationMenuService.reorderSections(req.params.id, req.body.orderedIds);
+    ApiResponse.success(res, menu, 'Menu sections reordered successfully');
+  });
+
   // Item handlers
   addMenuItem = catchAsync(async (req, res) => {
     const menu = await navigationMenuService.addMenuItem(req.params.id, req.params.sectionId, req.body);
@@ -72,6 +77,15 @@ class NavigationMenuController {
       req.params.itemId
     );
     ApiResponse.success(res, menu, 'Menu item deleted successfully');
+  });
+
+  reorderMenuItems = catchAsync(async (req, res) => {
+    const menu = await navigationMenuService.reorderMenuItems(
+      req.params.id,
+      req.params.sectionId,
+      req.body.orderedIds
+    );
+    ApiResponse.success(res, menu, 'Menu items reordered successfully');
   });
 }
 

@@ -1,5 +1,6 @@
 const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { publicUrl } = require('./media');
 
 class CloudflareR2Service {
   constructor() {
@@ -67,6 +68,7 @@ class CloudflareR2Service {
     const cleanFolder = (folder || 'general').replace(/^\/+|\/+$/g, '');
     const key = `${cleanFolder}/${Date.now()}-${cleanFilename}`;
 
+    const fileUrl = publicUrl(key);
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
@@ -74,16 +76,10 @@ class CloudflareR2Service {
     });
 
     const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: 3600 });
-    const publicBase = this.publicDomain
-      ? this.publicDomain.replace(/\/$/, '')
-      : (process.env.NODE_ENV === 'development' || !process.env.BACKEND_URL
-          ? `/api/upload/file`
-          : `${process.env.BACKEND_URL.replace(/\/$/, '')}/api/upload/file`);
-
-    const fileUrl = `${publicBase}/${key}`;
 
     return {
       uploadUrl,
+      url: fileUrl,
       fileUrl,
       key,
       method: 'PUT',
@@ -96,6 +92,7 @@ class CloudflareR2Service {
     const cleanFilename = (filename || 'asset.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
     const key = `${folder}/${Date.now()}-${cleanFilename}`;
 
+    const fileUrl = publicUrl(key);
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
@@ -105,17 +102,9 @@ class CloudflareR2Service {
 
     await this.client.send(command);
 
-    const publicBase = this.publicDomain
-      ? this.publicDomain.replace(/\/$/, '')
-      : (process.env.NODE_ENV === 'development' || !process.env.BACKEND_URL
-          ? `/api/upload/file`
-          : `${process.env.BACKEND_URL.replace(/\/$/, '')}/api/upload/file`);
-
-    const fileUrl = `${publicBase}/${key}`;
 
     return {
       url: fileUrl,
-      public_id: key,
       key,
     };
   }

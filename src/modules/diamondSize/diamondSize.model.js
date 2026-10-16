@@ -26,11 +26,6 @@ const diamondSizeSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
@@ -38,7 +33,6 @@ const diamondSizeSchema = new mongoose.Schema(
   }
 );
 
-diamondSizeSchema.index({ status: 1, isDeleted: 1 });
 diamondSizeSchema.index({ sizeFrom: 1, sizeTo: 1 });
 
 diamondSizeSchema.plugin(metaPlugin);

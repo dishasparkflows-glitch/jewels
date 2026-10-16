@@ -7,28 +7,26 @@ class SizeService {
   // ------------------------------- create size ----------------------------
   async create(data) {
     const categoryId = data.categoryId || data.category;
-    const subTypeId = data.subTypeId || data.subType || null;
 
     if (data.name && categoryId) {
       data.name = data.name.trim();
       const existing = await Size.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
         categoryId,
-        subTypeId,
         isDeleted: false,
       });
       if (existing) {
         throw new ApiError(
           409,
-          `Size "${data.name}" already exists for this category/sub-type`
+          `Size "${data.name}" already exists for this category`
         );
       }
     }
 
     if (categoryId) data.categoryId = categoryId;
-    if (subTypeId) data.subTypeId = subTypeId;
     delete data.category;
     delete data.subType;
+    delete data.subTypeId;
 
     return await Size.create(data);
   }
@@ -59,10 +57,6 @@ class SizeService {
     if (categoryId) {
       filter.categoryId = categoryId;
     }
-    const subTypeId = queryParams.subTypeId || queryParams.subType;
-    if (subTypeId) {
-      filter.subTypeId = subTypeId;
-    }
     if (queryParams.search) {
       filter.name = new RegExp(queryParams.search, 'i');
     }
@@ -88,15 +82,11 @@ class SizeService {
     if (categoryId) {
       filter.categoryId = categoryId;
     }
-    const subTypeId = queryParams.subTypeId || queryParams.subType;
-    if (subTypeId) {
-      filter.subTypeId = subTypeId;
-    }
 
     return await Size.find(filter)
       .populate('categoryId', 'name slug type')
       .sort({ name: 1 })
-      .select('_id name categoryId subTypeId status')
+      .select('_id name categoryId status')
       .lean();
   }
 
@@ -104,29 +94,27 @@ class SizeService {
 
   async update(id, data) {
     const categoryId = data.categoryId || data.category;
-    const subTypeId = data.subTypeId !== undefined ? data.subTypeId : data.subType;
 
     if (data.name && categoryId) {
       data.name = data.name.trim();
       const existing = await Size.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
         categoryId,
-        subTypeId: subTypeId || null,
         _id: { $ne: id },
         isDeleted: false,
       });
       if (existing) {
         throw new ApiError(
           409,
-          `Size "${data.name}" already exists for this category/sub-type`
+          `Size "${data.name}" already exists for this category`
         );
       }
     }
 
     if (categoryId) data.categoryId = categoryId;
-    if (subTypeId !== undefined) data.subTypeId = subTypeId;
     delete data.category;
     delete data.subType;
+    delete data.subTypeId;
 
     const item = await Size.findOneAndUpdate(
       { _id: id, isDeleted: false },

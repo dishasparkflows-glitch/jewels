@@ -42,15 +42,15 @@ const settingSchema = new mongoose.Schema(
     },
     logoImage: {
       url: { type: String, default: '' },
-      public_id: { type: String, default: '' },
+      key: { type: String, default: '' },
     },
     mobileLogoImage: {
       url: { type: String, default: '' },
-      public_id: { type: String, default: '' },
+      key: { type: String, default: '' },
     },
     certificateImage: {
       url: { type: String, default: '' },
-      public_id: { type: String, default: '' },
+      key: { type: String, default: '' },
     },
 
     // Monetary Settlement
@@ -67,11 +67,6 @@ const settingSchema = new mongoose.Schema(
       trim: true,
     },
 
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,

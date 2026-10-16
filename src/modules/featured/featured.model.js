@@ -18,7 +18,7 @@ const featuredSchema = new mongoose.Schema(
     },
     image: {
       url: String,
-      public_id: String,
+      key: String,
     },
     status: {
       type: String,
@@ -39,19 +39,13 @@ const featuredSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
   }
 );
 
-featuredSchema.index({ status: 1, isDeleted: 1 });
-featuredSchema.index({ placement: 1, status: 1, isDeleted: 1 });
+featuredSchema.index({ placement: 1, status: 1 });
 
 featuredSchema.plugin(metaPlugin);
 

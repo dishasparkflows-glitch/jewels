@@ -151,11 +151,6 @@ const whatsAppTemplateSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,

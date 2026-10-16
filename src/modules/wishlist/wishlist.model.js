@@ -21,10 +21,7 @@ const wishlistItemSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
-    image: {
-      type: String,
-      default: '',
-    },
+    image: require('../../utils/mediaField'),
     category: {
       type: String,
       default: '',

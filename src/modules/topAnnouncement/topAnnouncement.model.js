@@ -35,11 +35,6 @@ const topAnnouncementSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
@@ -58,10 +53,6 @@ const topAnnouncementSettingSchema = new mongoose.Schema(
     autoplayInterval: {
       type: Number,
       default: 4000,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
     },
   },
   {

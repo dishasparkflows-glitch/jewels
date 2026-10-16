@@ -1,17 +1,6 @@
 const mongoose = require('mongoose');
 const metaPlugin = require('../../utils/metaPlugin');
 
-const subTypeSchema = new mongoose.Schema(
-  {
-    name: { type: String, trim: true },
-    code: { type: String, trim: true },
-    sizeChart: {
-      url: String,
-      public_id: String,
-    },
-  },
-  { _id: true }
-);
 
 const promoBannerSchema = new mongoose.Schema(
   {
@@ -22,7 +11,7 @@ const promoBannerSchema = new mongoose.Schema(
     },
     image: {
       url: { type: String, trim: true, default: '' },
-      public_id: { type: String, trim: true, default: '' },
+      key: { type: String, trim: true, default: '' },
     },
     url: {
       type: String,
@@ -68,21 +57,21 @@ const categorySchema = new mongoose.Schema(
     images: [
       {
         url: String,
-        public_id: String,
+        key: String,
         title: String,
       },
     ],
     icon: {
       url: { type: String, trim: true, default: '' },
-      public_id: { type: String, trim: true, default: '' },
+      key: { type: String, trim: true, default: '' },
     },
     banner: {
-      url: { type: String, trim: true, default: '' },
-      public_id: { type: String, trim: true, default: '' },
+      url: { type: String, trim: true },
+      key: { type: String, trim: true },
     },
     sizeChart: {
       url: String,
-      public_id: String,
+      key: String,
     },
     status: {
       type: String,
@@ -90,12 +79,6 @@ const categorySchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    subTypes: [subTypeSchema],
     promoBanners: [promoBannerSchema],
   },
   {

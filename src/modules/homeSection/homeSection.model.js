@@ -18,15 +18,7 @@ const homeSectionItemSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
-    imageUrl: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    imagePublicId: {
-      type: String,
-      default: '',
-    },
+    image: require('../../utils/mediaField'),
     linkUrl: {
       type: String,
       trim: true,
@@ -153,11 +145,11 @@ const homeSectionSchema = new mongoose.Schema(
     },
     image: {
       url: { type: String, default: '' },
-      public_id: { type: String, default: '' },
+      key: { type: String, default: '' },
     },
     mobileImage: {
       url: { type: String, default: '' },
-      public_id: { type: String, default: '' },
+      key: { type: String, default: '' },
     },
     items: [homeSectionItemSchema],
     order: {
@@ -183,11 +175,6 @@ const homeSectionSchema = new mongoose.Schema(
       autoplaySpeed: { type: Number, default: 5000 },
       fullWidth: { type: Boolean, default: false },
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
@@ -195,10 +182,6 @@ const homeSectionSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   }
 );
-
-homeSectionSchema.index({ status: 1, isDeleted: 1 });
-homeSectionSchema.index({ order: 1, isDeleted: 1 });
-homeSectionSchema.index({ sectionKey: 1, isDeleted: 1 });
 
 homeSectionSchema.plugin(metaPlugin);
 

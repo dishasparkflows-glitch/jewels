@@ -77,14 +77,7 @@ const currencySchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
-    },
-
-    metadata: {
-      isDeleted: {
-        type: Boolean,
-        default: false,
-      },
-    },
+    },
   },
   {
     timestamps: true,
@@ -101,7 +94,6 @@ currencySchema.index(
 
 currencySchema.index({
   'settings.isActive': 1,
-  'metadata.isDeleted': 1,
 });
 
 module.exports = mongoose.model('Currency', currencySchema);

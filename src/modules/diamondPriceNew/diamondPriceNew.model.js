@@ -55,11 +55,6 @@ const diamondPriceNewSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     strictPopulate: false,

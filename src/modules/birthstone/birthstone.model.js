@@ -28,17 +28,12 @@ const birthstoneSchema = new mongoose.Schema(
     },
     image: {
       url: { type: String, default: '' },
-      public_id: { type: String, default: '' },
+      key: { type: String, default: '' },
     },
     status: {
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
-      index: true,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
       index: true,
     },
   },
@@ -48,8 +43,6 @@ const birthstoneSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   }
 );
-
-birthstoneSchema.index({ status: 1, isDeleted: 1 });
 
 birthstoneSchema.plugin(metaPlugin);
 

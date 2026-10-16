@@ -22,19 +22,12 @@ const instagramPostSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
     collection: 'instagram_posts',
   }
 );
-
-instagramPostSchema.index({ isActive: 1, isDeleted: 1 });
 
 instagramPostSchema.plugin(metaPlugin);
 

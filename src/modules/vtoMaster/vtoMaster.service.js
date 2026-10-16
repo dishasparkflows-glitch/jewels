@@ -1,57 +1,13 @@
 const VTOMaster = require('./vtoMaster.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
-const { getMediaUrl } = require('../../utils/cloudflareR2');
+const { normalizeAssets } = require('../../utils/media');
 
 class VTOMasterService {
-  // Helper to format media URLs with Cloudflare R2 signed URL
+  // Public CDN URLs are stable and do not need temporary signed download URLs.
   async formatMedia(item) {
     if (!item) return item;
-
-    const resolveUrl = async (img) => {
-      if (!img) return img;
-      const key = img.public_id || img.key;
-
-      if (key) {
-        try {
-          const downloadUrl = await getMediaUrl(key);
-          if (downloadUrl) {
-            return {
-              ...img,
-              url: downloadUrl,
-            };
-          }
-        } catch (err) {
-          console.error('[formatMedia] Error generating signed R2 media URL:', err.message);
-        }
-      }
-
-      let url = img.url || '';
-      if (url && typeof url === 'string') {
-        const trimmed = url.trim();
-        if (trimmed.startsWith('/api/upload/file/')) {
-          const extractedKey = trimmed.replace('/api/upload/file/', '');
-          try {
-            const downloadUrl = await getMediaUrl(extractedKey);
-            if (downloadUrl) {
-              return { ...img, url: downloadUrl };
-            }
-          } catch {
-            // fallback
-          }
-        }
-        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-          return { ...img, url: trimmed };
-        }
-      }
-
-      return img;
-    };
-
-    const doc = item.toObject ? item.toObject() : { ...item };
-    if (doc.lightImage) doc.lightImage = await resolveUrl(doc.lightImage);
-    if (doc.darkImage) doc.darkImage = await resolveUrl(doc.darkImage);
-    return doc;
+    return normalizeAssets(item.toObject ? item.toObject() : item);
   }
 
   // ------------------------------- create vto master ----------------------------

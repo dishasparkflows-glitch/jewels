@@ -16,20 +16,12 @@ const sieveSizeSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
     collection: 'sieve_sizes',
   }
 );
-
-sieveSizeSchema.index({ status: 1, isDeleted: 1 });
-
 sieveSizeSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('SieveSize', sieveSizeSchema, 'sieve_sizes');

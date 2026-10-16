@@ -84,12 +84,7 @@ const whatsAppMessageSchema = new mongoose.Schema(
     sentAt: { type: Date },
     deliveredAt: { type: Date },
     readAt: { type: Date },
-    failedAt: { type: Date },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
+    failedAt: { type: Date },
   },
   {
     versionKey: false,

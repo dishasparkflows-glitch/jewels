@@ -21,11 +21,6 @@ const menuSectionSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
@@ -35,7 +30,7 @@ const menuSectionSchema = new mongoose.Schema(
   }
 );
 
-menuSectionSchema.index({ categoryId: 1, status: 1, isDeleted: 1 });
+menuSectionSchema.index({ categoryId: 1, status: 1 });
 
 menuSectionSchema.plugin(metaPlugin);
 

@@ -12,17 +12,12 @@ const diamondCutSchema = new mongoose.Schema(
     },
     image: {
       url: String,
-      public_id: String,
+      key: String,
     },
     status: {
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
-      index: true,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
       index: true,
     },
   },
@@ -31,8 +26,6 @@ const diamondCutSchema = new mongoose.Schema(
     collection: 'diamond_cuts',
   }
 );
-
-diamondCutSchema.index({ status: 1, isDeleted: 1 });
 
 diamondCutSchema.plugin(metaPlugin);
 

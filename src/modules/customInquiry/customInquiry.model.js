@@ -64,18 +64,13 @@ const customInquirySchema = new mongoose.Schema(
     referenceImages: [
       {
         url: String,
-        public_id: String,
+        key: String,
       },
     ],
     status: {
       type: String,
       enum: ['pending', 'confirmed', 'completed', 'cancelled'],
       default: 'pending',
-      index: true,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
       index: true,
     },
   },

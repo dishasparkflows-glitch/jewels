@@ -39,10 +39,7 @@ const userSchema = new mongoose.Schema(
         trim: true,
         maxlength: 50,
       },
-      avatar: {
-        type: String,
-        default: null,
-      },
+      avatar: require('../../utils/mediaField'),
       bio: {
         type: String,
         default: '',

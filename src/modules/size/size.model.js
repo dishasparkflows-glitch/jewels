@@ -15,20 +15,10 @@ const sizeSchema = new mongoose.Schema(
       required: [true, 'Please select a category for this size'],
       index: true,
     },
-    subTypeId: {
-      type: mongoose.Schema.Types.ObjectId,
-      default: null,
-      index: true,
-    },
     status: {
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
-      index: true,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
       index: true,
     },
   },
@@ -39,7 +29,7 @@ const sizeSchema = new mongoose.Schema(
   }
 );
 
-sizeSchema.index({ categoryId: 1, subTypeId: 1, status: 1, isDeleted: 1 });
+sizeSchema.index({ categoryId: 1, status: 1 });
 
 sizeSchema.plugin(metaPlugin);
 

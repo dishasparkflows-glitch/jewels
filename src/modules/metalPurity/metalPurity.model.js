@@ -27,11 +27,6 @@ const metalPuritySchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
@@ -39,7 +34,7 @@ const metalPuritySchema = new mongoose.Schema(
   }
 );
 
-metalPuritySchema.index({ metalType: 1, status: 1, isDeleted: 1 });
+metalPuritySchema.index({ metalType: 1, status: 1 });
 
 metalPuritySchema.plugin(metaPlugin);
 

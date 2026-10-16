@@ -28,11 +28,6 @@ const codSequenceSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
@@ -41,7 +36,7 @@ const codSequenceSchema = new mongoose.Schema(
 );
 
 // Helpful index for COD calculation: find active tier where orderAmount <= uptoAmount
-codSequenceSchema.index({ uptoAmount: 1, status: 1, isDeleted: 1 });
+codSequenceSchema.index({ uptoAmount: 1, status: 1 });
 
 codSequenceSchema.plugin(metaPlugin);
 

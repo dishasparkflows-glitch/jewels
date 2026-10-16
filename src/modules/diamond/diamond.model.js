@@ -64,17 +64,12 @@ const diamondSchema = new mongoose.Schema(
     },
     image: {
       url: String,
-      public_id: String,
+      key: String,
     },
     status: {
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
-      index: true,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
       index: true,
     },
   },
@@ -86,7 +81,6 @@ const diamondSchema = new mongoose.Schema(
   }
 );
 
-diamondSchema.index({ status: 1, isDeleted: 1 });
 diamondSchema.index({ carat: 1, price: 1 });
 
 diamondSchema.virtual('color').get(function () { return this.colorId; }).set(function (v) { this.colorId = v; });

@@ -72,18 +72,12 @@ const couponSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
   }
 );
 
-couponSchema.index({ status: 1, isDeleted: 1 });
 couponSchema.index({ 'validity.startDate': 1, 'validity.endDate': 1 });
 couponSchema.index({ status: 1, 'meta.createdAt': -1 });
 

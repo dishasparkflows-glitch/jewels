@@ -428,7 +428,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
 
                 newlyUploadedImages.push({
                   url: r2Data.url,
-                  public_id: r2Data.public_id,
+                  key: r2Data.key,
                   mediaType: 'image',
                 });
               }

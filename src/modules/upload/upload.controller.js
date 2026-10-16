@@ -4,6 +4,7 @@ const ApiError = require('../../utils/ApiError');
 const path = require('path');
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const cloudflareR2 = require('../../utils/cloudflareR2');
+const { publicUrl } = require('../../utils/media');
 
 // ------------------------------- get presigned url ----------------------------
 const getPresignedUrl = catchAsync(async (req, res) => {
@@ -15,7 +16,7 @@ const getPresignedUrl = catchAsync(async (req, res) => {
     folder,
   });
 
-  return ApiResponse.success(res, result, 'Presigned upload URL generated successfully');
+  return ApiResponse.success(res, result, 'Presigned upload URL generated successfully', 200, { includeMediaKeys: true });
 });
 
 // ------------------------------- direct put upload ----------------------------
@@ -40,6 +41,7 @@ const directPut = catchAsync(async (req, res) => {
     throw new ApiError(500, 'Cloudflare R2 storage is not configured');
   }
 
+  const fileUrl = publicUrl(key);
   await cloudflareR2.client.send(
     new PutObjectCommand({
       Bucket: cloudflareR2.bucketName,
@@ -49,24 +51,18 @@ const directPut = catchAsync(async (req, res) => {
     })
   );
 
-  const publicBase = cloudflareR2.publicDomain
-    ? cloudflareR2.publicDomain.replace(/\/$/, '')
-    : (process.env.NODE_ENV === 'development' || !process.env.BACKEND_URL
-        ? `/api/upload/file`
-        : `${process.env.BACKEND_URL.replace(/\/$/, '')}/api/upload/file`);
-  const fileUrl = `${publicBase}/${key}`;
 
   return ApiResponse.success(
     res,
     { url: fileUrl, fileUrl, key },
-    'File uploaded to Cloudflare R2 successfully'
+    'File uploaded to Cloudflare R2 successfully', 200, { includeMediaKeys: true }
   );
 });
 
 // ------------------------------- delete file ----------------------------
 const deleteFile = catchAsync(async (req, res) => {
   const { filepath, key } = req.body;
-  const target = filepath || key;
+  const target = key || filepath;
   if (!target) throw new ApiError(400, 'File path or key is required');
 
   await cloudflareR2.deleteFile(target);

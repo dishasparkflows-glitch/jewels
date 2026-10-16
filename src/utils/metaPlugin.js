@@ -14,6 +14,7 @@ const { getRequestContext } = require('./context');
  *   meta.deletedAt  - Timestamp of soft deletion
  */
 function metaPlugin(schema) {
+  schema.plugin(require('./mediaPlugin'));
   // Prevent duplicate plugin registration
   if (schema.path('meta') || schema.paths?.['meta.createdAt']) {
     return;
@@ -32,6 +33,36 @@ function metaPlugin(schema) {
       deletedAt: { type: Date, default: null },
     },
   });
+
+  // Index meta.deletedAt for performant soft-delete queries
+  schema.index({ 'meta.deletedAt': 1 });
+
+  // Query pre-hook: seamlessly map isDeleted to meta.deletedAt
+  schema.pre(
+    [
+      'find',
+      'findOne',
+      'countDocuments',
+      'estimatedDocumentCount',
+      'distinct',
+      'findOneAndUpdate',
+      'updateOne',
+      'updateMany',
+    ],
+    function () {
+      const filter = this.getFilter();
+      if (filter && typeof filter === 'object') {
+        if ('isDeleted' in filter) {
+          if (filter.isDeleted === false) {
+            filter['meta.deletedAt'] = null;
+          } else if (filter.isDeleted === true) {
+            filter['meta.deletedAt'] = { $ne: null };
+          }
+          delete filter.isDeleted;
+        }
+      }
+    }
+  );
 
   // Auto-set meta.createdAt & meta.createdBy on new docs, meta.updatedAt & meta.updatedBy on every save
   schema.pre('save', function (next) {
@@ -54,6 +85,7 @@ function metaPlugin(schema) {
   });
 
   // Auto-set meta.updatedAt & meta.updatedBy on findOneAndUpdate / updateOne / updateMany
+  // Also seamlessly map $set.isDeleted: true -> meta.deletedAt: now
   schema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function (next) {
     const currentUserId = getRequestContext('userId');
     const now = new Date();
@@ -61,6 +93,16 @@ function metaPlugin(schema) {
 
     if (update) {
       if (update.$set) {
+        if ('isDeleted' in update.$set) {
+          if (update.$set.isDeleted === true) {
+            update.$set['meta.deletedAt'] = now;
+            if (currentUserId) update.$set['meta.deletedBy'] = currentUserId;
+          } else if (update.$set.isDeleted === false) {
+            update.$set['meta.deletedAt'] = null;
+            update.$set['meta.deletedBy'] = null;
+          }
+          delete update.$set.isDeleted;
+        }
         update.$set['meta.updatedAt'] = now;
         if (currentUserId) {
           update.$set['meta.updatedBy'] = currentUserId;

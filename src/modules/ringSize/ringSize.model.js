@@ -16,19 +16,12 @@ const ringSizeSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
     collection: 'ring_sizes',
   }
 );
-
-ringSizeSchema.index({ status: 1, isDeleted: 1 });
 
 ringSizeSchema.plugin(metaPlugin);
 

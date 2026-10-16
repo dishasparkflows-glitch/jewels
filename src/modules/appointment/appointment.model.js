@@ -84,11 +84,6 @@ const appointmentSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,

@@ -17,6 +17,8 @@ router
   .delete(navigationMenuController.delete);
 
 // Sections under a menu
+router.post('/:id/sections/reorder', navigationMenuController.reorderSections);
+
 router
   .route('/:id/sections')
   .post(navigationMenuController.addSection);
@@ -27,6 +29,8 @@ router
   .delete(navigationMenuController.deleteSection);
 
 // Items under a section
+router.post('/:id/sections/:sectionId/items/reorder', navigationMenuController.reorderMenuItems);
+
 router
   .route('/:id/sections/:sectionId/items')
   .post(navigationMenuController.addMenuItem);

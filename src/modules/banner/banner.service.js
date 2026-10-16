@@ -4,38 +4,6 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class BannerService {
-  _normalizePayload(data = {}) {
-    const payload = { ...data };
-
-    if (!payload.content) {
-      payload.content = {};
-    }
-    if (payload.content.title !== undefined) payload.content.title = String(payload.content.title).trim();
-    if (payload.content.subtitle !== undefined) payload.content.subtitle = String(payload.content.subtitle).trim();
-    if (payload.content.description !== undefined) payload.content.description = String(payload.content.description).trim();
-
-    if (!payload.display) {
-      payload.display = {};
-    }
-
-    const catId = payload.display.categoryId || payload.display.category || null;
-    const validCatId = catId && catId !== '' && catId !== 'null' ? catId : null;
-    payload.display.categoryId = validCatId;
-    if (payload.display.category !== undefined) {
-      delete payload.display.category;
-    }
-
-    if (payload.display.type === undefined) payload.display.type = 'herobanner';
-    if (payload.display.position === undefined) payload.display.position = 'none';
-    if (payload.display.bannerKey === undefined) payload.display.bannerKey = 'custom_jewellery';
-    if (payload.display.order !== undefined) payload.display.order = Number(payload.display.order) || 0;
-
-    if (payload.startDate) payload.startDate = new Date(payload.startDate);
-    if (payload.endDate) payload.endDate = new Date(payload.endDate);
-
-    return payload;
-  }
-
   _formatBanner(banner) {
     if (!banner) return null;
     return banner.toObject ? banner.toObject() : banner;
@@ -43,15 +11,14 @@ class BannerService {
 
   // ------------------------------- create banner ----------------------------
   async create(data) {
-    const normalized = this._normalizePayload(data);
-    const created = await Banner.create(normalized);
+    const created = await Banner.create(data);
     const populated = await Banner.findById(created._id).populate('display.categoryId', 'name slug');
     return this._formatBanner(populated);
   }
 
   // ------------------------------- get one banner ----------------------------
   async getOne(id) {
-    const banner = await Banner.findOne({ _id: id, isDeleted: false }).populate('display.categoryId', 'name slug');
+    const banner = await Banner.findOne({ _id: id }).populate('display.categoryId', 'name slug');
     if (!banner) {
       throw new ApiError(404, 'Banner not found');
     }
@@ -62,7 +29,7 @@ class BannerService {
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const now = new Date();
-    const andConditions = [{ isDeleted: false }];
+    const andConditions = [];
 
     if (queryParams.status) {
       andConditions.push({ status: queryParams.status });
@@ -143,7 +110,6 @@ class BannerService {
   async getLookup(queryParams = {}) {
     const now = new Date();
     const andConditions = [
-      { isDeleted: false },
       { status: 'active' },
       {
         $nor: [
@@ -178,7 +144,6 @@ class BannerService {
     const now = new Date();
 
     const baseOfferConds = [
-      { isDeleted: false },
       { status: 'active' },
       { 'display.type': 'offerbanner' },
       { $or: [{ endDate: null }, { endDate: { $gte: now } }] },
@@ -225,7 +190,6 @@ class BannerService {
     if (categoryId) {
       const categoryBanner = await Banner.findOne({
         $and: [
-          { isDeleted: false },
           { status: 'active' },
           { 'display.type': 'categorybanner' },
           { 'display.categoryId': categoryId },
@@ -247,7 +211,6 @@ class BannerService {
       try {
         const categoryDoc = await Category.findOne({
           _id: categoryId,
-          isDeleted: false,
         }).lean();
 
         if (categoryDoc) {
@@ -267,7 +230,7 @@ class BannerService {
                 },
                 image: {
                   url: bannerUrl,
-                  public_id: categoryDoc.banner?.public_id || '',
+                  key: categoryDoc.banner?.key || '',
                 },
                 mediaType: 'image',
                 display: {
@@ -302,10 +265,9 @@ class BannerService {
 
   // ------------------------------- update banner ----------------------------
   async update(id, data) {
-    const normalized = this._normalizePayload(data);
     const banner = await Banner.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: normalized },
+      { _id: id },
+      { $set: data },
       { new: true, runValidators: true }
     ).populate('display.categoryId', 'name slug');
 
@@ -319,8 +281,8 @@ class BannerService {
   // ------------------------------- delete banner ----------------------------
   async delete(id) {
     const banner = await Banner.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
       { new: true }
     );
 
@@ -335,7 +297,6 @@ class BannerService {
   async autoDeleteExpiredOffers() {
     const now = new Date();
     const filter = {
-      isDeleted: false,
       'display.type': 'offerbanner',
       endDate: { $ne: null, $lt: now },
     };
@@ -351,7 +312,7 @@ class BannerService {
     const expiredIds = expiredOffers.map((b) => b._id);
     const result = await Banner.updateMany(
       { _id: { $in: expiredIds } },
-      { $set: { isDeleted: true, status: 'inactive' } }
+      { $set: { status: 'inactive', 'meta.deletedAt': now } }
     );
 
     console.log(

@@ -8,7 +8,7 @@ const custJewelleryBeforAfterSchema = new mongoose.Schema(
         type: String,
         required: true,
       },
-      public_id: {
+      key: {
         type: String,
         required: true,
       },
@@ -18,7 +18,7 @@ const custJewelleryBeforAfterSchema = new mongoose.Schema(
         type: String,
         required: true,
       },
-      public_id: {
+      key: {
         type: String,
         required: true,
       },
@@ -37,11 +37,6 @@ const custJewelleryBeforAfterSchema = new mongoose.Schema(
     position: {
       type: Number,
       default: 0,
-      index: true,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
       index: true,
     },
   },

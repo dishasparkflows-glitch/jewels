@@ -80,19 +80,14 @@ const navigationMenuSchema = new mongoose.Schema(
     },
     icon: {
       url: String,
-      public_id: String,
+      key: String,
       name: String,
     },
     image: {
       url: String,
-      public_id: String,
+      key: String,
     },
     sections: [menuSectionSchema],
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
   },
   {
     versionKey: false,
@@ -102,7 +97,7 @@ const navigationMenuSchema = new mongoose.Schema(
   }
 );
 
-navigationMenuSchema.index({ navType: 1, order: 1, isDeleted: 1 });
+navigationMenuSchema.index({ navType: 1, order: 1 });
 navigationMenuSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('NavigationMenu', navigationMenuSchema, 'navigation_menus');

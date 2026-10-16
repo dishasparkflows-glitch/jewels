@@ -6,17 +6,17 @@ class CategoryService {
   _normalizePayload(data) {
     const payload = { ...data };
     if (typeof payload.icon === 'string') {
-      payload.icon = { url: payload.icon.trim(), public_id: '' };
+      payload.icon = { url: payload.icon.trim(), key: '' };
     }
     if (typeof payload.banner === 'string') {
-      payload.banner = { url: payload.banner.trim(), public_id: '' };
+      payload.banner = { url: payload.banner.trim(), key: '' };
     }
     if (Array.isArray(payload.promoBanners)) {
       payload.promoBanners = payload.promoBanners.map((item) => {
         if (typeof item === 'string') {
           return {
             title: '',
-            image: { url: item.trim(), public_id: '' },
+            image: { url: item.trim(), key: '' },
             url: item.trim(),
             link: '',
             subtitle: '',
@@ -29,7 +29,7 @@ class CategoryService {
           title: item.title || '',
           image: {
             url: typeof item.image === 'string' ? item.image.trim() : (item.image?.url || itemUrl || ''),
-            public_id: item.image?.public_id || item.public_id || '',
+            key: item.image?.key || item.key || '',
           },
           url: itemUrl,
           link: item.link || '',
@@ -50,7 +50,7 @@ class CategoryService {
 
   // ------------------------------- get one category ----------------------------
   async getOne(id) {
-    const item = await Category.findOne({ _id: id, isDeleted: false });
+    const item = await Category.findOne({ _id: id });
     if (!item) {
       throw new ApiError(404, 'Category not found');
     }
@@ -60,7 +60,7 @@ class CategoryService {
   // ------------------------------- get all categories ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = { isDeleted: false };
+    const filter = {};
 
 
     if (queryParams.status) {
@@ -84,12 +84,13 @@ class CategoryService {
 
   // ------------------------------- get category lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { isDeleted: false, status: 'active' };
-
-
+    const filter = {};
+    if (queryParams.status) {
+      filter.status = queryParams.status;
+    }
 
     return await Category.find(filter)
-      .select('_id name banner icon images subTypes promoBanners slug')
+      .select('_id name status icon')
       .sort({ name: 1 })
       .lean();
   }
@@ -98,7 +99,7 @@ class CategoryService {
   async update(id, data) {
     const payload = this._normalizePayload(data);
     const item = await Category.findOneAndUpdate(
-      { _id: id, isDeleted: false },
+      { _id: id },
       { $set: payload },
       { new: true, runValidators: true }
     );
@@ -113,8 +114,8 @@ class CategoryService {
   // ------------------------------- delete category ----------------------------
   async delete(id) {
     const item = await Category.findOneAndUpdate(
-      { _id: id, isDeleted: false },
-      { $set: { isDeleted: true, status: 'inactive' } },
+      { _id: id },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
       { new: true }
     );
 

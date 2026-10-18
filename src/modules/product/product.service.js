@@ -64,7 +64,13 @@ class ProductService {
 
     if (data.productType === 'ornate' || data.isOrnate || (data.tagNo && data.tagNo.trim() !== '')) {
       data.isOrnate = true;
-      data.productType = 'ornate';
+      if (!data.productType || data.productType === 'ornate') {
+        data.productType = 'silver';
+      }
+      if (data.basicInfo && (!data.basicInfo.productType || data.basicInfo.productType === 'ornate')) {
+        data.basicInfo.productType = 'silver';
+        data.basicInfo.isOrnate = true;
+      }
       if (!data.sku && data.tagNo) data.sku = data.tagNo;
     }
 
@@ -84,28 +90,42 @@ class ProductService {
       : { $or: [{ slug: id }, { sku: id }] };
 
     let product = await Product.findOne(filter)
-      .populate('category', 'name slug sizeChart')
-      .populate('metalColors', 'name code hex')
-      .populate('colorImages.metalColorId', 'name code hex')
-      .populate('variants.metalPurityId', 'name karat metalType')
-      .populate('variants.diamondTypeId', 'name')
-      .populate('variants.diamondShapeId', 'name')
-      .populate('variants.diamondColorId', 'name')
-      .populate('variants.diamondClarityId', 'name')
+      .populate({ path: 'category', select: 'name slug sizeChart', strictPopulate: false })
+      .populate({ path: 'categoryIds', select: 'name slug sizeChart', strictPopulate: false })
+      .populate({ path: 'metalColors', select: 'name code hex', strictPopulate: false })
+      .populate({ path: 'metalColorIds', select: 'name code hex', strictPopulate: false })
+      .populate({ path: 'colorImages.metalColorId', select: 'name code hex', strictPopulate: false })
+      .populate({ path: 'variants.metalPurityId', select: 'name karat metalType', strictPopulate: false })
+      .populate({ path: 'variants.diamondTypeId', select: 'name', strictPopulate: false })
+      .populate({ path: 'variants.diamondShapeId', select: 'name', strictPopulate: false })
+      .populate({ path: 'variants.diamondColorId', select: 'name', strictPopulate: false })
+      .populate({ path: 'variants.diamondClarityId', select: 'name', strictPopulate: false })
       .lean();
 
     if (!product) {
       throw new ApiError(404, 'Product not found');
     }
 
+    if ((!product.category || product.category.length === 0) && product.categoryIds?.length > 0) {
+      product.category = product.categoryIds;
+    }
+    if ((!product.metalColors || product.metalColors.length === 0) && product.metalColorIds?.length > 0) {
+      product.metalColors = product.metalColorIds;
+    }
+
     if (product.ornateImages) {
       delete product.ornateImages;
     }
-    if (Array.isArray(product.images)) {
+    if (Array.isArray(product.images) && product.images.length > 0) {
       product.images = product.images.filter((img) => {
         const url = typeof img === 'string' ? img : (img?.url || '');
         return !url.toLowerCase().includes('ornate');
       });
+    } else {
+      const colImgs = (product.colorImages || []).flatMap((c) => c.images || []);
+      product.images = colImgs.length > 0
+        ? colImgs
+        : (product.ornate?.ornateImages || []);
     }
     return product;
   }
@@ -150,17 +170,26 @@ class ProductService {
 
     if (queryParams.productType) {
       const pt = String(queryParams.productType).toLowerCase();
+      let typeMatcher;
       if (pt === 'jewelry' || pt === 'gold') {
-        filter.productType = { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] };
+        typeMatcher = { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] };
       } else if (pt === 'silver' || pt === 'standard') {
-        filter.productType = { $in: ['silver', 'standard', 'Silver', 'Standard'] };
+        typeMatcher = { $in: ['silver', 'standard', 'Silver', 'Standard'] };
       } else {
-        filter.productType = queryParams.productType;
+        typeMatcher = queryParams.productType;
       }
+      filter.$and = [
+        ...(filter.$and || []),
+        { $or: [{ 'basicInfo.productType': typeMatcher }, { productType: typeMatcher }] },
+      ];
     }
 
     if (queryParams.isOrnate !== undefined) {
-      filter.isOrnate = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
+      const isO = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
+      filter.$and = [
+        ...(filter.$and || []),
+        { $or: [{ 'basicInfo.isOrnate': isO }, { isOrnate: isO }] },
+      ];
     }
 
     if (queryParams.status) {
@@ -353,6 +382,7 @@ class ProductService {
       } else if (pt === 'silver' || pt === 'standard') {
         conditions.push({
           $or: [
+            { 'basicInfo.productType': { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
             { productType: { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
             { 'specifications.metalName': new RegExp('silver', 'i') },
             { metalName: new RegExp('silver', 'i') },
@@ -361,16 +391,20 @@ class ProductService {
         });
       } else if (pt === 'ornate') {
         conditions.push({
-          $or: [{ isOrnate: true }, { productType: 'ornate' }],
+          $or: [{ 'basicInfo.isOrnate': true }, { isOrnate: true }, { 'basicInfo.productType': 'ornate' }, { productType: 'ornate' }],
         });
       } else {
-        conditions.push({ productType: queryParams.productType });
+        conditions.push({
+          $or: [{ 'basicInfo.productType': queryParams.productType }, { productType: queryParams.productType }],
+        });
       }
     }
 
     if (queryParams.isOrnate !== undefined) {
       const isO = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
-      conditions.push({ isOrnate: isO });
+      conditions.push({
+        $or: [{ 'basicInfo.isOrnate': isO }, { isOrnate: isO }],
+      });
     }
 
     if (queryParams.category) {
@@ -394,8 +428,9 @@ class ProductService {
 
     const [rawItems, total] = await Promise.all([
       Product.find(filter)
-        .select('_id title category images colorImages sku tagNo price salePrice mrp displayPrice productType isOrnate specifications metalName status')
-        .populate('category', 'name slug')
+        .select('_id title basicInfo category categoryIds images colorImages sku tagNo ornate price salePrice mrp displayPrice pricing productType isOrnate specifications metalName status')
+        .populate({ path: 'category', select: 'name slug', strictPopulate: false })
+        .populate({ path: 'categoryIds', select: 'name slug', strictPopulate: false })
         .sort({ 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
         .limit(limit)
@@ -408,23 +443,29 @@ class ProductService {
         p.images?.[0]?.url ||
         (typeof p.images?.[0] === 'string' ? p.images[0] : '') ||
         p.colorImages?.[0]?.images?.[0]?.url ||
+        p.ornate?.ornateImages?.[0]?.url ||
         '';
 
-      const effectivePrice = Number(p.salePrice || p.displayPrice || p.price || p.pricing?.salePrice || p.mrp || 0);
+      const effectivePrice = Number(p.salePrice || p.displayPrice || p.price || p.pricing?.salePrice || p.pricing?.mrp || p.mrp || 0);
+
+      const resolvedCategory =
+        (Array.isArray(p.category) && p.category.length > 0) ? p.category :
+        (Array.isArray(p.categoryIds) && p.categoryIds.length > 0) ? p.categoryIds :
+        [];
 
       return {
         _id: p._id,
         id: p._id,
         title: p.title || p.basicInfo?.title || '',
-        sku: p.sku || p.tagNo || p.basicInfo?.sku || '',
-        tagNo: p.tagNo || '',
-        category: p.category || [],
+        sku: p.sku || p.tagNo || p.ornate?.tagNo || p.basicInfo?.sku || '',
+        tagNo: p.tagNo || p.ornate?.tagNo || '',
+        category: resolvedCategory,
         price: effectivePrice,
-        salePrice: p.salePrice || p.displayPrice || p.price || 0,
-        mrp: p.mrp || 0,
-        productType: p.productType,
-        isOrnate: Boolean(p.isOrnate),
-        metalName: p.metalName || '',
+        salePrice: p.salePrice || p.pricing?.salePrice || p.displayPrice || p.price || 0,
+        mrp: p.mrp || p.pricing?.mrp || 0,
+        productType: p.productType || p.basicInfo?.productType,
+        isOrnate: Boolean(p.isOrnate || p.basicInfo?.isOrnate),
+        metalName: p.metalName || p.specifications?.metalName || '',
         status: p.status,
         images: p.images || [],
         colorImages: p.colorImages || [],

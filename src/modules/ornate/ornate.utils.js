@@ -252,7 +252,7 @@ function buildProductPayloadFromLabel(label, {
       slug: activeSlug,
       description,
       remark: label.Remark || '',
-      productType: 'ornate',
+      productType: 'silver',
       isOrnate: true,
     },
     pricing: {
@@ -288,7 +288,7 @@ function buildProductPayloadFromLabel(label, {
     },
 
     // Core schema fields
-    productType: 'ornate',
+    productType: 'silver',
     isOrnate: true,
     sku,
     tagNo,

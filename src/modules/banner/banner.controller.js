@@ -29,7 +29,7 @@ class BannerController {
   // ----------------------- get category display banner ----------------------
   getCategoryDisplayBanner = catchAsync(async (req, res) => {
     const categoryId = req.query.category || req.query.categoryId || req.params.categoryId;
-    const result = await bannerService.getCategoryDisplayBanner(categoryId);
+    const result = await bannerService.getCategoryDisplayBanner(categoryId, req.query.platform);
     ApiResponse.success(res, result, 'Display banner retrieved successfully');
   });
 

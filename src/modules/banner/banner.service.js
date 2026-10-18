@@ -61,6 +61,10 @@ class BannerService {
       }
     }
 
+    if (queryParams.platform) {
+      andConditions.push({ 'display.platform': queryParams.platform });
+    }
+
     // 3. Filter by category
     if (queryParams.category) {
       andConditions.push({ 'display.categoryId': queryParams.category });
@@ -125,6 +129,11 @@ class BannerService {
       andConditions.push({ 'display.type': queryParams.type });
     }
 
+    const platform = ['web', 'mobile'].includes(queryParams.platform) ? queryParams.platform : 'web';
+    andConditions.push(platform === 'web'
+      ? { $or: [{ 'display.platform': 'web' }, { 'display.platform': { $exists: false } }] }
+      : { 'display.platform': platform });
+
     if (queryParams.category) {
       andConditions.push({ 'display.categoryId': queryParams.category });
     }
@@ -140,12 +149,17 @@ class BannerService {
   }
 
   // ----------------------- get category display banner -----------------------
-  async getCategoryDisplayBanner(categoryId = null) {
+  async getCategoryDisplayBanner(categoryId = null, platform = 'web') {
     const now = new Date();
+    const selectedPlatform = ['web', 'mobile'].includes(platform) ? platform : 'web';
+    const platformCondition = selectedPlatform === 'web'
+      ? { $or: [{ 'display.platform': 'web' }, { 'display.platform': { $exists: false } }] }
+      : { 'display.platform': selectedPlatform };
 
     const baseOfferConds = [
       { status: 'active' },
       { 'display.type': 'offerbanner' },
+      platformCondition,
       { $or: [{ endDate: null }, { endDate: { $gte: now } }] },
       { $or: [{ startDate: null }, { startDate: { $lte: now } }] },
     ];
@@ -172,7 +186,7 @@ class BannerService {
     }
 
     const generalOffer = await Banner.findOne({
-      $and: baseOfferConds,
+      $and: [...baseOfferConds, platformCondition],
     })
       .populate('display.categoryId', 'name slug')
       .sort({ 'display.order': 1, 'meta.createdAt': -1 })
@@ -192,6 +206,7 @@ class BannerService {
         $and: [
           { status: 'active' },
           { 'display.type': 'categorybanner' },
+          platformCondition,
           { 'display.categoryId': categoryId },
         ],
       })
@@ -235,6 +250,7 @@ class BannerService {
                 mediaType: 'image',
                 display: {
                   type: 'categorybanner',
+                  platform: selectedPlatform,
                   categoryId: {
                     _id: categoryDoc._id,
                     name: categoryDoc.name,

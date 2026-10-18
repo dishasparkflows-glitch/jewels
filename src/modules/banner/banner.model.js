@@ -40,6 +40,12 @@ const bannerSchema = new mongoose.Schema(
         default: 'herobanner',
         required: [true, 'Please specify the banner type'],
       },
+      platform: {
+        type: String,
+        enum: ['web', 'mobile'],
+        default: 'web',
+        index: true,
+      },
       position: {
         type: String,
         default: 'none',

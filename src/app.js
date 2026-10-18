@@ -45,6 +45,9 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
+// ─── Static Files ──────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, '../public')));
+
 // ─── API Routes ────────────────────────────────────────────────
 app.use('/api', routes);
 

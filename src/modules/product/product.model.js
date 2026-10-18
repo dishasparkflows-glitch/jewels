@@ -9,8 +9,12 @@ const basicInfoSchema = new mongoose.Schema({
   remark: { type: String, default: '', trim: true },
   productType: {
     type: String,
-    enum: ['gold', 'silver', 'ornate'],
+    enum: ['gold', 'silver', 'jewelry', 'standard', 'ornate'],
   },
+  gender: [{
+    type: String,
+    enum: ['Male', 'Female', 'Unisex', 'Kids'],
+  }],
   isOrnate: { type: Boolean, default: false },
 }, { _id: false });
 
@@ -69,17 +73,6 @@ const productSchema = new mongoose.Schema(
       type: ornateSchema,
       default: () => ({}),
     },
-    productType: {
-      type: String,
-      enum: ['gold', 'silver', 'jewelry', 'standard', 'ornate'],
-      index: true,
-    },
-    // Flag to distinguish ornate products in single collection
-    isOrnate: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
     gstPercentage: {
       type: Number,
     },
@@ -99,23 +92,57 @@ const productSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-
-
+    category: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+    }],
+    categoryId: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+    }],
     categoryIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
+    }],
+    featured: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Featured',
+    }],
+    featuredId: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Featured',
     }],
     featuredIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Featured',
     }],
+    menuItem: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MenuItem',
+    }],
+    menuItemId: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MenuItem',
+    }],
     menuItemIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'MenuItem',
     }],
+    size: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Size',
+    }],
+    sizeId: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Size',
+    }],
     sizeIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Size',
+    }],
+    metalColors: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MetalColor',
     }],
     metalColorIds: [{
       type: mongoose.Schema.Types.ObjectId,
@@ -123,6 +150,32 @@ const productSchema = new mongoose.Schema(
     }],
 
     // ── Media & Color Images ──────────────────────────────────
+    images: [{
+      url: String,
+      key: String,
+      mediaType: { type: String, default: 'image' },
+    }],
+    title: { type: String, trim: true, default: '' },
+    sku: { type: String, trim: true, default: '' },
+    slug: { type: String, trim: true, default: '' },
+    description: { type: String, default: '' },
+    productType: {
+      type: String,
+      enum: ['gold', 'silver', 'jewelry', 'standard', 'ornate'],
+      index: true,
+    },
+    isOrnate: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    tagNo: { type: String, index: true },
+    price: { type: Number, default: 0 },
+    salePrice: { type: Number, default: 0 },
+    costPrice: { type: Number, default: 0 },
+    displayPrice: { type: Number, default: 0 },
+    mrp: { type: Number, default: 0 },
+    metalName: { type: String, default: '' },
     colorImages: [{
       metalColorId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -153,13 +206,6 @@ const productSchema = new mongoose.Schema(
         clipBottom: { type: Number, default: 0 },
         rotation: { type: Number, default: 0 },
       },
-    }],
-
-    // General product images
-    images: [{
-      url: String,
-      key: String,
-      mediaType: { type: String, default: 'image' },
     }],
 
     // ── Diamond Configurations ────────────────────────────────
@@ -228,10 +274,6 @@ const productSchema = new mongoose.Schema(
       otherAmount: { type: Number, default: 0 },
     }],
 
-    // ── Ornate Tag/Identification & Notes ─────────────────────
-    tagNo: { type: String, index: true },
-    remark: { type: String, default: '', trim: true },
-
     // ── Status & Metadata ─────────────────────────────────────
     stockStatus: {
       type: String,
@@ -242,20 +284,12 @@ const productSchema = new mongoose.Schema(
       enum: ['active', 'inactive', 'draft', 'approved'],
       index: true,
     },
-
     birthMonth: [{
       type: String,
       enum: [
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December',
       ],
-    }],
-    promoBanner: [{
-      type: String,
-    }],
-    gender: [{
-      type: String,
-      enum: ['Male', 'Female', 'Unisex', 'Kids'],
     }],
     seo: {
       metaTitle: { type: String, default: '' },
@@ -273,96 +307,45 @@ const productSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    strictPopulate: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
 // Indexes for high performance querying
-productSchema.index({ 'basicInfo.title': 'text', sku: 'text', tagNo: 'text' });
-productSchema.index({ status: 1, isOrnate: 1 });
+productSchema.index({ status: 1, 'basicInfo.isOrnate': 1 });
+productSchema.index({ 'basicInfo.productType': 1, status: 1 });
 productSchema.index({ categoryIds: 1, status: 1 });
+productSchema.index({ category: 1, status: 1 });
 productSchema.index({ 'pricing.salePrice': 1 });
 productSchema.index({ 'meta.createdAt': -1 });
-
-// Virtuals for legacy and convenience access
-productSchema.virtual('price').get(function () {
-  return this.pricing?.mrp ?? 0;
-});
-productSchema.virtual('salePrice').get(function () {
-  return this.pricing?.salePrice ?? 0;
-});
-productSchema.virtual('costPrice').get(function () {
-  return this.pricing?.costPrice ?? 0;
-});
-productSchema.virtual('displayPrice').get(function () {
-  return this.pricing?.salePrice ?? this.pricing?.mrp ?? 0;
-});
-productSchema.virtual('slug').get(function () {
-  return this.basicInfo?.slug ?? '';
-});
-productSchema.virtual('stockQty').get(function () {
-  return this.ornate?.stockQty ?? 0;
-});
-productSchema.virtual('ornateImages').get(function () {
-  return this.ornate?.ornateImages ?? [];
-});
-
-// Virtual populates for singular/legacy relation fields
-productSchema.virtual('category', {
-  ref: 'Category',
-  localField: 'categoryIds',
-  foreignField: '_id',
-});
-productSchema.virtual('categoryId', {
-  ref: 'Category',
-  localField: 'categoryIds',
-  foreignField: '_id',
-});
-productSchema.virtual('featured', {
-  ref: 'Featured',
-  localField: 'featuredIds',
-  foreignField: '_id',
-});
-productSchema.virtual('featuredId', {
-  ref: 'Featured',
-  localField: 'featuredIds',
-  foreignField: '_id',
-});
-productSchema.virtual('menuItem', {
-  ref: 'MenuItem',
-  localField: 'menuItemIds',
-  foreignField: '_id',
-});
-productSchema.virtual('menuItemId', {
-  ref: 'MenuItem',
-  localField: 'menuItemIds',
-  foreignField: '_id',
-});
-productSchema.virtual('size', {
-  ref: 'Size',
-  localField: 'sizeIds',
-  foreignField: '_id',
-});
-productSchema.virtual('sizeId', {
-  ref: 'Size',
-  localField: 'sizeIds',
-  foreignField: '_id',
-});
-productSchema.virtual('metalColors', {
-  ref: 'MetalColor',
-  localField: 'metalColorIds',
-  foreignField: '_id',
-});
-
 productSchema.pre('save', function (next) {
-  if (this.isOrnate && this.tagNo && !this.sku) {
-    this.sku = this.tagNo;
+  // Sync category & categoryIds
+  if (this.category?.length && (!this.categoryIds || !this.categoryIds.length)) {
+    this.categoryIds = this.category;
+  } else if (this.categoryIds?.length && (!this.category || !this.category.length)) {
+    this.category = this.categoryIds;
   }
-  if (this.isOrnate && !this.productType) {
-    this.productType = 'ornate';
-  } else if (this.productType === 'ornate') {
-    this.isOrnate = true;
+  // Sync metalColors & metalColorIds
+  if (this.metalColors?.length && (!this.metalColorIds || !this.metalColorIds.length)) {
+    this.metalColorIds = this.metalColors;
+  } else if (this.metalColorIds?.length && (!this.metalColors || !this.metalColors.length)) {
+    this.metalColors = this.metalColorIds;
+  }
+
+  const isOrnate = Boolean(this.basicInfo?.isOrnate ?? this.isOrnate);
+  const tagNo = this.ornate?.tagNo || this.tagNo;
+  if (isOrnate && tagNo && !this.sku) {
+    this.sku = tagNo;
+  }
+  if (this.basicInfo) {
+    if (isOrnate && (!this.basicInfo.productType || this.basicInfo.productType === 'ornate')) {
+      this.basicInfo.productType = 'silver';
+    }
+    if (isOrnate) {
+      this.basicInfo.isOrnate = true;
+    }
   }
   const activeTitle = this.basicInfo?.title || this.title;
   if (this.basicInfo && !this.basicInfo.slug && activeTitle) {
@@ -370,6 +353,9 @@ productSchema.pre('save', function (next) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+  if (!this.slug && this.basicInfo?.slug) {
+    this.slug = this.basicInfo.slug;
   }
   next();
 });

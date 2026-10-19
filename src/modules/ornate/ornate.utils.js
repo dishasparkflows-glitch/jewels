@@ -234,7 +234,6 @@ function buildProductPayloadFromLabel(label, {
   const inStockQty = (label.InStock ?? 1) > 0 ? (Number(label.Pcs) || 1) : 0;
   const isSold = label.InStock === 0 || inStockQty === 0;
   const description = label.Remark || label.ItemName || '';
-  const gstPercentage = Number(label.GSTPer) || 3;
   const baseMetalWeight = Number(label.NetWt) || Number(label.GrossWt) || 0;
   const baseLabourCharge = Number(label.LabourAmt) || 0;
   const goldAmt = Number(label.GoldAmt) || 0;
@@ -260,9 +259,11 @@ function buildProductPayloadFromLabel(label, {
       salePrice,
       costPrice: Number(label.TotalCostAmt) || 0,
       ornatePrice: mrp || salePrice || 0,
-      gstPercentage,
       markupPercentage: 0,
       mrpMarkupPercentage: 0,
+      baseLabourCharge,
+      certificateCharge: Number(label.CertificateAmt) || 0,
+      otherAmountPercentage: 0,
     },
     specifications: {
       metalWeight: baseMetalWeight,
@@ -291,15 +292,12 @@ function buildProductPayloadFromLabel(label, {
     productType: 'silver',
     isOrnate: true,
     remark: label.Remark || '',
-    gstPercentage,
-    baseMetalWeight,
-    baseLabourCharge,
     stockStatus: isSold ? 'Out of Stock' : 'In Stock',
     categoryIds: categoryId ? [categoryId] : [],
   };
 
   if (Array.isArray(newlyUploadedImages) && newlyUploadedImages.length > 0) {
-    setFields.images = newlyUploadedImages;
+    setFields.ornate.ornateImages = newlyUploadedImages;
   }
 
   return {

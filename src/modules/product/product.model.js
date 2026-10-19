@@ -75,10 +75,6 @@ const productSchema = new mongoose.Schema(
       type: ornateSchema,
       default: () => ({}),
     },
-    baseMetalWeight: {
-      type: Number,
-      default: 0,
-    },
     categoryIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',

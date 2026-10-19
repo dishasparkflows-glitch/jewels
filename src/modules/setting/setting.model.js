@@ -52,6 +52,14 @@ const settingSchema = new mongoose.Schema(
       url: { type: String, default: '' },
       key: { type: String, default: '' },
     },
+    trustBadges: [{
+      title: { type: String, trim: true, default: '' },
+      image: {
+        url: { type: String, trim: true, default: '' },
+        key: { type: String, trim: true, default: '' },
+      },
+      order: { type: Number, default: 0 },
+    }],
 
     // Monetary Settlement
     bankName: {

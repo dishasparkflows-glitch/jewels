@@ -92,57 +92,21 @@ const productSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    category: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Category',
-    }],
-    categoryId: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Category',
-    }],
     categoryIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',
-    }],
-    featured: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Featured',
-    }],
-    featuredId: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Featured',
     }],
     featuredIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Featured',
     }],
-    menuItem: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'MenuItem',
-    }],
-    menuItemId: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'MenuItem',
-    }],
     menuItemIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'MenuItem',
     }],
-    size: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Size',
-    }],
-    sizeId: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Size',
-    }],
     sizeIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Size',
-    }],
-    metalColors: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'MetalColor',
     }],
     metalColorIds: [{
       type: mongoose.Schema.Types.ObjectId,
@@ -317,23 +281,9 @@ const productSchema = new mongoose.Schema(
 productSchema.index({ status: 1, 'basicInfo.isOrnate': 1 });
 productSchema.index({ 'basicInfo.productType': 1, status: 1 });
 productSchema.index({ categoryIds: 1, status: 1 });
-productSchema.index({ category: 1, status: 1 });
 productSchema.index({ 'pricing.salePrice': 1 });
 productSchema.index({ 'meta.createdAt': -1 });
 productSchema.pre('save', function (next) {
-  // Sync category & categoryIds
-  if (this.category?.length && (!this.categoryIds || !this.categoryIds.length)) {
-    this.categoryIds = this.category;
-  } else if (this.categoryIds?.length && (!this.category || !this.category.length)) {
-    this.category = this.categoryIds;
-  }
-  // Sync metalColors & metalColorIds
-  if (this.metalColors?.length && (!this.metalColorIds || !this.metalColorIds.length)) {
-    this.metalColorIds = this.metalColors;
-  } else if (this.metalColorIds?.length && (!this.metalColors || !this.metalColors.length)) {
-    this.metalColors = this.metalColorIds;
-  }
-
   const isOrnate = Boolean(this.basicInfo?.isOrnate ?? this.isOrnate);
   const tagNo = this.ornate?.tagNo || this.tagNo;
   if (isOrnate && tagNo && !this.sku) {

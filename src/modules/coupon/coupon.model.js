@@ -3,6 +3,12 @@ const metaPlugin = require('../../utils/metaPlugin');
 
 const couponSchema = new mongoose.Schema(
   {
+    categoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      default: null,
+      index: true,
+    },
     // 1. Coupon Details
     coupon: {
       code: {
@@ -68,7 +74,7 @@ const couponSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['active', 'inactive'],
+      enum: ['active', 'inactive', 'expired'],
       default: 'active',
       index: true,
     },

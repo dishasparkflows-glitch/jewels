@@ -10,6 +10,7 @@ class TopAnnouncementService {
       settings = await TopAnnouncementSetting.create({
         isEnabled: true,
         autoplayInterval: 4000,
+        displayDirection: 'horizontal',
       });
     }
     return settings;
@@ -21,10 +22,12 @@ class TopAnnouncementService {
       settings = await TopAnnouncementSetting.create({
         isEnabled: data.isEnabled !== undefined ? Boolean(data.isEnabled) : true,
         autoplayInterval: data.autoplayInterval || 4000,
+        displayDirection: data.displayDirection || 'horizontal',
       });
     } else {
       if (data.isEnabled !== undefined) settings.isEnabled = Boolean(data.isEnabled);
       if (data.autoplayInterval !== undefined) settings.autoplayInterval = Number(data.autoplayInterval);
+      if (data.displayDirection !== undefined) settings.displayDirection = data.displayDirection;
       await settings.save();
     }
     return settings;
@@ -105,6 +108,7 @@ class TopAnnouncementService {
     return {
       isEnabled: settings.isEnabled,
       autoplayInterval: settings.autoplayInterval || 4000,
+      displayDirection: settings.displayDirection || 'horizontal',
       items,
     };
   }

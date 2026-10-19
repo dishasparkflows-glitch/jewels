@@ -7,76 +7,11 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class ProductService {
   // ------------------------------- create product ----------------------------
   async create(data) {
-    // Sync structured blocks into root fields if provided
-    if (data.basicInfo) {
-      if (data.basicInfo.title && !data.title) data.title = data.basicInfo.title;
-      if (data.basicInfo.sku && !data.sku) data.sku = data.basicInfo.sku;
-      if (data.basicInfo.slug && !data.slug) data.slug = data.basicInfo.slug;
-      if (data.basicInfo.description && !data.description) data.description = data.basicInfo.description;
-      if (data.basicInfo.remark && !data.remark) data.remark = data.basicInfo.remark;
-      if (data.basicInfo.productType) data.productType = data.basicInfo.productType;
-      if (data.basicInfo.isOrnate !== undefined) data.isOrnate = Boolean(data.basicInfo.isOrnate);
-    }
-    if (data.pricing) {
-      if (data.pricing.mrp !== undefined && !data.mrp) data.mrp = data.pricing.mrp;
-      if (data.pricing.mrp !== undefined && !data.price) data.price = data.pricing.mrp;
-      if (data.pricing.salePrice !== undefined && !data.salePrice) data.salePrice = data.pricing.salePrice;
-      if (data.pricing.gstPercentage !== undefined && !data.gstPercentage) data.gstPercentage = data.pricing.gstPercentage;
-      if (data.pricing.markupPercentage !== undefined && !data.markupPercentage) data.markupPercentage = data.pricing.markupPercentage;
-    }
-    if (data.specifications?.metalWeight !== undefined && !data.baseMetalWeight) {
-      data.baseMetalWeight = data.specifications.metalWeight;
-    }
-    if (data.ornate) {
-      if (data.ornate.tagNo && !data.tagNo) data.tagNo = data.ornate.tagNo;
-      if (data.ornate.stockQty !== undefined && !data.stockQty) data.stockQty = data.ornate.stockQty;
-      if (data.ornate.labourAmt !== undefined && !data.baseLabourCharge) data.baseLabourCharge = data.ornate.labourAmt;
-      if (data.ornate.remark && !data.remark) data.remark = data.ornate.remark;
-    }
-
-    if (data.category && (!data.categoryIds || data.categoryIds.length === 0)) {
-      data.categoryIds = Array.isArray(data.category) ? data.category : [data.category];
-    }
-    if (data.categoryId && (!data.categoryIds || data.categoryIds.length === 0)) {
-      data.categoryIds = Array.isArray(data.categoryId) ? data.categoryId : [data.categoryId];
-    }
-    if (data.featured && (!data.featuredIds || data.featuredIds.length === 0)) {
-      data.featuredIds = Array.isArray(data.featured) ? data.featured : [data.featured];
-    }
-    if (data.featuredId && (!data.featuredIds || data.featuredIds.length === 0)) {
-      data.featuredIds = Array.isArray(data.featuredId) ? data.featuredId : [data.featuredId];
-    }
-    if (data.menuItem && (!data.menuItemIds || data.menuItemIds.length === 0)) {
-      data.menuItemIds = Array.isArray(data.menuItem) ? data.menuItem : [data.menuItem];
-    }
-    if (data.menuItemId && (!data.menuItemIds || data.menuItemIds.length === 0)) {
-      data.menuItemIds = Array.isArray(data.menuItemId) ? data.menuItemId : [data.menuItemId];
-    }
-    if (data.size && (!data.sizeIds || data.sizeIds.length === 0)) {
-      data.sizeIds = Array.isArray(data.size) ? data.size : [data.size];
-    }
-    if (data.sizeId && (!data.sizeIds || data.sizeIds.length === 0)) {
-      data.sizeIds = Array.isArray(data.sizeId) ? data.sizeId : [data.sizeId];
-    }
-    if (data.metalColors && (!data.metalColorIds || data.metalColorIds.length === 0)) {
-      data.metalColorIds = Array.isArray(data.metalColors) ? data.metalColors : [data.metalColors];
-    }
-
-    if (data.productType === 'ornate' || data.isOrnate || (data.tagNo && data.tagNo.trim() !== '')) {
-      data.isOrnate = true;
-      if (!data.productType || data.productType === 'ornate') {
-        data.productType = 'silver';
+    if (data.sku) {
+      const existingSku = await Product.findOne({ sku: data.sku });
+      if (existingSku) {
+        throw new ApiError(409, `Product with SKU/Tag "${data.sku}" already exists`);
       }
-      if (data.basicInfo && (!data.basicInfo.productType || data.basicInfo.productType === 'ornate')) {
-        data.basicInfo.productType = 'silver';
-        data.basicInfo.isOrnate = true;
-      }
-      if (!data.sku && data.tagNo) data.sku = data.tagNo;
-    }
-
-    const existingSku = await Product.findOne({ sku: data.sku });
-    if (existingSku) {
-      throw new ApiError(409, `Product with SKU/Tag "${data.sku}" already exists`);
     }
 
     return await Product.create(data);
@@ -90,9 +25,7 @@ class ProductService {
       : { $or: [{ slug: id }, { sku: id }] };
 
     let product = await Product.findOne(filter)
-      .populate({ path: 'category', select: 'name slug sizeChart', strictPopulate: false })
       .populate({ path: 'categoryIds', select: 'name slug sizeChart', strictPopulate: false })
-      .populate({ path: 'metalColors', select: 'name code hex', strictPopulate: false })
       .populate({ path: 'metalColorIds', select: 'name code hex', strictPopulate: false })
       .populate({ path: 'colorImages.metalColorId', select: 'name code hex', strictPopulate: false })
       .populate({ path: 'variants.metalPurityId', select: 'name karat metalType', strictPopulate: false })
@@ -106,16 +39,6 @@ class ProductService {
       throw new ApiError(404, 'Product not found');
     }
 
-    if ((!product.category || product.category.length === 0) && product.categoryIds?.length > 0) {
-      product.category = product.categoryIds;
-    }
-    if ((!product.metalColors || product.metalColors.length === 0) && product.metalColorIds?.length > 0) {
-      product.metalColors = product.metalColorIds;
-    }
-
-    if (product.ornateImages) {
-      delete product.ornateImages;
-    }
     if (Array.isArray(product.images) && product.images.length > 0) {
       product.images = product.images.filter((img) => {
         const url = typeof img === 'string' ? img : (img?.url || '');
@@ -138,9 +61,6 @@ class ProductService {
     if (!product) {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
     }
-    if (product.ornateImages) {
-      delete product.ornateImages;
-    }
     if (Array.isArray(product.images)) {
       product.images = product.images.filter((img) => {
         const url = typeof img === 'string' ? img : (img?.url || '');
@@ -161,10 +81,10 @@ class ProductService {
         { title: searchRegex },
         { sku: searchRegex },
         { tagNo: searchRegex },
-        { barcodeNo: searchRegex },
-        { uniqueLabelID: searchRegex },
-        { groupName: searchRegex },
-        { itemName: searchRegex },
+        { 'ornate.barcode': searchRegex },
+        { 'ornate.itemCode': searchRegex },
+        { 'ornate.groupName': searchRegex },
+        { 'ornate.customGroupName': searchRegex },
       ];
     }
 
@@ -197,18 +117,18 @@ class ProductService {
     }
 
     if (queryParams.category) {
-      filter.$or = [{ categoryIds: queryParams.category }, { category: queryParams.category }];
+      filter.categoryIds = queryParams.category;
     }
 
     if (queryParams.menuItem) {
       if (!mongoose.isValidObjectId(queryParams.menuItem)) throw new ApiError(400, 'Valid menuItem ID is required');
       filter.$and = [...(filter.$and || []), { $or: [
-        { menuItem: queryParams.menuItem }, { menuItemIds: queryParams.menuItem }, { menuItemId: queryParams.menuItem },
+        { menuItemIds: queryParams.menuItem },
       ] }];
     }
 
     // Match the positive price precedence used by storefront product cards.
-    const effectivePrice = ['salePrice', 'pricing.salePrice', 'displayPrice', 'pricing.displayPrice', 'price']
+    const effectivePrice = ['salePrice', 'pricing.salePrice', 'displayPrice', 'price']
       .reduceRight((fallback, field) => ({ $cond: [{ $gt: [`$${field}`, 0] }, `$${field}`, fallback] }), null);
     const priceConditions = [];
     for (const [parameter, operator] of [['minPrice', '$gte'], ['maxPrice', '$lte']]) {
@@ -225,14 +145,14 @@ class ProductService {
     // Facet counts respect all other filters, but not the current audience selection.
     const facetFilter = { ...filter };
     const genders = getShopForGenders(queryParams.shopFor);
-    if (genders.length) filter.gender = { $in: genders };
+    if (genders.length) filter['basicInfo.gender'] = { $in: genders };
     const facetsQuery = queryParams.includeFacets === 'true'
       ? Promise.all(SHOP_FOR_OPTIONS.map(async (option) => ({
         value: option.value, label: option.label,
-        count: await Product.countDocuments({ ...facetFilter, gender: { $in: option.genders } }),
+        count: await Product.countDocuments({ ...facetFilter, 'basicInfo.gender': { $in: option.genders } }),
       })))
       : Promise.resolve(undefined);
-    const colorPopulation = { path: 'metalColors metalColorIds colorImages.metalColorId', select: 'name code hex' };
+    const colorPopulation = { path: 'metalColorIds colorImages.metalColorId', select: 'name code hex' };
     const priceSort = { 'price-low': 1, 'price-high': -1 }[queryParams.sort];
     const itemQuery = priceSort
       ? Product.aggregate([
@@ -251,7 +171,7 @@ class ProductService {
   // Helper to format concise product card info for the home page
   _formatHomeProduct(p) {
     if (!p) return null;
-    const title = p.basicInfo?.title || p.title || p.itemName || '';
+    const title = p.basicInfo?.title || p.title || '';
     const sku = p.basicInfo?.sku || p.sku || p.tagNo || '';
     const slug = p.basicInfo?.slug || p.slug || '';
 
@@ -298,13 +218,12 @@ class ProductService {
       image,
       images,
       colorImages: p.colorImages || [],
-      metalColors: p.metalColors || [],
+      metalColors: p.metalColorIds || [],
       metalColorIds: p.metalColorIds || [],
       metalName: p.metalName || '',
-      category: p.category || [],
+      category: p.categoryIds || [],
       productType: p.productType || '',
       isOrnate: Boolean(p.isOrnate),
-      inStock: p.inStock ?? p.stockQty,
       stockStatus: p.stockStatus || '',
     };
   }
@@ -315,7 +234,7 @@ class ProductService {
     const filter = { 'meta.deletedAt': null, status: 'active' };
 
     if (queryParams.category) {
-      filter.$or = [{ categoryIds: queryParams.category }, { category: queryParams.category }];
+      filter.categoryIds = queryParams.category;
     }
     if (queryParams.metalName) {
       filter.metalName = new RegExp(queryParams.metalName, 'i');
@@ -323,11 +242,11 @@ class ProductService {
 
     // Select ONLY needed fields from mongo to keep query ultra fast (no ornateImages for storefront)
     const selectFields =
-      '_id title sku slug price salePrice mrp displayPrice images colorImages metalColors metalColorIds metalName stockQty stockStatus inStock category productType isOrnate basicInfo pricing';
+      '_id title sku slug price salePrice mrp displayPrice images colorImages metalColorIds metalName stockStatus categoryIds productType isOrnate basicInfo pricing ornate';
 
     const items = await Product.find(filter)
       .select(selectFields)
-      .populate('metalColors metalColorIds colorImages.metalColorId', 'name code hex')
+      .populate('metalColorIds colorImages.metalColorId', 'name code hex')
       .sort({ 'meta.createdAt': -1, _id: -1 })
       .limit(limit)
       .lean();
@@ -371,7 +290,6 @@ class ProductService {
             {
               $or: [
                 { productType: { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] } },
-                { 'specifications.metalName': new RegExp('gold', 'i') },
                 { metalName: new RegExp('gold', 'i') },
                 { title: new RegExp('gold', 'i') },
               ],
@@ -384,7 +302,6 @@ class ProductService {
           $or: [
             { 'basicInfo.productType': { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
             { productType: { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
-            { 'specifications.metalName': new RegExp('silver', 'i') },
             { metalName: new RegExp('silver', 'i') },
             { title: new RegExp('silver|925', 'i') },
           ],
@@ -408,7 +325,7 @@ class ProductService {
     }
 
     if (queryParams.category) {
-      conditions.push({ $or: [{ categoryIds: queryParams.category }, { category: queryParams.category }] });
+      conditions.push({ categoryIds: queryParams.category });
     }
 
     if (queryParams.search) {
@@ -418,8 +335,9 @@ class ProductService {
           { title: searchRegex },
           { sku: searchRegex },
           { tagNo: searchRegex },
-          { barcodeNo: searchRegex },
-          { itemName: searchRegex },
+          { 'ornate.barcode': searchRegex },
+          { 'ornate.itemCode': searchRegex },
+          { 'ornate.groupName': searchRegex },
         ],
       });
     }
@@ -428,8 +346,7 @@ class ProductService {
 
     const [rawItems, total] = await Promise.all([
       Product.find(filter)
-        .select('_id title basicInfo category categoryIds images colorImages sku tagNo ornate price salePrice mrp displayPrice pricing productType isOrnate specifications metalName status')
-        .populate({ path: 'category', select: 'name slug', strictPopulate: false })
+        .select('_id title basicInfo categoryIds images colorImages sku tagNo ornate price salePrice mrp displayPrice pricing productType isOrnate specifications metalName status')
         .populate({ path: 'categoryIds', select: 'name slug', strictPopulate: false })
         .sort({ 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
@@ -449,7 +366,6 @@ class ProductService {
       const effectivePrice = Number(p.salePrice || p.displayPrice || p.price || p.pricing?.salePrice || p.pricing?.mrp || p.mrp || 0);
 
       const resolvedCategory =
-        (Array.isArray(p.category) && p.category.length > 0) ? p.category :
         (Array.isArray(p.categoryIds) && p.categoryIds.length > 0) ? p.categoryIds :
         [];
 
@@ -465,7 +381,7 @@ class ProductService {
         mrp: p.mrp || p.pricing?.mrp || 0,
         productType: p.productType || p.basicInfo?.productType,
         isOrnate: Boolean(p.isOrnate || p.basicInfo?.isOrnate),
-        metalName: p.metalName || p.specifications?.metalName || '',
+        metalName: p.metalName || '',
         status: p.status,
         images: p.images || [],
         colorImages: p.colorImages || [],
@@ -478,60 +394,6 @@ class ProductService {
 
   // ------------------------------- update product ----------------------------
   async update(id, data) {
-    if (data.basicInfo) {
-      if (data.basicInfo.title) data.title = data.basicInfo.title;
-      if (data.basicInfo.sku) data.sku = data.basicInfo.sku;
-      if (data.basicInfo.slug) data.slug = data.basicInfo.slug;
-      if (data.basicInfo.description) data.description = data.basicInfo.description;
-      if (data.basicInfo.remark !== undefined) data.remark = data.basicInfo.remark;
-      if (data.basicInfo.productType) data.productType = data.basicInfo.productType;
-      if (data.basicInfo.isOrnate !== undefined) data.isOrnate = Boolean(data.basicInfo.isOrnate);
-    }
-    if (data.pricing) {
-      if (data.pricing.mrp !== undefined) data.mrp = data.pricing.mrp;
-      if (data.pricing.mrp !== undefined) data.price = data.pricing.mrp;
-      if (data.pricing.salePrice !== undefined) data.salePrice = data.pricing.salePrice;
-      if (data.pricing.gstPercentage !== undefined) data.gstPercentage = data.pricing.gstPercentage;
-      if (data.pricing.markupPercentage !== undefined) data.markupPercentage = data.pricing.markupPercentage;
-    }
-    if (data.specifications?.metalWeight !== undefined) {
-      data.baseMetalWeight = data.specifications.metalWeight;
-    }
-    if (data.ornate) {
-      if (data.ornate.tagNo) data.tagNo = data.ornate.tagNo;
-      if (data.ornate.stockQty !== undefined) data.stockQty = data.ornate.stockQty;
-      if (data.ornate.labourAmt !== undefined && !data.baseLabourCharge) data.baseLabourCharge = data.ornate.labourAmt;
-      if (data.ornate.remark !== undefined) data.remark = data.ornate.remark;
-    }
-
-    if (data.category && (!data.categoryIds || data.categoryIds.length === 0)) {
-      data.categoryIds = Array.isArray(data.category) ? data.category : [data.category];
-    }
-    if (data.categoryId && (!data.categoryIds || data.categoryIds.length === 0)) {
-      data.categoryIds = Array.isArray(data.categoryId) ? data.categoryId : [data.categoryId];
-    }
-    if (data.featured && (!data.featuredIds || data.featuredIds.length === 0)) {
-      data.featuredIds = Array.isArray(data.featured) ? data.featured : [data.featured];
-    }
-    if (data.featuredId && (!data.featuredIds || data.featuredIds.length === 0)) {
-      data.featuredIds = Array.isArray(data.featuredId) ? data.featuredId : [data.featuredId];
-    }
-    if (data.menuItem && (!data.menuItemIds || data.menuItemIds.length === 0)) {
-      data.menuItemIds = Array.isArray(data.menuItem) ? data.menuItem : [data.menuItem];
-    }
-    if (data.menuItemId && (!data.menuItemIds || data.menuItemIds.length === 0)) {
-      data.menuItemIds = Array.isArray(data.menuItemId) ? data.menuItemId : [data.menuItemId];
-    }
-    if (data.size && (!data.sizeIds || data.sizeIds.length === 0)) {
-      data.sizeIds = Array.isArray(data.size) ? data.size : [data.size];
-    }
-    if (data.sizeId && (!data.sizeIds || data.sizeIds.length === 0)) {
-      data.sizeIds = Array.isArray(data.sizeId) ? data.sizeId : [data.sizeId];
-    }
-    if (data.metalColors && (!data.metalColorIds || data.metalColorIds.length === 0)) {
-      data.metalColorIds = Array.isArray(data.metalColors) ? data.metalColors : [data.metalColors];
-    }
-
     if (data.sku) {
       const duplicate = await Product.findOne({
         sku: data.sku,

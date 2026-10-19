@@ -54,6 +54,11 @@ const topAnnouncementSettingSchema = new mongoose.Schema(
       type: Number,
       default: 4000,
     },
+    displayDirection: {
+      type: String,
+      enum: ['horizontal', 'vertical'],
+      default: 'horizontal',
+    },
   },
   {
     versionKey: false,

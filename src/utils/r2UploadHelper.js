@@ -74,7 +74,7 @@ const CANONICAL_MODULES = [
  * Naming convention: module-timestamp-shortId.extension
  * Object key: folder/module-timestamp-shortId.extension (e.g. categories/category-1792148468272-a3f7.jpg)
  */
-function generateR2ObjectKey({ module: rawModule, contentType }) {
+function generateR2ObjectKey({ module: rawModule, contentType, productId }) {
   if (!rawModule || typeof rawModule !== 'string' || !rawModule.trim()) {
     throw new ApiError(400, 'Module is required. Examples: "user", "category", "product", "navigation"');
   }
@@ -105,12 +105,16 @@ function generateR2ObjectKey({ module: rawModule, contentType }) {
   const timestamp = Date.now();
   const shortId = crypto.randomBytes(2).toString('hex');
   const filename = `${config.prefix}-${timestamp}-${shortId}.${extension}`;
-  const key = `${config.folder}/${filename}`;
+  let folder = config.folder;
+  if (productId !== undefined && productId !== null && productId !== '') {
+    folder = `${config.folder}/${String(productId).toLowerCase()}`;
+  }
+  const key = `${folder}/${filename}`;
 
   return {
     key,
     filename,
-    folder: config.folder,
+    folder,
     prefix: config.prefix,
     module: moduleName,
     contentType: normalizedContentType,

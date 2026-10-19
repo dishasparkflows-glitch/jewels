@@ -26,7 +26,7 @@ class FeaturedService {
     if (Array.isArray(productIds) && productIds.length > 0) {
       await Product.updateMany(
         { _id: { $in: productIds } },
-        { $addToSet: { featured: item._id } }
+        { $addToSet: { featuredIds: item._id } }
       );
     }
 
@@ -41,7 +41,7 @@ class FeaturedService {
       throw new ApiError(404, 'Featured item not found');
     }
     const matchingProducts = await Product.find({
-      featured: id,
+      featuredIds: id,
     }).select('_id title sku price images').lean();
 
     return {
@@ -80,7 +80,7 @@ class FeaturedService {
     const itemsWithCounts = await Promise.all(
       items.map(async (item) => {
         const matchingProducts = await Product.find({
-          featured: item._id,
+          featuredIds: item._id,
         }).select('_id').lean();
         return {
           ...item,
@@ -125,12 +125,12 @@ class FeaturedService {
     if (Array.isArray(productIds)) {
       data.productCount = productIds.length;
       await Product.updateMany(
-        { featured: id, _id: { $nin: productIds } },
-        { $pull: { featured: id } }
+        { featuredIds: id, _id: { $nin: productIds } },
+        { $pull: { featuredIds: id } }
       );
       await Product.updateMany(
         { _id: { $in: productIds } },
-        { $addToSet: { featured: id } }
+        { $addToSet: { featuredIds: id } }
       );
     }
 
@@ -176,7 +176,7 @@ class FeaturedService {
       throw new ApiError(404, 'Featured item not found');
     }
 
-    await Product.updateMany({ featured: id }, { $pull: { featured: id } });
+    await Product.updateMany({ featuredIds: id }, { $pull: { featuredIds: id } });
 
     return { message: 'Featured item deleted successfully', id };
   }

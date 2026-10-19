@@ -3,6 +3,7 @@ const app = require('./app');
 const connectDB = require('./config/db');
 const { startOrnateCron } = require('./modules/ornate/ornate.cron');
 const { startBannerCron } = require('./modules/banner/banner.cron');
+const { startCouponExpirationCron } = require('./modules/coupon/coupon.cron');
 
 const PORT = process.env.PORT || 5000;
 
@@ -13,6 +14,9 @@ connectDB().then(() => {
 
   // Start recurring banner offer auto-cleanup cron
   startBannerCron();
+
+  // Expire coupons nightly at midnight Asia/Kolkata.
+  startCouponExpirationCron();
 
   app.listen(PORT, () => {
     console.log(`\n🚀 Jewels API Server running on port ${PORT}`);

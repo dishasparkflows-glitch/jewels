@@ -45,15 +45,22 @@ class CouponService {
     if (queryParams.status) {
       filter.status = queryParams.status;
     }
+    if (queryParams.validityStatus === 'expired') {
+      filter.status = 'expired';
+    } else if (queryParams.validityStatus === 'active') {
+      filter.status = 'active';
+    }
     if (queryParams.discounttype) {
       filter['discount.type'] = queryParams.discounttype;
     }
     if (queryParams.search) {
       const reg = new RegExp(queryParams.search, 'i');
-      filter.$or = [
+      const searchCondition = { $or: [
         { 'coupon.code': reg },
         { 'coupon.description': reg },
-      ];
+      ] };
+      if (filter.$and) filter.$and.push(searchCondition);
+      else filter.$and = [searchCondition];
     }
 
     const [items, total] = await Promise.all([

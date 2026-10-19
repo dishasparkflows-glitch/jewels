@@ -26,10 +26,11 @@ class CloudflareR2Service {
   }
 
   // ------------------------------- generate presigned put url ----------------------------
-  async getPresignedPutUrl({ module: rawModule, folder, contentType, expiresIn = 3600 }) {
+  async getPresignedPutUrl({ module: rawModule, folder, contentType, productId, expiresIn = 3600 }) {
     const { key, contentType: validatedContentType } = generateR2ObjectKey({
       module: rawModule || folder,
       contentType,
+      productId,
     });
 
     const fileUrl = publicUrl(key);

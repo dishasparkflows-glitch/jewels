@@ -5,7 +5,7 @@ const cloudflareR2 = require('../../utils/cloudflareR2');
 
 // ------------------------------- get presigned url ----------------------------
 const getPresignedUrl = catchAsync(async (req, res) => {
-  const { module: rawModule, folder, contentType, productId, files } = req.body;
+  const { module: rawModule, folder, contentType, productId, subfolder, files } = req.body;
   const targetModule = rawModule || folder;
 
   if (!targetModule) {
@@ -28,6 +28,7 @@ const getPresignedUrl = catchAsync(async (req, res) => {
         module: targetModule,
         contentType: file.contentType,
         productId,
+        subfolder,
         expiresIn,
       }),
     })));
@@ -44,6 +45,7 @@ const getPresignedUrl = catchAsync(async (req, res) => {
     module: targetModule,
     contentType,
     productId,
+    subfolder,
     expiresIn,
   });
 
@@ -53,6 +55,19 @@ const getPresignedUrl = catchAsync(async (req, res) => {
     'Presigned upload URL generated successfully',
     200
   );
+});
+
+const getFile = catchAsync(async (req, res) => {
+  const key = typeof req.query.key === 'string' ? req.query.key : '';
+  if (!key.startsWith('products/') || key.includes('..')) {
+    throw new ApiError(400, 'A valid product media key is required');
+  }
+
+  const object = await cloudflareR2.getFile(key);
+  if (object.ContentType) res.type(object.ContentType);
+  if (object.ContentLength != null) res.set('Content-Length', String(object.ContentLength));
+  res.set('Cache-Control', 'private, no-store');
+  object.Body.pipe(res);
 });
 
 // ------------------------------- delete file ----------------------------
@@ -66,4 +81,4 @@ const deleteFile = catchAsync(async (req, res) => {
   return ApiResponse.success(res, null, 'File deleted from Cloudflare R2 successfully');
 });
 
-module.exports = { getPresignedUrl, deleteFile };
+module.exports = { getPresignedUrl, getFile, deleteFile };

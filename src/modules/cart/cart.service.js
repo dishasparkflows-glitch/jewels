@@ -159,8 +159,8 @@ class CartService {
         const found = await Product.findById(productIdStr).lean();
         if (found) {
           productRef = found._id;
-          if (!productData.title) productData.title = found.title;
-          if (!productData.price) productData.price = found.price;
+          if (!productData.title) productData.title = found.basicInfo?.title;
+          if (!productData.price) productData.price = found.pricing?.salePrice || found.pricing?.mrp;
           if (!productData.image && found.images?.[0]) {
             productData.image = typeof found.images[0] === 'string' ? found.images[0] : found.images[0]?.url;
           }

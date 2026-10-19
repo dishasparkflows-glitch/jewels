@@ -187,8 +187,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
 
       // Check if product already exists in Product table and has images
       const matchCriteria = [];
-      if (sku) matchCriteria.push({ sku });
-      if (tagNo) matchCriteria.push({ tagNo });
+      if (sku) matchCriteria.push({ 'basicInfo.sku': sku });
       if (tagNo) matchCriteria.push({ 'ornate.tagNo': tagNo });
       if (barcode) matchCriteria.push({ 'ornate.barcode': barcode });
       if (uniqueLabelID) matchCriteria.push({ uniqueLabelID });
@@ -196,7 +195,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
       if (labelNo) matchCriteria.push({ labelNo });
 
       const existingProduct = await Product.findOne({ $or: matchCriteria })
-        .select('images sku tagNo slug')
+        .select('images basicInfo.sku basicInfo.slug ornate.tagNo')
         .lean();
 
       const hasImages =
@@ -265,7 +264,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
         {
           $set: setFields,
           $setOnInsert: {
-            slug: generatedSlug,
+            'basicInfo.slug': generatedSlug,
             status: 'active',
           },
         },
@@ -325,8 +324,7 @@ async function syncOrnateSoldLabels() {
     await Product.findOneAndUpdate(
       {
         $or: [
-          { sku },
-          { tagNo: uniqueLabelID },
+          { 'basicInfo.sku': sku },
           { 'ornate.tagNo': uniqueLabelID },
           { 'ornate.barcode': label.BarcodeNo || uniqueLabelID },
           { uniqueLabelID },
@@ -335,9 +333,6 @@ async function syncOrnateSoldLabels() {
       },
       {
         $set: {
-          price: salePrice,
-          salePrice,
-          displayPrice: salePrice,
           stockQty: 0,
           stockStatus: 'Out of Stock',
           isOrnate: true,
@@ -345,15 +340,13 @@ async function syncOrnateSoldLabels() {
           'basicInfo.productType': 'silver',
           'basicInfo.isOrnate': true,
           'pricing.salePrice': salePrice,
-          'pricing.displayPrice': salePrice,
           'ornate.isSold': true,
           'ornate.stockQty': 0,
         },
         $setOnInsert: {
           'basicInfo.title': label.ItemName || `Ornate Item ${sku}`,
-          sku,
-          tagNo: sku,
-          slug: (label.ItemName || `Ornate Item ${sku}` + '-' + sku)
+          'basicInfo.sku': sku,
+          'basicInfo.slug': (label.ItemName || `Ornate Item ${sku}` + '-' + sku)
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-+|-+$/g, ''),
@@ -379,8 +372,7 @@ async function syncOrnateSoldLabels() {
           { uniqueLabelID: { $in: soldIds } },
           { barcodeNo: { $in: soldIds } },
           { labelNo: { $in: soldIds } },
-          { sku: { $in: soldIds } },
-          { tagNo: { $in: soldIds } },
+          { 'basicInfo.sku': { $in: soldIds } },
         ],
       },
       {
@@ -470,20 +462,18 @@ async function getOrnateErpSoldLabels() {
   const dbMatch = await Product.find({
     isOrnate: true,
     $or: [
-      { sku: { $in: Array.from(allSoldIds) } },
-      { tagNo: { $in: Array.from(allSoldIds) } },
+      { 'basicInfo.sku': { $in: Array.from(allSoldIds) } },
       { 'ornate.tagNo': { $in: Array.from(allSoldIds) } },
       { 'ornate.barcode': { $in: Array.from(allSoldIds) } },
       { uniqueLabelID: { $in: Array.from(allSoldIds) } },
       { barcodeNo: { $in: Array.from(allSoldIds) } },
       { labelNo: { $in: Array.from(allSoldIds) } },
     ],
-  }).select('sku tagNo stockQty stockStatus status salePrice ornate uniqueLabelID barcodeNo labelNo').lean();
+  }).select('basicInfo.sku stockQty stockStatus status pricing.salePrice ornate uniqueLabelID barcodeNo labelNo').lean();
 
   const dbMap = new Map();
   dbMatch.forEach(p => {
-    if (p.sku) dbMap.set(p.sku.toLowerCase(), p);
-    if (p.tagNo) dbMap.set(p.tagNo.toLowerCase(), p);
+    if (p.basicInfo?.sku) dbMap.set(p.basicInfo.sku.toLowerCase(), p);
     if (p.ornate?.tagNo) dbMap.set(p.ornate.tagNo.toLowerCase(), p);
     if (p.ornate?.barcode) dbMap.set(p.ornate.barcode.toLowerCase(), p);
     if (p.uniqueLabelID) dbMap.set(p.uniqueLabelID.toLowerCase(), p);
@@ -526,8 +516,7 @@ async function syncSpecificSoldLabels(productIds) {
         { uniqueLabelID: { $in: cleanIds } },
         { barcodeNo: { $in: cleanIds } },
         { labelNo: { $in: cleanIds } },
-        { sku: { $in: cleanIds } },
-        { tagNo: { $in: cleanIds } },
+      { 'basicInfo.sku': { $in: cleanIds } },
       ],
     },
     {
@@ -583,17 +572,13 @@ async function syncOrnateMetalRateChanges() {
             $or: [
               { uniqueLabelID },
               { barcodeNo: label.BarcodeNo || uniqueLabelID },
-              { sku: uniqueLabelID },
+              { 'basicInfo.sku': uniqueLabelID },
             ],
           },
           {
             $set: {
-              price: mrp || newSalePrice,
-              salePrice: newSalePrice,
-              displayPrice: newSalePrice,
               'pricing.mrp': mrp || newSalePrice,
               'pricing.salePrice': newSalePrice,
-              'pricing.displayPrice': newSalePrice,
               'ornate.goldAmt': goldAmt,
               'ornate.labourAmt': labourAmt,
             },

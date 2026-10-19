@@ -7,10 +7,10 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class ProductService {
   // ------------------------------- create product ----------------------------
   async create(data) {
-    if (data.sku) {
-      const existingSku = await Product.findOne({ sku: data.sku });
+    if (data.basicInfo?.sku) {
+      const existingSku = await Product.findOne({ 'basicInfo.sku': data.basicInfo.sku });
       if (existingSku) {
-        throw new ApiError(409, `Product with SKU/Tag "${data.sku}" already exists`);
+        throw new ApiError(409, `Product with SKU/Tag "${data.basicInfo.sku}" already exists`);
       }
     }
 
@@ -21,12 +21,13 @@ class ProductService {
   async getOne(id) {
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const filter = isObjectId
-      ? { $or: [{ _id: id }, { slug: id }, { sku: id }] }
-      : { $or: [{ slug: id }, { sku: id }] };
+      ? { $or: [{ _id: id }, { 'basicInfo.slug': id }, { 'basicInfo.sku': id }, { 'ornate.tagNo': id }] }
+      : { $or: [{ 'basicInfo.slug': id }, { 'basicInfo.sku': id }, { 'ornate.tagNo': id }] };
 
     let product = await Product.findOne(filter)
       .populate({ path: 'categoryIds', select: 'name slug sizeChart', strictPopulate: false })
       .populate({ path: 'metalColorIds', select: 'name code hex', strictPopulate: false })
+      .populate({ path: 'metalPurityIds', select: 'name karat metalType', strictPopulate: false })
       .populate({ path: 'colorImages.metalColorId', select: 'name code hex', strictPopulate: false })
       .populate({ path: 'variants.metalPurityId', select: 'name karat metalType', strictPopulate: false })
       .populate({ path: 'variants.diamondTypeId', select: 'name', strictPopulate: false })
@@ -39,33 +40,16 @@ class ProductService {
       throw new ApiError(404, 'Product not found');
     }
 
-    if (Array.isArray(product.images) && product.images.length > 0) {
-      product.images = product.images.filter((img) => {
-        const url = typeof img === 'string' ? img : (img?.url || '');
-        return !url.toLowerCase().includes('ornate');
-      });
-    } else {
-      const colImgs = (product.colorImages || []).flatMap((c) => c.images || []);
-      product.images = colImgs.length > 0
-        ? colImgs
-        : (product.ornate?.ornateImages || []);
-    }
     return product;
   }
 
   // ------------------------------- get product by sku or tag ----------------------------
   async getBySkuOrTag(code) {
     const product = await Product.findOne({
-      $or: [{ sku: code }, { tagNo: code }],
+      $or: [{ 'basicInfo.sku': code }, { 'ornate.tagNo': code }],
     }).lean();
     if (!product) {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
-    }
-    if (Array.isArray(product.images)) {
-      product.images = product.images.filter((img) => {
-        const url = typeof img === 'string' ? img : (img?.url || '');
-        return !url.toLowerCase().includes('ornate');
-      });
     }
     return product;
   }
@@ -78,9 +62,9 @@ class ProductService {
     if (queryParams.search) {
       const searchRegex = new RegExp(queryParams.search, 'i');
       filter.$or = [
-        { title: searchRegex },
-        { sku: searchRegex },
-        { tagNo: searchRegex },
+        { 'basicInfo.title': searchRegex },
+        { 'basicInfo.sku': searchRegex },
+        { 'ornate.tagNo': searchRegex },
         { 'ornate.barcode': searchRegex },
         { 'ornate.itemCode': searchRegex },
         { 'ornate.groupName': searchRegex },
@@ -128,7 +112,7 @@ class ProductService {
     }
 
     // Match the positive price precedence used by storefront product cards.
-    const effectivePrice = ['salePrice', 'pricing.salePrice', 'displayPrice', 'price']
+    const effectivePrice = ['pricing.salePrice', 'pricing.mrp']
       .reduceRight((fallback, field) => ({ $cond: [{ $gt: [`$${field}`, 0] }, `$${field}`, fallback] }), null);
     const priceConditions = [];
     for (const [parameter, operator] of [['minPrice', '$gte'], ['maxPrice', '$lte']]) {
@@ -171,25 +155,15 @@ class ProductService {
   // Helper to format concise product card info for the home page
   _formatHomeProduct(p) {
     if (!p) return null;
-    const title = p.basicInfo?.title || p.title || '';
-    const sku = p.basicInfo?.sku || p.sku || p.tagNo || '';
-    const slug = p.basicInfo?.slug || p.slug || '';
-
-    const salePrice = Number(p.salePrice || p.pricing?.salePrice || p.displayPrice || p.price || 0);
-    const mrp = Number(p.mrp || p.pricing?.mrp || 0);
+    const salePrice = Number(p.pricing?.salePrice || 0);
+    const mrp = Number(p.pricing?.mrp || 0);
     const price = salePrice > 0 ? salePrice : (mrp > 0 ? mrp : null);
 
     // Extract primary image
     let image = '';
     const images = [];
 
-    if (Array.isArray(p.images) && p.images.length > 0) {
-      p.images.forEach((img) => {
-        const u = typeof img === 'string' ? img : img?.url;
-        if (u && !u.toLowerCase().includes('ornate')) images.push(u);
-      });
-    }
-    if (images.length === 0 && Array.isArray(p.colorImages)) {
+    if (Array.isArray(p.colorImages)) {
       p.colorImages.forEach((c) => {
         if (Array.isArray(c.images)) {
           c.images.forEach((img) => {
@@ -209,21 +183,16 @@ class ProductService {
     return {
       _id: p._id,
       id: p._id,
-      title,
-      sku,
-      slug,
-      price,
-      salePrice: salePrice > 0 ? salePrice : (mrp > 0 ? mrp : null),
-      mrp: mrp > 0 ? mrp : null,
+      basicInfo: p.basicInfo || {},
+      pricing: p.pricing || {},
+      cataloguePrice: price,
       image,
-      images,
       colorImages: p.colorImages || [],
       metalColors: p.metalColorIds || [],
       metalColorIds: p.metalColorIds || [],
-      metalName: p.metalName || '',
       category: p.categoryIds || [],
-      productType: p.productType || '',
-      isOrnate: Boolean(p.isOrnate),
+      productType: p.basicInfo?.productType || '',
+      isOrnate: Boolean(p.basicInfo?.isOrnate),
       stockStatus: p.stockStatus || '',
     };
   }
@@ -237,12 +206,15 @@ class ProductService {
       filter.categoryIds = queryParams.category;
     }
     if (queryParams.metalName) {
-      filter.metalName = new RegExp(queryParams.metalName, 'i');
+      filter.$or = [
+        { 'ornate.metalName': new RegExp(queryParams.metalName, 'i') },
+        { 'basicInfo.productType': new RegExp(queryParams.metalName, 'i') },
+      ];
     }
 
     // Select ONLY needed fields from mongo to keep query ultra fast (no ornateImages for storefront)
     const selectFields =
-      '_id title sku slug price salePrice mrp displayPrice images colorImages metalColorIds metalName stockStatus categoryIds productType isOrnate basicInfo pricing ornate';
+      '_id colorImages metalColorIds stockStatus categoryIds basicInfo pricing ornate';
 
     const items = await Product.find(filter)
       .select(selectFields)
@@ -256,7 +228,7 @@ class ProductService {
     // Curate sections for the home page storefront
     const platinum = formatted.filter((p) => !p.isOrnate).slice(0, 5);
     const silver = formatted
-      .filter((p) => p.isOrnate || p.metalName?.toUpperCase() === 'SILVER')
+      .filter((p) => p.basicInfo?.isOrnate || p.ornate?.metalName?.toUpperCase() === 'SILVER')
       .slice(0, 5);
     const trending = formatted.slice(0, 5);
 
@@ -289,30 +261,30 @@ class ProductService {
           $and: [
             {
               $or: [
-                { productType: { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] } },
-                { metalName: new RegExp('gold', 'i') },
-                { title: new RegExp('gold', 'i') },
+                { 'basicInfo.productType': { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] } },
+                { 'ornate.metalName': new RegExp('gold', 'i') },
+                { 'basicInfo.title': new RegExp('gold', 'i') },
               ],
             },
-            { isOrnate: { $ne: true } },
+            { 'basicInfo.isOrnate': { $ne: true } },
           ],
         });
       } else if (pt === 'silver' || pt === 'standard') {
         conditions.push({
           $or: [
             { 'basicInfo.productType': { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
-            { productType: { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
-            { metalName: new RegExp('silver', 'i') },
-            { title: new RegExp('silver|925', 'i') },
+            { 'basicInfo.productType': { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
+            { 'ornate.metalName': new RegExp('silver', 'i') },
+            { 'basicInfo.title': new RegExp('silver|925', 'i') },
           ],
         });
       } else if (pt === 'ornate') {
         conditions.push({
-          $or: [{ 'basicInfo.isOrnate': true }, { isOrnate: true }, { 'basicInfo.productType': 'ornate' }, { productType: 'ornate' }],
+          $or: [{ 'basicInfo.isOrnate': true }, { 'basicInfo.productType': 'ornate' }],
         });
       } else {
         conditions.push({
-          $or: [{ 'basicInfo.productType': queryParams.productType }, { productType: queryParams.productType }],
+          'basicInfo.productType': queryParams.productType,
         });
       }
     }
@@ -320,7 +292,7 @@ class ProductService {
     if (queryParams.isOrnate !== undefined) {
       const isO = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
       conditions.push({
-        $or: [{ 'basicInfo.isOrnate': isO }, { isOrnate: isO }],
+        'basicInfo.isOrnate': isO,
       });
     }
 
@@ -332,9 +304,9 @@ class ProductService {
       const searchRegex = new RegExp(queryParams.search, 'i');
       conditions.push({
         $or: [
-          { title: searchRegex },
-          { sku: searchRegex },
-          { tagNo: searchRegex },
+          { 'basicInfo.title': searchRegex },
+          { 'basicInfo.sku': searchRegex },
+          { 'ornate.tagNo': searchRegex },
           { 'ornate.barcode': searchRegex },
           { 'ornate.itemCode': searchRegex },
           { 'ornate.groupName': searchRegex },
@@ -346,7 +318,7 @@ class ProductService {
 
     const [rawItems, total] = await Promise.all([
       Product.find(filter)
-        .select('_id title basicInfo categoryIds images colorImages sku tagNo ornate price salePrice mrp displayPrice pricing productType isOrnate specifications metalName status')
+        .select('_id basicInfo categoryIds colorImages ornate pricing productType isOrnate specifications status')
         .populate({ path: 'categoryIds', select: 'name slug', strictPopulate: false })
         .sort({ 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
@@ -356,14 +328,13 @@ class ProductService {
     ]);
 
     const items = rawItems.map((p) => {
+      const derivedImages = (p.colorImages || []).flatMap((color) => color.images || []);
       const thumb =
-        p.images?.[0]?.url ||
-        (typeof p.images?.[0] === 'string' ? p.images[0] : '') ||
-        p.colorImages?.[0]?.images?.[0]?.url ||
+        derivedImages?.[0]?.url ||
         p.ornate?.ornateImages?.[0]?.url ||
         '';
 
-      const effectivePrice = Number(p.salePrice || p.displayPrice || p.price || p.pricing?.salePrice || p.pricing?.mrp || p.mrp || 0);
+      const effectivePrice = Number(p.pricing?.salePrice || p.pricing?.mrp || 0);
 
       const resolvedCategory =
         (Array.isArray(p.categoryIds) && p.categoryIds.length > 0) ? p.categoryIds :
@@ -372,18 +343,14 @@ class ProductService {
       return {
         _id: p._id,
         id: p._id,
-        title: p.title || p.basicInfo?.title || '',
-        sku: p.sku || p.tagNo || p.ornate?.tagNo || p.basicInfo?.sku || '',
-        tagNo: p.tagNo || p.ornate?.tagNo || '',
+        basicInfo: p.basicInfo || {},
+        pricing: p.pricing || {},
+        ornate: p.ornate || {},
         category: resolvedCategory,
-        price: effectivePrice,
-        salePrice: p.salePrice || p.pricing?.salePrice || p.displayPrice || p.price || 0,
-        mrp: p.mrp || p.pricing?.mrp || 0,
-        productType: p.productType || p.basicInfo?.productType,
-        isOrnate: Boolean(p.isOrnate || p.basicInfo?.isOrnate),
-        metalName: p.metalName || '',
+        productType: p.basicInfo?.productType,
+        isOrnate: Boolean(p.basicInfo?.isOrnate),
+        cataloguePrice: effectivePrice,
         status: p.status,
-        images: p.images || [],
         colorImages: p.colorImages || [],
         thumbnail: thumb,
       };
@@ -394,13 +361,13 @@ class ProductService {
 
   // ------------------------------- update product ----------------------------
   async update(id, data) {
-    if (data.sku) {
+    if (data.basicInfo?.sku) {
       const duplicate = await Product.findOne({
-        sku: data.sku,
+        'basicInfo.sku': data.basicInfo.sku,
         _id: { $ne: id },
       });
       if (duplicate) {
-        throw new ApiError(409, `Product with SKU "${data.sku}" already exists`);
+        throw new ApiError(409, `Product with SKU "${data.basicInfo.sku}" already exists`);
       }
     }
 

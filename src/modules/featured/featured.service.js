@@ -42,7 +42,7 @@ class FeaturedService {
     }
     const matchingProducts = await Product.find({
       featuredIds: id,
-    }).select('_id title sku price images').lean();
+    }).select('_id basicInfo pricing images').lean();
 
     return {
       ...item,

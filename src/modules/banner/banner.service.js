@@ -11,14 +11,21 @@ class BannerService {
 
   // ------------------------------- create banner ----------------------------
   async create(data) {
+    if (data.display?.type === 'collectionbanner' && data.collectionImages?.length !== 4) {
+      throw new ApiError(400, 'Collection banners must contain exactly four images');
+    }
     const created = await Banner.create(data);
-    const populated = await Banner.findById(created._id).populate('display.categoryId', 'name slug');
+    const populated = await Banner.findById(created._id)
+      .populate('display.categoryId', 'name slug')
+      .populate('display.menuItemIds', 'title menuSectionId');
     return this._formatBanner(populated);
   }
 
   // ------------------------------- get one banner ----------------------------
   async getOne(id) {
-    const banner = await Banner.findOne({ _id: id }).populate('display.categoryId', 'name slug');
+    const banner = await Banner.findOne({ _id: id })
+      .populate('display.categoryId', 'name slug')
+      .populate('display.menuItemIds', 'title menuSectionId');
     if (!banner) {
       throw new ApiError(404, 'Banner not found');
     }
@@ -97,6 +104,7 @@ class BannerService {
     const [items, total] = await Promise.all([
       Banner.find(filter)
         .populate('display.categoryId', 'name slug')
+        .populate('display.menuItemIds', 'title menuSectionId')
         .sort({ 'display.order': 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
@@ -142,6 +150,7 @@ class BannerService {
 
     const items = await Banner.find(filter)
       .populate('display.categoryId', 'name slug')
+      .populate('display.menuItemIds', 'title menuSectionId')
       .sort({ 'display.order': 1, 'meta.createdAt': -1 })
       .lean();
 
@@ -281,11 +290,22 @@ class BannerService {
 
   // ------------------------------- update banner ----------------------------
   async update(id, data) {
+    if (data.display?.type === 'collectionbanner' || data.collectionImages !== undefined) {
+      const existing = await Banner.findById(id).select('display.type collectionImages').lean();
+      if (!existing) throw new ApiError(404, 'Banner not found');
+      const nextType = data.display?.type || existing.display?.type;
+      const nextImages = data.collectionImages ?? existing.collectionImages;
+      if (nextType === 'collectionbanner' && nextImages?.length !== 4) {
+        throw new ApiError(400, 'Collection banners must contain exactly four images');
+      }
+    }
     const banner = await Banner.findOneAndUpdate(
       { _id: id },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
-    ).populate('display.categoryId', 'name slug');
+    )
+      .populate('display.categoryId', 'name slug')
+      .populate('display.menuItemIds', 'title menuSectionId');
 
     if (!banner) {
       throw new ApiError(404, 'Banner not found');

@@ -242,7 +242,7 @@ function buildProductPayloadFromLabel(label, {
   const itemCode = label.ItemMstId ? String(label.ItemMstId) : '';
 
   const generatedSlug = generateProductSlug(title, sku);
-  const activeSlug = existingProduct?.slug || generatedSlug;
+  const activeSlug = existingProduct?.basicInfo?.slug || generatedSlug;
 
   const setFields = {
     // Structured Product Blocks (matching product.model.js)
@@ -290,8 +290,6 @@ function buildProductPayloadFromLabel(label, {
     // Core schema fields
     productType: 'silver',
     isOrnate: true,
-    sku,
-    tagNo,
     remark: label.Remark || '',
     gstPercentage,
     baseMetalWeight,

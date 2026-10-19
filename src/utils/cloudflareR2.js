@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { publicUrl } = require('./media');
 const { generateR2ObjectKey } = require('./r2UploadHelper');
@@ -26,11 +26,12 @@ class CloudflareR2Service {
   }
 
   // ------------------------------- generate presigned put url ----------------------------
-  async getPresignedPutUrl({ module: rawModule, folder, contentType, productId, expiresIn = 3600 }) {
+  async getPresignedPutUrl({ module: rawModule, folder, contentType, productId, subfolder, expiresIn = 3600 }) {
     const { key, contentType: validatedContentType } = generateR2ObjectKey({
       module: rawModule || folder,
       contentType,
       productId,
+      subfolder,
     });
 
     const fileUrl = publicUrl(key);
@@ -82,6 +83,10 @@ class CloudflareR2Service {
         Key: key,
       })
     );
+  }
+
+  async getFile(key) {
+    return this.client.send(new GetObjectCommand({ Bucket: this.bucketName, Key: key }));
   }
 }
 

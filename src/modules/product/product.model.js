@@ -23,9 +23,11 @@ const pricingSchema = new mongoose.Schema({
   salePrice: { type: Number, default: 0 },
   costPrice: { type: Number, default: 0 },
   ornatePrice: { type: Number, default: 0 },
-  gstPercentage: { type: Number },
   markupPercentage: { type: Number, default: 0 },
   mrpMarkupPercentage: { type: Number, default: 0 },
+  baseLabourCharge: { type: Number, default: 0 },
+  certificateCharge: { type: Number, default: 0 },
+  otherAmountPercentage: { type: Number, default: 0 },
 }, { _id: false });
 
 const specificationsSchema = new mongoose.Schema({
@@ -73,22 +75,7 @@ const productSchema = new mongoose.Schema(
       type: ornateSchema,
       default: () => ({}),
     },
-    gstPercentage: {
-      type: Number,
-    },
     baseMetalWeight: {
-      type: Number,
-      default: 0,
-    },
-    baseLabourCharge: {
-      type: Number,
-      default: 0,
-    },
-    certificateCharge: {
-      type: Number,
-      default: 0,
-    },
-    otherAmountPercentage: {
       type: Number,
       default: 0,
     },
@@ -112,17 +99,12 @@ const productSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'MetalColor',
     }],
+    metalPurityIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MetalPurity',
+    }],
 
     // ── Media & Color Images ──────────────────────────────────
-    images: [{
-      url: String,
-      key: String,
-      mediaType: { type: String, default: 'image' },
-    }],
-    title: { type: String, trim: true, default: '' },
-    sku: { type: String, trim: true, default: '' },
-    slug: { type: String, trim: true, default: '' },
-    description: { type: String, default: '' },
     productType: {
       type: String,
       enum: ['gold', 'silver', 'jewelry', 'standard', 'ornate'],
@@ -133,13 +115,6 @@ const productSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
-    tagNo: { type: String, index: true },
-    price: { type: Number, default: 0 },
-    salePrice: { type: Number, default: 0 },
-    costPrice: { type: Number, default: 0 },
-    displayPrice: { type: Number, default: 0 },
-    mrp: { type: Number, default: 0 },
-    metalName: { type: String, default: '' },
     colorImages: [{
       metalColorId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -285,9 +260,9 @@ productSchema.index({ 'pricing.salePrice': 1 });
 productSchema.index({ 'meta.createdAt': -1 });
 productSchema.pre('save', function (next) {
   const isOrnate = Boolean(this.basicInfo?.isOrnate ?? this.isOrnate);
-  const tagNo = this.ornate?.tagNo || this.tagNo;
-  if (isOrnate && tagNo && !this.sku) {
-    this.sku = tagNo;
+  const tagNo = this.ornate?.tagNo;
+  if (isOrnate && tagNo && !this.basicInfo?.sku) {
+    this.basicInfo.sku = tagNo;
   }
   if (this.basicInfo) {
     if (isOrnate && (!this.basicInfo.productType || this.basicInfo.productType === 'ornate')) {
@@ -297,15 +272,12 @@ productSchema.pre('save', function (next) {
       this.basicInfo.isOrnate = true;
     }
   }
-  const activeTitle = this.basicInfo?.title || this.title;
+  const activeTitle = this.basicInfo?.title;
   if (this.basicInfo && !this.basicInfo.slug && activeTitle) {
     this.basicInfo.slug = activeTitle
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
-  }
-  if (!this.slug && this.basicInfo?.slug) {
-    this.slug = this.basicInfo.slug;
   }
   next();
 });

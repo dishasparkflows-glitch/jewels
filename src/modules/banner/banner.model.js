@@ -26,6 +26,15 @@ const bannerSchema = new mongoose.Schema(
         ref: 'Category',
         required: false,
       },
+      menuItemIds: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MenuItem',
+      }],
+      collectionGroup: {
+        type: String,
+        enum: ['gold', 'silver', 'spiritual'],
+        default: null,
+      },
       type: {
         type: String,
         enum: [
@@ -75,6 +84,10 @@ const bannerSchema = new mongoose.Schema(
       url: String,
       key: String,
     },
+    collectionImages: [{
+      url: { type: String, required: true },
+      key: { type: String, default: '' },
+    }],
     video: {
       url: String,
       key: String,

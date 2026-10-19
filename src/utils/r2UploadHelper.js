@@ -74,7 +74,7 @@ const CANONICAL_MODULES = [
  * Naming convention: module-timestamp-shortId.extension
  * Object key: folder/module-timestamp-shortId.extension (e.g. categories/category-1792148468272-a3f7.jpg)
  */
-function generateR2ObjectKey({ module: rawModule, contentType, productId }) {
+function generateR2ObjectKey({ module: rawModule, contentType, productId, subfolder }) {
   if (!rawModule || typeof rawModule !== 'string' || !rawModule.trim()) {
     throw new ApiError(400, 'Module is required. Examples: "user", "category", "product", "navigation"');
   }
@@ -108,6 +108,13 @@ function generateR2ObjectKey({ module: rawModule, contentType, productId }) {
   let folder = config.folder;
   if (productId !== undefined && productId !== null && productId !== '') {
     folder = `${config.folder}/${String(productId).toLowerCase()}`;
+  }
+  if (subfolder) {
+    if (moduleName !== 'product' && moduleName !== 'products') {
+      throw new ApiError(400, 'Subfolders are only supported for product media');
+    }
+    if (subfolder !== 'compressed') throw new ApiError(400, 'Unsupported product media subfolder');
+    folder = `${folder}/compressed`;
   }
   const key = `${folder}/${filename}`;
 

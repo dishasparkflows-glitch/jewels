@@ -25,6 +25,7 @@ const {
   mapStuddedDetails,
   generateProductSlug,
   buildProductPayloadFromLabel,
+  cleanPayload,
 } = ornateUtils;
 
 // ------------------------------- get ornate erp categories ----------------------------
@@ -261,7 +262,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
             status: 'active',
           },
         },
-        { upsert: true, returnDocument: 'after', runValidators: false }
+        { upsert: true, returnDocument: 'after', runValidators: false, setDefaultsOnInsert: false }
       );
 
       upsertedCount++;
@@ -326,7 +327,7 @@ async function syncOrnateSoldLabels() {
         ],
       },
       {
-        $set: {
+        $set: cleanPayload({
           stockStatus: 'Out of Stock',
           isOrnate: true,
           productType: 'silver',
@@ -335,8 +336,8 @@ async function syncOrnateSoldLabels() {
           'pricing.salePrice': salePrice,
           'ornate.isSold': true,
           'ornate.stockQty': 0,
-        },
-        $setOnInsert: {
+        }) || {},
+        $setOnInsert: cleanPayload({
           'basicInfo.title': label.ItemName || `Ornate Item ${sku}`,
           'basicInfo.sku': sku,
           'basicInfo.slug': (label.ItemName || `Ornate Item ${sku}` + '-' + sku)
@@ -346,9 +347,9 @@ async function syncOrnateSoldLabels() {
           status: 'active',
           'ornate.tagNo': String(label.LabelNo || uniqueLabelID),
           'ornate.barcode': String(label.BarcodeNo || uniqueLabelID),
-        },
+        }) || {},
       },
-      { upsert: true, returnDocument: 'after', runValidators: false }
+      { upsert: true, returnDocument: 'after', runValidators: false, setDefaultsOnInsert: false }
     );
     upsertedCount++;
   }

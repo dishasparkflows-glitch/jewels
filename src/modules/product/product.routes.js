@@ -4,6 +4,8 @@ const productController = require('./product.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
+router.post('/pricing-preview', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), productController.previewPricing);
+
 // Public or Storefront / Lookup endpoints
 router.get('/home', productController.getHomeProducts);
 router.get('/lookup', productController.getLookup);

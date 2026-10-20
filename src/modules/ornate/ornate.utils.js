@@ -220,7 +220,45 @@ function generateProductSlug(title = '', sku = '') {
 }
 
 /**
- * Builds the complete MongoDB product payload strictly aligned with product.model.js
+ * Recursively cleans payloads by removing:
+ * - undefined & null values
+ * - empty strings or whitespace-only strings
+ * - empty arrays []
+ * - empty objects {}
+ * Retains valid numeric and boolean data (e.g. 0, false).
+ */
+function cleanPayload(obj) {
+  if (obj === null || obj === undefined) return undefined;
+  if (typeof obj !== 'object') {
+    if (typeof obj === 'string') {
+      const trimmed = obj.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    }
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return undefined;
+    const cleanedArr = obj
+      .map((item) => cleanPayload(item))
+      .filter((item) => item !== undefined && item !== null && (typeof item !== 'object' || Object.keys(item).length > 0));
+    return cleanedArr.length > 0 ? cleanedArr : undefined;
+  }
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const cleaned = cleanPayload(value);
+    if (cleaned !== undefined && cleaned !== null) {
+      if (typeof cleaned === 'object' && !Array.isArray(cleaned) && Object.keys(cleaned).length === 0) {
+        continue;
+      }
+      result[key] = cleaned;
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
+ * Builds the complete MongoDB product payload strictly aligned with product.model.js,
+ * storing ONLY fields that have available values (no empty arrays, strings, or objects).
  */
 function buildProductPayloadFromLabel(label, {
   existingProduct = null,
@@ -243,14 +281,18 @@ function buildProductPayloadFromLabel(label, {
   const generatedSlug = generateProductSlug(title, sku);
   const activeSlug = existingProduct?.basicInfo?.slug || generatedSlug;
 
-  const setFields = {
+  const availableImages = Array.isArray(newlyUploadedImages) && newlyUploadedImages.length > 0
+    ? newlyUploadedImages
+    : (existingProduct?.ornate?.ornateImages?.length > 0 ? existingProduct.ornate.ornateImages : undefined);
+
+  const rawSetFields = {
     // Structured Product Blocks (matching product.model.js)
     basicInfo: {
       title,
       sku,
       slug: activeSlug,
-      description,
-      remark: label.Remark || '',
+      description: description?.trim() || undefined,
+      remark: label.Remark?.trim() || undefined,
       productType: 'silver',
       isOrnate: true,
     },
@@ -265,22 +307,20 @@ function buildProductPayloadFromLabel(label, {
       certificateCharge: Number(label.CertificateAmt) || 0,
       otherAmountPercentage: 0,
     },
-    specifications: {
+    specifications: baseMetalWeight ? {
       metalWeight: baseMetalWeight,
-    },
+    } : undefined,
     ornate: {
-      tagNo,
-      barcode,
-      itemCode,
-      customGroupName: label.ItemName || label.GroupName || '',
-      companyCode: label.CompanyCode || '',
-      carat: label.Carat || '',
-      groupName: label.GroupName || '',
-      metalName: label.MetalName || '',
-      remark: label.Remark || '',
-      ornateImages: Array.isArray(newlyUploadedImages) && newlyUploadedImages.length > 0
-        ? newlyUploadedImages
-        : (existingProduct?.ornate?.ornateImages || []),
+      tagNo: tagNo || undefined,
+      barcode: barcode || undefined,
+      itemCode: itemCode || undefined,
+      customGroupName: label.ItemName?.trim() || label.GroupName?.trim() || undefined,
+      companyCode: label.CompanyCode?.trim() || undefined,
+      carat: label.Carat?.trim() || undefined,
+      groupName: label.GroupName?.trim() || undefined,
+      metalName: label.MetalName?.trim() || undefined,
+      remark: label.Remark?.trim() || undefined,
+      ornateImages: availableImages,
       goldAmt,
       labourAmt: baseLabourCharge,
       diamondAmt,
@@ -292,12 +332,13 @@ function buildProductPayloadFromLabel(label, {
     productType: 'silver',
     isOrnate: true,
     stockStatus: isSold ? 'Out of Stock' : 'In Stock',
-    categoryIds: categoryId ? [categoryId] : [],
   };
 
-  if (Array.isArray(newlyUploadedImages) && newlyUploadedImages.length > 0) {
-    setFields.ornate.ornateImages = newlyUploadedImages;
+  if (categoryId) {
+    rawSetFields.categoryIds = [categoryId];
   }
+
+  const setFields = cleanPayload(rawSetFields) || {};
 
   return {
     sku,
@@ -325,4 +366,5 @@ module.exports = {
   mapStuddedDetails,
   generateProductSlug,
   buildProductPayloadFromLabel,
+  cleanPayload,
 };

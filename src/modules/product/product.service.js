@@ -1,31 +1,63 @@
 const mongoose = require('mongoose');
 const Product = require('./product.model');
+const { calculateProductPricing, loadPricingMasters } = require('./product.pricing');
 const { SHOP_FOR_OPTIONS, getShopForGenders } = require('./product.filters');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
-
-// Lean and aggregate results do not apply schema defaults to existing records.
-const withColorStatuses = (product) => {
-  if (Array.isArray(product.colorImages)) {
-    product.colorImages = product.colorImages.map((color) => ({
-      ...color,
-      status: color.status ?? 'active',
-    }));
-  }
-  return product;
-};
+const {
+  withColorStatuses,
+  sanitizeColorImages,
+  isPricingUnchanged,
+  formatHomeProduct,
+  formatLookupProduct,
+  buildProductSearchFilter,
+  buildProductTypeFilter,
+  buildLookupProductTypeFilter,
+  getEffectivePriceExpression,
+  buildPriceRangeConditions,
+} = require('./product.utils');
 
 class ProductService {
+  async previewPricing(data) {
+    return calculateProductPricing(data, await loadPricingMasters());
+  }
+
+  async applyPricing(data) {
+    if (data.pricing?.calculationMode !== 'automatic') return data;
+    const result = await this.previewPricing(data);
+    return { ...data, variants: result.variants, pricing: { ...data.pricing, salePrice: result.salePrice } };
+  }
+
+  // Refresh calculated prices before DB filtering/sorting so listing prices and
+  // detail prices use the same current master rates. Manual/ERP rows are untouched.
+  async refreshCalculatedPrices() {
+    if (this.pricingRefresh) return this.pricingRefresh;
+    this.pricingRefresh = (async () => {
+      const products = await Product.find({ 'pricing.calculationMode': 'automatic', 'meta.deletedAt': null }).lean();
+      if (!products.length) return;
+      const masters = await loadPricingMasters();
+      const writes = [];
+      for (const product of products) {
+        const result = calculateProductPricing(product, masters);
+        const unchanged = isPricingUnchanged(product, result);
+        if (!unchanged) {
+          writes.push({
+            updateOne: {
+              filter: { _id: product._id, 'meta.updatedAt': product.meta?.updatedAt },
+              update: { $set: { variants: result.variants, 'pricing.salePrice': result.salePrice } },
+            },
+          });
+        }
+      }
+      if (writes.length) await Product.bulkWrite(writes);
+    })();
+    try { await this.pricingRefresh; } finally { this.pricingRefresh = null; }
+  }
+
   // ------------------------------- create product ----------------------------
   async create(data) {
-    if (Array.isArray(data.colorImages)) {
-      data.colorImages = data.colorImages.map((ci) => {
-        const item = { ...ci };
-        if (!item.metalColorId || !mongoose.isValidObjectId(item.metalColorId)) {
-          delete item.metalColorId;
-        }
-        return item;
-      });
+    if (data.colorImages) {
+      data.colorImages = sanitizeColorImages(data.colorImages);
     }
     if (data.basicInfo?.sku) {
       const existingSku = await Product.findOne({ 'basicInfo.sku': data.basicInfo.sku });
@@ -34,11 +66,12 @@ class ProductService {
       }
     }
 
-    return await Product.create(data);
+    return await Product.create(await this.applyPricing(data));
   }
 
   // ------------------------------- get one product ----------------------------
   async getOne(id) {
+    await this.refreshCalculatedPrices();
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const filter = isObjectId
       ? { $or: [{ _id: id }, { 'basicInfo.slug': id }, { 'basicInfo.sku': id }, { 'ornate.tagNo': id }] }
@@ -49,6 +82,7 @@ class ProductService {
       .populate({ path: 'metalColorIds', select: 'name code hex', strictPopulate: false })
       .populate({ path: 'metalPurityIds', select: 'name karat metalType', strictPopulate: false })
       .populate({ path: 'colorImages.metalColorId', select: 'name code hex', strictPopulate: false })
+      .populate({ path: 'variants.metalColorId', select: 'name code hex', strictPopulate: false })
       .populate({ path: 'variants.metalPurityId', select: 'name karat metalType', strictPopulate: false })
       .populate({ path: 'variants.diamondTypeId', select: 'name', strictPopulate: false })
       .populate({ path: 'variants.diamondShapeId', select: 'name', strictPopulate: false })
@@ -65,6 +99,7 @@ class ProductService {
 
   // ------------------------------- get product by sku or tag ----------------------------
   async getBySkuOrTag(code) {
+    await this.refreshCalculatedPrices();
     const product = await Product.findOne({
       $or: [{ 'basicInfo.sku': code }, { 'ornate.tagNo': code }],
     }).lean();
@@ -76,36 +111,20 @@ class ProductService {
 
   // ------------------------------- get all products ----------------------------
   async getAll(queryParams = {}) {
+    await this.refreshCalculatedPrices();
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
     if (queryParams.search) {
-      const searchRegex = new RegExp(queryParams.search, 'i');
-      filter.$or = [
-        { 'basicInfo.title': searchRegex },
-        { 'basicInfo.sku': searchRegex },
-        { 'ornate.tagNo': searchRegex },
-        { 'ornate.barcode': searchRegex },
-        { 'ornate.itemCode': searchRegex },
-        { 'ornate.groupName': searchRegex },
-        { 'ornate.customGroupName': searchRegex },
-      ];
+      const searchConditions = buildProductSearchFilter(queryParams.search);
+      if (searchConditions) filter.$or = searchConditions;
     }
 
     if (queryParams.productType) {
-      const pt = String(queryParams.productType).toLowerCase();
-      let typeMatcher;
-      if (pt === 'jewelry' || pt === 'gold') {
-        typeMatcher = { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] };
-      } else if (pt === 'silver' || pt === 'standard') {
-        typeMatcher = { $in: ['silver', 'standard', 'Silver', 'Standard'] };
-      } else {
-        typeMatcher = queryParams.productType;
+      const typeCondition = buildProductTypeFilter(queryParams.productType);
+      if (typeCondition) {
+        filter.$and = [...(filter.$and || []), typeCondition];
       }
-      filter.$and = [
-        ...(filter.$and || []),
-        { $or: [{ 'basicInfo.productType': typeMatcher }, { productType: typeMatcher }] },
-      ];
     }
 
     if (queryParams.isOrnate !== undefined) {
@@ -132,20 +151,9 @@ class ProductService {
     }
 
     // Match the positive price precedence used by storefront product cards.
-    const effectivePrice = ['pricing.salePrice', 'pricing.mrp']
-      .reduceRight((fallback, field) => ({ $cond: [{ $gt: [`$${field}`, 0] }, `$${field}`, fallback] }), null);
-    const priceConditions = [];
-    for (const [parameter, operator] of [['minPrice', '$gte'], ['maxPrice', '$lte']]) {
-      if (queryParams[parameter] !== undefined && queryParams[parameter] !== '') {
-        const value = Number(queryParams[parameter]);
-        if (!Number.isFinite(value) || value < 0) throw new ApiError(400, 'Price must be a non-negative number');
-        priceConditions.push({ [operator]: [effectivePrice, value] });
-      }
-    }
+    const effectivePrice = getEffectivePriceExpression();
+    const priceConditions = buildPriceRangeConditions(queryParams, effectivePrice);
     if (priceConditions.length) filter.$expr = { $and: [{ $ne: [effectivePrice, null] }, ...priceConditions] };
-    if (queryParams.minPrice && queryParams.maxPrice && Number(queryParams.minPrice) > Number(queryParams.maxPrice)) {
-      throw new ApiError(400, 'Maximum price must be greater than minimum price');
-    }
     // Facet counts respect all other filters, but not the current audience selection.
     const facetFilter = { ...filter };
     const genders = getShopForGenders(queryParams.shopFor);
@@ -174,52 +182,12 @@ class ProductService {
 
   // Helper to format concise product card info for the home page
   _formatHomeProduct(p) {
-    if (!p) return null;
-    withColorStatuses(p);
-    const salePrice = Number(p.pricing?.salePrice || 0);
-    const mrp = Number(p.pricing?.mrp || 0);
-    const price = salePrice > 0 ? salePrice : (mrp > 0 ? mrp : null);
-
-    // Extract primary image
-    let image = '';
-    const images = [];
-
-    if (Array.isArray(p.colorImages)) {
-      p.colorImages.forEach((c) => {
-        if (Array.isArray(c.images)) {
-          c.images.forEach((img) => {
-            const u = typeof img === 'string' ? img : img?.url;
-            if (u && !u.toLowerCase().includes('ornate')) images.push(u);
-          });
-        }
-      });
-    }
-
-    if (images.length > 0) {
-      image = images[0];
-    } else {
-      image = '';
-    }
-
-    return {
-      _id: p._id,
-      id: p._id,
-      basicInfo: p.basicInfo || {},
-      pricing: p.pricing || {},
-      cataloguePrice: price,
-      image,
-      colorImages: p.colorImages || [],
-      metalColors: p.metalColorIds || [],
-      metalColorIds: p.metalColorIds || [],
-      category: p.categoryIds || [],
-      productType: p.basicInfo?.productType || '',
-      isOrnate: Boolean(p.basicInfo?.isOrnate),
-      stockStatus: p.stockStatus || '',
-    };
+    return formatHomeProduct(p);
   }
 
   // ------------------------------- get home products (streamlined info) ----------------------------
   async getHomeProducts(queryParams = {}) {
+    await this.refreshCalculatedPrices();
     const limit = Math.min(Number(queryParams.limit) || 24, 50);
     const filter = { 'meta.deletedAt': null, status: 'active' };
 
@@ -244,7 +212,7 @@ class ProductService {
       .limit(limit)
       .lean();
 
-    const formatted = items.map((p) => this._formatHomeProduct(p));
+    const formatted = items.map((p) => formatHomeProduct(p));
 
     // Curate sections for the home page storefront
     const platinum = formatted.filter((p) => !p.isOrnate).slice(0, 5);
@@ -266,6 +234,7 @@ class ProductService {
 
   // ------------------------------- get product lookup ----------------------------
   async getLookup(queryParams = {}) {
+    await this.refreshCalculatedPrices();
     const { page, limit, skip } = getPagination(queryParams);
     const conditions = [{ 'meta.deletedAt': null }];
 
@@ -276,38 +245,8 @@ class ProductService {
     }
 
     if (queryParams.productType && queryParams.productType !== 'all') {
-      const pt = String(queryParams.productType).toLowerCase();
-      if (pt === 'gold' || pt === 'jewelry') {
-        conditions.push({
-          $and: [
-            {
-              $or: [
-                { 'basicInfo.productType': { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] } },
-                { 'ornate.metalName': new RegExp('gold', 'i') },
-                { 'basicInfo.title': new RegExp('gold', 'i') },
-              ],
-            },
-            { 'basicInfo.isOrnate': { $ne: true } },
-          ],
-        });
-      } else if (pt === 'silver' || pt === 'standard') {
-        conditions.push({
-          $or: [
-            { 'basicInfo.productType': { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
-            { 'basicInfo.productType': { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
-            { 'ornate.metalName': new RegExp('silver', 'i') },
-            { 'basicInfo.title': new RegExp('silver|925', 'i') },
-          ],
-        });
-      } else if (pt === 'ornate') {
-        conditions.push({
-          $or: [{ 'basicInfo.isOrnate': true }, { 'basicInfo.productType': 'ornate' }],
-        });
-      } else {
-        conditions.push({
-          'basicInfo.productType': queryParams.productType,
-        });
-      }
+      const typeCondition = buildLookupProductTypeFilter(queryParams.productType);
+      if (typeCondition) conditions.push(typeCondition);
     }
 
     if (queryParams.isOrnate !== undefined) {
@@ -322,17 +261,10 @@ class ProductService {
     }
 
     if (queryParams.search) {
-      const searchRegex = new RegExp(queryParams.search, 'i');
-      conditions.push({
-        $or: [
-          { 'basicInfo.title': searchRegex },
-          { 'basicInfo.sku': searchRegex },
-          { 'ornate.tagNo': searchRegex },
-          { 'ornate.barcode': searchRegex },
-          { 'ornate.itemCode': searchRegex },
-          { 'ornate.groupName': searchRegex },
-        ],
-      });
+      const searchConditions = buildProductSearchFilter(queryParams.search);
+      if (searchConditions) {
+        conditions.push({ $or: searchConditions });
+      }
     }
 
     const filter = conditions.length === 1 ? conditions[0] : { $and: conditions };
@@ -348,49 +280,22 @@ class ProductService {
       Product.countDocuments(filter),
     ]);
 
-    const items = rawItems.map((p) => {
-      withColorStatuses(p);
-      const derivedImages = (p.colorImages || []).flatMap((color) => color.images || []);
-      const thumb =
-        derivedImages?.[0]?.url ||
-        p.ornate?.ornateImages?.[0]?.url ||
-        '';
-
-      const effectivePrice = Number(p.pricing?.salePrice || p.pricing?.mrp || 0);
-
-      const resolvedCategory =
-        (Array.isArray(p.categoryIds) && p.categoryIds.length > 0) ? p.categoryIds :
-        [];
-
-      return {
-        _id: p._id,
-        id: p._id,
-        basicInfo: p.basicInfo || {},
-        pricing: p.pricing || {},
-        ornate: p.ornate || {},
-        category: resolvedCategory,
-        productType: p.basicInfo?.productType,
-        isOrnate: Boolean(p.basicInfo?.isOrnate),
-        cataloguePrice: effectivePrice,
-        status: p.status,
-        colorImages: p.colorImages || [],
-        thumbnail: thumb,
-      };
-    });
+    const items = rawItems.map((p) => formatLookupProduct(p));
 
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
   // ------------------------------- update product ----------------------------
   async update(id, data) {
-    if (Array.isArray(data.colorImages)) {
-      data.colorImages = data.colorImages.map((ci) => {
-        const item = { ...ci };
-        if (!item.metalColorId || !mongoose.isValidObjectId(item.metalColorId)) {
-          delete item.metalColorId;
-        }
-        return item;
-      });
+    const existing = await Product.findById(id).lean();
+    if (!existing) throw new ApiError(404, 'Product not found');
+    if ((data.pricing?.calculationMode ?? existing.pricing?.calculationMode) === 'automatic') {
+      const combined = { ...existing, ...data, pricing: { ...existing.pricing, ...data.pricing }, specifications: { ...existing.specifications, ...data.specifications } };
+      const calculated = await this.applyPricing(combined);
+      data = { ...data, variants: calculated.variants, pricing: calculated.pricing };
+    }
+    if (data.colorImages) {
+      data.colorImages = sanitizeColorImages(data.colorImages);
     }
     if (data.basicInfo?.sku) {
       const duplicate = await Product.findOne({

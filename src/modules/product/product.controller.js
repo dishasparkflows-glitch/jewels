@@ -3,6 +3,9 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 
 class ProductController {
+  previewPricing = catchAsync(async (req, res) => {
+    ApiResponse.success(res, await productService.previewPricing(req.body), 'Pricing calculated');
+  });
   // ------------------------------- create product ----------------------------
   create = catchAsync(async (req, res) => {
     const product = await productService.create(req.body);

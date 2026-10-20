@@ -85,6 +85,7 @@ const bannerSchema = new mongoose.Schema(
       key: String,
     },
     collectionImages: [{
+      categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
       url: { type: String, required: true },
       key: { type: String, default: '' },
     }],

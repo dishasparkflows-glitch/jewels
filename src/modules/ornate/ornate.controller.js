@@ -29,7 +29,7 @@ class OrnateController {
     if (result.success) {
       ApiResponse.success(res, result.result, 'Ornate Full Sync completed successfully');
     } else {
-      ApiResponse.error(res, result.error, 500);
+      res.status(500).json({ success: false, message: result.error, data: result.result });
     }
   });
 
@@ -38,6 +38,7 @@ class OrnateController {
     const { sessionId, categories, productIds } = req.body || {};
     const options = (categories || productIds) ? { categories, productIds } : null;
     const result = await ornateService.syncOrnateLabels(sessionId, options);
+    if (!result.success) return res.status(500).json({ success: false, message: 'Ornate label sync failed for one or more records', data: result });
     ApiResponse.success(res, result, `Synced ${result.count || 0} labels from Ornate ERP`);
   });
 
@@ -57,6 +58,7 @@ class OrnateController {
   // ------------------------------- sync ornate metal rates ----------------------------
   syncMetalRates = catchAsync(async (req, res) => {
     const result = await ornateService.syncOrnateMetalRateChanges();
+    if (!result.success) return res.status(500).json({ success: false, message: 'Ornate metal rate sync failed for one or more records', data: result });
     ApiResponse.success(res, result, `Updated metal rates for ${result.count || 0} products`);
   });
 

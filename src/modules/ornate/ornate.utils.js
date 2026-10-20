@@ -291,7 +291,6 @@ function buildProductPayloadFromLabel(label, {
     // Core schema fields
     productType: 'silver',
     isOrnate: true,
-    remark: label.Remark || '',
     stockStatus: isSold ? 'Out of Stock' : 'In Stock',
     categoryIds: categoryId ? [categoryId] : [],
   };

@@ -25,6 +25,7 @@ const pricingSchema = new mongoose.Schema({
   ornatePrice: { type: Number, default: 0 },
   markupPercentage: { type: Number, default: 0 },
   mrpMarkupPercentage: { type: Number, default: 0 },
+  calculatedPrice: { type: Number, default: 0 },
   baseLabourCharge: { type: Number, default: 0 },
   certificateCharge: { type: Number, default: 0 },
   otherAmountPercentage: { type: Number, default: 0 },
@@ -112,9 +113,17 @@ const productSchema = new mongoose.Schema(
       index: true,
     },
     colorImages: [{
+      status: {
+        type: String,
+        enum: ['active', 'inactive'],
+        default: 'active',
+        required: true,
+      },
       metalColorId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'MetalColor',
+        required: false,
+        default: null,
       },
       images: [{
         url: String,
@@ -274,6 +283,13 @@ productSchema.pre('save', function (next) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+  if (Array.isArray(this.colorImages)) {
+    this.colorImages.forEach((ci) => {
+      if (!ci.metalColorId || !mongoose.isValidObjectId(ci.metalColorId)) {
+        ci.metalColorId = null;
+      }
+    });
   }
   next();
 });

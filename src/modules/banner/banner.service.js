@@ -17,6 +17,7 @@ class BannerService {
     const created = await Banner.create(data);
     const populated = await Banner.findById(created._id)
       .populate('display.categoryId', 'name slug')
+      .populate('collectionImages.categoryId', 'name slug')
       .populate('display.menuItemIds', 'title menuSectionId');
     return this._formatBanner(populated);
   }
@@ -25,6 +26,7 @@ class BannerService {
   async getOne(id) {
     const banner = await Banner.findOne({ _id: id })
       .populate('display.categoryId', 'name slug')
+      .populate('collectionImages.categoryId', 'name slug')
       .populate('display.menuItemIds', 'title menuSectionId');
     if (!banner) {
       throw new ApiError(404, 'Banner not found');
@@ -104,6 +106,7 @@ class BannerService {
     const [items, total] = await Promise.all([
       Banner.find(filter)
         .populate('display.categoryId', 'name slug')
+      .populate('collectionImages.categoryId', 'name slug')
         .populate('display.menuItemIds', 'title menuSectionId')
         .sort({ 'display.order': 1, 'meta.createdAt': -1 })
         .skip(skip)
@@ -150,6 +153,7 @@ class BannerService {
 
     const items = await Banner.find(filter)
       .populate('display.categoryId', 'name slug')
+      .populate('collectionImages.categoryId', 'name slug')
       .populate('display.menuItemIds', 'title menuSectionId')
       .sort({ 'display.order': 1, 'meta.createdAt': -1 })
       .lean();
@@ -181,6 +185,7 @@ class BannerService {
         ],
       })
         .populate('display.categoryId', 'name slug')
+      .populate('collectionImages.categoryId', 'name slug')
         .sort({ 'display.order': 1, 'meta.createdAt': -1 })
         .lean();
 
@@ -198,6 +203,7 @@ class BannerService {
       $and: [...baseOfferConds, platformCondition],
     })
       .populate('display.categoryId', 'name slug')
+      .populate('collectionImages.categoryId', 'name slug')
       .sort({ 'display.order': 1, 'meta.createdAt': -1 })
       .lean();
 
@@ -220,6 +226,7 @@ class BannerService {
         ],
       })
         .populate('display.categoryId', 'name slug')
+      .populate('collectionImages.categoryId', 'name slug')
         .sort({ 'display.order': 1, 'meta.createdAt': -1 })
         .lean();
 
@@ -305,6 +312,7 @@ class BannerService {
       { returnDocument: 'after', runValidators: true }
     )
       .populate('display.categoryId', 'name slug')
+      .populate('collectionImages.categoryId', 'name slug')
       .populate('display.menuItemIds', 'title menuSectionId');
 
     if (!banner) {

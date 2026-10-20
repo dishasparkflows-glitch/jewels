@@ -117,11 +117,8 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
   const studdedDetails = data?.StuddedDetail || [];
   const newSessionId = data?.Session?.[0]?.SessionId;
 
-  if (newSessionId) {
-    setLastSessionId(newSessionId);
-  }
-
   if (labelDetails.length === 0) {
+    if (newSessionId && !options) setLastSessionId(newSessionId);
     return { success: true, count: 0, lastSessionId: getLastSessionId() };
   }
 
@@ -182,26 +179,23 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
 
   for (const label of labelsToProcess) {
     try {
-      const { uniqueLabelID, barcodeNo, labelNo, sku, tagNo, barcode } = extractLabelIdentifiers(label);
-      if (!sku) continue;
+      const { sku, tagNo, barcode } = extractLabelIdentifiers(label);
+      if (!sku) throw new Error('Label has no identifier');
 
       // Check if product already exists in Product table and has images
       const matchCriteria = [];
       if (sku) matchCriteria.push({ 'basicInfo.sku': sku });
       if (tagNo) matchCriteria.push({ 'ornate.tagNo': tagNo });
       if (barcode) matchCriteria.push({ 'ornate.barcode': barcode });
-      if (uniqueLabelID) matchCriteria.push({ uniqueLabelID });
-      if (barcodeNo) matchCriteria.push({ barcodeNo });
-      if (labelNo) matchCriteria.push({ labelNo });
 
       const existingProduct = await Product.findOne({ $or: matchCriteria })
-        .select('images basicInfo.sku basicInfo.slug ornate.tagNo')
+        .select('colorImages basicInfo.sku basicInfo.slug ornate')
         .lean();
 
       const hasImages =
         existingProduct &&
-        Array.isArray(existingProduct.images) &&
-        existingProduct.images.length > 0;
+        (existingProduct.ornate?.ornateImages?.length > 0 ||
+          existingProduct.colorImages?.some((color) => color.images?.length > 0));
 
       // Download from FTP and upload to Cloudflare R2 only if NO images exist yet
       const newlyUploadedImages = [];
@@ -250,7 +244,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
       const categoryId = await resolveCategory(label.GroupName, categoryCache);
 
       // Build product payload strictly matching product.model.js
-      const { generatedSlug, setFields } = buildProductPayloadFromLabel(label, {
+      const { setFields } = buildProductPayloadFromLabel(label, {
         studdedDetails,
         existingProduct,
         categoryId,
@@ -264,7 +258,6 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
         {
           $set: setFields,
           $setOnInsert: {
-            'basicInfo.slug': generatedSlug,
             status: 'active',
           },
         },
@@ -284,8 +277,11 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
     } catch {}
   }
 
+  // Advance the global cursor only after a complete, successful batch.
+  if (errorCount === 0 && !options && newSessionId) setLastSessionId(newSessionId);
+
   return {
-    success: true,
+    success: errorCount === 0,
     count: upsertedCount,
     errorCount,
     errors: errors.slice(0, 20),
@@ -318,22 +314,19 @@ async function syncOrnateSoldLabels() {
     const uniqueLabelID = label.UniqueLabelID || label.BarcodeNo || label.LabelNo;
     if (!uniqueLabelID) continue;
 
-    const sku = uniqueLabelID;
+    const sku = String(uniqueLabelID).trim();
     const { salePrice } = calculateLabelPrice(label);
 
     await Product.findOneAndUpdate(
       {
         $or: [
           { 'basicInfo.sku': sku },
-          { 'ornate.tagNo': uniqueLabelID },
-          { 'ornate.barcode': label.BarcodeNo || uniqueLabelID },
-          { uniqueLabelID },
-          { barcodeNo: label.BarcodeNo || uniqueLabelID },
+          { 'ornate.tagNo': String(label.LabelNo || uniqueLabelID).trim() },
+          { 'ornate.barcode': String(label.BarcodeNo || uniqueLabelID) },
         ],
       },
       {
         $set: {
-          stockQty: 0,
           stockStatus: 'Out of Stock',
           isOrnate: true,
           productType: 'silver',
@@ -351,7 +344,8 @@ async function syncOrnateSoldLabels() {
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-+|-+$/g, ''),
           status: 'active',
-          images: [],
+          'ornate.tagNo': String(label.LabelNo || uniqueLabelID),
+          'ornate.barcode': String(label.BarcodeNo || uniqueLabelID),
         },
       },
       { upsert: true, returnDocument: 'after', runValidators: false }
@@ -361,7 +355,7 @@ async function syncOrnateSoldLabels() {
 
   const soldIds = soldList
     .map((item) => item.UniqueLabelId || item.UniqueLabelID || item.BarcodeNo || item.LabelNo)
-    .filter(Boolean);
+    .filter(Boolean).map((id) => String(id).trim());
 
   let modifiedCount = 0;
   if (soldIds.length > 0) {
@@ -369,15 +363,13 @@ async function syncOrnateSoldLabels() {
       {
         isOrnate: true,
         $or: [
-          { uniqueLabelID: { $in: soldIds } },
-          { barcodeNo: { $in: soldIds } },
-          { labelNo: { $in: soldIds } },
           { 'basicInfo.sku': { $in: soldIds } },
+          { 'ornate.barcode': { $in: soldIds } },
+          { 'ornate.tagNo': { $in: soldIds } },
         ],
       },
       {
         $set: {
-          stockQty: 0,
           stockStatus: 'Out of Stock',
           'ornate.isSold': true,
           'ornate.stockQty': 0,
@@ -465,20 +457,15 @@ async function getOrnateErpSoldLabels() {
       { 'basicInfo.sku': { $in: Array.from(allSoldIds) } },
       { 'ornate.tagNo': { $in: Array.from(allSoldIds) } },
       { 'ornate.barcode': { $in: Array.from(allSoldIds) } },
-      { uniqueLabelID: { $in: Array.from(allSoldIds) } },
-      { barcodeNo: { $in: Array.from(allSoldIds) } },
-      { labelNo: { $in: Array.from(allSoldIds) } },
+
     ],
-  }).select('basicInfo.sku stockQty stockStatus status pricing.salePrice ornate uniqueLabelID barcodeNo labelNo').lean();
+  }).select('basicInfo.sku stockStatus status pricing.salePrice ornate').lean();
 
   const dbMap = new Map();
   dbMatch.forEach(p => {
     if (p.basicInfo?.sku) dbMap.set(p.basicInfo.sku.toLowerCase(), p);
     if (p.ornate?.tagNo) dbMap.set(p.ornate.tagNo.toLowerCase(), p);
     if (p.ornate?.barcode) dbMap.set(p.ornate.barcode.toLowerCase(), p);
-    if (p.uniqueLabelID) dbMap.set(p.uniqueLabelID.toLowerCase(), p);
-    if (p.barcodeNo) dbMap.set(p.barcodeNo.toLowerCase(), p);
-    if (p.labelNo) dbMap.set(p.labelNo.toLowerCase(), p);
   });
 
   const enrichedItems = combinedItems.map(item => {
@@ -490,8 +477,8 @@ async function getOrnateErpSoldLabels() {
       ...item,
       inDb: !!dbProduct,
       dbStatus: dbProduct ? dbProduct.status : 'not_synced',
-      currentInStock: dbProduct ? (dbProduct.stockQty ?? 0) : 0,
-      alreadySoldInDb: dbProduct ? (dbProduct.ornate?.isSold || dbProduct.stockQty === 0 || dbProduct.stockStatus === 'Out of Stock') : false,
+      currentInStock: dbProduct ? (dbProduct.ornate?.stockQty ?? 0) : 0,
+      alreadySoldInDb: dbProduct ? (dbProduct.ornate?.isSold || dbProduct.ornate?.stockQty === 0 || dbProduct.stockStatus === 'Out of Stock') : false,
     };
   });
 
@@ -513,15 +500,13 @@ async function syncSpecificSoldLabels(productIds) {
     {
       isOrnate: true,
       $or: [
-        { uniqueLabelID: { $in: cleanIds } },
-        { barcodeNo: { $in: cleanIds } },
-        { labelNo: { $in: cleanIds } },
+        { 'ornate.barcode': { $in: cleanIds } },
+        { 'ornate.tagNo': { $in: cleanIds } },
       { 'basicInfo.sku': { $in: cleanIds } },
       ],
     },
     {
       $set: {
-        stockQty: 0,
         stockStatus: 'Out of Stock',
         'ornate.isSold': true,
         'ornate.stockQty': 0,
@@ -570,9 +555,9 @@ async function syncOrnateMetalRateChanges() {
           {
             isOrnate: true,
             $or: [
-              { uniqueLabelID },
-              { barcodeNo: label.BarcodeNo || uniqueLabelID },
-              { 'basicInfo.sku': uniqueLabelID },
+              { 'basicInfo.sku': String(uniqueLabelID) },
+              { 'ornate.barcode': String(label.BarcodeNo || uniqueLabelID) },
+              { 'ornate.tagNo': String(label.LabelNo || uniqueLabelID) },
             ],
           },
           {
@@ -593,7 +578,7 @@ async function syncOrnateMetalRateChanges() {
     }
   }
 
-  return { success: true, count: updatedCount, errorCount, errors: errors.slice(0, 20) };
+  return { success: errorCount === 0, count: updatedCount, errorCount, errors: errors.slice(0, 20) };
 }
 
 // ------------------------------- run ornate full sync ----------------------------
@@ -617,7 +602,8 @@ async function runOrnateFullSync() {
       results.metalRateSync = await syncOrnateMetalRateChanges();
     }
 
-    return { success: true, results };
+    const success = [results.labelSync, results.soldSync, results.metalRateSync].filter(Boolean).every((result) => result.success);
+    return { success, results };
   } catch (err) {
     console.error('[Ornate NX] Full Sync Error:', err.message);
     throw err;

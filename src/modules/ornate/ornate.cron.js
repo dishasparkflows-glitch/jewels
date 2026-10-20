@@ -28,13 +28,14 @@ async function triggerOrnateSync(source = 'cron') {
   try {
     const result = await ornateService.runOrnateFullSync();
     lastSyncTime = new Date();
-    lastSyncStatus = 'success';
+    lastSyncStatus = result.success ? 'success' : 'error';
     lastSyncResult = {
       timestamp: lastSyncTime,
       durationMs: Date.now() - startTime,
       results: result.results,
     };
-    lastSyncError = null;
+    lastSyncError = result.success ? null : 'Ornate sync completed with failed records; inspect results for details';
+    if (!result.success) return { success: false, error: lastSyncError, result: lastSyncResult };
 
     console.log(`[Ornate Cron] ✅ Full Sync completed successfully in ${Date.now() - startTime}ms`);
     return { success: true, result: lastSyncResult };

@@ -4,9 +4,29 @@ const { SHOP_FOR_OPTIONS, getShopForGenders } = require('./product.filters');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
+// Lean and aggregate results do not apply schema defaults to existing records.
+const withColorStatuses = (product) => {
+  if (Array.isArray(product.colorImages)) {
+    product.colorImages = product.colorImages.map((color) => ({
+      ...color,
+      status: color.status ?? 'active',
+    }));
+  }
+  return product;
+};
+
 class ProductService {
   // ------------------------------- create product ----------------------------
   async create(data) {
+    if (Array.isArray(data.colorImages)) {
+      data.colorImages = data.colorImages.map((ci) => {
+        const item = { ...ci };
+        if (!item.metalColorId || !mongoose.isValidObjectId(item.metalColorId)) {
+          delete item.metalColorId;
+        }
+        return item;
+      });
+    }
     if (data.basicInfo?.sku) {
       const existingSku = await Product.findOne({ 'basicInfo.sku': data.basicInfo.sku });
       if (existingSku) {
@@ -40,7 +60,7 @@ class ProductService {
       throw new ApiError(404, 'Product not found');
     }
 
-    return product;
+    return withColorStatuses(product);
   }
 
   // ------------------------------- get product by sku or tag ----------------------------
@@ -51,7 +71,7 @@ class ProductService {
     if (!product) {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
     }
-    return product;
+    return withColorStatuses(product);
   }
 
   // ------------------------------- get all products ----------------------------
@@ -149,12 +169,13 @@ class ProductService {
       : Product.find(filter).populate(colorPopulation).sort({ 'meta.createdAt': -1, _id: -1 }).skip(skip).limit(limit).lean();
     const [items, total, shopFor] = await Promise.all([itemQuery, Product.countDocuments(filter), facetsQuery]);
 
-    return { items, pagination: getPaginationMeta(total, page, limit), facets: shopFor ? { shopFor } : undefined };
+    return { items: items.map(withColorStatuses), pagination: getPaginationMeta(total, page, limit), facets: shopFor ? { shopFor } : undefined };
   }
 
   // Helper to format concise product card info for the home page
   _formatHomeProduct(p) {
     if (!p) return null;
+    withColorStatuses(p);
     const salePrice = Number(p.pricing?.salePrice || 0);
     const mrp = Number(p.pricing?.mrp || 0);
     const price = salePrice > 0 ? salePrice : (mrp > 0 ? mrp : null);
@@ -328,6 +349,7 @@ class ProductService {
     ]);
 
     const items = rawItems.map((p) => {
+      withColorStatuses(p);
       const derivedImages = (p.colorImages || []).flatMap((color) => color.images || []);
       const thumb =
         derivedImages?.[0]?.url ||
@@ -361,6 +383,15 @@ class ProductService {
 
   // ------------------------------- update product ----------------------------
   async update(id, data) {
+    if (Array.isArray(data.colorImages)) {
+      data.colorImages = data.colorImages.map((ci) => {
+        const item = { ...ci };
+        if (!item.metalColorId || !mongoose.isValidObjectId(item.metalColorId)) {
+          delete item.metalColorId;
+        }
+        return item;
+      });
+    }
     if (data.basicInfo?.sku) {
       const duplicate = await Product.findOne({
         'basicInfo.sku': data.basicInfo.sku,

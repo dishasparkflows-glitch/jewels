@@ -190,7 +190,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
       if (barcode) matchCriteria.push({ 'ornate.barcode': barcode });
 
       const existingProduct = await Product.findOne({ $or: matchCriteria })
-        .select('colorImages basicInfo.sku basicInfo.slug ornate')
+        .select('colorImages basicInfo.sku basicInfo.slug ornate pricing')
         .lean();
 
       const hasImages =
@@ -259,7 +259,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
         {
           $set: setFields,
           $setOnInsert: {
-            status: 'active',
+            status: 'draft',
           },
         },
         { upsert: true, returnDocument: 'after', runValidators: false, setDefaultsOnInsert: false }
@@ -331,8 +331,6 @@ async function syncOrnateSoldLabels() {
           stockStatus: 'Out of Stock',
           isOrnate: true,
           productType: 'silver',
-          'basicInfo.productType': 'silver',
-          'basicInfo.isOrnate': true,
           'pricing.salePrice': salePrice,
           'ornate.isSold': true,
           'ornate.stockQty': 0,
@@ -344,7 +342,7 @@ async function syncOrnateSoldLabels() {
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-+|-+$/g, ''),
-          status: 'active',
+          status: 'draft',
           'ornate.tagNo': String(label.LabelNo || uniqueLabelID),
           'ornate.barcode': String(label.BarcodeNo || uniqueLabelID),
         }) || {},

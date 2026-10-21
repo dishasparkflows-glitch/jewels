@@ -285,6 +285,16 @@ function buildProductPayloadFromLabel(label, {
     ? newlyUploadedImages
     : (existingProduct?.ornate?.ornateImages?.length > 0 ? existingProduct.ornate.ornateImages : undefined);
 
+  const ornatePrice = mrp || salePrice || 0;
+  // For 1st time insert (or products without custom cost), set ornatePrice as costPrice and calculatedPrice
+  const hasCustomCost =
+    existingProduct?.pricing?.costPrice &&
+    Number(existingProduct.pricing.costPrice) !== Number(label.TotalCostAmt) &&
+    Number(existingProduct.pricing.costPrice) !== 0;
+
+  const costPrice = hasCustomCost ? Number(existingProduct.pricing.costPrice) : ornatePrice;
+  const calculatedPrice = hasCustomCost ? (Number(existingProduct.pricing.calculatedPrice) || costPrice) : ornatePrice;
+
   const rawSetFields = {
     // Structured Product Blocks (matching product.model.js)
     basicInfo: {
@@ -293,16 +303,15 @@ function buildProductPayloadFromLabel(label, {
       slug: activeSlug,
       description: description?.trim() || undefined,
       remark: label.Remark?.trim() || undefined,
-      productType: 'silver',
-      isOrnate: true,
     },
     pricing: {
       mrp,
       salePrice,
-      costPrice: Number(label.TotalCostAmt) || 0,
-      ornatePrice: mrp || salePrice || 0,
-      markupPercentage: 0,
-      mrpMarkupPercentage: 0,
+      costPrice,
+      ornatePrice,
+      calculatedPrice,
+      markupPercentage: existingProduct?.pricing?.markupPercentage || 0,
+      mrpMarkupPercentage: existingProduct?.pricing?.mrpMarkupPercentage || 0,
       baseLabourCharge,
       certificateCharge: Number(label.CertificateAmt) || 0,
       otherAmountPercentage: 0,

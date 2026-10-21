@@ -52,13 +52,6 @@ router.get(
 );
 
 router.get(
-  '/erp-categories',
-  authenticate,
-  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
-  ornateController.getCategories
-);
-
-router.get(
   '/sold-labels',
   authenticate,
   authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),

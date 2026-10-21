@@ -5,11 +5,39 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 function getSafePopulates() {
   const fields = [];
-  if (mongoose.models['DiamondType']) fields.push({ path: 'diamondTypeId' });
-  if (mongoose.models['DiamondShape']) fields.push({ path: 'diamondShapeId' });
-  if (mongoose.models['DiamondClarity']) fields.push({ path: 'diamondClarityId' });
-  if (mongoose.models['DiamondColor']) fields.push({ path: 'diamondColorId' });
+  if (mongoose.models['DiamondType']) fields.push({ path: 'diamondTypeId', select: '_id name' });
+  if (mongoose.models['DiamondShape']) fields.push({ path: 'diamondShapeId', select: '_id name' });
+  if (mongoose.models['DiamondClarity']) fields.push({ path: 'diamondClarityId', select: '_id name' });
+  if (mongoose.models['DiamondColor']) fields.push({ path: 'diamondColorId', select: '_id name' });
   return fields;
+}
+
+function getLookupPopulates() {
+  const fields = [];
+  if (mongoose.models['DiamondType']) fields.push({ path: 'diamondTypeId', select: '_id name' });
+  if (mongoose.models['DiamondShape']) fields.push({ path: 'diamondShapeId', select: '_id name' });
+  if (mongoose.models['DiamondClarity']) fields.push({ path: 'diamondClarityId', select: '_id name' });
+  if (mongoose.models['DiamondColor']) fields.push({ path: 'diamondColorId', select: '_id name' });
+  return fields;
+}
+
+async function resolveEntityIds(modelName, values) {
+  if (!values) return [];
+  const list = Array.isArray(values) ? values : String(values).split(',').map((s) => s.trim()).filter(Boolean);
+  const ids = [];
+  const names = [];
+  for (const v of list) {
+    if (/^[a-f\d]{24}$/i.test(v)) ids.push(v);
+    else names.push(v);
+  }
+  if (names.length > 0 && mongoose.models[modelName]) {
+    const records = await mongoose.models[modelName].find({
+      name: { $in: names.map((n) => new RegExp(`^${n}$`, 'i')) },
+      'meta.deletedAt': null,
+    }).select('_id').lean();
+    ids.push(...records.map((r) => String(r._id)));
+  }
+  return ids;
 }
 
 class CenterDiamondPriceService {
@@ -85,15 +113,32 @@ class CenterDiamondPriceService {
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null };
 
-    if (queryParams.diamondTypeId) filter.diamondTypeId = queryParams.diamondTypeId;
-    if (queryParams.diamondShapeId) filter.diamondShapeId = queryParams.diamondShapeId;
-    if (queryParams.diamondClarityId) filter.diamondClarityId = queryParams.diamondClarityId;
-    if (queryParams.diamondColorId) filter.diamondColorId = queryParams.diamondColorId;
+    if (queryParams.diamondTypeId) {
+      const typeIds = await resolveEntityIds('DiamondType', queryParams.diamondTypeId);
+      if (typeIds.length === 1) filter.diamondTypeId = typeIds[0];
+      else if (typeIds.length > 1) filter.diamondTypeId = { $in: typeIds };
+    }
+    if (queryParams.diamondShapeId) {
+      const shapeIds = await resolveEntityIds('DiamondShape', queryParams.diamondShapeId);
+      if (shapeIds.length === 1) filter.diamondShapeId = shapeIds[0];
+      else if (shapeIds.length > 1) filter.diamondShapeId = { $in: shapeIds };
+    }
+    if (queryParams.diamondClarityId) {
+      const clarityIds = await resolveEntityIds('DiamondClarity', queryParams.diamondClarityId);
+      if (clarityIds.length === 1) filter.diamondClarityId = clarityIds[0];
+      else if (clarityIds.length > 1) filter.diamondClarityId = { $in: clarityIds };
+    }
+    if (queryParams.diamondColorId) {
+      const colorIds = await resolveEntityIds('DiamondColor', queryParams.diamondColorId);
+      if (colorIds.length === 1) filter.diamondColorId = colorIds[0];
+      else if (colorIds.length > 1) filter.diamondColorId = { $in: colorIds };
+    }
 
     let findQuery = CenterDiamondPrice.find(filter)
-      .select('_id diamondTypeId diamondShapeId diamondClarityId diamondColorId priceINR priceUSD sizeFrom sizeTo');
+      .select('_id diamondTypeId diamondShapeId diamondClarityId diamondColorId priceINR priceUSD sizeFrom sizeTo')
+      .sort({ sizeFrom: 1 });
 
-    const populates = getSafePopulates();
+    const populates = getLookupPopulates();
     if (populates.length > 0) findQuery = findQuery.populate(populates);
 
     return await findQuery.lean();

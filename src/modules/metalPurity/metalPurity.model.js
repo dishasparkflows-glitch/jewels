@@ -21,6 +21,11 @@ const metalPuritySchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    order: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
     status: {
       type: String,
       enum: ['active', 'inactive'],

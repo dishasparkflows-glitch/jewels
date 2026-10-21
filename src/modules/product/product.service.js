@@ -24,6 +24,17 @@ class ProductService {
 
   async applyPricing(data) {
     if (data.pricing?.calculationMode !== 'automatic') return data;
+    // For drafts, never fail product creation if specifications or purities are not yet configured
+    if (data.status === 'draft') {
+      const metalWeight = Number(data.specifications?.metalWeight);
+      if (!metalWeight || metalWeight <= 0) return data;
+      try {
+        const result = await this.previewPricing(data);
+        return { ...data, variants: result.variants, pricing: { ...data.pricing, salePrice: result.salePrice } };
+      } catch (err) {
+        return data;
+      }
+    }
     const result = await this.previewPricing(data);
     return { ...data, variants: result.variants, pricing: { ...data.pricing, salePrice: result.salePrice } };
   }
@@ -120,18 +131,19 @@ class ProductService {
       if (searchConditions) filter.$or = searchConditions;
     }
 
+    const isOrnateSpecified = queryParams.isOrnate !== undefined && queryParams.isOrnate !== '';
     if (queryParams.productType) {
-      const typeCondition = buildProductTypeFilter(queryParams.productType);
+      const typeCondition = buildProductTypeFilter(queryParams.productType, isOrnateSpecified);
       if (typeCondition) {
         filter.$and = [...(filter.$and || []), typeCondition];
       }
     }
 
-    if (queryParams.isOrnate !== undefined) {
+    if (isOrnateSpecified) {
       const isO = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
       filter.$and = [
         ...(filter.$and || []),
-        { $or: [{ 'basicInfo.isOrnate': isO }, { isOrnate: isO }] },
+        { isOrnate: isO ? true : { $ne: true } },
       ];
     }
 
@@ -189,7 +201,7 @@ class ProductService {
   async getHomeProducts(queryParams = {}) {
     await this.refreshCalculatedPrices();
     const limit = Math.min(Number(queryParams.limit) || 24, 50);
-    const filter = { 'meta.deletedAt': null, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: { $in: ['approved', 'active'] } };
 
     if (queryParams.category) {
       filter.categoryIds = queryParams.category;
@@ -197,13 +209,13 @@ class ProductService {
     if (queryParams.metalName) {
       filter.$or = [
         { 'ornate.metalName': new RegExp(queryParams.metalName, 'i') },
-        { 'basicInfo.productType': new RegExp(queryParams.metalName, 'i') },
+        { productType: new RegExp(queryParams.metalName, 'i') },
       ];
     }
 
     // Select ONLY needed fields from mongo to keep query ultra fast (no ornateImages for storefront)
     const selectFields =
-      '_id colorImages metalColorIds stockStatus categoryIds basicInfo pricing ornate';
+      '_id colorImages metalColorIds stockStatus categoryIds basicInfo pricing ornate productType isOrnate';
 
     const items = await Product.find(filter)
       .select(selectFields)
@@ -217,7 +229,7 @@ class ProductService {
     // Curate sections for the home page storefront
     const platinum = formatted.filter((p) => !p.isOrnate).slice(0, 5);
     const silver = formatted
-      .filter((p) => p.basicInfo?.isOrnate || p.ornate?.metalName?.toUpperCase() === 'SILVER')
+      .filter((p) => p.isOrnate || p.ornate?.metalName?.toUpperCase() === 'SILVER')
       .slice(0, 5);
     const trending = formatted.slice(0, 5);
 
@@ -241,18 +253,19 @@ class ProductService {
     if (queryParams.status && queryParams.status !== 'all') {
       conditions.push({ status: queryParams.status });
     } else if (!queryParams.status) {
-      conditions.push({ status: 'active' });
+      conditions.push({ status: 'approved' });
     }
 
+    const isOrnateSpecified = queryParams.isOrnate !== undefined && queryParams.isOrnate !== '';
     if (queryParams.productType && queryParams.productType !== 'all') {
-      const typeCondition = buildLookupProductTypeFilter(queryParams.productType);
+      const typeCondition = buildLookupProductTypeFilter(queryParams.productType, isOrnateSpecified);
       if (typeCondition) conditions.push(typeCondition);
     }
 
-    if (queryParams.isOrnate !== undefined) {
+    if (isOrnateSpecified) {
       const isO = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
       conditions.push({
-        'basicInfo.isOrnate': isO,
+        isOrnate: isO ? true : { $ne: true },
       });
     }
 

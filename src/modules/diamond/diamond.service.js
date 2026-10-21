@@ -255,7 +255,7 @@ class DiamondService {
       DiamondSize.find(filter).sort({ name: 1 }).select('_id name sizeFrom sizeTo status').lean(),
       SieveSize.find(filter).sort({ name: 1 }).select('_id name status').lean(),
       MetalColor.find(filter).sort({ name: 1 }).select('_id name colorCode colorCodeEnd status').lean(),
-      MetalPurity.find(filter).sort({ name: 1 }).select('_id name metalType purityPercent status').lean(),
+      MetalPurity.find(filter).sort({ order: 1, karat: 1, name: 1 }).select('_id name metalType karat order purityPercent status').lean(),
     ]);
 
     return {

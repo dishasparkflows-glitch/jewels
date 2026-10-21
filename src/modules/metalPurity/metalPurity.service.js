@@ -14,6 +14,12 @@ class MetalPurityService {
         throw new ApiError(409, `Metal purity "${data.name}" already exists`);
       }
     }
+    if (data.order !== undefined) {
+      data.order = Number(data.order) || 0;
+    } else {
+      const highest = await MetalPurity.findOne({ 'meta.deletedAt': null }).sort({ order: -1 }).select('order');
+      data.order = (highest?.order || 0) + 1;
+    }
     return await MetalPurity.create(data);
   }
 
@@ -43,7 +49,7 @@ class MetalPurityService {
 
     const [items, total] = await Promise.all([
       MetalPurity.find(filter)
-        .sort({ karat: 1, 'meta.createdAt': 1 })
+        .sort({ order: 1, karat: 1, name: 1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -61,8 +67,8 @@ class MetalPurityService {
     }
 
     return await MetalPurity.find(filter)
-      .sort({ karat: -1, name: 1 })
-      .select('_id name metalType karat status')
+      .sort({ order: 1, karat: 1, name: 1 })
+      .select('_id name metalType karat order status')
       .lean();
   }
 
@@ -77,6 +83,9 @@ class MetalPurityService {
       if (existing) {
         throw new ApiError(409, `Metal purity "${data.name}" already exists`);
       }
+    }
+    if (data.order !== undefined) {
+      data.order = Number(data.order) || 0;
     }
 
     const item = await MetalPurity.findOneAndUpdate(

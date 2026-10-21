@@ -7,10 +7,6 @@ const basicInfoSchema = new mongoose.Schema({
   slug: { type: String, trim: true },
   description: { type: String },
   remark: { type: String, trim: true },
-  productType: {
-    type: String,
-    enum: ['gold', 'silver', 'jewelry', 'standard', 'ornate'],
-  },
   gender: {
     type: [{
       type: String,
@@ -18,7 +14,6 @@ const basicInfoSchema = new mongoose.Schema({
     }],
     default: undefined,
   },
-  isOrnate: { type: Boolean, default: false },
 }, { _id: false });
 
 const pricingSchema = new mongoose.Schema({
@@ -137,7 +132,8 @@ const productSchema = new mongoose.Schema(
     // ── Media & Color Images ──────────────────────────────────
     productType: {
       type: String,
-      enum: ['gold', 'silver', 'jewelry', 'standard', 'ornate'],
+      enum: ['gold', 'silver'],
+      default: 'gold',
       index: true,
     },
     isOrnate: {
@@ -276,7 +272,8 @@ const productSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'draft', 'approved'],
+      enum: ['draft', 'approved'],
+      default: 'draft',
       index: true,
     },
     birthMonth: {
@@ -317,24 +314,23 @@ const productSchema = new mongoose.Schema(
 );
 
 // Indexes for high performance querying
-productSchema.index({ status: 1, 'basicInfo.isOrnate': 1 });
-productSchema.index({ 'basicInfo.productType': 1, status: 1 });
+productSchema.index({ status: 1, isOrnate: 1 });
+productSchema.index({ productType: 1, status: 1 });
 productSchema.index({ categoryIds: 1, status: 1 });
 productSchema.index({ 'pricing.salePrice': 1 });
 productSchema.index({ 'meta.createdAt': -1 });
 productSchema.pre('save', function (next) {
-  const isOrnate = Boolean(this.basicInfo?.isOrnate ?? this.isOrnate);
+  const isOrnate = Boolean(this.isOrnate);
   const tagNo = this.ornate?.tagNo;
   if (isOrnate && tagNo && !this.basicInfo?.sku) {
+    if (!this.basicInfo) this.basicInfo = {};
     this.basicInfo.sku = tagNo;
   }
-  if (this.basicInfo) {
-    if (isOrnate && (!this.basicInfo.productType || this.basicInfo.productType === 'ornate')) {
-      this.basicInfo.productType = 'silver';
-    }
-    if (isOrnate) {
-      this.basicInfo.isOrnate = true;
-    }
+  if (isOrnate && this.productType !== 'silver') {
+    this.productType = 'silver';
+  }
+  if (isOrnate) {
+    this.isOrnate = true;
   }
   const activeTitle = this.basicInfo?.title;
   if (this.basicInfo && !this.basicInfo.slug && activeTitle) {

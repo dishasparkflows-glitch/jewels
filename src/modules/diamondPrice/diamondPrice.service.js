@@ -5,10 +5,10 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 function getSafePopulates() {
   const fields = [];
-  if (mongoose.models['DiamondType']) fields.push({ path: 'diamondTypeId' });
-  if (mongoose.models['DiamondShape']) fields.push({ path: 'diamondShapeId' });
-  if (mongoose.models['DiamondClarity']) fields.push({ path: 'diamondClarityId' });
-  if (mongoose.models['DiamondColor']) fields.push({ path: 'diamondColorId' });
+  if (mongoose.models['DiamondType']) fields.push({ path: 'diamondTypeId', select: '_id name' });
+  if (mongoose.models['DiamondShape']) fields.push({ path: 'diamondShapeId', select: '_id name' });
+  if (mongoose.models['DiamondClarity']) fields.push({ path: 'diamondClarityId', select: '_id name' });
+  if (mongoose.models['DiamondColor']) fields.push({ path: 'diamondColorId', select: '_id name' });
   return fields;
 }
 

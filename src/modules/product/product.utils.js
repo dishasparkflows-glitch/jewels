@@ -26,6 +26,7 @@ const sanitizeColorImages = (colorImages) => {
 };
 
 const PRICING_COMPARISON_KEYS = [
+  'pricingKey', 'sku', 'combination', 'sideDiamondWeight', 'centerDiamondWeight', 'centerDiamondRate', 'certificateCharge', 'subtotal',
   'price',
   'metalCost',
   'metalRate',
@@ -95,8 +96,8 @@ const formatHomeProduct = (p) => {
     metalColors: p.metalColorIds || [],
     metalColorIds: p.metalColorIds || [],
     category: p.categoryIds || [],
-    productType: p.basicInfo?.productType || '',
-    isOrnate: Boolean(p.basicInfo?.isOrnate),
+    productType: p.productType || '',
+    isOrnate: Boolean(p.isOrnate),
     stockStatus: p.stockStatus || '',
   };
 };
@@ -125,8 +126,8 @@ const formatLookupProduct = (p) => {
     pricing: p.pricing || {},
     ornate: p.ornate || {},
     category: resolvedCategory,
-    productType: p.basicInfo?.productType,
-    isOrnate: Boolean(p.basicInfo?.isOrnate),
+    productType: p.productType || '',
+    isOrnate: Boolean(p.isOrnate),
     cataloguePrice: effectivePrice,
     status: p.status,
     colorImages: p.colorImages || [],
@@ -154,56 +155,38 @@ const buildProductSearchFilter = (search) => {
 /**
  * Builds productType filter for catalogue
  */
-const buildProductTypeFilter = (productType) => {
+const buildProductTypeFilter = (productType, isOrnateSpecified = false) => {
   if (!productType) return null;
   const pt = String(productType).toLowerCase();
-  let typeMatcher;
-  if (pt === 'jewelry' || pt === 'gold') {
-    typeMatcher = { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] };
-  } else if (pt === 'silver' || pt === 'standard') {
-    typeMatcher = { $in: ['silver', 'standard', 'Silver', 'Standard'] };
-  } else {
-    typeMatcher = productType;
+  if (pt === 'gold') {
+    return { productType: 'gold' };
   }
-  return { $or: [{ 'basicInfo.productType': typeMatcher }, { productType: typeMatcher }] };
+  if (pt === 'silver') {
+    return isOrnateSpecified
+      ? { productType: 'silver' }
+      : { productType: 'silver', isOrnate: { $ne: true } };
+  }
+  return { productType: pt };
 };
 
 /**
  * Builds productType filter specifically for lookup modal
  */
-const buildLookupProductTypeFilter = (productType) => {
+const buildLookupProductTypeFilter = (productType, isOrnateSpecified = false) => {
   if (!productType || productType === 'all') return null;
   const pt = String(productType).toLowerCase();
-  if (pt === 'gold' || pt === 'jewelry') {
-    return {
-      $and: [
-        {
-          $or: [
-            { 'basicInfo.productType': { $in: ['gold', 'jewelry', 'Gold', 'Jewelry'] } },
-            { 'ornate.metalName': new RegExp('gold', 'i') },
-            { 'basicInfo.title': new RegExp('gold', 'i') },
-          ],
-        },
-        { 'basicInfo.isOrnate': { $ne: true } },
-      ],
-    };
-  } else if (pt === 'silver' || pt === 'standard') {
-    return {
-      $or: [
-        { 'basicInfo.productType': { $in: ['silver', 'Silver', 'standard', 'Standard'] } },
-        { 'ornate.metalName': new RegExp('silver', 'i') },
-        { 'basicInfo.title': new RegExp('silver|925', 'i') },
-      ],
-    };
-  } else if (pt === 'ornate') {
-    return {
-      $or: [{ 'basicInfo.isOrnate': true }, { 'basicInfo.productType': 'ornate' }],
-    };
-  } else {
-    return {
-      'basicInfo.productType': productType,
-    };
+  if (pt === 'gold') {
+    return { productType: 'gold' };
   }
+  if (pt === 'silver') {
+    return isOrnateSpecified
+      ? { productType: 'silver' }
+      : { productType: 'silver', isOrnate: { $ne: true } };
+  }
+  if (pt === 'ornate') {
+    return { isOrnate: true };
+  }
+  return { productType: pt };
 };
 
 /**

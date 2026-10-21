@@ -6,6 +6,7 @@ const path = require('path');
 const Product = require('../product/product.model');
 const cloudflareR2 = require('../../utils/cloudflareR2');
 const ornateUtils = require('./ornate.utils');
+const productGroupService = require('../productGroup/productGroup.service');
 
 const {
   ORNATE_BASE_URL,
@@ -254,7 +255,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
       });
 
       // Upsert into Product collection with 1 flag: isOrnate: true
-      await Product.findOneAndUpdate(
+      const upsertedProduct = await Product.findOneAndUpdate(
         { $or: matchCriteria },
         {
           $set: setFields,
@@ -262,8 +263,17 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
             status: 'draft',
           },
         },
-        { upsert: true, returnDocument: 'after', runValidators: false, setDefaultsOnInsert: false }
+        { upsert: true, returnDocument: 'after', new: true, runValidators: false, setDefaultsOnInsert: false }
       );
+
+      // Auto-assign to matching product_group or create a new entry
+      if (upsertedProduct) {
+        try {
+          await productGroupService.assignOrnateProductToGroup(upsertedProduct, label);
+        } catch (groupErr) {
+          console.error(`[Ornate Sync] Auto-grouping failed for product ${upsertedProduct._id}:`, groupErr.message);
+        }
+      }
 
       upsertedCount++;
     } catch (err) {
@@ -318,7 +328,7 @@ async function syncOrnateSoldLabels() {
     const sku = String(uniqueLabelID).trim();
     const { salePrice } = calculateLabelPrice(label);
 
-    await Product.findOneAndUpdate(
+    const soldProduct = await Product.findOneAndUpdate(
       {
         $or: [
           { 'basicInfo.sku': sku },
@@ -347,8 +357,17 @@ async function syncOrnateSoldLabels() {
           'ornate.barcode': String(label.BarcodeNo || uniqueLabelID),
         }) || {},
       },
-      { upsert: true, returnDocument: 'after', runValidators: false, setDefaultsOnInsert: false }
+      { upsert: true, returnDocument: 'after', new: true, runValidators: false, setDefaultsOnInsert: false }
     );
+
+    if (soldProduct) {
+      try {
+        await productGroupService.assignOrnateProductToGroup(soldProduct, label);
+      } catch (groupErr) {
+        console.error(`[Ornate Sync] Auto-grouping failed for sold product ${soldProduct._id}:`, groupErr.message);
+      }
+    }
+
     upsertedCount++;
   }
 

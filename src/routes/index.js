@@ -51,6 +51,7 @@ const wishlistRoutes = require('../modules/wishlist/wishlist.routes');
 const cartRoutes = require('../modules/cart/cart.routes');
 const whatsappRoutes = require('../modules/whatsapp/whatsapp.routes');
 const ornateRoutes = require('../modules/ornate/ornate.routes');
+const productGroupRoutes = require('../modules/productGroup/productGroup.routes');
 const currencyRoutes = require('../modules/currency/currency.routes');
 
 // Mount routes
@@ -59,6 +60,7 @@ router.use('/users', userRoutes);
 router.use('/addresses', addressRoutes);
 router.use('/products', productRoutes);
 router.use('/product', productRoutes);
+router.use('/product-groups', productGroupRoutes);
 router.use('/ornate', ornateRoutes);
 router.use('/catalog/ornate-products', (req, res, next) => {
   req.query.isOrnate = 'true';

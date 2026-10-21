@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 const Product = require('./product.model');
-const { calculateProductPricing, loadPricingMasters } = require('./product.pricing');
+const {
+  calculateProductPricing,
+  loadPricingMasters
+} = require('./product.pricing');
 const { SHOP_FOR_OPTIONS, getShopForGenders } = require('./product.filters');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -14,7 +17,7 @@ const {
   buildProductTypeFilter,
   buildLookupProductTypeFilter,
   getEffectivePriceExpression,
-  buildPriceRangeConditions,
+  buildPriceRangeConditions
 } = require('./product.utils');
 
 class ProductService {
@@ -30,13 +33,21 @@ class ProductService {
       if (!metalWeight || metalWeight <= 0) return data;
       try {
         const result = await this.previewPricing(data);
-        return { ...data, variants: result.variants, pricing: { ...data.pricing, salePrice: result.salePrice } };
+        return {
+          ...data,
+          variants: result.variants,
+          pricing: { ...data.pricing, salePrice: result.salePrice }
+        };
       } catch (err) {
         return data;
       }
     }
     const result = await this.previewPricing(data);
-    return { ...data, variants: result.variants, pricing: { ...data.pricing, salePrice: result.salePrice } };
+    return {
+      ...data,
+      variants: result.variants,
+      pricing: { ...data.pricing, salePrice: result.salePrice }
+    };
   }
 
   // Refresh calculated prices before DB filtering/sorting so listing prices and
@@ -44,7 +55,10 @@ class ProductService {
   async refreshCalculatedPrices() {
     if (this.pricingRefresh) return this.pricingRefresh;
     this.pricingRefresh = (async () => {
-      const products = await Product.find({ 'pricing.calculationMode': 'automatic', 'meta.deletedAt': null }).lean();
+      const products = await Product.find({
+        'pricing.calculationMode': 'automatic',
+        'meta.deletedAt': null
+      }).lean();
       if (!products.length) return;
       const masters = await loadPricingMasters();
       const writes = [];
@@ -54,15 +68,27 @@ class ProductService {
         if (!unchanged) {
           writes.push({
             updateOne: {
-              filter: { _id: product._id, 'meta.updatedAt': product.meta?.updatedAt },
-              update: { $set: { variants: result.variants, 'pricing.salePrice': result.salePrice } },
-            },
+              filter: {
+                _id: product._id,
+                'meta.updatedAt': product.meta?.updatedAt
+              },
+              update: {
+                $set: {
+                  variants: result.variants,
+                  'pricing.salePrice': result.salePrice
+                }
+              }
+            }
           });
         }
       }
       if (writes.length) await Product.bulkWrite(writes);
     })();
-    try { await this.pricingRefresh; } finally { this.pricingRefresh = null; }
+    try {
+      await this.pricingRefresh;
+    } finally {
+      this.pricingRefresh = null;
+    }
   }
 
   // ------------------------------- create product ----------------------------
@@ -71,9 +97,14 @@ class ProductService {
       data.colorImages = sanitizeColorImages(data.colorImages);
     }
     if (data.basicInfo?.sku) {
-      const existingSku = await Product.findOne({ 'basicInfo.sku': data.basicInfo.sku });
+      const existingSku = await Product.findOne({
+        'basicInfo.sku': data.basicInfo.sku
+      });
       if (existingSku) {
-        throw new ApiError(409, `Product with SKU/Tag "${data.basicInfo.sku}" already exists`);
+        throw new ApiError(
+          409,
+          `Product with SKU/Tag "${data.basicInfo.sku}" already exists`
+        );
       }
     }
 
@@ -85,20 +116,73 @@ class ProductService {
     await this.refreshCalculatedPrices();
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const filter = isObjectId
-      ? { $or: [{ _id: id }, { 'basicInfo.slug': id }, { 'basicInfo.sku': id }, { 'ornate.tagNo': id }] }
-      : { $or: [{ 'basicInfo.slug': id }, { 'basicInfo.sku': id }, { 'ornate.tagNo': id }] };
+      ? {
+          $or: [
+            { _id: id },
+            { 'basicInfo.slug': id },
+            { 'basicInfo.sku': id },
+            { 'ornate.tagNo': id }
+          ]
+        }
+      : {
+          $or: [
+            { 'basicInfo.slug': id },
+            { 'basicInfo.sku': id },
+            { 'ornate.tagNo': id }
+          ]
+        };
 
     let product = await Product.findOne(filter)
-      .populate({ path: 'categoryIds', select: 'name slug sizeChart', strictPopulate: false })
-      .populate({ path: 'metalColorIds', select: 'name code hex', strictPopulate: false })
-      .populate({ path: 'metalPurityIds', select: 'name karat metalType', strictPopulate: false })
-      .populate({ path: 'colorImages.metalColorId', select: 'name code hex', strictPopulate: false })
-      .populate({ path: 'variants.metalColorId', select: 'name code hex', strictPopulate: false })
-      .populate({ path: 'variants.metalPurityId', select: 'name karat metalType', strictPopulate: false })
-      .populate({ path: 'variants.diamondTypeId', select: 'name', strictPopulate: false })
-      .populate({ path: 'variants.diamondShapeId', select: 'name', strictPopulate: false })
-      .populate({ path: 'variants.diamondColorId', select: 'name', strictPopulate: false })
-      .populate({ path: 'variants.diamondClarityId', select: 'name', strictPopulate: false })
+      .populate({
+        path: 'categoryIds',
+        select: 'name slug sizeChart',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'metalColorIds',
+        select: 'name code hex',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'metalPurityIds',
+        select: 'name karat metalType',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'colorImages.metalColorId',
+        select: 'name code hex',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'variants.metalColorId',
+        select: 'name code hex',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'variants.metalPurityId',
+        select: 'name karat metalType',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'variants.diamondTypeId',
+        select: 'name',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'variants.diamondShapeId',
+        select: 'name',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'variants.diamondColorId',
+        select: 'name',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'variants.diamondClarityId',
+        select: 'name',
+        strictPopulate: false
+      })
       .lean();
 
     if (!product) {
@@ -112,7 +196,7 @@ class ProductService {
   async getBySkuOrTag(code) {
     await this.refreshCalculatedPrices();
     const product = await Product.findOne({
-      $or: [{ 'basicInfo.sku': code }, { 'ornate.tagNo': code }],
+      $or: [{ 'basicInfo.sku': code }, { 'ornate.tagNo': code }]
     }).lean();
     if (!product) {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
@@ -131,19 +215,24 @@ class ProductService {
       if (searchConditions) filter.$or = searchConditions;
     }
 
-    const isOrnateSpecified = queryParams.isOrnate !== undefined && queryParams.isOrnate !== '';
+    const isOrnateSpecified =
+      queryParams.isOrnate !== undefined && queryParams.isOrnate !== '';
     if (queryParams.productType) {
-      const typeCondition = buildProductTypeFilter(queryParams.productType, isOrnateSpecified);
+      const typeCondition = buildProductTypeFilter(
+        queryParams.productType,
+        isOrnateSpecified
+      );
       if (typeCondition) {
         filter.$and = [...(filter.$and || []), typeCondition];
       }
     }
 
     if (isOrnateSpecified) {
-      const isO = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
+      const isO =
+        queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
       filter.$and = [
         ...(filter.$and || []),
-        { isOrnate: isO ? true : { $ne: true } },
+        { isOrnate: isO ? true : { $ne: true } }
       ];
     }
 
@@ -156,40 +245,172 @@ class ProductService {
     }
 
     if (queryParams.menuItem) {
-      if (!mongoose.isValidObjectId(queryParams.menuItem)) throw new ApiError(400, 'Valid menuItem ID is required');
-      filter.$and = [...(filter.$and || []), { $or: [
-        { menuItemIds: queryParams.menuItem },
-      ] }];
+      if (!mongoose.isValidObjectId(queryParams.menuItem))
+        throw new ApiError(400, 'Valid menuItem ID is required');
+      filter.$and = [
+        ...(filter.$and || []),
+        { $or: [{ menuItemIds: queryParams.menuItem }] }
+      ];
+    }
+
+    // Grouping support: if includeGroups is requested, group products into representative group cards
+    let groupCards = [];
+    if (queryParams.includeGroups === 'true') {
+      try {
+        const ProductGroup = require('../productGroup/productGroup.model');
+        const productGroupService = require('../productGroup/productGroup.service');
+
+        const activeGroups = await ProductGroup.find({
+          status: 'active',
+          'meta.deletedAt': null
+        })
+          .populate({
+            path: 'productIds',
+            select:
+              '_id basicInfo pricing specifications ornate colorImages status stockStatus productType isOrnate categoryIds meta'
+          })
+          .lean();
+
+        const groupedProductIds = [];
+
+        for (const group of activeGroups) {
+          if (!group.productIds || !group.productIds.length) continue;
+          group.productIds.forEach((p) => {
+            if (p?._id) groupedProductIds.push(p._id);
+          });
+
+          const summary = productGroupService.computeGroupSummary(
+            group,
+            group.productIds
+          );
+          if (!summary.representative) continue;
+
+          const rep = summary.representative;
+          groupCards.push({
+            _id: group._id,
+            isGroup: true,
+            groupCode: group.groupCode,
+            groupName: group.groupName,
+            name: group.groupName,
+            slug: group.slug || rep.basicInfo?.slug,
+            basicInfo: {
+              title: group.groupName,
+              slug: group.slug || rep.basicInfo?.slug,
+              description: group.description || rep.basicInfo?.description || ''
+            },
+            pricing: {
+              salePrice: summary.representativePrice,
+              mrp: rep.pricing?.mrp || summary.representativePrice,
+              minPrice: summary.minPrice,
+              maxPrice: summary.maxPrice
+            },
+            variantCount: summary.eligibleCount,
+            colorImages: rep.colorImages,
+            images: rep.images,
+            ornate: rep.ornate,
+            stockStatus: rep.stockStatus,
+            status: 'approved',
+            productType: rep.productType,
+            isOrnate: rep.isOrnate,
+            categoryIds: rep.categoryIds,
+            memberProductIds: group.productIds.map((p) => p._id),
+            representative: rep,
+            meta: group.meta
+          });
+        }
+
+        if (groupedProductIds.length > 0) {
+          filter._id = { $nin: groupedProductIds };
+        }
+      } catch (err) {
+        console.error('Error folding groups in getAll:', err);
+      }
     }
 
     // Match the positive price precedence used by storefront product cards.
     const effectivePrice = getEffectivePriceExpression();
-    const priceConditions = buildPriceRangeConditions(queryParams, effectivePrice);
-    if (priceConditions.length) filter.$expr = { $and: [{ $ne: [effectivePrice, null] }, ...priceConditions] };
+    const priceConditions = buildPriceRangeConditions(
+      queryParams,
+      effectivePrice
+    );
+    if (priceConditions.length)
+      filter.$expr = {
+        $and: [{ $ne: [effectivePrice, null] }, ...priceConditions]
+      };
     // Facet counts respect all other filters, but not the current audience selection.
     const facetFilter = { ...filter };
     const genders = getShopForGenders(queryParams.shopFor);
     if (genders.length) filter['basicInfo.gender'] = { $in: genders };
-    const facetsQuery = queryParams.includeFacets === 'true'
-      ? Promise.all(SHOP_FOR_OPTIONS.map(async (option) => ({
-        value: option.value, label: option.label,
-        count: await Product.countDocuments({ ...facetFilter, 'basicInfo.gender': { $in: option.genders } }),
-      })))
-      : Promise.resolve(undefined);
-    const colorPopulation = { path: 'metalColorIds colorImages.metalColorId', select: 'name code hex' };
+    const facetsQuery =
+      queryParams.includeFacets === 'true'
+        ? Promise.all(
+            SHOP_FOR_OPTIONS.map(async (option) => ({
+              value: option.value,
+              label: option.label,
+              count: await Product.countDocuments({
+                ...facetFilter,
+                'basicInfo.gender': { $in: option.genders }
+              })
+            }))
+          )
+        : Promise.resolve(undefined);
+    const colorPopulation = {
+      path: 'metalColorIds colorImages.metalColorId',
+      select: 'name code hex'
+    };
     const priceSort = { 'price-low': 1, 'price-high': -1 }[queryParams.sort];
     const itemQuery = priceSort
       ? Product.aggregate([
-        { $match: Product.find(filter).cast(Product) },
-        { $set: { cataloguePrice: effectivePrice, cataloguePriceMissing: { $cond: [{ $eq: [effectivePrice, null] }, 1, 0] } } },
-        { $sort: { cataloguePriceMissing: 1, cataloguePrice: priceSort, _id: -1 } },
-        { $skip: skip }, { $limit: limit },
-        { $unset: ['cataloguePrice', 'cataloguePriceMissing'] },
-      ]).then((products) => Product.populate(products, colorPopulation))
-      : Product.find(filter).populate(colorPopulation).sort({ 'meta.createdAt': -1, _id: -1 }).skip(skip).limit(limit).lean();
-    const [items, total, shopFor] = await Promise.all([itemQuery, Product.countDocuments(filter), facetsQuery]);
+          { $match: Product.find(filter).cast(Product) },
+          {
+            $set: {
+              cataloguePrice: effectivePrice,
+              cataloguePriceMissing: {
+                $cond: [{ $eq: [effectivePrice, null] }, 1, 0]
+              }
+            }
+          },
+          {
+            $sort: {
+              cataloguePriceMissing: 1,
+              cataloguePrice: priceSort,
+              _id: -1
+            }
+          },
+          { $skip: skip },
+          { $limit: limit },
+          { $unset: ['cataloguePrice', 'cataloguePriceMissing'] }
+        ]).then((products) => Product.populate(products, colorPopulation))
+      : Product.find(filter)
+          .populate(colorPopulation)
+          .sort({ 'meta.createdAt': -1, _id: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean();
+    const [items, total, shopFor] = await Promise.all([
+      itemQuery,
+      Product.countDocuments(filter),
+      facetsQuery
+    ]);
 
-    return { items: items.map(withColorStatuses), pagination: getPaginationMeta(total, page, limit), facets: shopFor ? { shopFor } : undefined };
+    if (queryParams.includeGroups === 'true' && groupCards.length > 0) {
+      const displayedGroupCards = page === 1 ? groupCards : [];
+      const combined = [
+        ...displayedGroupCards,
+        ...items.map(withColorStatuses)
+      ];
+      return {
+        items: combined,
+        pagination: getPaginationMeta(total + groupCards.length, page, limit),
+        facets: shopFor ? { shopFor } : undefined
+      };
+    }
+
+    return {
+      items: items.map(withColorStatuses),
+      pagination: getPaginationMeta(total, page, limit),
+      facets: shopFor ? { shopFor } : undefined
+    };
   }
 
   // Helper to format concise product card info for the home page
@@ -201,7 +422,10 @@ class ProductService {
   async getHomeProducts(queryParams = {}) {
     await this.refreshCalculatedPrices();
     const limit = Math.min(Number(queryParams.limit) || 24, 50);
-    const filter = { 'meta.deletedAt': null, status: { $in: ['approved', 'active'] } };
+    const filter = {
+      'meta.deletedAt': null,
+      status: { $in: ['approved', 'active'] }
+    };
 
     if (queryParams.category) {
       filter.categoryIds = queryParams.category;
@@ -209,7 +433,7 @@ class ProductService {
     if (queryParams.metalName) {
       filter.$or = [
         { 'ornate.metalName': new RegExp(queryParams.metalName, 'i') },
-        { productType: new RegExp(queryParams.metalName, 'i') },
+        { productType: new RegExp(queryParams.metalName, 'i') }
       ];
     }
 
@@ -229,7 +453,9 @@ class ProductService {
     // Curate sections for the home page storefront
     const platinum = formatted.filter((p) => !p.isOrnate).slice(0, 5);
     const silver = formatted
-      .filter((p) => p.isOrnate || p.ornate?.metalName?.toUpperCase() === 'SILVER')
+      .filter(
+        (p) => p.isOrnate || p.ornate?.metalName?.toUpperCase() === 'SILVER'
+      )
       .slice(0, 5);
     const trending = formatted.slice(0, 5);
 
@@ -238,9 +464,9 @@ class ProductService {
       sections: {
         platinum: platinum.length > 0 ? platinum : formatted.slice(0, 5),
         silver: silver.length > 0 ? silver : formatted.slice(5, 10),
-        trending: trending.length > 0 ? trending : formatted.slice(0, 5),
+        trending: trending.length > 0 ? trending : formatted.slice(0, 5)
       },
-      total: formatted.length,
+      total: formatted.length
     };
   }
 
@@ -256,16 +482,21 @@ class ProductService {
       conditions.push({ status: 'approved' });
     }
 
-    const isOrnateSpecified = queryParams.isOrnate !== undefined && queryParams.isOrnate !== '';
+    const isOrnateSpecified =
+      queryParams.isOrnate !== undefined && queryParams.isOrnate !== '';
     if (queryParams.productType && queryParams.productType !== 'all') {
-      const typeCondition = buildLookupProductTypeFilter(queryParams.productType, isOrnateSpecified);
+      const typeCondition = buildLookupProductTypeFilter(
+        queryParams.productType,
+        isOrnateSpecified
+      );
       if (typeCondition) conditions.push(typeCondition);
     }
 
     if (isOrnateSpecified) {
-      const isO = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
+      const isO =
+        queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
       conditions.push({
-        isOrnate: isO ? true : { $ne: true },
+        isOrnate: isO ? true : { $ne: true }
       });
     }
 
@@ -280,17 +511,24 @@ class ProductService {
       }
     }
 
-    const filter = conditions.length === 1 ? conditions[0] : { $and: conditions };
+    const filter =
+      conditions.length === 1 ? conditions[0] : { $and: conditions };
 
     const [rawItems, total] = await Promise.all([
       Product.find(filter)
-        .select('_id basicInfo categoryIds colorImages ornate pricing productType isOrnate specifications status')
-        .populate({ path: 'categoryIds', select: 'name slug', strictPopulate: false })
+        .select(
+          '_id basicInfo categoryIds colorImages ornate pricing productType isOrnate specifications status'
+        )
+        .populate({
+          path: 'categoryIds',
+          select: 'name slug',
+          strictPopulate: false
+        })
         .sort({ 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      Product.countDocuments(filter),
+      Product.countDocuments(filter)
     ]);
 
     const items = rawItems.map((p) => formatLookupProduct(p));
@@ -302,10 +540,22 @@ class ProductService {
   async update(id, data) {
     const existing = await Product.findById(id).lean();
     if (!existing) throw new ApiError(404, 'Product not found');
-    if ((data.pricing?.calculationMode ?? existing.pricing?.calculationMode) === 'automatic') {
-      const combined = { ...existing, ...data, pricing: { ...existing.pricing, ...data.pricing }, specifications: { ...existing.specifications, ...data.specifications } };
+    if (
+      (data.pricing?.calculationMode ?? existing.pricing?.calculationMode) ===
+      'automatic'
+    ) {
+      const combined = {
+        ...existing,
+        ...data,
+        pricing: { ...existing.pricing, ...data.pricing },
+        specifications: { ...existing.specifications, ...data.specifications }
+      };
       const calculated = await this.applyPricing(combined);
-      data = { ...data, variants: calculated.variants, pricing: calculated.pricing };
+      data = {
+        ...data,
+        variants: calculated.variants,
+        pricing: calculated.pricing
+      };
     }
     if (data.colorImages) {
       data.colorImages = sanitizeColorImages(data.colorImages);
@@ -313,10 +563,13 @@ class ProductService {
     if (data.basicInfo?.sku) {
       const duplicate = await Product.findOne({
         'basicInfo.sku': data.basicInfo.sku,
-        _id: { $ne: id },
+        _id: { $ne: id }
       });
       if (duplicate) {
-        throw new ApiError(409, `Product with SKU "${data.basicInfo.sku}" already exists`);
+        throw new ApiError(
+          409,
+          `Product with SKU "${data.basicInfo.sku}" already exists`
+        );
       }
     }
 

@@ -93,6 +93,9 @@ class ProductService {
 
   // ------------------------------- create product ----------------------------
   async create(data) {
+    if (data.status === 'active') {
+      data.status = 'approved';
+    }
     if (data.colorImages) {
       data.colorImages = sanitizeColorImages(data.colorImages);
     }
@@ -538,6 +541,9 @@ class ProductService {
 
   // ------------------------------- update product ----------------------------
   async update(id, data) {
+    if (data.status === 'active') {
+      data.status = 'approved';
+    }
     const existing = await Product.findById(id).lean();
     if (!existing) throw new ApiError(404, 'Product not found');
     if (

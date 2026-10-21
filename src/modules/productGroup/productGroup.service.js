@@ -400,6 +400,63 @@ class ProductGroupService {
   }
 
   /**
+   * Lightweight listing — returns only groupName, groupCode, productCount, status
+   * without populating product documents (much faster for Common Groups tab)
+   */
+  async getGroupsSummary(queryParams = {}) {
+    const { page, limit, skip } = getPagination(queryParams);
+    const filter = { 'meta.deletedAt': null };
+
+    if (queryParams.status && queryParams.status !== 'all') {
+      filter.status = queryParams.status;
+    } else if (!queryParams.status) {
+      filter.status = 'active';
+    }
+
+    if (queryParams.search && queryParams.search.trim()) {
+      const term = queryParams.search.trim();
+      const escaped = term.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+      const searchRegex = { $regex: escaped, $options: 'i' };
+
+      filter.$or = [
+        { groupName: searchRegex },
+        { groupCode: searchRegex },
+        { slug: searchRegex },
+      ];
+    }
+
+    const total = await ProductGroup.countDocuments(filter);
+
+    const sortMap = {
+      latest: { 'meta.createdAt': -1, _id: -1 },
+      name_asc: { groupName: 1 },
+      name_desc: { groupName: -1 },
+    };
+    const dbSort = sortMap[queryParams.sort] || { 'meta.createdAt': -1, _id: -1 };
+
+    const rawGroups = await ProductGroup.find(filter)
+      .select('_id groupCode groupName status productIds meta')
+      .sort(dbSort)
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const items = rawGroups.map((g) => ({
+      _id: g._id,
+      groupCode: g.groupCode,
+      groupName: g.groupName,
+      status: g.status,
+      productCount: Array.isArray(g.productIds) ? g.productIds.length : 0,
+      createdAt: g.meta?.createdAt,
+    }));
+
+    return {
+      items,
+      pagination: getPaginationMeta(total, page, limit),
+    };
+  }
+
+  /**
    * Get single group details with fully populated products
    */
   async getGroupById(id) {
@@ -667,23 +724,15 @@ class ProductGroupService {
   /**
    * Explicitly move products from one group to another
    */
-  async moveProducts({ sourceGroupId, targetGroupId, productIds, userId = null }) {
-    if (!sourceGroupId || !targetGroupId) {
-      throw new ApiError(400, 'Both source and target group IDs are required');
-    }
-    if (String(sourceGroupId) === String(targetGroupId)) {
-      throw new ApiError(400, 'Source and target groups must be different');
+  async moveProducts({ sourceGroupId, targetGroupId, newGroupName, productIds, userId = null }) {
+    if (!sourceGroupId) {
+      throw new ApiError(400, 'Source group ID is required');
     }
 
-    const [sourceGroup, targetGroup] = await Promise.all([
-      ProductGroup.findOne({ _id: sourceGroupId, 'meta.deletedAt': null }),
-      ProductGroup.findOne({ _id: targetGroupId, 'meta.deletedAt': null }),
-    ]);
-
+    const sourceGroup = await ProductGroup.findOne({ _id: sourceGroupId, 'meta.deletedAt': null });
     if (!sourceGroup) throw new ApiError(404, 'Source group not found');
-    if (!targetGroup) throw new ApiError(404, 'Target group not found');
 
-    const validIds = productIds.filter((id) => mongoose.isValidObjectId(id));
+    const validIds = (productIds || []).filter((id) => mongoose.isValidObjectId(id));
     if (!validIds.length) {
       throw new ApiError(400, 'No valid product IDs provided to move');
     }
@@ -697,6 +746,82 @@ class ProductGroupService {
       sourceUpdate.$set.primaryProductId = null;
       sourceUpdate.$set.representativeMode = 'auto';
     }
+
+    // CASE 1: Create another group with auto/custom name
+    if (newGroupName && newGroupName.trim()) {
+      const trimmedName = newGroupName.trim();
+      let safeSlug = trimmedName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+      if (!safeSlug) {
+        safeSlug = `group-${Date.now().toString(36)}`;
+      }
+
+      const existingSlug = await ProductGroup.findOne({
+        slug: safeSlug,
+        'meta.deletedAt': null,
+      });
+      if (existingSlug) {
+        safeSlug = `${safeSlug}-${Date.now().toString(36)}`;
+      }
+
+      const groupCode = await this.generateGroupCode();
+
+      // Pull from source group
+      await ProductGroup.findByIdAndUpdate(sourceGroupId, sourceUpdate);
+
+      // Create new group
+      const newGroup = await ProductGroup.create({
+        groupCode,
+        groupName: trimmedName,
+        slug: safeSlug,
+        description: '',
+        productIds: validIds,
+        primaryProductId: validIds[0] || null,
+        representativeMode: 'auto',
+        status: 'active',
+        sync: {
+          firstSyncedAt: null,
+          firstSyncedBy: null,
+          firstSourceProductId: null,
+          firstProductIds: [],
+          firstSyncedFields: [],
+          lastSyncedAt: null,
+          lastSyncedBy: null,
+          lastSyncOperationId: null,
+          syncVersion: 0,
+        },
+        meta: {
+          createdBy: userId,
+          updatedBy: userId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+
+      return {
+        message: `Successfully created group "${newGroup.groupName}" and moved ${validIds.length} product(s)`,
+        sourceGroupId,
+        targetGroupId: newGroup._id,
+        newGroup,
+        movedCount: validIds.length,
+      };
+    }
+
+    // CASE 2: Move to an existing target group
+    if (!targetGroupId) {
+      throw new ApiError(400, 'Target group ID or New group name is required');
+    }
+    if (String(sourceGroupId) === String(targetGroupId)) {
+      throw new ApiError(400, 'Source and target groups must be different');
+    }
+
+    const targetGroup = await ProductGroup.findOne({ _id: targetGroupId, 'meta.deletedAt': null });
+    if (!targetGroup) throw new ApiError(404, 'Target group not found');
+
+    // Pull from source
     await ProductGroup.findByIdAndUpdate(sourceGroupId, sourceUpdate);
 
     // Push to target
@@ -710,6 +835,57 @@ class ProductGroupService {
       sourceGroupId,
       targetGroupId,
       movedCount: validIds.length,
+    };
+  }
+
+  /**
+   * Approve products in a group where stockStatus is In Stock
+   */
+  async approveGroup(groupId, productIds = null, userId = null) {
+    const group = await ProductGroup.findOne({ _id: groupId, 'meta.deletedAt': null });
+    if (!group) throw new ApiError(404, 'Product group not found');
+
+    let targetIds = group.productIds || [];
+    if (Array.isArray(productIds) && productIds.length > 0) {
+      const validCustom = productIds.filter((id) => mongoose.isValidObjectId(id));
+      if (validCustom.length > 0) {
+        targetIds = targetIds.filter((id) =>
+          validCustom.some((cId) => String(cId) === String(id))
+        );
+      }
+    }
+
+    if (!targetIds.length) {
+      throw new ApiError(400, 'No products found in this group to approve');
+    }
+
+    // Filter where stockStatus is 'In Stock' and not sold/deleted
+    const filter = {
+      _id: { $in: targetIds },
+      'meta.deletedAt': null,
+      'ornate.isSold': { $ne: true },
+      $or: [
+        { stockStatus: 'In Stock' },
+        { stockStatus: { $regex: /^in stock$/i } },
+        { stockStatus: { $exists: false } },
+        { stockStatus: null },
+      ],
+    };
+
+    const updateResult = await Product.updateMany(filter, {
+      $set: {
+        status: 'approved',
+        'meta.updatedBy': userId,
+        'meta.updatedAt': new Date(),
+      },
+    });
+
+    const updatedGroup = await this.getGroupById(groupId);
+
+    return {
+      message: `Successfully approved ${updateResult.modifiedCount} in-stock product(s) in "${group.groupName}"`,
+      approvedCount: updateResult.modifiedCount,
+      group: updatedGroup,
     };
   }
 

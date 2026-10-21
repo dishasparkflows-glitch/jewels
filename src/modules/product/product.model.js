@@ -273,6 +273,7 @@ const productSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ['draft', 'approved'],
+      set: (val) => (val === 'active' ? 'approved' : val),
       default: 'draft',
       index: true,
     },

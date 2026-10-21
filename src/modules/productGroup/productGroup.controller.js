@@ -13,6 +13,11 @@ class ProductGroupController {
     ApiResponse.paginated(res, items, pagination, 'Product groups retrieved successfully');
   });
 
+  getSummary = catchAsync(async (req, res) => {
+    const { items, pagination } = await productGroupService.getGroupsSummary(req.query);
+    ApiResponse.paginated(res, items, pagination, 'Product groups summary retrieved successfully');
+  });
+
   getOne = catchAsync(async (req, res) => {
     const group = await productGroupService.getGroupById(req.params.id);
     ApiResponse.success(res, group, 'Product group retrieved successfully');
@@ -55,9 +60,19 @@ class ProductGroupController {
     const result = await productGroupService.moveProducts({
       sourceGroupId: req.params.id || req.body.sourceGroupId,
       targetGroupId: req.body.targetGroupId || req.body.target,
+      newGroupName: req.body.newGroupName,
       productIds: req.body.productIds,
       userId: req.user?._id,
     });
+    ApiResponse.success(res, result, result.message);
+  });
+
+  approveGroup = catchAsync(async (req, res) => {
+    const result = await productGroupService.approveGroup(
+      req.params.id,
+      req.body.productIds,
+      req.user?._id
+    );
     ApiResponse.success(res, result, result.message);
   });
 

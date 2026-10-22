@@ -188,6 +188,21 @@ class ProductService {
       })
       .lean();
 
+    if (!product && !isObjectId) {
+      const candidates = await Product.find({ 'basicInfo.title': { $exists: true, $ne: '' } }).select('_id basicInfo.title').lean();
+      const matched = candidates.find((cand) => {
+        const titleSlug = (cand.basicInfo?.title || '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        return titleSlug === String(id).toLowerCase();
+      });
+      if (matched) {
+        await Product.updateOne({ _id: matched._id }, { $set: { 'basicInfo.slug': id } });
+        return this.getOne(String(matched._id));
+      }
+    }
+
     if (!product) {
       throw new ApiError(404, 'Product not found');
     }
@@ -361,7 +376,18 @@ class ProductService {
       path: 'metalColorIds colorImages.metalColorId',
       select: 'name code hex'
     };
-    const priceSort = { 'price-low': 1, 'price-high': -1 }[queryParams.sort];
+    const priceSort = {
+      'price-low': 1,
+      'price-high': -1,
+      'price_asc': 1,
+      'price_desc': -1,
+    }[queryParams.sort];
+
+    let fallbackSort = { 'meta.createdAt': -1, _id: -1 };
+    if (queryParams.sort === 'name_asc') {
+      fallbackSort = { 'basicInfo.title': 1, _id: -1 };
+    }
+
     const itemQuery = priceSort
       ? Product.aggregate([
           { $match: Product.find(filter).cast(Product) },
@@ -386,7 +412,7 @@ class ProductService {
         ]).then((products) => Product.populate(products, colorPopulation))
       : Product.find(filter)
           .populate(colorPopulation)
-          .sort({ 'meta.createdAt': -1, _id: -1 })
+          .sort(fallbackSort)
           .skip(skip)
           .limit(limit)
           .lean();

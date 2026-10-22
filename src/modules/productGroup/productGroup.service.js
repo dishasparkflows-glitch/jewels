@@ -233,57 +233,149 @@ class ProductGroupService {
   }
 
   /**
+   * Helper to extract valid image URL from a product document
+   */
+  extractProductImage(product) {
+    if (!product) return null;
+    if (product.images && product.images[0]) {
+      const img = product.images[0];
+      return typeof img === 'string' ? img : img.url;
+    }
+    if (product.ornate?.ornateImages) {
+      if (Array.isArray(product.ornate.ornateImages) && product.ornate.ornateImages[0]) {
+        const img = product.ornate.ornateImages[0];
+        return typeof img === 'string' ? img : img.url;
+      }
+      if (typeof product.ornate.ornateImages === 'string' && product.ornate.ornateImages.startsWith('http')) {
+        return product.ornate.ornateImages;
+      }
+    }
+    if (product.colorImages && product.colorImages[0]?.images?.[0]) {
+      const img = product.colorImages[0].images[0];
+      return typeof img === 'string' ? img : img.url;
+    }
+    if (product.media?.gallery?.[0]?.url) return product.media.gallery[0].url;
+    if (product.imageUrl) return product.imageUrl;
+    return null;
+  }
+
+  /**
+   * Resolve 1st product image from a group's products
+   */
+  getFirstProductImage(products = [], primaryId = null) {
+    if (!Array.isArray(products) || !products.length) return null;
+    if (primaryId) {
+      const primary = products.find((p) => String(p._id) === String(primaryId));
+      const pImg = this.extractProductImage(primary);
+      if (pImg) return pImg;
+    }
+    for (const p of products) {
+      const img = this.extractProductImage(p);
+      if (img) return img;
+    }
+    return null;
+  }
+
+  /**
+   * Build condition for filtering groups by their member product status
+   */
+  async buildProductStatusConditions(statusParam) {
+    if (!statusParam || statusParam === 'all') return null;
+
+    if (statusParam === 'draft') {
+      const draftProductIds = await Product.find({
+        isOrnate: true,
+        status: { $in: ['draft', 'inactive'] },
+        'meta.deletedAt': null,
+      }).distinct('_id');
+      return { productIds: { $in: draftProductIds } };
+    }
+
+    if (statusParam === 'approved') {
+      const approvedProductIds = await Product.find({
+        isOrnate: true,
+        status: { $in: ['approved', 'active'] },
+        'ornate.isSold': { $ne: true },
+        stockStatus: { $ne: 'Sold' },
+        'meta.deletedAt': null,
+      }).distinct('_id');
+      return { productIds: { $in: approvedProductIds } };
+    }
+
+    if (statusParam === 'sold') {
+      const soldProductIds = await Product.find({
+        isOrnate: true,
+        $or: [
+          { 'ornate.isSold': true },
+          { stockStatus: 'Sold' },
+          { status: 'sold' },
+        ],
+        'meta.deletedAt': null,
+      }).distinct('_id');
+      return { productIds: { $in: soldProductIds } };
+    }
+
+    return null;
+  }
+
+  /**
    * Get accurate counts for all admin Ornate Products tabs
    */
   async getTabCounts() {
-    const baseFilter = { isOrnate: true, 'meta.deletedAt': null };
+    const baseGroupFilter = { status: 'active', 'meta.deletedAt': null };
 
-    // 1. All Products
-    const all = await Product.countDocuments(baseFilter);
+    // 1. All Groups (all active groups)
+    const all = await ProductGroup.countDocuments(baseGroupFilter);
 
-    // 2. Draft
-    const draft = await Product.countDocuments({
-      ...baseFilter,
+    // 2. Draft Groups: groups containing draft/inactive ornate products
+    const draftProductIds = await Product.find({
+      isOrnate: true,
       status: { $in: ['draft', 'inactive'] },
+      'meta.deletedAt': null,
+    }).distinct('_id');
+
+    const draft = await ProductGroup.countDocuments({
+      ...baseGroupFilter,
+      productIds: { $in: draftProductIds },
     });
 
-    // 3. Sold
-    const sold = await Product.countDocuments({
-      ...baseFilter,
+    // 3. Approved Groups: groups containing approved ornate products (not sold)
+    const approvedProductIds = await Product.find({
+      isOrnate: true,
+      status: { $in: ['approved', 'active'] },
+      'ornate.isSold': { $ne: true },
+      stockStatus: { $ne: 'Sold' },
+      'meta.deletedAt': null,
+    }).distinct('_id');
+
+    const approved = await ProductGroup.countDocuments({
+      ...baseGroupFilter,
+      productIds: { $in: approvedProductIds },
+    });
+
+    // 4. Sold Groups: groups containing sold ornate products
+    const soldProductIds = await Product.find({
+      isOrnate: true,
       $or: [
         { 'ornate.isSold': true },
         { stockStatus: 'Sold' },
         { status: 'sold' },
       ],
-    });
-
-    // 4. Approved (active and not sold)
-    const approved = await Product.countDocuments({
-      ...baseFilter,
-      status: { $in: ['approved', 'active'] },
-      'ornate.isSold': { $ne: true },
-      stockStatus: { $ne: 'Sold' },
-    });
-
-    // 5. Common Groups (count of unique active groups)
-    const commonGroupsCount = await ProductGroup.countDocuments({
-      status: 'active',
       'meta.deletedAt': null,
+    }).distinct('_id');
+
+    const sold = await ProductGroup.countDocuments({
+      ...baseGroupFilter,
+      productIds: { $in: soldProductIds },
     });
 
-    // 6. Ungrouped (eligible ornate products not member of any active group)
-    const activeGroups = await ProductGroup.find(
-      { status: 'active', 'meta.deletedAt': null },
-      { productIds: 1 }
-    ).lean();
+    // 5. Common Groups (total active groups)
+    const common_group = all;
 
-    const activeGroupProductIds = [
-      ...new Set(activeGroups.flatMap((g) => (g.productIds || []).map(String))),
-    ];
-
+    // 6. Ungrouped (all ornate products count)
     const ungrouped = await Product.countDocuments({
-      ...baseFilter,
-      _id: { $nin: activeGroupProductIds.map((id) => new mongoose.Types.ObjectId(id)) },
+      isOrnate: true,
+      'meta.deletedAt': null,
     });
 
     return {
@@ -291,7 +383,7 @@ class ProductGroupService {
       draft,
       approved,
       sold,
-      common_group: commonGroupsCount,
+      common_group,
       ungrouped,
     };
   }
@@ -303,9 +395,15 @@ class ProductGroupService {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
-    if (queryParams.status && queryParams.status !== 'all') {
+    const statusParam = queryParams.productStatus || queryParams.status;
+    const productCondition = await this.buildProductStatusConditions(statusParam);
+
+    if (productCondition) {
+      filter.productIds = productCondition.productIds;
+      filter.status = 'active';
+    } else if (queryParams.status && queryParams.status !== 'all') {
       filter.status = queryParams.status;
-    } else if (!queryParams.status) {
+    } else if (!queryParams.status || queryParams.status === 'active') {
       filter.status = 'active';
     }
 
@@ -326,16 +424,24 @@ class ProductGroupService {
           ],
         },
         { _id: 1 }
-      ).lean();
+      ).distinct('_id');
 
-      const pIds = matchingProductIds.map((p) => p._id);
-
-      filter.$or = [
+      const searchConditions = [
         { groupName: searchRegex },
         { groupCode: searchRegex },
         { slug: searchRegex },
-        { productIds: { $in: pIds } },
+        { productIds: { $in: matchingProductIds } },
       ];
+
+      if (filter.productIds) {
+        filter.$and = [
+          { productIds: filter.productIds },
+          { $or: searchConditions },
+        ];
+        delete filter.productIds;
+      } else {
+        filter.$or = searchConditions;
+      }
     }
 
     const total = await ProductGroup.countDocuments(filter);
@@ -361,6 +467,10 @@ class ProductGroupService {
 
     const items = rawGroups.map((g) => {
       const summary = this.computeGroupSummary(g, g.productIds);
+      const products = Array.isArray(g.productIds) ? g.productIds : [];
+      const imageUrl = this.getFirstProductImage(products, g.primaryProductId) || this.extractProductImage(summary.representative);
+      const firstProduct = products.length > 0 ? products[0] : null;
+
       return {
         _id: g._id,
         groupCode: g.groupCode,
@@ -376,6 +486,9 @@ class ProductGroupService {
         productCount: summary.totalProducts,
         eligibleCount: summary.eligibleCount,
         representative: summary.representative,
+        firstProduct: firstProduct ? { _id: firstProduct._id, basicInfo: firstProduct.basicInfo } : null,
+        imageUrl,
+        firstProductImage: imageUrl,
         representativePrice: summary.representativePrice,
         minPrice: summary.minPrice,
         maxPrice: summary.maxPrice,
@@ -400,16 +513,21 @@ class ProductGroupService {
   }
 
   /**
-   * Lightweight listing — returns only groupName, groupCode, productCount, status
-   * without populating product documents (much faster for Common Groups tab)
+   * Lightweight listing — returns groupName, groupCode, productCount, status, and 1st product image
    */
   async getGroupsSummary(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
-    if (queryParams.status && queryParams.status !== 'all') {
+    const statusParam = queryParams.productStatus || queryParams.status;
+    const productCondition = await this.buildProductStatusConditions(statusParam);
+
+    if (productCondition) {
+      filter.productIds = productCondition.productIds;
+      filter.status = 'active';
+    } else if (queryParams.status && queryParams.status !== 'all') {
       filter.status = queryParams.status;
-    } else if (!queryParams.status) {
+    } else if (!queryParams.status || queryParams.status === 'active') {
       filter.status = 'active';
     }
 
@@ -418,11 +536,35 @@ class ProductGroupService {
       const escaped = term.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
       const searchRegex = { $regex: escaped, $options: 'i' };
 
-      filter.$or = [
+      const matchingProductIds = await Product.find(
+        {
+          isOrnate: true,
+          $or: [
+            { 'basicInfo.sku': searchRegex },
+            { 'ornate.tagNo': searchRegex },
+            { 'basicInfo.title': searchRegex },
+            { 'ornate.barcode': searchRegex },
+          ],
+        },
+        { _id: 1 }
+      ).distinct('_id');
+
+      const searchConditions = [
         { groupName: searchRegex },
         { groupCode: searchRegex },
         { slug: searchRegex },
+        { productIds: { $in: matchingProductIds } },
       ];
+
+      if (filter.productIds) {
+        filter.$and = [
+          { productIds: filter.productIds },
+          { $or: searchConditions },
+        ];
+        delete filter.productIds;
+      } else {
+        filter.$or = searchConditions;
+      }
     }
 
     const total = await ProductGroup.countDocuments(filter);
@@ -435,20 +577,29 @@ class ProductGroupService {
     const dbSort = sortMap[queryParams.sort] || { 'meta.createdAt': -1, _id: -1 };
 
     const rawGroups = await ProductGroup.find(filter)
-      .select('_id groupCode groupName status productIds meta')
+      .populate({
+        path: 'productIds',
+        select: '_id basicInfo images ornate.ornateImages colorImages pricing status stockStatus',
+      })
       .sort(dbSort)
       .skip(skip)
       .limit(limit)
       .lean();
 
-    const items = rawGroups.map((g) => ({
-      _id: g._id,
-      groupCode: g.groupCode,
-      groupName: g.groupName,
-      status: g.status,
-      productCount: Array.isArray(g.productIds) ? g.productIds.length : 0,
-      createdAt: g.meta?.createdAt,
-    }));
+    const items = rawGroups.map((g) => {
+      const products = Array.isArray(g.productIds) ? g.productIds : [];
+      const imageUrl = this.getFirstProductImage(products, g.primaryProductId);
+      return {
+        _id: g._id,
+        groupCode: g.groupCode,
+        groupName: g.groupName,
+        status: g.status,
+        productCount: products.length,
+        createdAt: g.meta?.createdAt,
+        imageUrl,
+        firstProductImage: imageUrl,
+      };
+    });
 
     return {
       items,
@@ -927,11 +1078,20 @@ class ProductGroupService {
 
     const total = await Product.countDocuments(filter);
 
+    let dbSort = { 'meta.createdAt': -1, _id: -1 };
+    if (queryParams.sort === 'price_desc' || queryParams.sort === 'price-high') {
+      dbSort = { 'pricing.salePrice': -1, 'pricing.mrp': -1, _id: -1 };
+    } else if (queryParams.sort === 'price_asc' || queryParams.sort === 'price-low') {
+      dbSort = { 'pricing.salePrice': 1, 'pricing.mrp': 1, _id: -1 };
+    } else if (queryParams.sort === 'name_asc') {
+      dbSort = { 'basicInfo.title': 1, _id: -1 };
+    }
+
     const items = await Product.find(filter)
       .select(
         '_id basicInfo pricing specifications ornate colorImages status stockStatus productType isOrnate meta'
       )
-      .sort({ 'meta.createdAt': -1, _id: -1 })
+      .sort(dbSort)
       .skip(skip)
       .limit(limit)
       .lean();

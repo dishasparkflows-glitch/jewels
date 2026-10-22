@@ -39,6 +39,18 @@ const featuredSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    categoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      default: null,
+      index: true,
+    },
+    menuItemIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MenuItem',
+      },
+    ],
   },
   {
     versionKey: false,

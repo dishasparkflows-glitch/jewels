@@ -76,13 +76,23 @@ class CloudflareR2Service {
   // ------------------------------- delete file from R2 ----------------------------
   async deleteFile(key) {
     if (!key) return;
+    let cleanKey = String(key).replace(/^\/+/, '').split(/[?#]/)[0];
+    if (this.bucketName && cleanKey.startsWith(`${this.bucketName}/`)) {
+      cleanKey = cleanKey.slice(this.bucketName.length + 1);
+    }
 
-    await this.client.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      })
-    );
+    try {
+      await this.client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucketName,
+          Key: cleanKey,
+        })
+      );
+      console.log(`[Cloudflare R2] Successfully deleted object "${cleanKey}" from bucket "${this.bucketName}"`);
+    } catch (err) {
+      console.error(`[Cloudflare R2] Failed to delete object "${cleanKey}" from bucket "${this.bucketName}":`, err.message);
+      throw err;
+    }
   }
 
   async getFile(key) {

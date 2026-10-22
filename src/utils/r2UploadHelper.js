@@ -46,9 +46,14 @@ const MODULE_CONFIG = {
   setting: { folder: 'settings', prefix: 'setting' },
   settings: { folder: 'settings', prefix: 'setting' },
   'brand-logos': { folder: 'brand-logos', prefix: 'brand-logo' },
+  'trust-badge': { folder: 'settings/trust-badges', prefix: 'trust-badge' },
+  'trust-badges': { folder: 'settings/trust-badges', prefix: 'trust-badge' },
+  'trust-strip': { folder: 'settings/trust-badges', prefix: 'trust-badge' },
   certificates: { folder: 'certificates', prefix: 'certificate' },
   'home-section': { folder: 'home-sections', prefix: 'home-section' },
   'home-sections': { folder: 'home-sections', prefix: 'home-section' },
+  'website-theme': { folder: 'website-themes', prefix: 'website-theme' },
+  'website-themes': { folder: 'website-themes', prefix: 'website-theme' },
   'before-after': { folder: 'before-after', prefix: 'before-after' },
   general: { folder: 'general', prefix: 'general' },
 };
@@ -65,7 +70,9 @@ const CANONICAL_MODULES = [
   'birthstone',
   'celebrate-gift',
   'setting',
+  'trust-badges',
   'home-section',
+  'website-theme',
   'general',
 ];
 

@@ -6,9 +6,8 @@ const { optionalAuth, authenticate } = require('../../middleware/auth.middleware
 // Presigned URL generation for direct frontend image / video upload
 router.post('/presigned-url', optionalAuth, uploadController.getPresignedUrl);
 
-// Authenticated same-origin proxy for product media that must be read by browser tools
-// (for example, the admin's in-browser media compressor).
-router.get('/file', authenticate, uploadController.getFile);
+// Same-origin proxy for product media that can be read by browser tools & img tags
+router.get('/file', optionalAuth, uploadController.getFile);
 
 // File deletion endpoint
 router.delete('/', authenticate, uploadController.deleteFile);

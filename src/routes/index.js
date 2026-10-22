@@ -53,6 +53,7 @@ const whatsappRoutes = require('../modules/whatsapp/whatsapp.routes');
 const ornateRoutes = require('../modules/ornate/ornate.routes');
 const productGroupRoutes = require('../modules/productGroup/productGroup.routes');
 const currencyRoutes = require('../modules/currency/currency.routes');
+const websiteThemeRoutes = require('../modules/websiteTheme/websiteTheme.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -118,5 +119,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/settings', settingRoutes);
+router.use('/website', websiteThemeRoutes);
 
 module.exports = router;

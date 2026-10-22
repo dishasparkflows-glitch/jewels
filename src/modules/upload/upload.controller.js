@@ -72,7 +72,12 @@ const getFile = catchAsync(async (req, res) => {
 
 // ------------------------------- delete file ----------------------------
 const deleteFile = catchAsync(async (req, res) => {
-  const { filepath, key } = req.body;
+  const { filepath, key, keys } = req.body;
+  if (Array.isArray(keys) && keys.length > 0) {
+    await Promise.all(keys.map((k) => cloudflareR2.deleteFile(k)));
+    return ApiResponse.success(res, null, `${keys.length} files deleted from Cloudflare R2 successfully`);
+  }
+
   const target = key || filepath;
   if (!target) throw new ApiError(400, 'File path or key is required');
 

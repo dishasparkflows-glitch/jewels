@@ -4,6 +4,7 @@ const connectDB = require('./config/db');
 const { startOrnateCron } = require('./modules/ornate/ornate.cron');
 const { startBannerCron } = require('./modules/banner/banner.cron');
 const { startCouponExpirationCron } = require('./modules/coupon/coupon.cron');
+const { startWebsiteThemeCron } = require('./modules/websiteTheme/websiteTheme.cron');
 
 const PORT = process.env.PORT || 5000;
 
@@ -17,6 +18,9 @@ connectDB().then(() => {
 
   // Expire coupons nightly at midnight Asia/Kolkata.
   startCouponExpirationCron();
+
+  // Activate scheduled storefront themes and apply campaign expiry fallbacks.
+  startWebsiteThemeCron();
 
   app.listen(PORT, () => {
     console.log(`\n🚀 Jewels API Server running on port ${PORT}`);

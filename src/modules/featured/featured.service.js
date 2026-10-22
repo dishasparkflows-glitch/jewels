@@ -21,6 +21,10 @@ class FeaturedService {
       data.productCount = productIds.length;
     }
 
+    if (data.categoryId === '' || data.categoryId === undefined) {
+      data.categoryId = null;
+    }
+
     const item = await Featured.create(data);
 
     if (Array.isArray(productIds) && productIds.length > 0) {
@@ -36,7 +40,10 @@ class FeaturedService {
   // ------------------------------- get one featured item ----------------------------
 
   async getOne(id) {
-    const item = await Featured.findOne({ _id: id }).lean();
+    const item = await Featured.findOne({ _id: id })
+      .populate('categoryId', 'name type slug')
+      .populate('menuItemIds', 'title')
+      .lean();
     if (!item) {
       throw new ApiError(404, 'Featured item not found');
     }
@@ -70,6 +77,8 @@ class FeaturedService {
 
     const [items, total] = await Promise.all([
       Featured.find(filter)
+        .populate('categoryId', 'name type slug')
+        .populate('menuItemIds', 'title')
         .sort({ order: 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
@@ -134,11 +143,18 @@ class FeaturedService {
       );
     }
 
+    if (data.categoryId === '') {
+      data.categoryId = null;
+    }
+
     const item = await Featured.findOneAndUpdate(
       { _id: id },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
-    );
+    )
+      .populate('categoryId', 'name type slug')
+      .populate('menuItemIds', 'title')
+      .lean();
 
     if (!item) {
       throw new ApiError(404, 'Featured item not found');

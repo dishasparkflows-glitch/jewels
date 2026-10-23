@@ -3,6 +3,225 @@ const Category = require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
+function sanitizeStr(s) {
+  return typeof s === 'string' ? s.trim() : s;
+}
+
+function isEmptyStr(s) {
+  return typeof s === 'string' && s.trim() === '';
+}
+
+function isNullOrEmpty(v) {
+  return v === null || v === undefined || isEmptyStr(v);
+}
+
+function sanitizeBannerPayload(data) {
+  if (!data || typeof data !== 'object') return data;
+
+  const clean = {};
+
+  // Content
+  if (data.content && typeof data.content === 'object') {
+    const cleanContent = {};
+    for (const field of ['title', 'subtitle', 'description']) {
+      if (!isNullOrEmpty(data.content[field])) {
+        cleanContent[field] = sanitizeStr(data.content[field]);
+      }
+    }
+    if (Object.keys(cleanContent).length > 0) {
+      clean.content = cleanContent;
+    }
+  }
+
+  // Display
+  if (data.display && typeof data.display === 'object') {
+    const cleanDisplay = {};
+    for (const field of ['categoryId', 'collectionGroup', 'type', 'platform', 'position', 'order']) {
+      if (!isNullOrEmpty(data.display[field])) {
+        cleanDisplay[field] = sanitizeStr(data.display[field]);
+      }
+    }
+    if (Array.isArray(data.display.menuItemIds) && data.display.menuItemIds.length > 0) {
+      const cleanMenuIds = data.display.menuItemIds.filter((id) => !isNullOrEmpty(id));
+      if (cleanMenuIds.length > 0) cleanDisplay.menuItemIds = cleanMenuIds;
+    }
+    if (Object.keys(cleanDisplay).length > 0) {
+      clean.display = cleanDisplay;
+    }
+  }
+
+  // Root fields
+  for (const field of ['themeId', 'link', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status']) {
+    if (!isNullOrEmpty(data[field])) {
+      clean[field] = sanitizeStr(data[field]);
+    }
+  }
+
+  // Image
+  if (data.image && typeof data.image === 'object' && !isNullOrEmpty(data.image.url)) {
+    const cleanImg = { url: sanitizeStr(data.image.url) };
+    if (!isNullOrEmpty(data.image.key)) {
+      cleanImg.key = sanitizeStr(data.image.key);
+    }
+    clean.image = cleanImg;
+  }
+
+  // Video
+  if (data.video && typeof data.video === 'object' && !isNullOrEmpty(data.video.url)) {
+    const cleanVid = { url: sanitizeStr(data.video.url) };
+    if (!isNullOrEmpty(data.video.key)) {
+      cleanVid.key = sanitizeStr(data.video.key);
+    }
+    clean.video = cleanVid;
+  }
+
+  // CollectionImages
+  if (Array.isArray(data.collectionImages) && data.collectionImages.length > 0) {
+    const cleanImgs = data.collectionImages
+      .map((img) => {
+        if (!img || isNullOrEmpty(img.url)) return null;
+        const item = { url: sanitizeStr(img.url) };
+        if (!isNullOrEmpty(img.categoryId)) item.categoryId = img.categoryId;
+        if (!isNullOrEmpty(img.key)) item.key = sanitizeStr(img.key);
+        return item;
+      })
+      .filter(Boolean);
+    if (cleanImgs.length > 0) {
+      clean.collectionImages = cleanImgs;
+    }
+  }
+
+  return clean;
+}
+
+function buildBannerUpdateOps(data) {
+  if (!data || typeof data !== 'object') return { $set: data || {} };
+
+  const $set = {};
+  const $unset = {};
+
+  // Content
+  if (data.content !== undefined) {
+    if (isNullOrEmpty(data.content)) {
+      $unset['content'] = 1;
+    } else if (typeof data.content === 'object') {
+      for (const field of ['title', 'subtitle', 'description']) {
+        if (data.content[field] !== undefined) {
+          if (isNullOrEmpty(data.content[field])) {
+            $unset[`content.${field}`] = 1;
+          } else {
+            $set[`content.${field}`] = sanitizeStr(data.content[field]);
+          }
+        }
+      }
+    }
+  }
+
+  // Display
+  if (data.display !== undefined) {
+    if (isNullOrEmpty(data.display)) {
+      $unset['display'] = 1;
+    } else if (typeof data.display === 'object') {
+      const displayFields = ['categoryId', 'collectionGroup', 'type', 'platform', 'position', 'order'];
+      for (const field of displayFields) {
+        if (data.display[field] !== undefined) {
+          if (isNullOrEmpty(data.display[field])) {
+            $unset[`display.${field}`] = 1;
+          } else {
+            $set[`display.${field}`] = sanitizeStr(data.display[field]);
+          }
+        }
+      }
+      if (data.display.menuItemIds !== undefined) {
+        if (!Array.isArray(data.display.menuItemIds) || data.display.menuItemIds.length === 0) {
+          $unset['display.menuItemIds'] = 1;
+        } else {
+          $set['display.menuItemIds'] = data.display.menuItemIds.filter((id) => !isNullOrEmpty(id));
+        }
+      }
+    }
+  }
+
+  // Root fields
+  const simpleFields = ['themeId', 'link', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status'];
+  for (const field of simpleFields) {
+    if (data[field] !== undefined) {
+      if (isNullOrEmpty(data[field])) {
+        $unset[field] = 1;
+      } else {
+        $set[field] = sanitizeStr(data[field]);
+      }
+    }
+  }
+
+  // Image
+  if (data.image !== undefined) {
+    if (isNullOrEmpty(data.image) || isNullOrEmpty(data.image.url)) {
+      $unset['image'] = 1;
+    } else {
+      const cleanImg = { url: sanitizeStr(data.image.url) };
+      if (!isNullOrEmpty(data.image.key)) {
+        cleanImg.key = sanitizeStr(data.image.key);
+      }
+      $set['image'] = cleanImg;
+    }
+  }
+
+  // Video
+  if (data.video !== undefined) {
+    if (isNullOrEmpty(data.video) || isNullOrEmpty(data.video.url)) {
+      $unset['video'] = 1;
+    } else {
+      const cleanVid = { url: sanitizeStr(data.video.url) };
+      if (!isNullOrEmpty(data.video.key)) {
+        cleanVid.key = sanitizeStr(data.video.key);
+      }
+      $set['video'] = cleanVid;
+    }
+  }
+
+  // If mediaType is explicitly set, unset the opposite media
+  if (data.mediaType === 'image') {
+    $unset['video'] = 1;
+  } else if (data.mediaType === 'video') {
+    $unset['image'] = 1;
+    $unset['collectionImages'] = 1;
+  }
+
+  // If display.type is explicitly set and not collectionbanner, unset collectionImages
+  if (data.display?.type && data.display.type !== 'collectionbanner') {
+    $unset['collectionImages'] = 1;
+  }
+
+  // CollectionImages
+  if (data.collectionImages !== undefined) {
+    if (!Array.isArray(data.collectionImages) || data.collectionImages.length === 0) {
+      $unset['collectionImages'] = 1;
+    } else {
+      const cleanImages = data.collectionImages
+        .map((img) => {
+          if (!img || isNullOrEmpty(img.url)) return null;
+          const item = { url: sanitizeStr(img.url) };
+          if (!isNullOrEmpty(img.categoryId)) item.categoryId = img.categoryId;
+          if (!isNullOrEmpty(img.key)) item.key = sanitizeStr(img.key);
+          return item;
+        })
+        .filter(Boolean);
+      if (cleanImages.length > 0) {
+        $set['collectionImages'] = cleanImages;
+      } else {
+        $unset['collectionImages'] = 1;
+      }
+    }
+  }
+
+  const updateQuery = {};
+  if (Object.keys($set).length > 0) updateQuery.$set = $set;
+  if (Object.keys($unset).length > 0) updateQuery.$unset = $unset;
+
+  return updateQuery;
+}
+
 class BannerService {
   _formatBanner(banner) {
     if (!banner) return null;
@@ -11,10 +230,11 @@ class BannerService {
 
   // ------------------------------- create banner ----------------------------
   async create(data) {
-    if (data.display?.type === 'collectionbanner' && data.collectionImages?.length !== 4) {
-      throw new ApiError(400, 'Collection banners must contain exactly four images');
+    if (data.display?.type === 'collectionbanner' && Array.isArray(data.collectionImages) && data.collectionImages.length > 0 && data.collectionImages.length !== 4) {
+      throw new ApiError(400, 'Collection banners must contain exactly four images if images are provided');
     }
-    const created = await Banner.create(data);
+    const cleanData = sanitizeBannerPayload(data);
+    const created = await Banner.create(cleanData);
     const populated = await Banner.findById(created._id)
       .populate('display.categoryId', 'name slug')
       .populate('collectionImages.categoryId', 'name slug')
@@ -50,7 +270,7 @@ class BannerService {
         $nor: [
           {
             'display.type': 'offerbanner',
-            endDate: { $ne: null, $lt: now },
+            endDate: { $ne: null, $exists: true, $lt: now },
           },
         ],
       });
@@ -62,10 +282,10 @@ class BannerService {
 
       if (queryParams.type === 'offerbanner' && queryParams.status === 'active') {
         andConditions.push({
-          $or: [{ endDate: null }, { endDate: { $gte: now } }],
+          $or: [{ endDate: null }, { endDate: { $exists: false } }, { endDate: { $gte: now } }],
         });
         andConditions.push({
-          $or: [{ startDate: null }, { startDate: { $lte: now } }],
+          $or: [{ startDate: null }, { startDate: { $exists: false } }, { startDate: { $lte: now } }],
         });
       }
     }
@@ -130,7 +350,7 @@ class BannerService {
         $nor: [
           {
             'display.type': 'offerbanner',
-            endDate: { $ne: null, $lt: now },
+            endDate: { $ne: null, $exists: true, $lt: now },
           },
         ],
       },
@@ -173,8 +393,8 @@ class BannerService {
       { status: 'active' },
       { 'display.type': 'offerbanner' },
       platformCondition,
-      { $or: [{ endDate: null }, { endDate: { $gte: now } }] },
-      { $or: [{ startDate: null }, { startDate: { $lte: now } }] },
+      { $or: [{ endDate: null }, { endDate: { $exists: false } }, { endDate: { $gte: now } }] },
+      { $or: [{ startDate: null }, { startDate: { $exists: false } }, { startDate: { $lte: now } }] },
     ];
 
     if (categoryId) {
@@ -301,14 +521,18 @@ class BannerService {
       const existing = await Banner.findById(id).select('display.type collectionImages').lean();
       if (!existing) throw new ApiError(404, 'Banner not found');
       const nextType = data.display?.type || existing.display?.type;
-      const nextImages = data.collectionImages ?? existing.collectionImages;
-      if (nextType === 'collectionbanner' && nextImages?.length !== 4) {
-        throw new ApiError(400, 'Collection banners must contain exactly four images');
+      const nextImages = data.collectionImages !== undefined ? data.collectionImages : existing.collectionImages;
+      if (nextType === 'collectionbanner' && Array.isArray(nextImages) && nextImages.length > 0 && nextImages.length !== 4) {
+        throw new ApiError(400, 'Collection banners must contain exactly four images if images are provided');
       }
+    }
+    const updateOps = buildBannerUpdateOps(data);
+    if (!updateOps.$set && !updateOps.$unset) {
+      return this.getOne(id);
     }
     const banner = await Banner.findOneAndUpdate(
       { _id: id },
-      { $set: data },
+      updateOps,
       { returnDocument: 'after', runValidators: true }
     )
       .populate('display.categoryId', 'name slug')
@@ -342,7 +566,7 @@ class BannerService {
     const now = new Date();
     const filter = {
       'display.type': 'offerbanner',
-      endDate: { $ne: null, $lt: now },
+      endDate: { $ne: null, $exists: true, $lt: now },
     };
 
     const expiredOffers = await Banner.find(filter)

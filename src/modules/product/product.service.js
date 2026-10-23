@@ -64,23 +64,28 @@ class ProductService {
       const masters = await loadPricingMasters();
       const writes = [];
       for (const product of products) {
-        const result = calculateProductPricing(product, masters);
-        const unchanged = isPricingUnchanged(product, result);
-        if (!unchanged) {
-          writes.push({
-            updateOne: {
-              filter: {
-                _id: product._id,
-                'meta.updatedAt': product.meta?.updatedAt
-              },
-              update: {
-                $set: {
-                  variants: result.variants,
-                  'pricing.salePrice': result.salePrice
+        try {
+          const result = calculateProductPricing(product, masters);
+          const unchanged = isPricingUnchanged(product, result);
+          if (!unchanged) {
+            writes.push({
+              updateOne: {
+                filter: {
+                  _id: product._id,
+                  'meta.updatedAt': product.meta?.updatedAt
+                },
+                update: {
+                  $set: {
+                    variants: result.variants,
+                    'pricing.salePrice': result.salePrice
+                  }
                 }
               }
-            }
-          });
+            });
+          }
+        } catch (err) {
+          // Skip products that cannot be automatically calculated
+          continue;
         }
       }
       if (writes.length) await Product.bulkWrite(writes);
@@ -286,7 +291,11 @@ class ProductService {
           .populate({
             path: 'productIds',
             select:
-              '_id basicInfo pricing specifications ornate colorImages status stockStatus productType isOrnate categoryIds menuItemIds meta'
+              '_id basicInfo pricing specifications ornate colorImages metalColorIds status stockStatus productType isOrnate categoryIds menuItemIds meta',
+            populate: {
+              path: 'metalColorIds colorImages.metalColorId',
+              select: 'name colorCode colorCodeEnd code hex'
+            }
           })
           .lean();
 
@@ -500,6 +509,8 @@ class ProductService {
             },
             variantCount: summary.eligibleCount,
             colorImages: rep.colorImages,
+            metalColorIds: rep.metalColorIds,
+            metalColors: rep.metalColors,
             images: rep.images,
             ornate: rep.ornate,
             stockStatus: rep.stockStatus,
@@ -562,7 +573,7 @@ class ProductService {
         : Promise.resolve(undefined);
     const colorPopulation = {
       path: 'metalColorIds colorImages.metalColorId',
-      select: 'name code hex'
+      select: 'name colorCode colorCodeEnd code hex'
     };
     const priceSort = {
       'price-low': 1,
@@ -731,7 +742,11 @@ class ProductService {
           .populate({
             path: 'productIds',
             select:
-              '_id basicInfo pricing specifications ornate colorImages status stockStatus productType isOrnate categoryIds menuItemIds meta'
+              '_id basicInfo pricing specifications ornate colorImages metalColorIds status stockStatus productType isOrnate categoryIds menuItemIds meta',
+            populate: {
+              path: 'metalColorIds colorImages.metalColorId',
+              select: 'name colorCode colorCodeEnd code hex'
+            }
           })
           .lean();
 
@@ -772,6 +787,9 @@ class ProductService {
             slug: group.slug || rep.basicInfo?.slug,
             isGroup: true,
             variantCount: group.productIds.length,
+            colorImages: rep.colorImages,
+            metalColorIds: rep.metalColorIds,
+            metalColors: rep.metalColors,
             images: rep.colorImages?.flatMap((c) => c.images?.map((img) => img.url)) || [],
             pricing: {
               ...rep.pricing,
@@ -802,11 +820,12 @@ class ProductService {
     }
 
     const selectFields =
-      '_id basicInfo pricing ornate productType isOrnate colorImages stockStatus categoryIds menuItemIds meta';
+      '_id basicInfo pricing ornate productType isOrnate colorImages metalColorIds metalPurityIds variants centerDiamondRows stockStatus categoryIds menuItemIds meta';
 
     const [rawItems, total] = await Promise.all([
       Product.find(filter)
         .select(selectFields)
+        .populate('metalColorIds colorImages.metalColorId', 'name colorCode colorCodeEnd code hex')
         .sort(sort)
         .skip(skip)
         .limit(limit)
@@ -862,31 +881,63 @@ class ProductService {
     const formatted = items.map((p) => formatHomeProduct(p));
 
     // Curate sections for the home page storefront
-    const platinum = [];
+    const gold = [];
     const silver = [];
+    const platinum = [];
+
     items.forEach((raw, i) => {
       const f = formatted[i];
       if (!f) return;
-      const isSilver = Boolean(raw.isOrnate || raw.productType?.toLowerCase() === 'silver');
-      if (isSilver) {
-        if (silver.length < 5) silver.push(f);
+      const type = (raw.productType || '').toLowerCase();
+      const isSilver = Boolean(raw.isOrnate || type === 'silver');
+
+      if (type === 'gold') {
+        gold.push(f);
+      } else if (isSilver) {
+        silver.push(f);
+      } else if (type === 'platinum') {
+        platinum.push(f);
       } else {
-        if (platinum.length < 5) platinum.push(f);
+        gold.push(f);
       }
     });
-    const trending = formatted.slice(0, 5);
 
-    const platinumList = platinum.length > 0 ? platinum : formatted.slice(0, 5);
-    const silverList = silver.length > 0 ? silver : formatted.slice(5, 10);
-    const trendingList = trending.length > 0 ? trending : formatted.slice(0, 5);
+    // Preferred order matching home page "Most Loved on Neirah"
+    const preferredOrder = [
+      'round diamond channel set huggie hoop',
+      'round cut diamond statement huggie hoop',
+      'round & baguette diamond halo huggie hoop',
+      'diamond mixed cut geometric cluster hoop',
+      'round cut diamond gold heart drop hoop'
+    ];
+
+    const sortedGold = [...gold].sort((a, b) => {
+      const aTitle = (a.basicInfo?.title || a.title || '').toLowerCase();
+      const bTitle = (b.basicInfo?.title || b.title || '').toLowerCase();
+      const aIdx = preferredOrder.findIndex((prefix) => aTitle.includes(prefix));
+      const bIdx = preferredOrder.findIndex((prefix) => bTitle.includes(prefix));
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+      return 0;
+    });
+
+    const goldList = sortedGold.length > 0 ? sortedGold.slice(0, 5) : formatted.filter((p) => p.productType === 'gold').slice(0, 5);
+    const silverList = silver.length > 0 ? silver.slice(0, 5) : formatted.filter((p) => p.productType === 'silver').slice(0, 5);
+    const platinumList = platinum.length > 0 ? platinum.slice(0, 5) : [];
+    const trendingList = formatted.slice(0, 5);
 
     return {
       items: formatted,
       sections: {
+        gold: goldList,
+        mostLoved: goldList,
         platinum: platinumList,
         silver: silverList,
         trending: trendingList
       },
+      gold: goldList,
+      mostLoved: goldList,
       platinum: platinumList,
       silver: silverList,
       trending: trendingList,
@@ -941,7 +992,7 @@ class ProductService {
     const [rawItems, total] = await Promise.all([
       Product.find(filter)
         .select(
-          '_id basicInfo categoryIds colorImages ornate pricing productType isOrnate specifications status'
+          '_id basicInfo categoryIds colorImages ornate pricing productType isOrnate specifications status images'
         )
         .populate({
           path: 'categoryIds',

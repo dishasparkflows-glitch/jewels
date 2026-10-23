@@ -124,8 +124,165 @@ const extractProductImages = (p) => {
   return [...new Set(images)];
 };
 
+const COLOR_HEX_DEFAULTS = {
+  'white gold': '#dedede',
+  'rose gold': '#e8b4b8',
+  'yellow gold': '#e5c07b',
+  silver: '#d4d4d4',
+  platinum: '#e5e4e2',
+  gold: '#d4b85b',
+};
+
+const extractMetalColors = (p) => {
+  if (!p) return [];
+  const colorMap = new Map();
+
+  const sourceColorImages = Array.isArray(p.colorImages) && p.colorImages.length > 0
+    ? p.colorImages
+    : (Array.isArray(p.representative?.colorImages) ? p.representative.colorImages : []);
+
+  // 1. Process colorImages rows
+  for (const row of sourceColorImages) {
+    if (!row || row.status === 'inactive') continue;
+    const cObj = row.metalColor || row.metalColorId || row.color;
+    const isObj = typeof cObj === 'object' && cObj !== null;
+    const name = isObj ? cObj.name || '' : (typeof cObj === 'string' && !/^[a-f0-9]{24}$/i.test(cObj) ? cObj : '');
+    const colorCode = isObj ? (cObj.colorCode || cObj.hex || cObj.code || '') : (typeof row.hex === 'string' ? row.hex : '');
+    const colorCodeEnd = isObj ? (cObj.colorCodeEnd || '') : '';
+    const id = isObj ? String(cObj._id || '') : (typeof cObj === 'string' && /^[a-f0-9]{24}$/i.test(cObj) ? cObj : '');
+
+    const validImages = (row.images || [])
+      .map((img) => (typeof img === 'string' ? img : img?.url))
+      .filter((url) => url && typeof url === 'string' && !/\.(mp4|webm|mov)(?:[?#]|$)/i.test(url));
+
+    const firstPhoto = validImages[0] || '';
+    const fallbackHex = COLOR_HEX_DEFAULTS[name.toLowerCase()] || '#d4d4d4';
+    const hex = colorCode || fallbackHex;
+    const key = name || id || hex;
+
+    if (key) {
+      colorMap.set(key, {
+        id: id || undefined,
+        name: name || key,
+        colorCode: colorCode || hex,
+        colorCodeEnd,
+        hex,
+        firstPhoto,
+        image: firstPhoto,
+        images: validImages,
+      });
+    }
+  }
+
+  // 2. Also process metalColorIds & metalColors
+  const sourceMetalColors = [
+    ...(Array.isArray(p.metalColorIds) ? p.metalColorIds : []),
+    ...(Array.isArray(p.metalColors) ? p.metalColors : []),
+    ...(Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []),
+    ...(Array.isArray(p.representative?.metalColors) ? p.representative.metalColors : []),
+  ];
+
+  for (const mc of sourceMetalColors) {
+    if (!mc) continue;
+    const isObj = typeof mc === 'object' && mc !== null;
+    const id = isObj ? String(mc._id || mc.id || '') : (/^[a-f0-9]{24}$/i.test(mc) ? mc : '');
+    const name = isObj ? mc.name || '' : (!/^[a-f0-9]{24}$/i.test(mc) ? mc : '');
+    const colorCode = isObj ? (mc.colorCode || mc.hex || mc.code || '') : '';
+    const colorCodeEnd = isObj ? (mc.colorCodeEnd || '') : '';
+    const fallbackHex = COLOR_HEX_DEFAULTS[name.toLowerCase()] || '#d4d4d4';
+    const hex = colorCode || fallbackHex;
+    const key = name || id || hex;
+    if (!key) continue;
+
+    if (colorMap.has(key)) {
+      const existing = colorMap.get(key);
+      if (!existing.colorCode && (colorCode || hex)) existing.colorCode = colorCode || hex;
+      if (!existing.colorCodeEnd && colorCodeEnd) existing.colorCodeEnd = colorCodeEnd;
+      if (!existing.hex && hex) existing.hex = hex;
+      if (!existing.id && id) existing.id = id;
+    } else {
+      let matchedPhoto = '';
+      let matchedImages = [];
+      for (const row of sourceColorImages) {
+        const cObj = row?.metalColor || row?.metalColorId;
+        const cId = typeof cObj === 'object' ? String(cObj?._id || '') : String(cObj || '');
+        const cName = typeof cObj === 'object' ? cObj?.name || '' : (typeof cObj === 'string' && !/^[a-f0-9]{24}$/i.test(cObj) ? cObj : '');
+        if ((id && cId === id) || (name && cName.toLowerCase() === name.toLowerCase())) {
+          matchedImages = (row.images || [])
+            .map((img) => (typeof img === 'string' ? img : img?.url))
+            .filter((url) => url && typeof url === 'string' && !/\.(mp4|webm|mov)(?:[?#]|$)/i.test(url));
+          matchedPhoto = matchedImages[0] || '';
+          break;
+        }
+      }
+
+      colorMap.set(key, {
+        id: id || undefined,
+        name: name || key,
+        colorCode: colorCode || hex,
+        colorCodeEnd,
+        hex,
+        firstPhoto: matchedPhoto,
+        image: matchedPhoto,
+        images: matchedImages,
+      });
+    }
+  }
+
+  return Array.from(colorMap.values());
+};
+
+const formatColorImages = (colorImages) => {
+  if (!Array.isArray(colorImages)) return [];
+  return colorImages
+    .map((ci) => {
+      if (!ci) return null;
+      const cObj = ci.metalColor || ci.metalColorId;
+      const isObj = typeof cObj === 'object' && cObj !== null;
+      const name = isObj ? cObj.name || '' : '';
+      const colorCode = isObj ? (cObj.colorCode || cObj.hex || cObj.code || '') : '';
+      const colorCodeEnd = isObj ? (cObj.colorCodeEnd || '') : '';
+      const id = isObj ? String(cObj._id || '') : (typeof cObj === 'string' ? cObj : '');
+
+      const validImages = (ci.images || [])
+        .map((img) => (typeof img === 'string' ? img : img?.url))
+        .filter((url) => url && typeof url === 'string' && !/\.(mp4|webm|mov)(?:[?#]|$)/i.test(url));
+
+      const firstPhoto = validImages[0] || '';
+
+      return {
+        status: ci.status || 'active',
+        metalColorId: isObj
+          ? {
+              _id: id,
+              name,
+              colorCode,
+              colorCodeEnd,
+            }
+          : cObj,
+        metalColor: isObj
+          ? {
+              _id: id,
+              name,
+              colorCode,
+              colorCodeEnd,
+            }
+          : null,
+        firstPhoto,
+        firstImage: firstPhoto,
+        image: firstPhoto,
+        images: (ci.images || []).map((img) =>
+          typeof img === 'string'
+            ? { url: img, mediaType: 'image' }
+            : { url: img?.url, mediaType: img?.mediaType || 'image', key: img?.key }
+        ),
+      };
+    })
+    .filter(Boolean);
+};
+
 /**
- * Format storefront products (returning only images, title, basicInfo, pricing, etc.)
+ * Format storefront products (returning images, metal colors, 1st photos, basicInfo, pricing, etc.)
  */
 const formatStorefrontProduct = (p) => {
   if (!p) return null;
@@ -144,6 +301,31 @@ const formatStorefrontProduct = (p) => {
   const menuItemIds = Array.isArray(p.menuItemIds) ? p.menuItemIds : (p.menuItemIds ? [p.menuItemIds] : []);
   const gender = p.gender || p.basicInfo?.gender || [];
 
+  const metalColors = extractMetalColors(p);
+  const colorImages = formatColorImages(p.colorImages || p.representative?.colorImages || []);
+  const metalColorIds = Array.isArray(p.metalColorIds)
+    ? p.metalColorIds
+    : (Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []);
+
+  let selectedAttributes = undefined;
+  if (p.productType === 'gold') {
+    const firstVariant = Array.isArray(p.variants) && p.variants[0] ? p.variants[0] : null;
+    const firstCenterRow = Array.isArray(p.centerDiamondRows) && p.centerDiamondRows[0] ? p.centerDiamondRows[0] : null;
+    const firstMetalColor = metalColors[0]?.id || (Array.isArray(p.metalColorIds) ? p.metalColorIds[0] : null);
+
+    selectedAttributes = {
+      metalPurity: firstVariant?.metalPurityId || (Array.isArray(p.metalPurityIds) ? p.metalPurityIds[0] : null) || null,
+      metalColor: firstVariant?.metalColorId || firstMetalColor || null,
+      diamondType: firstVariant?.diamondTypeId || firstCenterRow?.diamondTypeId || null,
+      diamondShape: firstVariant?.diamondShapeId || firstCenterRow?.diamondShapeId || null,
+      diamondClarity: firstVariant?.diamondClarityId || firstCenterRow?.diamondClarityId || null,
+      diamondColor: firstVariant?.diamondColorId || firstCenterRow?.diamondColorId || null,
+      caratWeight: Number(firstVariant?.caratWeight ?? firstCenterRow?.caratWeight ?? 1.5),
+      size: null,
+      sizeRange: null,
+    };
+  }
+
   return {
     _id: p._id,
     id: p._id,
@@ -151,6 +333,9 @@ const formatStorefrontProduct = (p) => {
     slug,
     images,
     image: images[0] || '',
+    metalColors,
+    colorImages,
+    metalColorIds,
     basicInfo: {
       title,
       slug,
@@ -170,53 +355,12 @@ const formatStorefrontProduct = (p) => {
     gender,
     productType: p.productType || '',
     stockStatus: p.stockStatus || '',
+    selectedAttributes,
   };
 };
 
 const formatHomeProduct = (p) => {
-  if (!p) return null;
-  const isGroup = Boolean(p.isGroup);
-  const title = p.basicInfo?.title || p.groupName || p.name || 'Untitled product';
-  const slug = p.basicInfo?.slug || p.slug || '';
-  const description = p.basicInfo?.description || p.description || '';
-  const images = extractProductImages(p);
-
-  const salePrice = Number(p.pricing?.salePrice || 0);
-  const mrp = Number(p.pricing?.mrp || salePrice || 0);
-  const minPrice = Number(p.pricing?.minPrice || salePrice || 0);
-  const maxPrice = Number(p.pricing?.maxPrice || mrp || salePrice || 0);
-
-  const categoryIds = Array.isArray(p.categoryIds) ? p.categoryIds : (p.categoryIds ? [p.categoryIds] : []);
-  const menuItemIds = Array.isArray(p.menuItemIds) ? p.menuItemIds : (p.menuItemIds ? [p.menuItemIds] : []);
-  const gender = p.gender || p.basicInfo?.gender || [];
-
-  return {
-    _id: p._id,
-    id: p._id,
-    title,
-    slug,
-    images,
-    image: images[0] || '',
-    basicInfo: {
-      title,
-      slug,
-      description,
-      gender,
-    },
-    pricing: {
-      salePrice,
-      mrp,
-      minPrice,
-      maxPrice,
-    },
-    isGroup,
-    variantCount: p.variantCount || 0,
-    categoryIds,
-    menuItemIds,
-    gender,
-    productType: p.productType || '',
-    stockStatus: p.stockStatus || '',
-  };
+  return formatStorefrontProduct(p);
 };
 
 /**
@@ -225,13 +369,79 @@ const formatHomeProduct = (p) => {
 const formatLookupProduct = (p) => {
   if (!p) return null;
   withColorStatuses(p);
-  const derivedImages = (p.colorImages || []).flatMap((color) => color.images || []);
-  const thumb =
-    derivedImages?.[0]?.url ||
-    p.ornate?.ornateImages?.[0]?.url ||
-    '';
 
-  const effectivePrice = Number(p.pricing?.salePrice || p.pricing?.mrp || 0);
+  const title = p.basicInfo?.title || p.title || p.name || 'Untitled product';
+  const sku = p.basicInfo?.sku || p.sku || p.ornate?.itemCode || p.ornate?.tagNo || '';
+  const effectivePrice = Number(p.pricing?.salePrice || p.pricing?.mrp || p.cataloguePrice || 0);
+
+  // Extract 1st photo from colorImages (first valid image that is not a video)
+  let firstPhoto = '';
+  if (Array.isArray(p.colorImages)) {
+    for (const color of p.colorImages) {
+      if (Array.isArray(color.images)) {
+        for (const img of color.images) {
+          const u = typeof img === 'string' ? img : img?.url;
+          const mediaType = typeof img === 'object' ? img?.mediaType : '';
+          if (u && typeof u === 'string' && u.trim() && mediaType !== 'video') {
+            firstPhoto = u.trim();
+            break;
+          }
+        }
+      }
+      if (firstPhoto) break;
+    }
+  }
+
+  // Fallback to p.images, p.ornate.ornateImages, or p.image if colorImages has no photo
+  if (!firstPhoto && Array.isArray(p.images)) {
+    for (const img of p.images) {
+      const u = typeof img === 'string' ? img : img?.url;
+      if (u && typeof u === 'string' && u.trim() && !/\.(mp4|webm|mov)(?:[?#]|$)/i.test(u)) {
+        firstPhoto = u.trim();
+        break;
+      }
+    }
+  }
+
+  if (!firstPhoto && Array.isArray(p.ornate?.ornateImages)) {
+    for (const img of p.ornate.ornateImages) {
+      const u = typeof img === 'string' ? img : img?.url;
+      if (u && typeof u === 'string' && u.trim() && !/\.(mp4|webm|mov)(?:[?#]|$)/i.test(u)) {
+        firstPhoto = u.trim();
+        break;
+      }
+    }
+  }
+
+  if (!firstPhoto && p.image) {
+    const u = typeof p.image === 'string' ? p.image : p.image?.url;
+    if (u && typeof u === 'string' && u.trim()) {
+      firstPhoto = u.trim();
+    }
+  }
+
+  // Format colorImages keeping only the 1st image photo for each color
+  const formattedColorImages = Array.isArray(p.colorImages)
+    ? p.colorImages
+        .map((ci) => {
+          if (!ci) return null;
+          const validImgs = (ci.images || [])
+            .filter((img) => img && (typeof img === 'string' || img?.mediaType !== 'video'))
+            .map((img) => (typeof img === 'string' ? img : img?.url))
+            .filter(Boolean);
+          const photo = validImgs[0] || '';
+          return {
+            status: ci.status || 'active',
+            metalColorId: ci.metalColorId || null,
+            metalColor: ci.metalColorId || null,
+            firstPhoto: photo,
+            firstImage: photo,
+            image: photo,
+            images: photo ? [{ url: photo, mediaType: 'image' }] : [],
+          };
+        })
+        .filter(Boolean)
+    : [];
 
   const resolvedCategory =
     Array.isArray(p.categoryIds) && p.categoryIds.length > 0 ? p.categoryIds : [];
@@ -239,16 +449,23 @@ const formatLookupProduct = (p) => {
   return {
     _id: p._id,
     id: p._id,
+    title,
+    sku,
+    price: effectivePrice,
     basicInfo: p.basicInfo || {},
     pricing: p.pricing || {},
-    ornate: p.ornate || {},
     category: resolvedCategory,
+    categoryIds: resolvedCategory,
+    status: p.status || 'active',
+    colorImages: formattedColorImages,
+    firstPhoto,
+    firstImage: firstPhoto,
+    image: firstPhoto,
+    thumbnail: firstPhoto,
     productType: p.productType || '',
     isOrnate: Boolean(p.isOrnate),
     cataloguePrice: effectivePrice,
-    status: p.status,
-    colorImages: p.colorImages || [],
-    thumbnail: thumb,
+    ornate: p.ornate || {},
   };
 };
 
@@ -345,6 +562,8 @@ module.exports = {
   formatHomeProduct,
   formatStorefrontProduct,
   extractProductImages,
+  extractMetalColors,
+  formatColorImages,
   formatLookupProduct,
   buildProductSearchFilter,
   buildProductTypeFilter,

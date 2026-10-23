@@ -5,7 +5,6 @@ const { WebsiteTheme } = require('./websiteTheme.model');
 const Banner = require('../banner/banner.model');
 const Category = require('../category/category.model');
 const Featured = require('../featured/featured.model');
-const websiteThemeService = require('./websiteTheme.service');
 
 // ------------------------------- Theme Media Asset Schema & Model ----------------------------
 // Immutable objects: replacing an image creates a new asset; published themes retain the old one.
@@ -243,6 +242,9 @@ function storefront(module) {
     }
 
     try {
+      // Resolve lazily to avoid a circular import with WebsiteThemeService, which
+      // imports this module for save/resolve operations.
+      const websiteThemeService = require('./websiteTheme.service');
       const publicConfig = await websiteThemeService.getPublicConfig();
       const rows = publicConfig.theme?.config?.mediaOverrides || [];
       const originalJson = res.json.bind(res);

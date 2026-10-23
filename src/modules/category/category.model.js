@@ -43,6 +43,12 @@ const promoBannerSchema = new mongoose.Schema(
 
 const categorySchema = new mongoose.Schema(
   {
+    themeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'WebsiteTheme',
+      default: null,
+      index: true,
+    },
     name: {
       type: String,
       required: [true, 'Please add a category name'],

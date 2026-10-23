@@ -23,6 +23,10 @@ const cartItemSchema = new mongoose.Schema(
       required: true,
       default: 0,
     },
+    totalItemPrice: {
+      type: Number,
+      default: 0,
+    },
     originalPrice: {
       type: Number,
       default: null,
@@ -45,6 +49,18 @@ const cartItemSchema = new mongoose.Schema(
     selectedSize: {
       type: String,
       default: '',
+    },
+    selectedAttributes: {
+      _id: false,
+      metalPurity: { type: mongoose.Schema.Types.ObjectId, ref: 'MetalPurity', default: null },
+      metalColor: { type: mongoose.Schema.Types.ObjectId, ref: 'MetalColor', default: null },
+      diamondType: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType', default: null },
+      diamondShape: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape', default: null },
+      diamondClarity: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondClarity', default: null },
+      diamondColor: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondColor', default: null },
+      caratWeight: { type: Number, default: null },
+      size: { type: mongoose.Schema.Types.ObjectId, ref: 'Size', default: null },
+      sizeRange: { type: String, default: null },
     },
     addedAt: {
       type: Date,

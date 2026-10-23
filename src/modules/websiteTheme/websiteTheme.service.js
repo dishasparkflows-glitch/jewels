@@ -278,7 +278,8 @@ class WebsiteThemeService {
   async publish(id, data = {}, actorId) {
     const theme = await this.getById(id);
     if (theme.status === 'archived') throw new ApiError(409, 'Restore an archived theme by duplicating it before publishing.');
-    await this.validateConfig(theme.config, { requireComplete: true, requireActiveBanners: true });
+    const requireComplete = data.requireComplete === true;
+    await this.validateConfig(theme.config, { requireComplete, requireActiveBanners: requireComplete });
     const startAt = data.startAt ? new Date(data.startAt) : null;
     const endAt = data.endAt ? new Date(data.endAt) : null;
     if (startAt && Number.isNaN(startAt.getTime())) throw new ApiError(400, 'Invalid schedule start date.');

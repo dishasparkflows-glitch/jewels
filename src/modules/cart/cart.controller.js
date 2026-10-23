@@ -24,18 +24,41 @@ class CartController {
 
   // ------------------------------- add to cart ----------------------------
   addToCart = catchAsync(async (req, res) => {
-    const { userId, sessionId } = this.getIdentity(req);
-    const { product, quantity = 1, options = {} } = req.body;
+    const { userId: authUserId, sessionId } = this.getIdentity(req);
+    const {
+      product,
+      quantity = 1,
+      options = {},
+      userId,
+      productId,
+      addedAt,
+      price,
+      totalItemPrice,
+      selectedAttributes,
+    } = req.body;
+
+    const effectiveUserId = userId || authUserId || null;
 
     // Accept either product object or flat fields
-    const productData = product || req.body;
+    const productData = {
+      ...(typeof product === 'object' && product !== null ? product : {}),
+      ...(productId ? { productId } : {}),
+      ...(addedAt ? { addedAt } : {}),
+      ...(price !== undefined ? { price } : {}),
+      ...(totalItemPrice !== undefined ? { totalItemPrice } : {}),
+      ...(selectedAttributes ? { selectedAttributes } : {}),
+      ...(!product ? req.body : {}),
+    };
 
     const data = await cartService.addToCart({
-      userId,
+      userId: effectiveUserId,
       sessionId,
       productData,
-      quantity,
-      options,
+      quantity: quantity || productData.quantity || 1,
+      options: {
+        ...options,
+        ...(selectedAttributes ? { selectedAttributes } : {}),
+      },
     });
 
     ApiResponse.success(res, data, 'Item added to cart successfully');

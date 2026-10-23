@@ -10,7 +10,7 @@ class CartService {
    */
   async findOrCreateCart(userId, sessionId) {
     if (!userId && !sessionId) {
-      throw new ApiError(400, 'User ID or Session ID is required to manage cart');
+      sessionId = `guest_${new mongoose.Types.ObjectId().toString()}`;
     }
 
     let userCart = null;
@@ -83,18 +83,21 @@ class CartService {
 
     return {
       cartId: cart._id,
+      userId: cart.userId || cart.user || null,
       items: items.map((item) => ({
         _id: item._id,
         productId: String(item.productId),
         title: item.title,
         price: item.price,
+        totalItemPrice: item.totalItemPrice || ((item.price || 0) * (item.quantity || 1)),
         originalPrice: item.originalPrice,
         image: item.image,
         category: item.category,
         quantity: item.quantity,
         selectedMetal: item.selectedMetal,
         selectedSize: item.selectedSize,
-        itemTotal: (item.price || 0) * (item.quantity || 1),
+        selectedAttributes: item.selectedAttributes || undefined,
+        itemTotal: item.totalItemPrice || ((item.price || 0) * (item.quantity || 1)),
         addedAt: item.addedAt,
       })),
       totalItems,
@@ -133,16 +136,61 @@ class CartService {
    * Add item to cart
    */
   async addToCart({ userId, sessionId, productData, quantity = 1, options = {} }) {
-    if (!productData || !productData.productId) {
+    if (!productData || (!productData.productId && !productData.id && !productData._id)) {
       throw new ApiError(400, 'Product ID is required');
     }
 
-    const productIdStr = String(productData.productId).trim();
+    const productIdStr = String(productData.productId || productData.id || productData._id).trim();
     const parsedQty = Math.max(1, parseInt(quantity, 10) || 1);
     const selectedMetal = options.selectedMetal || productData.selectedMetal || '';
     const selectedSize = options.selectedSize || productData.selectedSize || '';
+    const addedAt = productData.addedAt ? new Date(productData.addedAt) : new Date();
 
     const cart = await this.findOrCreateCart(userId, sessionId);
+    if (userId) {
+      cart.userId = userId;
+      cart.user = userId;
+    }
+
+    let productRef = null;
+    let found = null;
+    if (mongoose.Types.ObjectId.isValid(productIdStr)) {
+      found = await Product.findById(productIdStr).lean();
+      if (found) {
+        productRef = found._id;
+        if (!productData.title) productData.title = found.basicInfo?.title;
+        if (!productData.price) productData.price = found.pricing?.salePrice || found.pricing?.mrp;
+        if (!productData.image && found.images?.[0]) {
+          productData.image = typeof found.images[0] === 'string' ? found.images[0] : found.images[0]?.url;
+        }
+      }
+    }
+
+    const price = Number(productData.price) || 0;
+    const totalItemPrice = Number(productData.totalItemPrice) || (price * parsedQty);
+
+    // Resolve selectedAttributes for gold products if needed
+    const isGold = (found?.productType === 'gold') || (productData.productType === 'gold');
+    let selectedAttributes = options.selectedAttributes || productData.selectedAttributes || null;
+
+    if (isGold || selectedAttributes) {
+      const firstVariant = found?.variants?.[0] || null;
+      const firstCenterRow = found?.centerDiamondRows?.[0] || null;
+
+      const toObjectId = (val) => (val && mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : (val || null));
+
+      selectedAttributes = {
+        metalPurity: toObjectId(selectedAttributes?.metalPurity || firstVariant?.metalPurityId || found?.metalPurityIds?.[0]),
+        metalColor: toObjectId(selectedAttributes?.metalColor || firstVariant?.metalColorId || found?.metalColorIds?.[0]),
+        diamondType: toObjectId(selectedAttributes?.diamondType || firstVariant?.diamondTypeId || firstCenterRow?.diamondTypeId),
+        diamondShape: toObjectId(selectedAttributes?.diamondShape || firstVariant?.diamondShapeId || firstCenterRow?.diamondShapeId),
+        diamondClarity: toObjectId(selectedAttributes?.diamondClarity || firstVariant?.diamondClarityId || firstCenterRow?.diamondClarityId),
+        diamondColor: toObjectId(selectedAttributes?.diamondColor || firstVariant?.diamondColorId || firstCenterRow?.diamondColorId),
+        caratWeight: Number(selectedAttributes?.caratWeight ?? firstVariant?.caratWeight ?? firstCenterRow?.caratWeight ?? 1.5),
+        size: toObjectId(selectedAttributes?.size),
+        sizeRange: selectedAttributes?.sizeRange || null,
+      };
+    }
 
     // Check if this product & metal combination already exists in cart
     const existingIndex = cart.items.findIndex(
@@ -153,32 +201,26 @@ class CartService {
 
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += parsedQty;
-    } else {
-      let productRef = null;
-      if (mongoose.Types.ObjectId.isValid(productIdStr)) {
-        const found = await Product.findById(productIdStr).lean();
-        if (found) {
-          productRef = found._id;
-          if (!productData.title) productData.title = found.basicInfo?.title;
-          if (!productData.price) productData.price = found.pricing?.salePrice || found.pricing?.mrp;
-          if (!productData.image && found.images?.[0]) {
-            productData.image = typeof found.images[0] === 'string' ? found.images[0] : found.images[0]?.url;
-          }
-        }
+      cart.items[existingIndex].totalItemPrice =
+        (Number(cart.items[existingIndex].price) || price) * cart.items[existingIndex].quantity;
+      if (selectedAttributes) {
+        cart.items[existingIndex].selectedAttributes = selectedAttributes;
       }
-
+    } else {
       cart.items.push({
         product: productRef,
         productId: productIdStr,
         title: productData.title || productData.name || '',
-        price: Number(productData.price) || 0,
+        price,
+        totalItemPrice,
         originalPrice: productData.originalPrice ? Number(productData.originalPrice) : null,
         image: productData.image || '',
         category: productData.category || '',
         quantity: parsedQty,
         selectedMetal,
         selectedSize,
-        addedAt: new Date(),
+        ...(selectedAttributes ? { selectedAttributes } : {}),
+        addedAt,
       });
     }
 

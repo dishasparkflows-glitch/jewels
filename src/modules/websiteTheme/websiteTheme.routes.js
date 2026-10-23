@@ -1,21 +1,45 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('./websiteTheme.controller');
+const websiteThemeController = require('./websiteTheme.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
 const adminOnly = [authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN)];
 
-router.get('/config', controller.getPublicConfig);
-router.get('/themes/history', ...adminOnly, controller.history);
-router.get('/themes', ...adminOnly, controller.list);
-router.post('/themes', ...adminOnly, controller.create);
-router.get('/themes/:id/preview', ...adminOnly, controller.preview);
-router.post('/themes/:id/duplicate', ...adminOnly, controller.duplicate);
-router.post('/themes/:id/publish', ...adminOnly, controller.publish);
-router.post('/themes/:id/rollback', ...adminOnly, controller.rollback);
-router.post('/themes/:id/archive', ...adminOnly, controller.archive);
-router.get('/themes/:id', ...adminOnly, controller.getOne);
-router.put('/themes/:id', ...adminOnly, controller.update);
+// ------------------------------- get public config ----------------------------
+router.get('/config', websiteThemeController.getPublicConfig);
+
+// ------------------------------- get theme publishing history ----------------------------
+router.get('/themes/history', ...adminOnly, websiteThemeController.history);
+
+// ------------------------------- get all website themes ----------------------------
+router.get('/themes', ...adminOnly, websiteThemeController.list);
+
+// ------------------------------- create website theme ----------------------------
+router.post('/themes', ...adminOnly, websiteThemeController.create);
+
+// ------------------------------- save theme media ----------------------------
+router.put('/themes/:id/media', ...adminOnly, websiteThemeController.saveMedia);
+
+// ------------------------------- preview website theme ----------------------------
+router.get('/themes/:id/preview', ...adminOnly, websiteThemeController.preview);
+
+// ------------------------------- duplicate website theme ----------------------------
+router.post('/themes/:id/duplicate', ...adminOnly, websiteThemeController.duplicate);
+
+// ------------------------------- publish website theme ----------------------------
+router.post('/themes/:id/publish', ...adminOnly, websiteThemeController.publish);
+
+// ------------------------------- rollback website theme ----------------------------
+router.post('/themes/:id/rollback', ...adminOnly, websiteThemeController.rollback);
+
+// ------------------------------- archive website theme ----------------------------
+router.post('/themes/:id/archive', ...adminOnly, websiteThemeController.archive);
+
+// ------------------------------- get one website theme ----------------------------
+router.get('/themes/:id', ...adminOnly, websiteThemeController.getOne);
+
+// ------------------------------- update website theme ----------------------------
+router.put('/themes/:id', ...adminOnly, websiteThemeController.update);
 
 module.exports = router;

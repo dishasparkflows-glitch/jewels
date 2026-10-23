@@ -1,8 +1,10 @@
 const mongoose = require('mongoose');
 const ApiError = require('../../utils/ApiError');
+const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const Category = require('../category/category.model');
 const Banner = require('../banner/banner.model');
 const { WebsiteTheme, WebsiteThemeSettings, WebsiteThemeHistory } = require('./websiteTheme.model');
+const themeMedia = require('./themeMedia');
 
 const TIMEZONE = 'Asia/Kolkata';
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -18,6 +20,10 @@ const snapshotOf = (theme) => ({
 
 class WebsiteThemeService {
   async validateConfig(config = {}, { requireComplete = false, requireActiveBanners = false } = {}) {
+    for (const row of config.mediaOverrides || []) {
+      await themeMedia.validateTarget(row.module, row.recordId, row.slot);
+      if (!await themeMedia.Asset.exists({ _id: row.assetId })) throw new ApiError(400, 'Theme image asset is missing');
+    }
     const colors = config.colors || {};
     for (const [key, value] of Object.entries(colors)) {
       if (!HEX_COLOR.test(value)) throw new ApiError(400, `Invalid ${key} color. Use a six-digit hex color.`);
@@ -128,6 +134,7 @@ class WebsiteThemeService {
     });
   }
 
+  // ------------------------------- create website theme ----------------------------
   async create(data, actorId) {
     if (!data.name?.trim()) throw new ApiError(400, 'Theme name is required.');
     const code = (data.code || data.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -141,23 +148,36 @@ class WebsiteThemeService {
     return theme;
   }
 
+  // ------------------------------- get all website themes ----------------------------
   async list(query = {}) {
-    const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+    const { page, limit, skip } = getPagination(query);
     const filter = { 'meta.deletedAt': null };
     if (query.status && query.status !== 'all') filter.status = query.status;
-    if (query.search) filter.$or = [
-      { name: new RegExp(String(query.search).trim(), 'i') },
-      { code: new RegExp(String(query.search).trim(), 'i') },
-      { description: new RegExp(String(query.search).trim(), 'i') },
-    ];
+    if (query.search) {
+      const q = String(query.search).trim();
+      filter.$or = [
+        { name: new RegExp(q, 'i') },
+        { code: new RegExp(q, 'i') },
+        { description: new RegExp(q, 'i') },
+      ];
+    }
     const [items, total] = await Promise.all([
-      WebsiteTheme.find(filter).sort({ 'meta.updatedAt': -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      WebsiteTheme.find(filter)
+        .sort({ 'meta.updatedAt': -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       WebsiteTheme.countDocuments(filter),
     ]);
-    return { items, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+    return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
+  // ------------------------------- save theme media ----------------------------
+  async saveMedia(id, body, actorId) {
+    return themeMedia.save(id, body, actorId);
+  }
+
+  // ------------------------------- get one website theme ----------------------------
   async getById(id) {
     if (!mongoose.isValidObjectId(id)) throw new ApiError(400, 'Invalid theme ID.');
     const theme = await WebsiteTheme.findOne({ _id: id, 'meta.deletedAt': null });
@@ -165,14 +185,23 @@ class WebsiteThemeService {
     return theme;
   }
 
+  // ------------------------------- update website theme ----------------------------
   async update(id, data, actorId) {
     const theme = await this.getById(id);
     if (theme.status === 'active') throw new ApiError(409, 'Edit the active theme by duplicating it first.');
     if (theme.status === 'archived') throw new ApiError(409, 'Archived themes cannot be edited.');
     if (data.status) throw new ApiError(400, 'Theme status can only be changed through publish, schedule, or archive actions.');
-    if (data.config) await this.validateConfig(data.config);
-    for (const key of ['name', 'description', 'config', 'schedule']) {
+    if (data.config) {
+      data.config.mediaOverrides = theme.config.mediaOverrides;
+      await this.validateConfig(data.config);
+    }
+    for (const key of ['name', 'description', 'schedule']) {
       if (data[key] !== undefined) theme[key] = data[key];
+    }
+    if (data.config) {
+      for (const [key, value] of Object.entries(data.config)) {
+        if (key !== 'mediaOverrides') theme.set(`config.${key}`, value);
+      }
     }
     if (data.code !== undefined) {
       const code = String(data.code).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -188,6 +217,7 @@ class WebsiteThemeService {
     return theme;
   }
 
+  // ------------------------------- duplicate website theme ----------------------------
   async duplicate(id, actorId) {
     const source = await this.getById(id);
     const codeBase = `${source.code}-copy`;
@@ -244,6 +274,7 @@ class WebsiteThemeService {
     return { theme, revision: updatedSettings.revision };
   }
 
+  // ------------------------------- publish website theme ----------------------------
   async publish(id, data = {}, actorId) {
     const theme = await this.getById(id);
     if (theme.status === 'archived') throw new ApiError(409, 'Restore an archived theme by duplicating it before publishing.');
@@ -279,6 +310,7 @@ class WebsiteThemeService {
     return { ...(await this.setActive(theme, actorId, 'published')), scheduled: false };
   }
 
+  // ------------------------------- archive website theme ----------------------------
   async archive(id, actorId) {
     const theme = await this.getById(id);
     const settings = await this.settings();
@@ -293,6 +325,7 @@ class WebsiteThemeService {
     return theme;
   }
 
+  // ------------------------------- rollback website theme ----------------------------
   async rollback(id, actorId) {
     const theme = await this.getById(id);
     if (!theme.publishedSnapshot) throw new ApiError(409, 'This theme has no published version to restore.');
@@ -300,11 +333,15 @@ class WebsiteThemeService {
     return this.setActive(theme, actorId, 'rolled_back');
   }
 
+  // ------------------------------- preview website theme ----------------------------
   async preview(id) {
     const theme = await this.getById(id);
-    return snapshotOf(theme);
+    const snapshot = snapshotOf(theme);
+    snapshot.config = await themeMedia.resolve(snapshot.config);
+    return snapshot;
   }
 
+  // ------------------------------- get public config ----------------------------
   async getPublicConfig() {
     const settings = await this.settings();
     if (!settings.activeThemeId) return { revision: settings.revision, timezone: TIMEZONE, theme: null };
@@ -312,16 +349,18 @@ class WebsiteThemeService {
     return {
       revision: settings.revision,
       timezone: TIMEZONE,
-      theme: theme?.publishedSnapshot || null,
+      theme: theme?.publishedSnapshot ? { ...theme.publishedSnapshot, config: await themeMedia.resolve(theme.publishedSnapshot.config) } : null,
     };
   }
 
+  // ------------------------------- get theme publishing history ----------------------------
   async getHistory(id) {
     const filter = {};
     if (id) filter.themeId = id;
     return WebsiteThemeHistory.find(filter).sort({ createdAt: -1 }).limit(100).populate('actorId', 'name email').lean();
   }
 
+  // ------------------------------- reconcile theme schedule ----------------------------
   async reconcileSchedule() {
     const settings = await this.settings();
     const now = new Date();
@@ -355,4 +394,6 @@ class WebsiteThemeService {
   }
 }
 
-module.exports = new WebsiteThemeService();
+const websiteThemeService = new WebsiteThemeService();
+Object.setPrototypeOf(module.exports, WebsiteThemeService.prototype);
+Object.assign(module.exports, websiteThemeService);

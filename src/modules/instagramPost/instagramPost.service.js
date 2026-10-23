@@ -52,10 +52,17 @@ class InstagramPostService {
 
   // ------------------------------- get instagram post lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { 'meta.deletedAt': null, isActive: true };
+    const filter = { 'meta.deletedAt': null };
+
+    if (queryParams.isActive !== undefined && queryParams.isActive !== '' && queryParams.isActive !== 'all') {
+      filter.isActive = queryParams.isActive === 'true' || queryParams.isActive === true;
+    } else {
+      filter.isActive = true;
+    }
+
     return await InstagramPost.find(filter)
-      .sort({ 'meta.createdAt': -1 })
-      .select('_id url order isActive')
+      .sort({ order: 1, 'meta.createdAt': -1 })
+      .select('_id url title order isActive')
       .lean();
   }
 

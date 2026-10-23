@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+router.use(require('../websiteTheme/themeMedia').storefront('featured'));
 const featuredController = require('./featured.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');

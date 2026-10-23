@@ -7,7 +7,9 @@ const { ROLES } = require('../../config/constants');
 router.post('/pricing-preview', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), productController.previewPricing);
 
 // Public or Storefront / Lookup endpoints
+router.get('/storefront', productController.getStorefrontProducts);
 router.get('/home', productController.getHomeProducts);
+router.get('/home/storefront', productController.getHomeProducts);
 router.get('/lookup', productController.getLookup);
 router.get('/sku/:code', productController.getBySkuOrTag);
 router.get('/', productController.getAll);

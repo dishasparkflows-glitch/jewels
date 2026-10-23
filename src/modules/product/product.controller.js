@@ -6,6 +6,7 @@ class ProductController {
   previewPricing = catchAsync(async (req, res) => {
     ApiResponse.success(res, await productService.previewPricing(req.body), 'Pricing calculated');
   });
+
   // ------------------------------- create product ----------------------------
   create = catchAsync(async (req, res) => {
     const product = await productService.create(req.body);
@@ -16,6 +17,18 @@ class ProductController {
   getHomeProducts = catchAsync(async (req, res) => {
     const data = await productService.getHomeProducts(req.query);
     ApiResponse.success(res, data, 'Home products retrieved successfully');
+  });
+
+  // ------------------------------- get storefront products (clean lightweight info) ----------------------------
+  getStorefrontProducts = catchAsync(async (req, res) => {
+    const { items, pagination, facets } = await productService.getStorefrontProducts(req.query);
+    ApiResponse.paginated(
+      res,
+      items,
+      pagination,
+      'Storefront products retrieved successfully',
+      facets
+    );
   });
 
   // ------------------------------- get all products ----------------------------

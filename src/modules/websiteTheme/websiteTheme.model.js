@@ -57,6 +57,12 @@ const navigationSchema = new mongoose.Schema({
 }, { _id: false });
 
 const configSchema = new mongoose.Schema({
+  mediaOverrides: { type: [new mongoose.Schema({
+    module: { type: String, enum: ['banner', 'category', 'featured'], required: true },
+    recordId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    slot: { type: String, required: true },
+    assetId: { type: mongoose.Schema.Types.ObjectId, ref: 'ThemeMediaAsset', required: true },
+  }, { _id: false })], default: [] },
   colors: {
     primary: { type: String, default: '#8B6C3A' },
     secondary: { type: String, default: '#EADCC8' },
@@ -129,7 +135,7 @@ const websiteThemeHistorySchema = new mongoose.Schema({
 }, { versionKey: false, timestamps: true });
 
 module.exports = {
-  WebsiteTheme: mongoose.model('WebsiteTheme', websiteThemeSchema),
-  WebsiteThemeSettings: mongoose.model('WebsiteThemeSettings', websiteThemeSettingsSchema),
-  WebsiteThemeHistory: mongoose.model('WebsiteThemeHistory', websiteThemeHistorySchema),
+  WebsiteTheme: mongoose.models.WebsiteTheme || mongoose.model('WebsiteTheme', websiteThemeSchema, 'websitethemes'),
+  WebsiteThemeSettings: mongoose.models.WebsiteThemeSettings || mongoose.model('WebsiteThemeSettings', websiteThemeSettingsSchema, 'websitethemesettings'),
+  WebsiteThemeHistory: mongoose.models.WebsiteThemeHistory || mongoose.model('WebsiteThemeHistory', websiteThemeHistorySchema, 'websitethemehistories'),
 };

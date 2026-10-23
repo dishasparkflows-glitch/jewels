@@ -57,48 +57,149 @@ const isPricingUnchanged = (product, result) => {
 /**
  * Helper to format concise product card info for the home page storefront
  */
-const formatHomeProduct = (p) => {
-  if (!p) return null;
-  withColorStatuses(p);
-  const salePrice = Number(p.pricing?.salePrice || 0);
-  const mrp = Number(p.pricing?.mrp || 0);
-  const price = salePrice > 0 ? salePrice : (mrp > 0 ? mrp : null);
-
-  // Extract primary image
-  let image = '';
+const extractProductImages = (p) => {
+  if (!p) return [];
   const images = [];
 
+  // 1. Direct images array (strings or objects with url)
+  if (Array.isArray(p.images)) {
+    p.images.forEach((img) => {
+      const u = typeof img === 'string' ? img : img?.url;
+      if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
+    });
+  }
+
+  // 2. Color images
   if (Array.isArray(p.colorImages)) {
     p.colorImages.forEach((c) => {
-      if (Array.isArray(c.images)) {
+      if (Array.isArray(c?.images)) {
         c.images.forEach((img) => {
           const u = typeof img === 'string' ? img : img?.url;
-          if (u && !u.toLowerCase().includes('ornate')) images.push(u);
+          if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
         });
       }
     });
   }
 
-  if (images.length > 0) {
-    image = images[0];
-  } else {
-    image = '';
+  // 3. Ornate images (from ERP / R2)
+  if (Array.isArray(p.ornate?.ornateImages)) {
+    p.ornate.ornateImages.forEach((img) => {
+      const u = typeof img === 'string' ? img : img?.url;
+      if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
+    });
   }
+
+  // 4. Group representative images
+  if (p.representative) {
+    if (Array.isArray(p.representative.images)) {
+      p.representative.images.forEach((img) => {
+        const u = typeof img === 'string' ? img : img?.url;
+        if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
+      });
+    }
+    if (Array.isArray(p.representative.colorImages)) {
+      p.representative.colorImages.forEach((c) => {
+        if (Array.isArray(c?.images)) {
+          c.images.forEach((img) => {
+            const u = typeof img === 'string' ? img : img?.url;
+            if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
+          });
+        }
+      });
+    }
+    if (Array.isArray(p.representative.ornate?.ornateImages)) {
+      p.representative.ornate.ornateImages.forEach((img) => {
+        const u = typeof img === 'string' ? img : img?.url;
+        if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
+      });
+    }
+  }
+
+  // 5. Single image fallback
+  if (p.image) {
+    const u = typeof p.image === 'string' ? p.image : p.image?.url;
+    if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
+  }
+
+  return [...new Set(images)];
+};
+
+/**
+ * Format storefront products (returning only images, title, basicInfo, pricing, etc.)
+ */
+const formatStorefrontProduct = (p) => {
+  if (!p) return null;
+  const isGroup = Boolean(p.isGroup);
+  const title = p.basicInfo?.title || p.groupName || p.name || 'Untitled product';
+  const slug = p.basicInfo?.slug || p.slug || '';
+  const description = p.basicInfo?.description || p.description || '';
+  const images = extractProductImages(p);
+
+  const salePrice = Number(p.pricing?.salePrice || 0);
+  const mrp = Number(p.pricing?.mrp || salePrice || 0);
+  const minPrice = Number(p.pricing?.minPrice || salePrice || 0);
+  const maxPrice = Number(p.pricing?.maxPrice || mrp || salePrice || 0);
 
   return {
     _id: p._id,
     id: p._id,
-    basicInfo: p.basicInfo || {},
-    pricing: p.pricing || {},
-    cataloguePrice: price,
-    image,
-    colorImages: p.colorImages || [],
-    metalColors: p.metalColorIds || [],
-    metalColorIds: p.metalColorIds || [],
-    category: p.categoryIds || [],
+    title,
+    slug,
+    images,
+    basicInfo: {
+      title,
+      slug,
+      description,
+    },
+    pricing: {
+      salePrice,
+      mrp,
+      minPrice,
+      maxPrice,
+    },
+    isGroup,
+    variantCount: p.variantCount || 0,
+    ...(p.categoryIds ? { categoryIds: p.categoryIds } : {}),
+  };
+};
+
+const formatHomeProduct = (p) => {
+  if (!p) return null;
+  const isGroup = Boolean(p.isGroup);
+  const title = p.basicInfo?.title || p.groupName || p.name || 'Untitled product';
+  const slug = p.basicInfo?.slug || p.slug || '';
+  const description = p.basicInfo?.description || p.description || '';
+  const images = extractProductImages(p);
+
+  const salePrice = Number(p.pricing?.salePrice || 0);
+  const mrp = Number(p.pricing?.mrp || salePrice || 0);
+  const minPrice = Number(p.pricing?.minPrice || salePrice || 0);
+  const maxPrice = Number(p.pricing?.maxPrice || mrp || salePrice || 0);
+
+  return {
+    _id: p._id,
+    id: p._id,
+    title,
+    slug,
+    images,
+    image: images[0] || '',
+    basicInfo: {
+      title,
+      slug,
+      description,
+    },
+    pricing: {
+      salePrice,
+      mrp,
+      minPrice,
+      maxPrice,
+    },
+    isGroup,
+    variantCount: p.variantCount || 0,
     productType: p.productType || '',
     isOrnate: Boolean(p.isOrnate),
     stockStatus: p.stockStatus || '',
+    ...(p.categoryIds ? { categoryIds: p.categoryIds } : {}),
   };
 };
 
@@ -226,6 +327,8 @@ module.exports = {
   sanitizeColorImages,
   isPricingUnchanged,
   formatHomeProduct,
+  formatStorefrontProduct,
+  extractProductImages,
   formatLookupProduct,
   buildProductSearchFilter,
   buildProductTypeFilter,

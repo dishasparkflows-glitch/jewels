@@ -12,6 +12,7 @@ const {
   sanitizeColorImages,
   isPricingUnchanged,
   formatHomeProduct,
+  formatStorefrontProduct,
   formatLookupProduct,
   buildProductSearchFilter,
   buildProductTypeFilter,
@@ -143,7 +144,7 @@ class ProductService {
       })
       .populate({
         path: 'metalColorIds',
-        select: 'name code hex',
+        select: 'name code colorCode colorCodeEnd',
         strictPopulate: false
       })
       .populate({
@@ -153,12 +154,12 @@ class ProductService {
       })
       .populate({
         path: 'colorImages.metalColorId',
-        select: 'name code hex',
+        select: 'name code colorCode colorCodeEnd',
         strictPopulate: false
       })
       .populate({
         path: 'variants.metalColorId',
-        select: 'name code hex',
+        select: 'name code colorCode colorCodeEnd',
         strictPopulate: false
       })
       .populate({
@@ -428,18 +429,30 @@ class ProductService {
         ...displayedGroupCards,
         ...items.map(withColorStatuses)
       ];
+      const finalItems = queryParams.view === 'storefront'
+        ? combined.map(formatStorefrontProduct)
+        : combined;
       return {
-        items: combined,
+        items: finalItems,
         pagination: getPaginationMeta(total + groupCards.length, page, limit),
         facets: shopFor ? { shopFor } : undefined
       };
     }
 
+    const finalItems = queryParams.view === 'storefront'
+      ? items.map(formatStorefrontProduct)
+      : items.map(withColorStatuses);
+
     return {
-      items: items.map(withColorStatuses),
+      items: finalItems,
       pagination: getPaginationMeta(total, page, limit),
       facets: shopFor ? { shopFor } : undefined
     };
+  }
+
+  // ------------------------------- get storefront products (lightweight listing) ----------------------------
+  async getStorefrontProducts(queryParams = {}) {
+    return this.getAll({ ...queryParams, view: 'storefront' });
   }
 
   // Helper to format concise product card info for the home page
@@ -472,7 +485,7 @@ class ProductService {
 
     const items = await Product.find(filter)
       .select(selectFields)
-      .populate('metalColorIds colorImages.metalColorId', 'name code hex')
+      .populate('metalColorIds colorImages.metalColorId', 'name code colorCode colorCodeEnd')
       .sort({ 'meta.createdAt': -1, _id: -1 })
       .limit(limit)
       .lean();
@@ -480,21 +493,28 @@ class ProductService {
     const formatted = items.map((p) => formatHomeProduct(p));
 
     // Curate sections for the home page storefront
-    const platinum = formatted.filter((p) => !p.isOrnate).slice(0, 5);
+    const platinum = formatted.filter((p) => !p.isOrnate || p.productType?.toLowerCase() === 'platinum').slice(0, 5);
     const silver = formatted
       .filter(
-        (p) => p.isOrnate || p.ornate?.metalName?.toUpperCase() === 'SILVER'
+        (p) => p.isOrnate || p.productType?.toLowerCase() === 'silver'
       )
       .slice(0, 5);
     const trending = formatted.slice(0, 5);
 
+    const platinumList = platinum.length > 0 ? platinum : formatted.slice(0, 5);
+    const silverList = silver.length > 0 ? silver : formatted.slice(5, 10);
+    const trendingList = trending.length > 0 ? trending : formatted.slice(0, 5);
+
     return {
       items: formatted,
       sections: {
-        platinum: platinum.length > 0 ? platinum : formatted.slice(0, 5),
-        silver: silver.length > 0 ? silver : formatted.slice(5, 10),
-        trending: trending.length > 0 ? trending : formatted.slice(0, 5)
+        platinum: platinumList,
+        silver: silverList,
+        trending: trendingList
       },
+      platinum: platinumList,
+      silver: silverList,
+      trending: trendingList,
       total: formatted.length
     };
   }

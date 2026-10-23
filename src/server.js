@@ -6,13 +6,13 @@ const { startBannerCron } = require('./modules/banner/banner.cron');
 const { startCouponExpirationCron } = require('./modules/coupon/coupon.cron');
 const { startWebsiteThemeCron } = require('./modules/websiteTheme/websiteTheme.cron');
 
+const http = require('http');
+const { initViewerSocket } = require('./socket/viewers.socket');
+
 const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB and start server
 connectDB().then(() => {
-  // Start recurring Ornate ERP 30-minute sync cron
-  // startOrnateCron();
-
   // Start recurring banner offer auto-cleanup cron
   startBannerCron();
 
@@ -22,7 +22,10 @@ connectDB().then(() => {
   // Activate scheduled storefront themes and apply campaign expiry fallbacks.
   startWebsiteThemeCron();
 
-  app.listen(PORT, () => {
+  const server = http.createServer(app);
+  initViewerSocket(server);
+
+  server.listen(PORT, () => {
     console.log(`\n🚀 Jewels API Server running on port ${PORT}`);
     console.log(`📋 Environment: ${process.env.NODE_ENV}`);
     console.log(`🔗 Health: http://localhost:${PORT}/health`);

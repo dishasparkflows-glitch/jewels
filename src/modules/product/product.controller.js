@@ -31,6 +31,17 @@ class ProductController {
     );
   });
 
+  // ------------------------------- get search storefront products (clean lightweight info) ----------------------------
+  getSearchStorefront = catchAsync(async (req, res) => {
+    const { items, pagination } = await productService.getSearchStorefront(req.query);
+    ApiResponse.paginated(
+      res,
+      items,
+      pagination,
+      'Storefront search results retrieved successfully'
+    );
+  });
+
   // ------------------------------- get all products ----------------------------
   getAll = catchAsync(async (req, res) => {
     const { items, pagination, facets } = await productService.getAll(req.query);

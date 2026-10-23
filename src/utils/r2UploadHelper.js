@@ -12,6 +12,8 @@ const MIME_EXTENSION_MAP = {
   'image/avif': 'avif',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
+  'video/webm;codecs=vp9': 'webm',
+  'video/webm;codecs=vp8': 'webm',
   'video/quicktime': 'mov',
   'application/pdf': 'pdf',
 };
@@ -100,7 +102,8 @@ function generateR2ObjectKey({ module: rawModule, contentType, productId, subfol
   }
 
   const normalizedContentType = contentType.trim().toLowerCase();
-  const extension = MIME_EXTENSION_MAP[normalizedContentType];
+  const baseMimeType = normalizedContentType.split(';')[0].trim();
+  const extension = MIME_EXTENSION_MAP[baseMimeType] || MIME_EXTENSION_MAP[normalizedContentType];
   if (!extension) {
     const allowedTypes = Object.keys(MIME_EXTENSION_MAP).join(', ');
     throw new ApiError(
@@ -131,7 +134,7 @@ function generateR2ObjectKey({ module: rawModule, contentType, productId, subfol
     folder,
     prefix: config.prefix,
     module: moduleName,
-    contentType: normalizedContentType,
+    contentType: baseMimeType,
     extension,
     timestamp,
     shortId,

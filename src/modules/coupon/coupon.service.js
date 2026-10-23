@@ -77,14 +77,12 @@ class CouponService {
 
   // ------------------------------- get coupon lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { 'meta.deletedAt': null, status: 'active' };
-    const now = new Date();
+    const filter = { 'meta.deletedAt': null };
+    filter.status = queryParams.status || 'active';
 
-    // Only return currently valid coupons in active lookup
-    filter.$or = [
-      { 'validity.endDate': null },
-      { 'validity.endDate': { $gte: now } },
-    ];
+    if (queryParams.search) {
+      filter['coupon.code'] = new RegExp(queryParams.search.trim(), 'i');
+    }
 
     return await Coupon.find(filter)
       .select('_id coupon discount validity usage status meta')

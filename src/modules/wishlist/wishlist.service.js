@@ -1,9 +1,10 @@
+const mongoose = require('mongoose');
 const Wishlist = require('./wishlist.model');
 const ApiError = require('../../utils/ApiError');
 
 class WishlistService {
   /**
-   * Helper: Find existing wishlist by userId
+   * Helper: Find or create wishlist by userId
    */
   async findOrCreateWishlist(userId) {
     if (!userId) {
@@ -14,7 +15,8 @@ class WishlistService {
     if (!wishlist) {
       wishlist = await Wishlist.create({
         userId,
-        items: [],
+        productIds: [],
+        addedAt: new Date(),
       });
     }
 
@@ -22,68 +24,57 @@ class WishlistService {
   }
 
   /**
-   * Get wishlist items for user
+   * Get wishlist for user
    */
   async getWishlist(userId) {
     if (!userId) {
-      return { items: [], count: 0, wishlistId: null };
+      return null;
     }
 
-    const wishlist = await this.findOrCreateWishlist(userId);
+    const wishlist = await Wishlist.findOne({ userId }).populate('productIds');
     if (!wishlist) {
-      return { items: [], count: 0, wishlistId: null };
+      return this.findOrCreateWishlist(userId);
     }
 
-    return {
-      items: wishlist.items || [],
-      count: wishlist.items?.length || 0,
-      wishlistId: wishlist._id,
-    };
+    return wishlist;
   }
 
   /**
    * Toggle item in wishlist (add if not present, remove if present)
    */
   async toggleItem({ userId, productData }) {
-    if (!productData || !productData.productId) {
+    const productId = typeof productData === 'string' ? productData : productData?.productId;
+    if (!productId) {
       throw new ApiError(400, 'Product ID is required');
     }
 
-    const productIdStr = String(productData.productId).trim();
+    const productIdStr = String(productId).trim();
+    if (!mongoose.isValidObjectId(productIdStr)) {
+      throw new ApiError(400, 'Invalid Product ID');
+    }
+
     const wishlist = await this.findOrCreateWishlist(userId);
 
-    // Check if item already in wishlist
-    const existingIndex = wishlist.items.findIndex(
-      (item) => String(item.productId) === productIdStr || String(item._id) === productIdStr
+    const existingIndex = wishlist.productIds.findIndex(
+      (id) => String(id) === productIdStr
     );
 
     let isWishlisted = false;
-
     if (existingIndex > -1) {
-      // Remove item
-      wishlist.items.splice(existingIndex, 1);
+      wishlist.productIds.splice(existingIndex, 1);
       isWishlisted = false;
     } else {
-      wishlist.items.push({
-        productId: productIdStr,
-        title: productData.title || '',
-        price: Number(productData.price) || 0,
-        originalPrice: productData.originalPrice ? Number(productData.originalPrice) : null,
-        image: productData.image || '',
-        category: productData.category || '',
-        slug: productData.slug || '',
-        addedAt: new Date(),
-      });
+      wishlist.productIds.push(productIdStr);
+      wishlist.addedAt = new Date();
       isWishlisted = true;
     }
 
     await wishlist.save();
+    await wishlist.populate('productIds');
 
     return {
       isWishlisted,
-      count: wishlist.items.length,
-      productId: productIdStr,
-      items: wishlist.items,
+      ...wishlist.toObject(),
     };
   }
 
@@ -91,31 +82,25 @@ class WishlistService {
    * Add item specifically
    */
   async addItem({ userId, productData }) {
-    if (!productData || !productData.productId) {
+    const productId = typeof productData === 'string' ? productData : productData?.productId;
+    if (!productId) {
       throw new ApiError(400, 'Product ID is required');
     }
-    const productIdStr = String(productData.productId).trim();
+    const productIdStr = String(productId).trim();
+    if (!mongoose.isValidObjectId(productIdStr)) {
+      throw new ApiError(400, 'Invalid Product ID');
+    }
+
     const wishlist = await this.findOrCreateWishlist(userId);
 
-    const exists = wishlist.items.some((item) => String(item.productId) === productIdStr);
+    const exists = wishlist.productIds.some((id) => String(id) === productIdStr);
     if (!exists) {
-      wishlist.items.push({
-        productId: productIdStr,
-        title: productData.title || '',
-        price: Number(productData.price) || 0,
-        originalPrice: productData.originalPrice ? Number(productData.originalPrice) : null,
-        image: productData.image || '',
-        category: productData.category || '',
-        slug: productData.slug || '',
-        addedAt: new Date(),
-      });
+      wishlist.productIds.push(productIdStr);
+      wishlist.addedAt = new Date();
       await wishlist.save();
     }
 
-    return {
-      count: wishlist.items.length,
-      items: wishlist.items,
-    };
+    return this.getWishlist(userId);
   }
 
   /**
@@ -128,19 +113,16 @@ class WishlistService {
     const productIdStr = String(productId).trim();
     const wishlist = await this.findOrCreateWishlist(userId);
 
-    const initialLength = wishlist.items.length;
-    wishlist.items = wishlist.items.filter(
-      (item) => String(item.productId) !== productIdStr && String(item._id) !== productIdStr
+    const initialLength = wishlist.productIds.length;
+    wishlist.productIds = wishlist.productIds.filter(
+      (id) => String(id) !== productIdStr
     );
 
-    if (wishlist.items.length !== initialLength) {
+    if (wishlist.productIds.length !== initialLength) {
       await wishlist.save();
     }
 
-    return {
-      count: wishlist.items.length,
-      items: wishlist.items,
-    };
+    return this.getWishlist(userId);
   }
 
   /**
@@ -148,9 +130,9 @@ class WishlistService {
    */
   async clearWishlist(userId) {
     const wishlist = await this.findOrCreateWishlist(userId);
-    wishlist.items = [];
+    wishlist.productIds = [];
     await wishlist.save();
-    return { count: 0, items: [] };
+    return wishlist;
   }
 }
 

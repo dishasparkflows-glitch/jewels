@@ -23,11 +23,11 @@ const themeMediaAssetSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    collection: 'thememediaassets',
+    collection: 'theme_media_assets',
   }
 );
 
-const Asset = mongoose.models.ThemeMediaAsset || mongoose.model('ThemeMediaAsset', themeMediaAssetSchema);
+const Asset = mongoose.models.ThemeMediaAsset || mongoose.model('ThemeMediaAsset', themeMediaAssetSchema, 'theme_media_assets');
 
 // ------------------------------- Target Models Resolver ----------------------------
 const getTargetModels = () => ({

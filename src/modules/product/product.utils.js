@@ -140,16 +140,22 @@ const formatStorefrontProduct = (p) => {
   const minPrice = Number(p.pricing?.minPrice || salePrice || 0);
   const maxPrice = Number(p.pricing?.maxPrice || mrp || salePrice || 0);
 
+  const categoryIds = Array.isArray(p.categoryIds) ? p.categoryIds : (p.categoryIds ? [p.categoryIds] : []);
+  const menuItemIds = Array.isArray(p.menuItemIds) ? p.menuItemIds : (p.menuItemIds ? [p.menuItemIds] : []);
+  const gender = p.gender || p.basicInfo?.gender || [];
+
   return {
     _id: p._id,
     id: p._id,
     title,
     slug,
     images,
+    image: images[0] || '',
     basicInfo: {
       title,
       slug,
       description,
+      gender,
     },
     pricing: {
       salePrice,
@@ -159,7 +165,11 @@ const formatStorefrontProduct = (p) => {
     },
     isGroup,
     variantCount: p.variantCount || 0,
-    ...(p.categoryIds ? { categoryIds: p.categoryIds } : {}),
+    categoryIds,
+    menuItemIds,
+    gender,
+    productType: p.productType || '',
+    stockStatus: p.stockStatus || '',
   };
 };
 
@@ -176,6 +186,10 @@ const formatHomeProduct = (p) => {
   const minPrice = Number(p.pricing?.minPrice || salePrice || 0);
   const maxPrice = Number(p.pricing?.maxPrice || mrp || salePrice || 0);
 
+  const categoryIds = Array.isArray(p.categoryIds) ? p.categoryIds : (p.categoryIds ? [p.categoryIds] : []);
+  const menuItemIds = Array.isArray(p.menuItemIds) ? p.menuItemIds : (p.menuItemIds ? [p.menuItemIds] : []);
+  const gender = p.gender || p.basicInfo?.gender || [];
+
   return {
     _id: p._id,
     id: p._id,
@@ -187,6 +201,7 @@ const formatHomeProduct = (p) => {
       title,
       slug,
       description,
+      gender,
     },
     pricing: {
       salePrice,
@@ -196,10 +211,11 @@ const formatHomeProduct = (p) => {
     },
     isGroup,
     variantCount: p.variantCount || 0,
+    categoryIds,
+    menuItemIds,
+    gender,
     productType: p.productType || '',
-    isOrnate: Boolean(p.isOrnate),
     stockStatus: p.stockStatus || '',
-    ...(p.categoryIds ? { categoryIds: p.categoryIds } : {}),
   };
 };
 

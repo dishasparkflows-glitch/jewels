@@ -54,6 +54,7 @@ const ornateRoutes = require('../modules/ornate/ornate.routes');
 const productGroupRoutes = require('../modules/productGroup/productGroup.routes');
 const currencyRoutes = require('../modules/currency/currency.routes');
 const websiteThemeRoutes = require('../modules/websiteTheme/websiteTheme.routes');
+const analyticsRoutes = require('../modules/analytics/analytics.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -120,5 +121,7 @@ router.use('/upload', uploadRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/settings', settingRoutes);
 router.use('/website', websiteThemeRoutes);
+router.use('/analytics', analyticsRoutes);
+router.use('/admin/analytics', analyticsRoutes);
 
 module.exports = router;

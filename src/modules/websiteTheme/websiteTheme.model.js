@@ -135,7 +135,7 @@ const websiteThemeHistorySchema = new mongoose.Schema({
 }, { versionKey: false, timestamps: true });
 
 module.exports = {
-  WebsiteTheme: mongoose.models.WebsiteTheme || mongoose.model('WebsiteTheme', websiteThemeSchema, 'websitethemes'),
-  WebsiteThemeSettings: mongoose.models.WebsiteThemeSettings || mongoose.model('WebsiteThemeSettings', websiteThemeSettingsSchema, 'websitethemesettings'),
-  WebsiteThemeHistory: mongoose.models.WebsiteThemeHistory || mongoose.model('WebsiteThemeHistory', websiteThemeHistorySchema, 'websitethemehistories'),
+  WebsiteTheme: mongoose.models.WebsiteTheme || mongoose.model('WebsiteTheme', websiteThemeSchema, 'website_themes'),
+  WebsiteThemeSettings: mongoose.models.WebsiteThemeSettings || mongoose.model('WebsiteThemeSettings', websiteThemeSettingsSchema, 'website_theme_settings'),
+  WebsiteThemeHistory: mongoose.models.WebsiteThemeHistory || mongoose.model('WebsiteThemeHistory', websiteThemeHistorySchema, 'website_theme_histories'),
 };

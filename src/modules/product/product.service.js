@@ -286,7 +286,7 @@ class ProductService {
           .populate({
             path: 'productIds',
             select:
-              '_id basicInfo pricing specifications ornate colorImages status stockStatus productType isOrnate categoryIds meta'
+              '_id basicInfo pricing specifications ornate colorImages status stockStatus productType isOrnate categoryIds menuItemIds meta'
           })
           .lean();
 
@@ -305,6 +305,180 @@ class ProductService {
           if (!summary.representative) continue;
 
           const rep = summary.representative;
+          const allCategoryIds = [
+            ...new Set(
+              group.productIds.flatMap((p) => (p.categoryIds || []).map(String))
+            )
+          ];
+          const allMenuItemIds = [
+            ...new Set(
+              group.productIds.flatMap((p) => (p.menuItemIds || []).map(String))
+            )
+          ];
+          const allGenders = [
+            ...new Set(
+              group.productIds.flatMap((p) => {
+                const g = p.basicInfo?.gender;
+                return Array.isArray(g) ? g : g ? [g] : [];
+              })
+            )
+          ];
+
+          const repCategoryIds = (rep.categoryIds || []).map(String);
+          const repMenuItemIds = (rep.menuItemIds || []).map(String);
+          const repGenders = Array.isArray(rep.basicInfo?.gender)
+            ? rep.basicInfo.gender
+            : rep.basicInfo?.gender
+            ? [rep.basicInfo.gender]
+            : Array.isArray(rep.gender)
+            ? rep.gender
+            : rep.gender
+            ? [rep.gender]
+            : [];
+
+          const groupCategoryIds = [
+            ...new Set([
+              ...allCategoryIds,
+              ...repCategoryIds,
+              ...(group.categoryId ? [String(group.categoryId)] : [])
+            ])
+          ];
+          const groupMenuItemIds = [
+            ...new Set([
+              ...allMenuItemIds,
+              ...repMenuItemIds,
+              ...(group.menuItemId ? [String(group.menuItemId)] : [])
+            ])
+          ];
+          const groupGender = [
+            ...new Set([
+              ...allGenders.map(String),
+              ...repGenders.map(String)
+            ])
+          ];
+
+          // 1. Filter by category
+          if (queryParams.category) {
+            const requestedCat = String(queryParams.category);
+            if (!groupCategoryIds.includes(requestedCat)) {
+              continue;
+            }
+          }
+
+          // 2. Filter by menuItem
+          if (queryParams.menuItem) {
+            const requestedMenuItem = String(queryParams.menuItem);
+            if (!groupMenuItemIds.includes(requestedMenuItem)) {
+              continue;
+            }
+          }
+
+          // 3. Filter by status
+          if (queryParams.status && queryParams.status !== 'all') {
+            const reqStatus = String(queryParams.status).toLowerCase();
+            const groupStatus = String(group.status || '').toLowerCase();
+            const repStatus = String(rep.status || '').toLowerCase();
+            if (reqStatus === 'active') {
+              if (groupStatus !== 'active' && repStatus !== 'active' && repStatus !== 'approved') {
+                continue;
+              }
+            } else if (groupStatus !== reqStatus && repStatus !== reqStatus) {
+              continue;
+            }
+          }
+
+          // 4. Filter by productType
+          if (queryParams.productType && queryParams.productType !== 'all') {
+            const reqPt = String(queryParams.productType).toLowerCase();
+            const repPt = String(rep.productType || '').toLowerCase();
+            const hasPt = group.productIds.some(
+              (p) => String(p.productType || '').toLowerCase() === reqPt
+            ) || repPt === reqPt;
+            if (!hasPt) {
+              continue;
+            }
+            if (reqPt === 'silver' && !isOrnateSpecified) {
+              const hasNonOrnateSilver = group.productIds.some(
+                (p) => String(p.productType || '').toLowerCase() === 'silver' && p.isOrnate !== true
+              ) || (repPt === 'silver' && rep.isOrnate !== true);
+              if (!hasNonOrnateSilver) {
+                continue;
+              }
+            }
+          }
+
+          // 5. Filter by isOrnate
+          if (isOrnateSpecified) {
+            const isO = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
+            const matchesOrnate = isO
+              ? (rep.isOrnate === true || group.productIds.some((p) => p.isOrnate === true))
+              : (rep.isOrnate !== true || group.productIds.some((p) => p.isOrnate !== true));
+            if (!matchesOrnate) {
+              continue;
+            }
+          }
+
+          // 6. Filter by shopFor / gender
+          const shopForGenders = getShopForGenders(queryParams.shopFor);
+          if (shopForGenders.length > 0) {
+            const matchesShopFor = groupGender.some((g) =>
+              shopForGenders.some((sfg) => String(sfg).toLowerCase() === String(g).toLowerCase())
+            );
+            if (!matchesShopFor) {
+              continue;
+            }
+          }
+          if (queryParams.gender) {
+            const targetGender = String(queryParams.gender).toLowerCase();
+            const matchesGender = groupGender.some(
+              (g) => String(g).toLowerCase() === targetGender
+            );
+            if (!matchesGender) {
+              continue;
+            }
+          }
+
+          // 7. Filter by search
+          if (queryParams.search) {
+            const term = queryParams.search.trim().toLowerCase();
+            const matchesSearch =
+              (group.groupName && group.groupName.toLowerCase().includes(term)) ||
+              (group.groupCode && group.groupCode.toLowerCase().includes(term)) ||
+              (group.description && group.description.toLowerCase().includes(term)) ||
+              (rep.basicInfo?.title && rep.basicInfo.title.toLowerCase().includes(term)) ||
+              (rep.basicInfo?.sku && rep.basicInfo.sku.toLowerCase().includes(term)) ||
+              group.productIds.some(
+                (p) =>
+                  (p.basicInfo?.title && p.basicInfo.title.toLowerCase().includes(term)) ||
+                  (p.basicInfo?.sku && p.basicInfo.sku.toLowerCase().includes(term)) ||
+                  (p.ornate?.tagNo && p.ornate.tagNo.toLowerCase().includes(term)) ||
+                  (p.ornate?.itemCode && p.ornate.itemCode.toLowerCase().includes(term)) ||
+                  (p.ornate?.groupName && p.ornate.groupName.toLowerCase().includes(term))
+              );
+            if (!matchesSearch) {
+              continue;
+            }
+          }
+
+          // 8. Filter by price range
+          const effectiveGroupPrice = summary.representativePrice || summary.maxPrice || 0;
+          if (queryParams.minPrice !== undefined && queryParams.minPrice !== '') {
+            const minP = Number(queryParams.minPrice);
+            if (Number.isFinite(minP)) {
+              if (effectiveGroupPrice < minP && (summary.maxPrice || 0) < minP) {
+                continue;
+              }
+            }
+          }
+          if (queryParams.maxPrice !== undefined && queryParams.maxPrice !== '') {
+            const maxP = Number(queryParams.maxPrice);
+            if (Number.isFinite(maxP)) {
+              if (effectiveGroupPrice > maxP && (summary.minPrice || 0) > maxP) {
+                continue;
+              }
+            }
+          }
+
           groupCards.push({
             _id: group._id,
             isGroup: true,
@@ -315,7 +489,8 @@ class ProductService {
             basicInfo: {
               title: group.groupName,
               slug: group.slug || rep.basicInfo?.slug,
-              description: group.description || rep.basicInfo?.description || ''
+              description: group.description || rep.basicInfo?.description || '',
+              gender: groupGender,
             },
             pricing: {
               salePrice: summary.representativePrice,
@@ -331,11 +506,23 @@ class ProductService {
             status: 'approved',
             productType: rep.productType,
             isOrnate: rep.isOrnate,
-            categoryIds: rep.categoryIds,
+            categoryIds: groupCategoryIds,
+            menuItemIds: groupMenuItemIds,
+            gender: groupGender,
             memberProductIds: group.productIds.map((p) => p._id),
             representative: rep,
             meta: group.meta
           });
+        }
+
+        if (queryParams.sort) {
+          if (queryParams.sort === 'price-low' || queryParams.sort === 'price_asc') {
+            groupCards.sort((a, b) => (a.pricing?.salePrice || 0) - (b.pricing?.salePrice || 0));
+          } else if (queryParams.sort === 'price-high' || queryParams.sort === 'price_desc') {
+            groupCards.sort((a, b) => (b.pricing?.salePrice || 0) - (a.pricing?.salePrice || 0));
+          } else if (queryParams.sort === 'name_asc') {
+            groupCards.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          }
         }
 
         if (groupedProductIds.length > 0) {
@@ -455,6 +642,188 @@ class ProductService {
     return this.getAll({ ...queryParams, view: 'storefront' });
   }
 
+  // ------------------------------- get search storefront products (streamlined info) ----------------------------
+  async getSearchStorefront(queryParams = {}) {
+    await this.refreshCalculatedPrices();
+    const { page, limit, skip } = getPagination(queryParams);
+    const searchTerm = (queryParams.search || queryParams.q || '').trim();
+
+    const conditions = [
+      { 'meta.deletedAt': null },
+      { status: { $in: ['active', 'approved'] } }
+    ];
+
+    let searchRegex = null;
+    if (searchTerm) {
+      const safeTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      searchRegex = new RegExp(safeTerm, 'i');
+      conditions.push({
+        $or: [
+          { 'basicInfo.title': searchRegex },
+          { 'basicInfo.slug': searchRegex },
+          { 'basicInfo.sku': searchRegex },
+          { 'basicInfo.description': searchRegex },
+          { 'ornate.tagNo': searchRegex },
+          { 'ornate.itemCode': searchRegex },
+          { 'ornate.barcode': searchRegex },
+          { 'ornate.groupName': searchRegex },
+          { 'ornate.customGroupName': searchRegex },
+          { 'ornate.metalName': searchRegex },
+          { productType: searchRegex }
+        ]
+      });
+    }
+
+    if (queryParams.category) {
+      conditions.push({ categoryIds: queryParams.category });
+    }
+
+    if (queryParams.menuItem) {
+      conditions.push({ menuItemIds: queryParams.menuItem });
+    }
+
+    if (queryParams.productType && queryParams.productType !== 'all') {
+      conditions.push({ productType: String(queryParams.productType).toLowerCase() });
+    }
+
+    if (queryParams.isOrnate !== undefined && queryParams.isOrnate !== '') {
+      conditions.push({ isOrnate: queryParams.isOrnate === 'true' });
+    }
+
+    const genders = (queryParams.shopFor || queryParams.gender || '')
+      .split(',')
+      .map((g) => g.trim())
+      .filter(Boolean);
+    if (genders.length > 0) {
+      conditions.push({ 'basicInfo.gender': { $in: genders } });
+    }
+
+    if (queryParams.minPrice || queryParams.maxPrice) {
+      const priceFilter = {};
+      if (queryParams.minPrice) priceFilter.$gte = Number(queryParams.minPrice);
+      if (queryParams.maxPrice) priceFilter.$lte = Number(queryParams.maxPrice);
+      conditions.push({
+        $or: [
+          { 'pricing.salePrice': priceFilter },
+          { 'pricing.mrp': priceFilter }
+        ]
+      });
+    }
+
+    // Support representative group cards when requested (defaults to true for storefront)
+    let groupCards = [];
+    const includeGroups = queryParams.includeGroups === 'true' || queryParams.includeGroups === true;
+    const groupedProductIds = [];
+
+    if (includeGroups) {
+      try {
+        const ProductGroup = require('../productGroup/productGroup.model');
+        const productGroupService = require('../productGroup/productGroup.service');
+        const groupFilter = {
+          status: 'active',
+          'meta.deletedAt': null
+        };
+        if (searchRegex) {
+          groupFilter.name = searchRegex;
+        }
+
+        const activeGroups = await ProductGroup.find(groupFilter)
+          .populate({
+            path: 'productIds',
+            select:
+              '_id basicInfo pricing specifications ornate colorImages status stockStatus productType isOrnate categoryIds menuItemIds meta'
+          })
+          .lean();
+
+        for (const group of activeGroups) {
+          if (!group.productIds || !group.productIds.length) continue;
+          group.productIds.forEach((p) => {
+            if (p?._id) groupedProductIds.push(p._id);
+          });
+
+          const summary = productGroupService.computeGroupSummary(
+            group,
+            group.productIds
+          );
+          if (!summary.representative) continue;
+          const rep = summary.representative;
+
+          if (queryParams.category) {
+            const allCatIds = [
+              ...group.productIds.flatMap((p) => (p.categoryIds || []).map(String)),
+              ...(group.categoryId ? [String(group.categoryId)] : [])
+            ];
+            if (!allCatIds.includes(String(queryParams.category))) continue;
+          }
+
+          if (queryParams.menuItem) {
+            const allMenuIds = [
+              ...group.productIds.flatMap((p) => (p.menuItemIds || []).map(String)),
+              ...(group.menuItemId ? [String(group.menuItemId)] : [])
+            ];
+            if (!allMenuIds.includes(String(queryParams.menuItem))) continue;
+          }
+
+          groupCards.push({
+            ...rep,
+            _id: group._id,
+            id: group._id,
+            groupName: group.name,
+            slug: group.slug || rep.basicInfo?.slug,
+            isGroup: true,
+            variantCount: group.productIds.length,
+            images: rep.colorImages?.flatMap((c) => c.images?.map((img) => img.url)) || [],
+            pricing: {
+              ...rep.pricing,
+              minPrice: summary.minPrice,
+              maxPrice: summary.maxPrice,
+              salePrice: summary.minPrice
+            }
+          });
+        }
+      } catch (groupErr) {
+        // Silently continue without groups if error occurs
+      }
+    }
+
+    if (groupedProductIds.length > 0) {
+      conditions.push({ _id: { $nin: groupedProductIds } });
+    }
+
+    const filter = conditions.length === 1 ? conditions[0] : { $and: conditions };
+
+    let sort = { 'meta.createdAt': -1, _id: -1 };
+    if (queryParams.sort === 'price_asc') {
+      sort = { 'pricing.salePrice': 1, _id: -1 };
+    } else if (queryParams.sort === 'price_desc') {
+      sort = { 'pricing.salePrice': -1, _id: -1 };
+    } else if (queryParams.sort === 'oldest') {
+      sort = { 'meta.createdAt': 1, _id: 1 };
+    }
+
+    const selectFields =
+      '_id basicInfo pricing ornate productType isOrnate colorImages stockStatus categoryIds menuItemIds meta';
+
+    const [rawItems, total] = await Promise.all([
+      Product.find(filter)
+        .select(selectFields)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(filter)
+    ]);
+
+    const displayedGroupCards = page === 1 ? groupCards.map(formatStorefrontProduct) : [];
+    const formattedProducts = rawItems.map(formatStorefrontProduct);
+    const items = [...displayedGroupCards, ...formattedProducts];
+
+    return {
+      items,
+      pagination: getPaginationMeta(total + groupCards.length, page, limit)
+    };
+  }
+
   // Helper to format concise product card info for the home page
   _formatHomeProduct(p) {
     return formatHomeProduct(p);
@@ -493,12 +862,18 @@ class ProductService {
     const formatted = items.map((p) => formatHomeProduct(p));
 
     // Curate sections for the home page storefront
-    const platinum = formatted.filter((p) => !p.isOrnate || p.productType?.toLowerCase() === 'platinum').slice(0, 5);
-    const silver = formatted
-      .filter(
-        (p) => p.isOrnate || p.productType?.toLowerCase() === 'silver'
-      )
-      .slice(0, 5);
+    const platinum = [];
+    const silver = [];
+    items.forEach((raw, i) => {
+      const f = formatted[i];
+      if (!f) return;
+      const isSilver = Boolean(raw.isOrnate || raw.productType?.toLowerCase() === 'silver');
+      if (isSilver) {
+        if (silver.length < 5) silver.push(f);
+      } else {
+        if (platinum.length < 5) platinum.push(f);
+      }
+    });
     const trending = formatted.slice(0, 5);
 
     const platinumList = platinum.length > 0 ? platinum : formatted.slice(0, 5);

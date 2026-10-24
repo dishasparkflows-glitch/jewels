@@ -3,13 +3,27 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const Category = require('../category/category.model');
 const Banner = require('../banner/banner.model');
+const Featured = require('../featured/featured.model');
 const { WebsiteTheme, WebsiteThemeSettings, WebsiteThemeHistory } = require('./websiteTheme.model');
 const themeMedia = require('./themeMedia');
 
 const TIMEZONE = 'Asia/Kolkata';
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
-const SECTION_KEYS = ['hero', 'categories', 'products', 'collections', 'trustBadges', 'customBanner', 'reviews', 'instagram'];
-const BANNER_TYPES = ['herobanner', 'collectionbanner', 'categorybanner', 'offerbanner', 'mobileappbanner', 'bookappointbanner', 'websitebanner'];
+const SECTION_KEYS = [
+  'hero',
+  'categories',
+  'products',
+  'collections',
+  'trustBadges',
+  'customBanner',
+  'reviews',
+  'instagram',
+  'celebrate',
+  'gifts',
+  'mobileApp',
+  'appointment',
+];
+const BANNER_TYPES = ['herobanner', 'collectionbanner', 'categorybanner', 'offerbanner', 'customizebanner', 'mobileappbanner', 'bookappointbanner', 'websitebanner'];
 
 const snapshotOf = (theme) => ({
   id: String(theme._id),
@@ -53,6 +67,29 @@ class WebsiteThemeService {
     const selectedBannerIds = bannerSelections.map((selection) => selection.bannerId?._id || selection.bannerId).filter(Boolean);
     if (selectedBannerIds.some((id) => !mongoose.isValidObjectId(id))) throw new ApiError(400, 'Theme banner selections must reference valid banner IDs.');
     if (new Set(selectedBannerIds.map(String)).size !== selectedBannerIds.length) throw new ApiError(400, 'A website banner can only be selected once per theme.');
+
+    const featuredSelections = config.featuredSelections || [];
+    if (featuredSelections.length > 100) throw new ApiError(400, 'A theme can reference at most 100 featured showcases.');
+    for (const selection of featuredSelections) {
+      if (!['Celebrate', 'Gifts'].includes(selection.placement || 'Celebrate')) {
+        throw new ApiError(400, 'Theme showcase placement must be Celebrate or Gifts.');
+      }
+    }
+    const selectedFeaturedIds = featuredSelections.map((selection) => selection.featuredId?._id || selection.featuredId).filter(Boolean);
+    if (selectedFeaturedIds.some((id) => !mongoose.isValidObjectId(id))) throw new ApiError(400, 'Theme showcase selections must reference valid IDs.');
+    if (new Set(selectedFeaturedIds.map(String)).size !== selectedFeaturedIds.length) throw new ApiError(400, 'A showcase can only be selected once per theme.');
+    if (selectedFeaturedIds.length) {
+      const referencedFeatured = await Featured.find({ _id: { $in: selectedFeaturedIds }, 'meta.deletedAt': null })
+        .select('_id placement status')
+        .lean();
+      const referencedById = new Map(referencedFeatured.map((item) => [String(item._id), item]));
+      for (const selection of featuredSelections) {
+        const featuredId = selection.featuredId?._id || selection.featuredId;
+        if (!featuredId) continue;
+        const item = referencedById.get(String(featuredId));
+        if (!item) throw new ApiError(400, 'A selected showcase no longer exists.');
+      }
+    }
     if (selectedBannerIds.length) {
       const referencedBanners = await Banner.find({ _id: { $in: selectedBannerIds }, 'meta.deletedAt': null })
         .select('_id display.type display.platform status')
@@ -262,7 +299,7 @@ class WebsiteThemeService {
       { new: true }
     );
     if (settings.scheduledThemeId && String(settings.scheduledThemeId) !== String(theme._id)) {
-      await WebsiteTheme.updateOne({ _id: settings.scheduledThemeId, status: 'scheduled' }, { $set: { status: 'draft', 'schedule.startAt': null } });
+      await WebsiteTheme.updateOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null }, { $set: { status: 'draft', 'schedule.startAt': null } });
     }
     await WebsiteTheme.updateMany({ status: 'active', _id: { $ne: theme._id } }, { $set: { status: 'draft' } });
     theme.status = 'active';
@@ -298,7 +335,7 @@ class WebsiteThemeService {
       await theme.save();
       const settings = await this.settings();
       if (settings.scheduledThemeId && String(settings.scheduledThemeId) !== String(theme._id)) {
-        await WebsiteTheme.updateOne({ _id: settings.scheduledThemeId, status: 'scheduled' }, { $set: { status: 'draft', 'schedule.startAt': null } });
+        await WebsiteTheme.updateOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null }, { $set: { status: 'draft', 'schedule.startAt': null } });
       }
       settings.scheduledThemeId = theme._id;
       await settings.save();
@@ -309,6 +346,25 @@ class WebsiteThemeService {
     theme.publishedSnapshot = snapshotOf(theme);
     await theme.save();
     return { ...(await this.setActive(theme, actorId, 'published')), scheduled: false };
+  }
+
+  async remove(id, actorId) {
+    const theme = await this.getById(id);
+    theme.meta.deletedAt = new Date();
+    theme.meta.deletedBy = actorId || null;
+    theme.meta.updatedBy = actorId || null;
+    theme.status = 'archived';
+    await theme.save();
+    // Clear only references to this theme; preserve unrelated live/scheduled themes.
+    for (const field of ['activeThemeId', 'scheduledThemeId', 'previousThemeId']) {
+      await WebsiteThemeSettings.updateOne({ key: 'storefront', [field]: theme._id }, { $set: { [field]: null } });
+    }
+    await WebsiteTheme.updateMany({ 'schedule.fallbackThemeId': theme._id }, { $set: { 'schedule.fallbackThemeId': null } });
+    const settings = await WebsiteThemeSettings.findOneAndUpdate(
+      { key: 'storefront' }, { $inc: { revision: 1 } }, { new: true }
+    );
+    await this.writeHistory(theme, 'deleted', actorId, 'Theme deleted. Shared media retained.', settings?.revision || 0);
+    return { id: String(theme._id) };
   }
 
   // ------------------------------- archive website theme ----------------------------
@@ -342,11 +398,226 @@ class WebsiteThemeService {
     return snapshot;
   }
 
+  // ------------------------------- get theme media library ----------------------------
+  async getMediaLibrary(id) {
+    let theme = null;
+    if (id && mongoose.isValidObjectId(id)) {
+      theme = await WebsiteTheme.findOne({ _id: id, 'meta.deletedAt': null }).lean();
+    }
+
+    const config = theme?.config || {};
+    const bannerSelections = config.bannerSelections || [];
+    const selectedBannerIds = new Set(bannerSelections.map((s) => String(s.bannerId?._id || s.bannerId || '')).filter(Boolean));
+    const featuredSelections = config.featuredSelections || [];
+    const selectedFeaturedIds = new Set(featuredSelections.map((s) => String(s.featuredId?._id || s.featuredId || '')).filter(Boolean));
+    const categoryAppearances = config.categoryAppearances || [];
+    const selectedCategoryIds = new Set(categoryAppearances.map((c) => String(c.categoryId?._id || c.categoryId || '')).filter(Boolean));
+    const mediaOverrides = config.mediaOverrides || [];
+
+    const [allBanners, allFeatured, allCategories, allAssets] = await Promise.all([
+      Banner.find({ 'meta.deletedAt': null }).lean(),
+      Featured.find({ 'meta.deletedAt': null }).lean(),
+      Category.find({ 'meta.deletedAt': null }).select('name slug icon banner promoBanners').lean(),
+      themeMedia.Asset.find({}).sort({ createdAt: -1 }).limit(100).lean(),
+    ]);
+
+    const items = [];
+    const seenUrls = new Set();
+
+    const extractName = (url, fallback) => {
+      if (!url) return fallback;
+      try {
+        const parts = url.split('/');
+        return parts[parts.length - 1].split('?')[0] || fallback;
+      } catch {
+        return fallback;
+      }
+    };
+
+    allBanners.forEach((banner) => {
+      const bannerId = String(banner._id);
+      const isSelectedInTheme = selectedBannerIds.has(bannerId);
+      const type = banner.display?.type || 'herobanner';
+      const platform = banner.display?.platform || 'web';
+      const title = banner.content?.title || banner.title || `${type} ${bannerId.slice(-4)}`;
+
+      if (banner.image?.url) {
+        const url = banner.image.url;
+        const key = banner.image.key || '';
+        const itemKey = `${bannerId}:desktop:${url}`;
+        items.push({
+          id: itemKey,
+          url,
+          key,
+          name: extractName(url, `${title} (Desktop)`),
+          mediaType: banner.mediaType || 'image',
+          variant: platform === 'mobile' ? 'mobile' : 'desktop',
+          module: 'banner',
+          filterType: type === 'herobanner' ? 'hero' : type === 'collectionbanner' ? 'collection' : type === 'categorybanner' ? 'category' : type === 'mobileappbanner' ? 'app' : 'banner',
+          recordId: bannerId,
+          recordTitle: title,
+          bannerType: type,
+          platform,
+          slot: 'image',
+          usageLocation: `${type.toUpperCase()} · ${platform === 'mobile' ? 'Mobile App' : 'Storefront Desktop'}`,
+          isUsed: isSelectedInTheme && banner.status === 'active',
+          status: banner.status,
+        });
+        seenUrls.add(url);
+      }
+
+      if (Array.isArray(banner.collectionImages)) {
+        banner.collectionImages.forEach((img, idx) => {
+          if (!img?.url) return;
+          const url = img.url;
+          const key = img.key || '';
+          const itemKey = `${bannerId}:collection:${idx}:${url}`;
+          items.push({
+            id: itemKey,
+            url,
+            key,
+            name: extractName(url, `${title} - Tile ${idx + 1}`),
+            mediaType: 'image',
+            variant: 'desktop',
+            module: 'banner',
+            filterType: 'collection',
+            recordId: bannerId,
+            recordTitle: title,
+            bannerType: type,
+            platform,
+            slot: `collection:${img._id || idx}`,
+            usageLocation: `Collection Banner · Tile ${idx + 1}`,
+            isUsed: isSelectedInTheme && banner.status === 'active',
+            status: banner.status,
+          });
+          seenUrls.add(url);
+        });
+      }
+    });
+
+    allFeatured.forEach((item) => {
+      const featId = String(item._id);
+      const isSelectedInTheme = selectedFeaturedIds.has(featId);
+      const placement = item.placement || 'Celebrate';
+      const title = item.name || `${placement} Item`;
+
+      if (item.image?.url) {
+        const url = item.image.url;
+        const key = item.image.key || '';
+        items.push({
+          id: `${featId}:${url}`,
+          url,
+          key,
+          name: extractName(url, title),
+          mediaType: 'image',
+          variant: 'universal',
+          module: 'featured',
+          filterType: 'celebrate_gifts',
+          recordId: featId,
+          recordTitle: title,
+          placement,
+          slot: 'image',
+          usageLocation: `${placement} Showcase · ${title}`,
+          isUsed: isSelectedInTheme && item.status === 'active',
+          status: item.status,
+        });
+        seenUrls.add(url);
+      }
+    });
+
+    allCategories.forEach((cat) => {
+      const catId = String(cat._id);
+      const isSelectedInTheme = selectedCategoryIds.has(catId);
+      const name = cat.name || 'Category';
+
+      if (cat.icon?.url) {
+        const url = cat.icon.url;
+        items.push({
+          id: `${catId}:icon:${url}`,
+          url,
+          key: cat.icon.key || '',
+          name: extractName(url, `${name} Icon`),
+          mediaType: 'image',
+          variant: 'universal',
+          module: 'category',
+          filterType: 'category_icons',
+          recordId: catId,
+          recordTitle: name,
+          slot: 'icon',
+          usageLocation: `Category Icon · ${name}`,
+          isUsed: isSelectedInTheme,
+          status: 'active',
+        });
+        seenUrls.add(url);
+      }
+
+      if (cat.banner?.url) {
+        const url = cat.banner.url;
+        items.push({
+          id: `${catId}:banner:${url}`,
+          url,
+          key: cat.banner.key || '',
+          name: extractName(url, `${name} Category Banner`),
+          mediaType: 'image',
+          variant: 'desktop',
+          module: 'category',
+          filterType: 'category',
+          recordId: catId,
+          recordTitle: name,
+          slot: 'banner',
+          usageLocation: `Category Header · ${name}`,
+          isUsed: true,
+          status: 'active',
+        });
+        seenUrls.add(url);
+      }
+    });
+
+    allAssets.forEach((asset) => {
+      if (!asset.url) return;
+      const isOverride = mediaOverrides.some((o) => String(o.assetId) === String(asset._id));
+      if (!seenUrls.has(asset.url) || isOverride) {
+        items.push({
+          id: String(asset._id),
+          url: asset.url,
+          key: asset.key || '',
+          name: extractName(asset.url, 'Theme Asset'),
+          mediaType: 'image',
+          variant: 'universal',
+          module: 'themeAsset',
+          filterType: isOverride ? 'all' : 'unused',
+          recordId: String(asset._id),
+          recordTitle: 'Theme Asset Upload',
+          slot: 'asset',
+          usageLocation: isOverride ? 'Theme Override' : 'Unassigned / Media Library',
+          isUsed: isOverride,
+          status: 'active',
+        });
+        seenUrls.add(asset.url);
+      }
+    });
+
+    return {
+      items,
+      total: items.length,
+      counts: {
+        all: items.length,
+        hero: items.filter((i) => i.filterType === 'hero').length,
+        collection: items.filter((i) => i.filterType === 'collection').length,
+        category: items.filter((i) => i.filterType === 'category').length,
+        app: items.filter((i) => i.filterType === 'app').length,
+        celebrate_gifts: items.filter((i) => i.filterType === 'celebrate_gifts').length,
+        category_icons: items.filter((i) => i.filterType === 'category_icons').length,
+        unused: items.filter((i) => !i.isUsed).length,
+      },
+    };
+  }
+
   // ------------------------------- get public config ----------------------------
   async getPublicConfig() {
     const settings = await this.settings();
     if (!settings.activeThemeId) return { revision: settings.revision, timezone: TIMEZONE, theme: null };
-    const theme = await WebsiteTheme.findById(settings.activeThemeId).lean();
+    const theme = await WebsiteTheme.findOne({ _id: settings.activeThemeId, 'meta.deletedAt': null }).lean();
     return {
       revision: settings.revision,
       timezone: TIMEZONE,
@@ -366,17 +637,17 @@ class WebsiteThemeService {
     const settings = await this.settings();
     const now = new Date();
     if (settings.scheduledThemeId) {
-      const scheduled = await WebsiteTheme.findOne({ _id: settings.scheduledThemeId, status: 'scheduled' });
+      const scheduled = await WebsiteTheme.findOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null });
       if (scheduled?.schedule?.startAt && scheduled.schedule.startAt <= now) {
         await this.setActive(scheduled, null, 'activated');
         return;
       }
     }
     if (settings.activeThemeId) {
-      const active = await WebsiteTheme.findById(settings.activeThemeId);
+      const active = await WebsiteTheme.findOne({ _id: settings.activeThemeId, 'meta.deletedAt': null });
       if (active?.schedule?.endAt && active.schedule.endAt <= now) {
         const fallbackId = active.schedule.fallbackThemeId || settings.previousThemeId;
-        const fallback = fallbackId ? await WebsiteTheme.findById(fallbackId) : null;
+        const fallback = fallbackId ? await WebsiteTheme.findOne({ _id: fallbackId, 'meta.deletedAt': null }) : null;
         active.status = 'draft';
         await active.save();
         if (fallback?.publishedSnapshot) {

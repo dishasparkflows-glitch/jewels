@@ -36,15 +36,39 @@ const categoryAppearanceSchema = new mongoose.Schema({
 }, { _id: false });
 
 const sectionSchema = new mongoose.Schema({
-  key: { type: String, enum: ['hero', 'categories', 'products', 'collections', 'trustBadges', 'customBanner', 'reviews', 'instagram'], required: true },
+  key: {
+    type: String,
+    enum: [
+      'hero',
+      'categories',
+      'products',
+      'collections',
+      'trustBadges',
+      'customBanner',
+      'reviews',
+      'instagram',
+      'celebrate',
+      'gifts',
+      'mobileApp',
+      'appointment',
+    ],
+    required: true,
+  },
   visible: { type: Boolean, default: true },
   order: { type: Number, default: 0 },
 }, { _id: false });
 
 const bannerSelectionSchema = new mongoose.Schema({
   bannerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Banner', default: null },
-  type: { type: String, enum: ['herobanner', 'collectionbanner', 'categorybanner', 'offerbanner', 'mobileappbanner', 'bookappointbanner', 'websitebanner'], required: true },
+  type: { type: String, enum: ['herobanner', 'collectionbanner', 'categorybanner', 'offerbanner', 'customizebanner', 'mobileappbanner', 'bookappointbanner', 'websitebanner'], required: true },
   platform: { type: String, enum: ['web', 'mobile'], default: 'web' },
+  order: { type: Number, min: 0, default: 1 },
+  visible: { type: Boolean, default: true },
+}, { _id: false });
+
+const featuredSelectionSchema = new mongoose.Schema({
+  featuredId: { type: mongoose.Schema.Types.ObjectId, ref: 'Featured', default: null },
+  placement: { type: String, enum: ['Celebrate', 'Gifts'], default: 'Celebrate' },
   order: { type: Number, min: 0, default: 1 },
   visible: { type: Boolean, default: true },
 }, { _id: false });
@@ -84,6 +108,7 @@ const configSchema = new mongoose.Schema({
   // Retain reads for older themes; new themes reference Banner records through bannerSelections.
   banners: { type: [bannerSchema], default: undefined },
   bannerSelections: { type: [bannerSelectionSchema], default: [] },
+  featuredSelections: { type: [featuredSelectionSchema], default: [] },
   categoryAppearances: { type: [categoryAppearanceSchema], default: [] },
   navigation: { type: [navigationSchema], default: [] },
   sections: { type: [sectionSchema], default: () => [
@@ -127,7 +152,7 @@ const websiteThemeSettingsSchema = new mongoose.Schema({
 const websiteThemeHistorySchema = new mongoose.Schema({
   themeId: { type: mongoose.Schema.Types.ObjectId, ref: 'WebsiteTheme', default: null },
   themeName: { type: String, default: '' },
-  action: { type: String, enum: ['created', 'duplicated', 'updated', 'scheduled', 'published', 'activated', 'expired', 'rolled_back', 'archived'], required: true },
+  action: { type: String, enum: ['created', 'duplicated', 'updated', 'scheduled', 'published', 'activated', 'expired', 'rolled_back', 'archived', 'deleted'], required: true },
   actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   revision: { type: Number, default: 0 },
   snapshot: { type: mongoose.Schema.Types.Mixed, default: null },

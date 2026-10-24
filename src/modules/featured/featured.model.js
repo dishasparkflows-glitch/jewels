@@ -11,10 +11,8 @@ const featuredSchema = new mongoose.Schema(
     },
     name: {
       type: String,
-      required: [true, 'Please provide featured item name'],
-      unique: true,
       trim: true,
-      index: true,
+      default: '',
     },
     placement: {
       type: String,

@@ -48,6 +48,7 @@ const bannerSchema = new mongoose.Schema(
           'collectionbanner',
           'categorybanner',
           'offerbanner',
+          'customizebanner',
           'websitebanner',
           'mobileappbanner',
           'bookappointbanner',

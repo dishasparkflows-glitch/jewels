@@ -49,7 +49,7 @@ class AnalyticsController {
         analyticsService.getStatus(),
         analyticsService.getOverview({ startDate, endDate }),
         analyticsService.getTimeline({ startDate, endDate }),
-        analyticsService.getTopProducts({ startDate, endDate, limit: 10 }),
+        analyticsService.getTopProducts({ startDate, endDate, limit: 100 }),
         analyticsService.getTrafficSources({ startDate, endDate }),
         analyticsService.getRealtime(),
       ]);

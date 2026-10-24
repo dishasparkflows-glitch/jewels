@@ -456,8 +456,8 @@ class AnalyticsService {
         title: p.basicInfo?.title || 'Jewellery Item',
         price: p.pricing?.salePrice || p.pricing?.mrp || 0,
         image: p.colorImages?.[0]?.images?.[0]?.url || p.ornate?.ornateImages?.[0]?.url || '',
-        views: (15 - idx * 2) * 12,
-        users: (15 - idx * 2) * 8,
+        views: Math.max(0, 15 - idx * 2) * 12,
+        users: Math.max(0, 15 - idx * 2) * 8,
         sku: p.basicInfo?.sku || p.ornate?.tagNo || '',
       }));
     } catch {

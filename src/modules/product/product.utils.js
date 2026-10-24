@@ -1,14 +1,109 @@
 const mongoose = require('mongoose');
 const ApiError = require('../../utils/ApiError');
 
+const MASTER_METAL_COLORS = {
+  '6ac90ab42c5692d9e254a047': { name: 'Yellow Gold', colorCode: '#E5C07B', colorCodeEnd: '#D4AF37', hex: '#E5C07B' },
+  '6ac90ab42c5692d9e254a048': { name: 'White Gold', colorCode: '#F3F4F6', colorCodeEnd: '#E5E7EB', hex: '#F3F4F6' },
+  '6ac90ab42c5692d9e254a049': { name: 'Rose Gold', colorCode: '#E8B4B8', colorCodeEnd: '#B76E79', hex: '#E8B4B8' },
+};
+
+const COLOR_HEX_DEFAULTS = {
+  'white gold': '#dedede',
+  'rose gold': '#e8b4b8',
+  'yellow gold': '#e5c07b',
+  silver: '#d4d4d4',
+  platinum: '#e5e4e2',
+  gold: '#d4b85b',
+};
+
+const resolveMetalColorInfo = (cObj, p = null) => {
+  const isObj = typeof cObj === 'object' && cObj !== null;
+  let id = isObj ? String(cObj._id || cObj.id || '') : (typeof cObj === 'string' && /^[a-f0-9]{24}$/i.test(cObj) ? cObj : '');
+  let name = isObj ? cObj.name || '' : (typeof cObj === 'string' && !/^[a-f0-9]{24}$/i.test(cObj) ? cObj : '');
+  let colorCode = isObj ? (cObj.colorCode || cObj.hex || cObj.code || '') : '';
+  let colorCodeEnd = isObj ? (cObj.colorCodeEnd || '') : '';
+
+  // If missing name or colorCode, try resolving from p.metalColorIds or p.metalColors
+  if ((!name || !colorCode) && p) {
+    const list = [
+      ...(Array.isArray(p.metalColorIds) ? p.metalColorIds : []),
+      ...(Array.isArray(p.metalColors) ? p.metalColors : []),
+      ...(Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []),
+      ...(Array.isArray(p.representative?.metalColors) ? p.representative.metalColors : []),
+    ];
+    for (const mc of list) {
+      if (!mc) continue;
+      const mcIsObj = typeof mc === 'object' && mc !== null;
+      const mcId = mcIsObj ? String(mc._id || mc.id || '') : String(mc);
+      const mcName = mcIsObj ? mc.name || '' : '';
+      if ((id && mcId === id) || (name && mcName && mcName.toLowerCase() === name.toLowerCase())) {
+        if (!id && mcId) id = mcId;
+        if (!name && mcName) name = mcName;
+        if (!colorCode && mcIsObj) colorCode = mc.colorCode || mc.hex || mc.code || '';
+        if (!colorCodeEnd && mcIsObj) colorCodeEnd = mc.colorCodeEnd || '';
+        break;
+      }
+    }
+  }
+
+  // Fallback to master metal colors if id known
+  if (id && MASTER_METAL_COLORS[id]) {
+    const m = MASTER_METAL_COLORS[id];
+    if (!name) name = m.name;
+    if (!colorCode) colorCode = m.colorCode;
+    if (!colorCodeEnd) colorCodeEnd = m.colorCodeEnd;
+  }
+
+  // Fallback hex
+  const fallbackHex = COLOR_HEX_DEFAULTS[(name || '').toLowerCase()] || '#d4d4d4';
+  const hex = colorCode || fallbackHex;
+
+  return { id, name, colorCode: colorCode || hex, colorCodeEnd, hex };
+};
+
 // Lean and aggregate results do not apply schema defaults to existing records.
 const withColorStatuses = (product) => {
   if (!product) return product;
   if (Array.isArray(product.colorImages)) {
-    product.colorImages = product.colorImages.map((color) => ({
-      ...color,
-      status: color.status ?? 'active',
-    }));
+    product.colorImages = product.colorImages.map((ci) => {
+      const validImgs = (ci.images || [])
+        .map((img) => (typeof img === 'string' ? img : img?.url))
+        .filter((url) => url && typeof url === 'string' && !/\.(mp4|webm|mov)(?:[?#]|$)/i.test(url));
+      const firstPhoto =
+        validImgs[0] ||
+        (typeof ci.firstPhoto === 'string' ? ci.firstPhoto : '') ||
+        (typeof ci.firstImage === 'string' ? ci.firstImage : '') ||
+        (typeof ci.image === 'string' ? ci.image : '') ||
+        '';
+      const resolved = resolveMetalColorInfo(ci.metalColor || ci.metalColorId, product);
+      return {
+        ...ci,
+        status: ci.status ?? 'active',
+        metalColorId: resolved.name
+          ? {
+              _id: resolved.id || undefined,
+              name: resolved.name,
+              colorCode: resolved.colorCode || resolved.hex,
+              colorCodeEnd: resolved.colorCodeEnd,
+            }
+          : (ci.metalColorId || null),
+        metalColor: resolved.name
+          ? {
+              _id: resolved.id || undefined,
+              name: resolved.name,
+              colorCode: resolved.colorCode || resolved.hex,
+              colorCodeEnd: resolved.colorCodeEnd,
+              hex: resolved.hex,
+            }
+          : (ci.metalColor || null),
+        firstPhoto,
+        firstImage: firstPhoto,
+        image: firstPhoto,
+      };
+    });
+  }
+  if (!product.metalColors || !product.metalColors.length) {
+    product.metalColors = extractMetalColors(product);
   }
   return product;
 };
@@ -124,15 +219,6 @@ const extractProductImages = (p) => {
   return [...new Set(images)];
 };
 
-const COLOR_HEX_DEFAULTS = {
-  'white gold': '#dedede',
-  'rose gold': '#e8b4b8',
-  'yellow gold': '#e5c07b',
-  silver: '#d4d4d4',
-  platinum: '#e5e4e2',
-  gold: '#d4b85b',
-};
-
 const extractMetalColors = (p) => {
   if (!p) return [];
   const colorMap = new Map();
@@ -145,33 +231,32 @@ const extractMetalColors = (p) => {
   for (const row of sourceColorImages) {
     if (!row || row.status === 'inactive') continue;
     const cObj = row.metalColor || row.metalColorId || row.color;
-    const isObj = typeof cObj === 'object' && cObj !== null;
-    const name = isObj ? cObj.name || '' : (typeof cObj === 'string' && !/^[a-f0-9]{24}$/i.test(cObj) ? cObj : '');
-    const colorCode = isObj ? (cObj.colorCode || cObj.hex || cObj.code || '') : (typeof row.hex === 'string' ? row.hex : '');
-    const colorCodeEnd = isObj ? (cObj.colorCodeEnd || '') : '';
-    const id = isObj ? String(cObj._id || '') : (typeof cObj === 'string' && /^[a-f0-9]{24}$/i.test(cObj) ? cObj : '');
+    const resolved = resolveMetalColorInfo(cObj, p);
+    const key = (resolved.name || resolved.id || resolved.hex || '').toLowerCase().trim();
+    if (!key) continue;
 
     const validImages = (row.images || [])
       .map((img) => (typeof img === 'string' ? img : img?.url))
       .filter((url) => url && typeof url === 'string' && !/\.(mp4|webm|mov)(?:[?#]|$)/i.test(url));
 
-    const firstPhoto = validImages[0] || '';
-    const fallbackHex = COLOR_HEX_DEFAULTS[name.toLowerCase()] || '#d4d4d4';
-    const hex = colorCode || fallbackHex;
-    const key = name || id || hex;
+    const firstPhoto =
+      validImages[0] ||
+      (typeof row.firstPhoto === 'string' ? row.firstPhoto : '') ||
+      (typeof row.firstImage === 'string' ? row.firstImage : '') ||
+      (typeof row.image === 'string' ? row.image : '') ||
+      '';
 
-    if (key) {
-      colorMap.set(key, {
-        id: id || undefined,
-        name: name || key,
-        colorCode: colorCode || hex,
-        colorCodeEnd,
-        hex,
-        firstPhoto,
-        image: firstPhoto,
-        images: validImages,
-      });
-    }
+    colorMap.set(key, {
+      id: resolved.id || undefined,
+      name: resolved.name || key,
+      colorCode: resolved.colorCode,
+      colorCodeEnd: resolved.colorCodeEnd,
+      hex: resolved.hex,
+      firstPhoto,
+      firstImage: firstPhoto,
+      image: firstPhoto,
+      images: validImages,
+    });
   }
 
   // 2. Also process metalColorIds & metalColors
@@ -184,45 +269,48 @@ const extractMetalColors = (p) => {
 
   for (const mc of sourceMetalColors) {
     if (!mc) continue;
-    const isObj = typeof mc === 'object' && mc !== null;
-    const id = isObj ? String(mc._id || mc.id || '') : (/^[a-f0-9]{24}$/i.test(mc) ? mc : '');
-    const name = isObj ? mc.name || '' : (!/^[a-f0-9]{24}$/i.test(mc) ? mc : '');
-    const colorCode = isObj ? (mc.colorCode || mc.hex || mc.code || '') : '';
-    const colorCodeEnd = isObj ? (mc.colorCodeEnd || '') : '';
-    const fallbackHex = COLOR_HEX_DEFAULTS[name.toLowerCase()] || '#d4d4d4';
-    const hex = colorCode || fallbackHex;
-    const key = name || id || hex;
+    const resolved = resolveMetalColorInfo(mc, p);
+    const key = (resolved.name || resolved.id || resolved.hex || '').toLowerCase().trim();
     if (!key) continue;
 
     if (colorMap.has(key)) {
       const existing = colorMap.get(key);
-      if (!existing.colorCode && (colorCode || hex)) existing.colorCode = colorCode || hex;
-      if (!existing.colorCodeEnd && colorCodeEnd) existing.colorCodeEnd = colorCodeEnd;
-      if (!existing.hex && hex) existing.hex = hex;
-      if (!existing.id && id) existing.id = id;
+      if (!existing.id && resolved.id) existing.id = resolved.id;
+      if (!existing.name && resolved.name) existing.name = resolved.name;
+      if (!existing.colorCode && resolved.colorCode) existing.colorCode = resolved.colorCode;
+      if (!existing.colorCodeEnd && resolved.colorCodeEnd) existing.colorCodeEnd = resolved.colorCodeEnd;
+      if (!existing.hex && resolved.hex) existing.hex = resolved.hex;
     } else {
       let matchedPhoto = '';
       let matchedImages = [];
       for (const row of sourceColorImages) {
-        const cObj = row?.metalColor || row?.metalColorId;
-        const cId = typeof cObj === 'object' ? String(cObj?._id || '') : String(cObj || '');
-        const cName = typeof cObj === 'object' ? cObj?.name || '' : (typeof cObj === 'string' && !/^[a-f0-9]{24}$/i.test(cObj) ? cObj : '');
-        if ((id && cId === id) || (name && cName.toLowerCase() === name.toLowerCase())) {
+        if (!row || row.status === 'inactive') continue;
+        const rResolved = resolveMetalColorInfo(row.metalColor || row.metalColorId || row.color, p);
+        if (
+          (resolved.id && rResolved.id && resolved.id === rResolved.id) ||
+          (resolved.name && rResolved.name && resolved.name.toLowerCase() === rResolved.name.toLowerCase())
+        ) {
           matchedImages = (row.images || [])
             .map((img) => (typeof img === 'string' ? img : img?.url))
             .filter((url) => url && typeof url === 'string' && !/\.(mp4|webm|mov)(?:[?#]|$)/i.test(url));
-          matchedPhoto = matchedImages[0] || '';
+          matchedPhoto =
+            matchedImages[0] ||
+            (typeof row.firstPhoto === 'string' ? row.firstPhoto : '') ||
+            (typeof row.firstImage === 'string' ? row.firstImage : '') ||
+            (typeof row.image === 'string' ? row.image : '') ||
+            '';
           break;
         }
       }
 
       colorMap.set(key, {
-        id: id || undefined,
-        name: name || key,
-        colorCode: colorCode || hex,
-        colorCodeEnd,
-        hex,
+        id: resolved.id || undefined,
+        name: resolved.name || key,
+        colorCode: resolved.colorCode,
+        colorCodeEnd: resolved.colorCodeEnd,
+        hex: resolved.hex,
         firstPhoto: matchedPhoto,
+        firstImage: matchedPhoto,
         image: matchedPhoto,
         images: matchedImages,
       });
@@ -232,42 +320,40 @@ const extractMetalColors = (p) => {
   return Array.from(colorMap.values());
 };
 
-const formatColorImages = (colorImages) => {
+const formatColorImages = (colorImages, p = null) => {
   if (!Array.isArray(colorImages)) return [];
   return colorImages
     .map((ci) => {
       if (!ci) return null;
       const cObj = ci.metalColor || ci.metalColorId;
-      const isObj = typeof cObj === 'object' && cObj !== null;
-      const name = isObj ? cObj.name || '' : '';
-      const colorCode = isObj ? (cObj.colorCode || cObj.hex || cObj.code || '') : '';
-      const colorCodeEnd = isObj ? (cObj.colorCodeEnd || '') : '';
-      const id = isObj ? String(cObj._id || '') : (typeof cObj === 'string' ? cObj : '');
+      const resolved = resolveMetalColorInfo(cObj, p);
 
       const validImages = (ci.images || [])
         .map((img) => (typeof img === 'string' ? img : img?.url))
         .filter((url) => url && typeof url === 'string' && !/\.(mp4|webm|mov)(?:[?#]|$)/i.test(url));
 
-      const firstPhoto = validImages[0] || '';
+      const firstPhoto =
+        validImages[0] ||
+        (typeof ci.firstPhoto === 'string' ? ci.firstPhoto : '') ||
+        (typeof ci.firstImage === 'string' ? ci.firstImage : '') ||
+        (typeof ci.image === 'string' ? ci.image : '') ||
+        '';
 
       return {
         status: ci.status || 'active',
-        metalColorId: isObj
-          ? {
-              _id: id,
-              name,
-              colorCode,
-              colorCodeEnd,
-            }
-          : cObj,
-        metalColor: isObj
-          ? {
-              _id: id,
-              name,
-              colorCode,
-              colorCodeEnd,
-            }
-          : null,
+        metalColorId: {
+          _id: resolved.id || undefined,
+          name: resolved.name || '',
+          colorCode: resolved.colorCode,
+          colorCodeEnd: resolved.colorCodeEnd,
+        },
+        metalColor: {
+          _id: resolved.id || undefined,
+          name: resolved.name || '',
+          colorCode: resolved.colorCode,
+          colorCodeEnd: resolved.colorCodeEnd,
+          hex: resolved.hex,
+        },
         firstPhoto,
         firstImage: firstPhoto,
         image: firstPhoto,
@@ -293,16 +379,17 @@ const formatStorefrontProduct = (p) => {
   const images = extractProductImages(p);
 
   const salePrice = Number(p.pricing?.salePrice || 0);
-  const mrp = Number(p.pricing?.mrp || salePrice || 0);
+  const isGold = String(p.productType || '').toLowerCase() === 'gold';
+  const mrp = isGold ? salePrice : Number(p.pricing?.mrp || salePrice || 0);
   const minPrice = Number(p.pricing?.minPrice || salePrice || 0);
-  const maxPrice = Number(p.pricing?.maxPrice || mrp || salePrice || 0);
+  const maxPrice = Number(p.pricing?.maxPrice || (isGold ? salePrice : mrp) || salePrice || 0);
 
   const categoryIds = Array.isArray(p.categoryIds) ? p.categoryIds : (p.categoryIds ? [p.categoryIds] : []);
   const menuItemIds = Array.isArray(p.menuItemIds) ? p.menuItemIds : (p.menuItemIds ? [p.menuItemIds] : []);
   const gender = p.gender || p.basicInfo?.gender || [];
 
   const metalColors = extractMetalColors(p);
-  const colorImages = formatColorImages(p.colorImages || p.representative?.colorImages || []);
+  const colorImages = formatColorImages(p.colorImages || p.representative?.colorImages || [], p);
   const metalColorIds = Array.isArray(p.metalColorIds)
     ? p.metalColorIds
     : (Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []);
@@ -453,7 +540,9 @@ const formatLookupProduct = (p) => {
     sku,
     price: effectivePrice,
     basicInfo: p.basicInfo || {},
-    pricing: p.pricing || {},
+    pricing: String(p.productType || '').toLowerCase() === 'gold' && p.pricing
+      ? { ...p.pricing, mrp: p.pricing.salePrice || effectivePrice }
+      : (p.pricing || {}),
     category: resolvedCategory,
     categoryIds: resolvedCategory,
     status: p.status || 'active',

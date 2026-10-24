@@ -6,7 +6,7 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class FeaturedService {
   // ------------------------------- create featured item ----------------------------
   async create(data) {
-    if (data.name) {
+    if (data.name && data.name.trim()) {
       data.name = data.name.trim();
       const existing = await Featured.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
@@ -14,6 +14,8 @@ class FeaturedService {
       if (existing) {
         throw new ApiError(409, `Featured item "${data.name}" already exists`);
       }
+    } else {
+      data.name = '';
     }
 
     const productIds = data.products || [];
@@ -119,7 +121,7 @@ class FeaturedService {
   // ------------------------------- update featured item ----------------------------
 
   async update(id, data) {
-    if (data.name) {
+    if (data.name && data.name.trim()) {
       data.name = data.name.trim();
       const existing = await Featured.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),

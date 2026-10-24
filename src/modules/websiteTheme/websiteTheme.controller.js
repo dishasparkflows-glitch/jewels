@@ -59,6 +59,10 @@ class WebsiteThemeController {
     ApiResponse.success(res, result, result.scheduled ? 'Website theme scheduled successfully' : 'Website theme published successfully');
   });
 
+  remove = catchAsync(async (req, res) => {
+    ApiResponse.success(res, await websiteThemeService.remove(req.params.id, req.user?._id), 'Website theme deleted successfully');
+  });
+
   // ------------------------------- archive website theme ----------------------------
   archive = catchAsync(async (req, res) => {
     const theme = await websiteThemeService.archive(req.params.id, req.user?._id);
@@ -75,6 +79,12 @@ class WebsiteThemeController {
   history = catchAsync(async (req, res) => {
     const items = await websiteThemeService.getHistory(req.query.themeId);
     ApiResponse.success(res, items, 'Publishing history retrieved successfully');
+  });
+
+  // ------------------------------- get theme media library ----------------------------
+  getMediaLibrary = catchAsync(async (req, res) => {
+    const data = await websiteThemeService.getMediaLibrary(req.params.id);
+    ApiResponse.success(res, data, 'Theme media library retrieved successfully');
   });
 }
 

@@ -24,6 +24,9 @@ router.put('/themes/:id/media', ...adminOnly, websiteThemeController.saveMedia);
 // ------------------------------- preview website theme ----------------------------
 router.get('/themes/:id/preview', ...adminOnly, websiteThemeController.preview);
 
+// ------------------------------- theme media library ----------------------------
+router.get('/themes/:id/media-library', ...adminOnly, websiteThemeController.getMediaLibrary);
+
 // ------------------------------- duplicate website theme ----------------------------
 router.post('/themes/:id/duplicate', ...adminOnly, websiteThemeController.duplicate);
 
@@ -41,5 +44,7 @@ router.get('/themes/:id', ...adminOnly, websiteThemeController.getOne);
 
 // ------------------------------- update website theme ----------------------------
 router.put('/themes/:id', ...adminOnly, websiteThemeController.update);
+
+router.delete('/themes/:id', ...adminOnly, websiteThemeController.remove);
 
 module.exports = router;

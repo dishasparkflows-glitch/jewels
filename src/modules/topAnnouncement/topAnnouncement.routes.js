@@ -7,7 +7,6 @@ const { ROLES } = require('../../config/constants');
 // ─── Public Storefront Endpoints ────────────────────────
 router.get('/public', topAnnouncementController.getPublic);
 router.get('/settings', topAnnouncementController.getSettings);
-router.get('/active', topAnnouncementController.getPublic);
 
 // ─── Admin Endpoints ────────────────────────────────────
 router.get('/', topAnnouncementController.getAll);

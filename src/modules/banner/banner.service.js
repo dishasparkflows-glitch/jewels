@@ -66,6 +66,15 @@ function sanitizeBannerPayload(data) {
     clean.image = cleanImg;
   }
 
+  // Mobile Image
+  if (data.mobileImage && typeof data.mobileImage === 'object' && !isNullOrEmpty(data.mobileImage.url)) {
+    const cleanMobileImg = { url: sanitizeStr(data.mobileImage.url) };
+    if (!isNullOrEmpty(data.mobileImage.key)) {
+      cleanMobileImg.key = sanitizeStr(data.mobileImage.key);
+    }
+    clean.mobileImage = cleanMobileImg;
+  }
+
   // Video
   if (data.video && typeof data.video === 'object' && !isNullOrEmpty(data.video.url)) {
     const cleanVid = { url: sanitizeStr(data.video.url) };
@@ -164,6 +173,19 @@ function buildBannerUpdateOps(data) {
         cleanImg.key = sanitizeStr(data.image.key);
       }
       $set['image'] = cleanImg;
+    }
+  }
+
+  // Mobile Image
+  if (data.mobileImage !== undefined) {
+    if (isNullOrEmpty(data.mobileImage) || isNullOrEmpty(data.mobileImage.url)) {
+      $unset['mobileImage'] = 1;
+    } else {
+      const cleanMobileImg = { url: sanitizeStr(data.mobileImage.url) };
+      if (!isNullOrEmpty(data.mobileImage.key)) {
+        cleanMobileImg.key = sanitizeStr(data.mobileImage.key);
+      }
+      $set['mobileImage'] = cleanMobileImg;
     }
   }
 

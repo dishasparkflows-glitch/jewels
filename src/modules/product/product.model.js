@@ -141,6 +141,10 @@ const productSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    certificateImage: {
+      url: { type: String, default: '' },
+      key: { type: String, default: '' },
+    },
     colorImages: {
       type: [{
         status: {
@@ -276,6 +280,18 @@ const productSchema = new mongoose.Schema(
       set: (val) => (val === 'active' ? 'approved' : val),
       default: 'draft',
       index: true,
+    },
+    inapp: {
+      type: Boolean,
+      default: true,
+    },
+    inweb: {
+      type: Boolean,
+      default: true,
+    },
+    visibility: {
+      web: { type: Boolean, default: true },
+      app: { type: Boolean, default: true },
     },
     birthMonth: {
       type: [{

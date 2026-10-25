@@ -6,7 +6,6 @@ const { ROLES } = require('../../config/constants');
 
 // ─── Public Storefront Endpoints ────────────────────────
 router.get('/public', homeSectionController.getPublic);
-router.get('/lookup', homeSectionController.getPublic);
 router.get('/key/:key', homeSectionController.getByKey);
 
 // ─── Admin Endpoints ────────────────────────────────────
@@ -43,13 +42,6 @@ router.post(
 
 router.patch(
   '/:id/toggle-status',
-  authenticate,
-  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
-  homeSectionController.toggleStatus
-);
-
-router.patch(
-  '/:id/status',
   authenticate,
   authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
   homeSectionController.toggleStatus

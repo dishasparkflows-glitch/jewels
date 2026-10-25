@@ -430,7 +430,11 @@ class WhatsAppService {
    */
   async sendAppointmentNotification(appointment) {
     try {
-      const { fullName, phoneNumber, appointmentDate, preferredTime, status } = appointment;
+      const fullName = appointment.customer?.name || appointment.fullName || 'Valued Client';
+      const phoneNumber = appointment.customer?.phone?.number || appointment.phoneNumber || '';
+      const appointmentDate = appointment.appointment?.date || appointment.appointmentDate || new Date();
+      const preferredTime = appointment.appointment?.preferredTime || appointment.preferredTime || '';
+      const status = appointment.status;
       if (!phoneNumber) return;
 
       const normalizedPhone = normalizePhoneNumber(phoneNumber);

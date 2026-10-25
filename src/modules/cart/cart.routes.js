@@ -8,10 +8,7 @@ router.use(optionalAuth);
 
 router.get('/', cartController.getCart);
 router.post('/add', cartController.addToCart);
-router.post('/', cartController.addToCart);
-router.patch('/quantity', cartController.updateQuantity);
 router.put('/quantity', cartController.updateQuantity);
-router.delete('/item/:productId', cartController.removeItem);
 router.delete('/:productId', cartController.removeItem);
 router.delete('/', cartController.clearCart);
 

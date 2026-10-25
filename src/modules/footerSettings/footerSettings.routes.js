@@ -11,7 +11,6 @@ router.get('/:id', footerSettingsController.getOne);
 
 // Protected Admin endpoints
 router.put('/settings', authenticate, footerSettingsController.updateSettings);
-router.put('/', authenticate, footerSettingsController.updateSettings);
 router.post('/', authenticate, footerSettingsController.create);
 router.put('/:id', authenticate, footerSettingsController.update);
 router.delete('/:id', authenticate, footerSettingsController.delete);

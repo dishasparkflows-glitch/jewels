@@ -5,7 +5,37 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class AppointmentService {
   // ------------------------------- create appointment ----------------------------
   async create(data) {
-    return await Appointment.create(data);
+    const payload = { ...data };
+
+    // Standardize customer if passed in alternative formats
+    if (!payload.customer && (payload.fullName || payload.name || payload.email || payload.phoneNumber || payload.phone)) {
+      payload.customer = {
+        name: payload.fullName || payload.name || '',
+        email: payload.email || '',
+        phone: {
+          countryCode: '91',
+          number: String(payload.phoneNumber || payload.phone || '').replace(/^\+91\s*/, ''),
+        },
+      };
+    }
+
+    // Standardize appointment if passed in alternative formats
+    if (!payload.appointment && (payload.appointmentDate || payload.date || payload.preferredTime || payload.serviceType)) {
+      payload.appointment = {
+        date: payload.appointmentDate || payload.date || null,
+        preferredTime: payload.preferredTime || payload.time || '',
+        serviceType: payload.serviceType || payload.service || 'Jewellery Viewing',
+      };
+    }
+
+    // Discard any extra top-level fields
+    delete payload.fullName;
+    delete payload.phoneNumber;
+    delete payload.appointmentDate;
+    delete payload.preferredTime;
+    delete payload.serviceType;
+
+    return await Appointment.create(payload);
   }
 
   // ------------------------------- get one appointment ----------------------------
@@ -29,18 +59,17 @@ class AppointmentService {
     if (queryParams.search) {
       const reg = new RegExp(queryParams.search, 'i');
       filter.$or = [
-        { fullName: reg },
-        { email: reg },
-        { phoneNumber: reg },
         { 'customer.name': reg },
         { 'customer.email': reg },
         { 'customer.phone.number': reg },
+        { 'appointment.serviceType': reg },
+        { customId: reg },
       ];
     }
 
     const [items, total] = await Promise.all([
       Appointment.find(filter)
-        .sort({ appointmentDate: -1, 'meta.createdAt': -1 })
+        .sort({ 'appointment.date': -1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -58,15 +87,22 @@ class AppointmentService {
     }
 
     return await Appointment.find(filter)
-      .sort({ appointmentDate: -1, 'appointment.date': -1 })
+      .sort({ 'appointment.date': -1, 'meta.createdAt': -1 })
       .lean();
   }
 
   // ------------------------------- update appointment ----------------------------
   async update(id, data) {
+    const payload = { ...data };
+    delete payload.fullName;
+    delete payload.phoneNumber;
+    delete payload.appointmentDate;
+    delete payload.preferredTime;
+    delete payload.serviceType;
+
     const item = await Appointment.findOneAndUpdate(
       { _id: id },
-      { $set: data },
+      { $set: payload },
       { returnDocument: 'after', runValidators: false }
     );
 

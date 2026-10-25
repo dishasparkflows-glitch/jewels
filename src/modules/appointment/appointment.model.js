@@ -3,39 +3,7 @@ const metaPlugin = require('../../utils/metaPlugin');
 
 const appointmentSchema = new mongoose.Schema(
   {
-    // Direct top-level fields (as stored in DB)
-    fullName: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    email: {
-      type: String,
-      trim: true,
-      lowercase: true,
-      default: '',
-    },
-    phoneNumber: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    appointmentDate: {
-      type: Date,
-      default: null,
-    },
-    preferredTime: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    serviceType: {
-      type: String,
-      trim: true,
-      default: 'Jewellery Viewing',
-    },
-
-    // 1. Nested Customer Details (for compatibility)
+    // 1. Customer Details
     customer: {
       name: {
         type: String,
@@ -58,7 +26,7 @@ const appointmentSchema = new mongoose.Schema(
       },
     },
 
-    // 2. Nested Appointment Details (for compatibility)
+    // 2. Appointment Details
     appointment: {
       date: {
         type: Date,
@@ -70,6 +38,7 @@ const appointmentSchema = new mongoose.Schema(
       serviceType: {
         type: String,
         trim: true,
+        default: 'Jewellery Viewing',
       },
     },
 
@@ -91,9 +60,6 @@ const appointmentSchema = new mongoose.Schema(
   }
 );
 
-appointmentSchema.index({ appointmentDate: 1 });
-appointmentSchema.index({ email: 1 });
-appointmentSchema.index({ phoneNumber: 1 });
 appointmentSchema.index({ 'appointment.date': 1 });
 appointmentSchema.index({ 'customer.email': 1 });
 appointmentSchema.index({ 'customer.phone.number': 1 });

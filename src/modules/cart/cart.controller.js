@@ -26,38 +26,33 @@ class CartController {
   addToCart = catchAsync(async (req, res) => {
     const { userId: authUserId, sessionId } = this.getIdentity(req);
     const {
-      product,
-      quantity = 1,
-      options = {},
+      selectedAttributes,
       userId,
       productId,
-      addedAt,
       price,
       totalItemPrice,
-      selectedAttributes,
+      quantity = 1,
+      product,
     } = req.body;
 
     const effectiveUserId = userId || authUserId || null;
-
-    // Accept either product object or flat fields
-    const productData = {
-      ...(typeof product === 'object' && product !== null ? product : {}),
-      ...(productId ? { productId } : {}),
-      ...(addedAt ? { addedAt } : {}),
-      ...(price !== undefined ? { price } : {}),
-      ...(totalItemPrice !== undefined ? { totalItemPrice } : {}),
-      ...(selectedAttributes ? { selectedAttributes } : {}),
-      ...(!product ? req.body : {}),
-    };
+    const resolvedProductId = productId || product?.productId || product?.id || product?._id;
+    const resolvedPrice = price !== undefined ? Number(price) : Number(product?.price || 0);
+    const resolvedTotalItemPrice = totalItemPrice !== undefined ? Number(totalItemPrice) : resolvedPrice;
+    const resolvedAttributes = selectedAttributes || product?.selectedAttributes || null;
 
     const data = await cartService.addToCart({
       userId: effectiveUserId,
       sessionId,
-      productData,
-      quantity: quantity || productData.quantity || 1,
+      productData: {
+        productId: resolvedProductId,
+        price: resolvedPrice,
+        totalItemPrice: resolvedTotalItemPrice,
+        selectedAttributes: resolvedAttributes,
+      },
+      quantity: Number(quantity) || 1,
       options: {
-        ...options,
-        ...(selectedAttributes ? { selectedAttributes } : {}),
+        selectedAttributes: resolvedAttributes,
       },
     });
 

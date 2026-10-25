@@ -9,6 +9,5 @@ router.get('/', optionalAuth, goldPriceController.getLatest);
 
 // Admin update & sync
 router.put('/', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), goldPriceController.updateRates);
-router.post('/', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), goldPriceController.updateRates);
 
 module.exports = router;

@@ -160,8 +160,12 @@ class CartService {
         productRef = found._id;
         if (!productData.title) productData.title = found.basicInfo?.title;
         if (!productData.price) productData.price = found.pricing?.salePrice || found.pricing?.mrp;
-        if (!productData.image && found.images?.[0]) {
-          productData.image = typeof found.images[0] === 'string' ? found.images[0] : found.images[0]?.url;
+        if (!productData.image) {
+          const firstImg =
+            found.colorImages?.[0]?.images?.[0] ||
+            found.ornate?.ornateImages?.[0] ||
+            found.images?.[0];
+          productData.image = typeof firstImg === 'string' ? firstImg : firstImg?.url || '';
         }
       }
     }
@@ -177,7 +181,7 @@ class CartService {
       const firstVariant = found?.variants?.[0] || null;
       const firstCenterRow = found?.centerDiamondRows?.[0] || null;
 
-      const toObjectId = (val) => (val && mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : (val || null));
+      const toObjectId = (val) => (val && mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null);
 
       selectedAttributes = {
         metalPurity: toObjectId(selectedAttributes?.metalPurity || firstVariant?.metalPurityId || found?.metalPurityIds?.[0]),
@@ -188,16 +192,22 @@ class CartService {
         diamondColor: toObjectId(selectedAttributes?.diamondColor || firstVariant?.diamondColorId || firstCenterRow?.diamondColorId),
         caratWeight: Number(selectedAttributes?.caratWeight ?? firstVariant?.caratWeight ?? firstCenterRow?.caratWeight ?? 1.5),
         size: toObjectId(selectedAttributes?.size),
-        sizeRange: selectedAttributes?.sizeRange || null,
+        sizeRange: selectedAttributes?.sizeRange || (typeof selectedAttributes?.size === 'string' && !mongoose.isValidObjectId(selectedAttributes.size) ? selectedAttributes.size : null),
       };
     }
 
-    // Check if this product & metal combination already exists in cart
-    const existingIndex = cart.items.findIndex(
-      (item) =>
-        String(item.productId) === productIdStr &&
-        (item.selectedMetal || '') === selectedMetal
-    );
+    // Check if this product & metal combination or matching variant exists in cart
+    const existingIndex = cart.items.findIndex((item) => {
+      const sameProduct = String(item.productId) === productIdStr;
+      if (!sameProduct) return false;
+      if (selectedAttributes?.metalColor && item.selectedAttributes?.metalColor) {
+        if (String(item.selectedAttributes.metalColor) !== String(selectedAttributes.metalColor)) return false;
+      }
+      if (selectedAttributes?.size && item.selectedAttributes?.size) {
+        if (String(item.selectedAttributes.size) !== String(selectedAttributes.size)) return false;
+      }
+      return true;
+    });
 
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += parsedQty;
@@ -210,15 +220,15 @@ class CartService {
       cart.items.push({
         product: productRef,
         productId: productIdStr,
-        title: productData.title || productData.name || '',
+        title: productData.title || found?.basicInfo?.title || '',
         price,
         totalItemPrice,
-        originalPrice: productData.originalPrice ? Number(productData.originalPrice) : null,
-        image: productData.image || '',
-        category: productData.category || '',
+        originalPrice: productData.originalPrice ? Number(productData.originalPrice) : (found?.pricing?.mrp || null),
+        image: productData.image || (found?.colorImages?.[0]?.images?.[0]?.url || found?.ornate?.ornateImages?.[0]?.url || ''),
+        category: productData.category || (found?.categoryIds?.[0] ? String(found.categoryIds[0]) : ''),
         quantity: parsedQty,
-        selectedMetal,
-        selectedSize,
+        selectedMetal: selectedMetal || (found?.metalColorIds?.[0] ? String(found.metalColorIds[0]) : ''),
+        selectedSize: selectedSize || (selectedAttributes?.size ? String(selectedAttributes.size) : ''),
         ...(selectedAttributes ? { selectedAttributes } : {}),
         addedAt,
       });

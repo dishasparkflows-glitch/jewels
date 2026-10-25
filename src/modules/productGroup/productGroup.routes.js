@@ -14,15 +14,12 @@ router.get('/summary', adminAuth, productGroupController.getSummary);
 
 // 2. Sync Operations
 router.post('/:id/sync/preview', adminAuth, productGroupController.previewSync);
-router.post('/sync/preview', adminAuth, productGroupController.previewSync);
 router.post('/:id/sync', adminAuth, productGroupController.executeSync);
-router.post('/sync', adminAuth, productGroupController.executeSync);
 
 // 3. Membership Operations
 router.post('/:id/products', adminAuth, productGroupController.addProducts);
 router.delete('/:id/products/:productId', adminAuth, productGroupController.removeProduct);
 router.post('/:id/move-products', adminAuth, productGroupController.moveProducts);
-router.post('/move-products', adminAuth, productGroupController.moveProducts);
 router.post('/:id/approve', adminAuth, productGroupController.approveGroup);
 
 // 4. Group Details & CRUD

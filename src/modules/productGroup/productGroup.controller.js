@@ -58,8 +58,8 @@ class ProductGroupController {
 
   moveProducts = catchAsync(async (req, res) => {
     const result = await productGroupService.moveProducts({
-      sourceGroupId: req.params.id || req.body.sourceGroupId,
-      targetGroupId: req.body.targetGroupId || req.body.target,
+      sourceGroupId: req.params.id,
+      targetGroupId: req.body.targetGroupId,
       newGroupName: req.body.newGroupName,
       productIds: req.body.productIds,
       userId: req.user?._id,
@@ -83,9 +83,9 @@ class ProductGroupController {
 
   previewSync = catchAsync(async (req, res) => {
     const preview = await productGroupService.previewSync({
-      groupId: req.params.id || req.body.groupId,
-      sourceProductId: req.body.sourceProductId || req.body.sourceId,
-      targetProductIds: req.body.targetProductIds || req.body.productIds,
+      groupId: req.params.id,
+      sourceProductId: req.body.sourceProductId,
+      targetProductIds: req.body.targetProductIds,
       fields: req.body.fields,
     });
     ApiResponse.success(res, preview, 'Sync preview generated successfully');
@@ -93,9 +93,9 @@ class ProductGroupController {
 
   executeSync = catchAsync(async (req, res) => {
     const result = await productGroupService.executeSync({
-      groupId: req.params.id || req.body.groupId,
-      sourceProductId: req.body.sourceProductId || req.body.sourceId,
-      targetProductIds: req.body.targetProductIds || req.body.productIds,
+      groupId: req.params.id,
+      sourceProductId: req.body.sourceProductId,
+      targetProductIds: req.body.targetProductIds,
       fields: req.body.fields,
       userId: req.user?._id,
     });

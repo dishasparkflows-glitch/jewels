@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Product = require('./product.model');
+const Setting = require('../setting/setting.model');
 const {
   calculateProductPricing,
   loadPricingMasters
@@ -213,7 +214,12 @@ class ProductService {
       throw new ApiError(404, 'Product not found');
     }
 
-    return withColorStatuses(product);
+    const setting = await Setting.findOne().select('certificateImage').lean();
+    const certificateImage = product.certificateImage?.url
+      ? product.certificateImage
+      : setting?.certificateImage || null;
+
+    return withColorStatuses({ ...product, certificateImage });
   }
 
   // ------------------------------- get product by sku or tag ----------------------------
@@ -225,7 +231,13 @@ class ProductService {
     if (!product) {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
     }
-    return withColorStatuses(product);
+
+    const setting = await Setting.findOne().select('certificateImage').lean();
+    const certificateImage = product.certificateImage?.url
+      ? product.certificateImage
+      : setting?.certificateImage || null;
+
+    return withColorStatuses({ ...product, certificateImage });
   }
 
   // ------------------------------- get all products ----------------------------

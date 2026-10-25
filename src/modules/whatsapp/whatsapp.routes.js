@@ -21,7 +21,6 @@ router.post('/templates/sync', ...adminOnly, whatsappController.syncProviderTemp
 router.get('/templates/provider', ...adminOnly, whatsappController.getProviderTemplates);
 router.get('/templates/:id', ...adminOnly, whatsappController.getTemplateById);
 router.put('/templates/:id', ...adminOnly, whatsappController.updateTemplate);
-router.patch('/templates/:id', ...adminOnly, whatsappController.updateTemplate);
 router.patch('/templates/:id/status', ...adminOnly, whatsappController.updateTemplateStatus);
 router.post('/templates/:id/preview', ...adminOnly, whatsappController.previewTemplate);
 router.delete('/templates/:id', ...adminOnly, whatsappController.deleteTemplate);

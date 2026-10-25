@@ -87,6 +87,11 @@ const bannerSchema = new mongoose.Schema(
       url: String,
       key: String,
     },
+    mobileImage: {
+      _id: false,
+      url: String,
+      key: String,
+    },
     collectionImages: {
       type: [{
         _id: false,
@@ -162,6 +167,14 @@ bannerSchema.pre('save', function (next) {
       this.image = undefined;
     } else if (this.image.key === '' || this.image.key === null) {
       this.image.key = undefined;
+    }
+  }
+
+  if (this.mobileImage) {
+    if (!this.mobileImage.url) {
+      this.mobileImage = undefined;
+    } else if (this.mobileImage.key === '' || this.mobileImage.key === null) {
+      this.mobileImage.key = undefined;
     }
   }
 

@@ -13,26 +13,6 @@ const promoBannerSchema = new mongoose.Schema(
       url: { type: String, trim: true, default: '' },
       key: { type: String, trim: true, default: '' },
     },
-    url: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    link: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    subtitle: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    status: {
-      type: String,
-      enum: ['active', 'inactive'],
-      default: 'active',
-    },
     order: {
       type: Number,
       default: 0,

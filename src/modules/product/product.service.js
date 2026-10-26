@@ -965,22 +965,31 @@ class ProductService {
       return 0;
     });
 
-    const goldList = sortedGold.length > 0 ? sortedGold.slice(0, 5) : formatted.filter((p) => p.productType === 'gold').slice(0, 5);
-    const silverList = silver.length > 0 ? silver.slice(0, 5) : formatted.filter((p) => p.productType === 'silver').slice(0, 5);
-    const platinumList = platinum.length > 0 ? platinum.slice(0, 5) : [];
-    const trendingList = formatted.slice(0, 5);
+    const goldList = sortedGold.length > 0 ? sortedGold.slice(0, 8) : formatted.filter((p) => p.productType === 'gold').slice(0, 8);
+    const mostLovedList = [...goldList];
+    if (mostLovedList.length < 8) {
+      formatted.forEach((item) => {
+        if (mostLovedList.length < 8 && !mostLovedList.some((g) => String(g._id || g.id) === String(item._id || item.id))) {
+          mostLovedList.push(item);
+        }
+      });
+    }
+
+    const silverList = silver.length > 0 ? silver.slice(0, 8) : formatted.filter((p) => p.productType === 'silver').slice(0, 8);
+    const platinumList = platinum.length > 0 ? platinum.slice(0, 8) : [];
+    const trendingList = formatted.slice(0, 8);
 
     return {
       items: formatted,
       sections: {
-        gold: goldList,
-        mostLoved: goldList,
+        gold: mostLovedList,
+        mostLoved: mostLovedList,
         platinum: platinumList,
         silver: silverList,
         trending: trendingList
       },
-      gold: goldList,
-      mostLoved: goldList,
+      gold: mostLovedList,
+      mostLoved: mostLovedList,
       platinum: platinumList,
       silver: silverList,
       trending: trendingList,

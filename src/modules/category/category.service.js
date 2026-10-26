@@ -13,12 +13,10 @@ function buildNavigation(categories, sections, items) {
     _id: category._id,
     name: category.name,
     slug: category.slug,
-    promoBanners: ordered((category.promoBanners || []).filter(active)).map((banner) => ({
+    promoBanners: ordered(category.promoBanners || []).map((banner) => ({
       _id: banner._id,
-      title: banner.title,
-      subtitle: banner.subtitle,
-      image: { url: banner.image?.url || banner.url || '' },
-      link: banner.link || '',
+      title: banner.title || '',
+      image: { url: banner.image?.url || '' },
     })),
     menuSections: ordered(
       sections.filter((section) => active(section) && id(section.categoryId) === id(category))

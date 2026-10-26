@@ -1,8 +1,68 @@
 const mongoose = require('mongoose');
 const Wishlist = require('./wishlist.model');
 const ApiError = require('../../utils/ApiError');
+const { formatStorefrontProduct } = require('../product/product.utils');
+
+const PRODUCT_POPULATE_CONFIG = {
+  path: 'productIds',
+  select: '_id basicInfo pricing colorImages metalColorIds productType isOrnate variants centerDiamondRows stockStatus categoryIds ornate.ornateImages',
+  populate: {
+    path: 'metalColorIds colorImages.metalColorId',
+    select: 'name colorCode colorCodeEnd code hex',
+  },
+};
+
+function formatWishlistProduct(p) {
+  if (!p) return null;
+  const formatted = formatStorefrontProduct(p);
+  if (!formatted) return null;
+
+  return {
+    _id: formatted._id,
+    id: formatted.id,
+    basicInfo: {
+      title: formatted.basicInfo?.title || formatted.title || '',
+      slug: formatted.basicInfo?.slug || formatted.slug || '',
+    },
+    pricing: {
+      salePrice: formatted.pricing?.salePrice || 0,
+      mrp: formatted.pricing?.mrp || 0,
+      ...(formatted.pricing?.minPrice ? { minPrice: formatted.pricing.minPrice } : {}),
+      ...(formatted.pricing?.maxPrice ? { maxPrice: formatted.pricing.maxPrice } : {}),
+    },
+    images: formatted.images || [],
+    image: formatted.image || (formatted.images && formatted.images[0]) || '',
+    metalColors: formatted.metalColors || [],
+    colorImages: formatted.colorImages || [],
+    metalColorIds: formatted.metalColorIds || [],
+    productType: formatted.productType || 'gold',
+    isOrnate: Boolean(formatted.isOrnate),
+    stockStatus: formatted.stockStatus || 'in_stock',
+    ...(formatted.selectedAttributes ? { selectedAttributes: formatted.selectedAttributes } : {}),
+    ...(formatted.categoryIds ? { categoryIds: formatted.categoryIds } : {}),
+  };
+}
 
 class WishlistService {
+  /**
+   * Format wishlist payload with only needed product fields
+   */
+  formatWishlist(wishlistDoc) {
+    if (!wishlistDoc) return null;
+    const w = typeof wishlistDoc.toObject === 'function' ? wishlistDoc.toObject() : wishlistDoc;
+    const rawList = Array.isArray(w.productIds) ? w.productIds : [];
+    const formattedProducts = rawList
+      .map(formatWishlistProduct)
+      .filter(Boolean);
+
+    return {
+      _id: w._id,
+      userId: w.userId,
+      productIds: formattedProducts,
+      addedAt: w.addedAt,
+    };
+  }
+
   /**
    * Helper: Find or create wishlist by userId
    */
@@ -41,12 +101,13 @@ class WishlistService {
       return null;
     }
 
-    const wishlist = await Wishlist.findOne({ userId }).populate('productIds');
+    const wishlist = await Wishlist.findOne({ userId }).populate(PRODUCT_POPULATE_CONFIG);
     if (!wishlist) {
-      return this.findOrCreateWishlist(userId);
+      const created = await this.findOrCreateWishlist(userId);
+      return this.formatWishlist(created);
     }
 
-    return wishlist;
+    return this.formatWishlist(wishlist);
   }
 
   /**
@@ -80,11 +141,12 @@ class WishlistService {
     }
 
     await wishlist.save();
-    await wishlist.populate('productIds');
+    await wishlist.populate(PRODUCT_POPULATE_CONFIG);
+    const formattedWishlist = this.formatWishlist(wishlist);
 
     return {
       isWishlisted,
-      ...wishlist.toObject(),
+      ...formattedWishlist,
     };
   }
 
@@ -142,7 +204,7 @@ class WishlistService {
     const wishlist = await this.findOrCreateWishlist(userId);
     wishlist.productIds = [];
     await wishlist.save();
-    return wishlist;
+    return this.formatWishlist(wishlist);
   }
 }
 

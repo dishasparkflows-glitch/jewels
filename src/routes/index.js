@@ -55,12 +55,15 @@ const productGroupRoutes = require('../modules/productGroup/productGroup.routes'
 const currencyRoutes = require('../modules/currency/currency.routes');
 const websiteThemeRoutes = require('../modules/websiteTheme/websiteTheme.routes');
 const analyticsRoutes = require('../modules/analytics/analytics.routes');
+const productController = require('../modules/product/product.controller');
 
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/addresses', addressRoutes);
 router.use('/products', productRoutes);
+router.get('/filters', productController.getStorefrontFilters);
+router.get('/storefront/filters', productController.getStorefrontFilters);
 router.use('/product-groups', productGroupRoutes);
 router.use('/ornate', ornateRoutes);
 router.use('/wishlist', wishlistRoutes);
@@ -110,6 +113,7 @@ router.use('/upload', uploadRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/settings', settingRoutes);
 router.use('/website', websiteThemeRoutes);
+router.use('/website-themes', websiteThemeRoutes);
 router.use('/analytics', analyticsRoutes);
 
 module.exports = router;

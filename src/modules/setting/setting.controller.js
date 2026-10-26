@@ -9,6 +9,12 @@ class SettingController {
     ApiResponse.success(res, settings, 'System settings retrieved successfully');
   });
 
+  // ------------------------------- get common settings ----------------------------
+  getCommonSettings = catchAsync(async (req, res) => {
+    const data = await settingService.getCommonSettings();
+    ApiResponse.success(res, data, 'Common store settings retrieved successfully');
+  });
+
   // ------------------------------- update settings ----------------------------
   updateSettings = catchAsync(async (req, res) => {
     const settings = await settingService.updateSettings(req.body);

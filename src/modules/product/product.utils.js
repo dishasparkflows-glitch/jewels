@@ -75,19 +75,13 @@ const withColorStatuses = (product) => {
         (typeof ci.firstImage === 'string' ? ci.firstImage : '') ||
         (typeof ci.image === 'string' ? ci.image : '') ||
         '';
-      const resolved = resolveMetalColorInfo(ci.metalColor || ci.metalColorId, product);
+      const resolved = resolveMetalColorInfo(ci.metalColorId || ci.metalColor, product);
+      const item = { ...ci };
+      delete item.metalColor;
       return {
-        ...ci,
-        status: ci.status ?? 'active',
+        ...item,
+        status: item.status ?? 'active',
         metalColorId: resolved.name
-          ? {
-              _id: resolved.id || undefined,
-              name: resolved.name,
-              colorCode: resolved.colorCode || resolved.hex,
-              colorCodeEnd: resolved.colorCodeEnd,
-            }
-          : (ci.metalColorId || null),
-        metalColor: resolved.name
           ? {
               _id: resolved.id || undefined,
               name: resolved.name,
@@ -95,10 +89,8 @@ const withColorStatuses = (product) => {
               colorCodeEnd: resolved.colorCodeEnd,
               hex: resolved.hex,
             }
-          : (ci.metalColor || null),
+          : (item.metalColorId || null),
         firstPhoto,
-        firstImage: firstPhoto,
-        image: firstPhoto,
       };
     });
   }
@@ -253,8 +245,6 @@ const extractMetalColors = (p) => {
       colorCodeEnd: resolved.colorCodeEnd,
       hex: resolved.hex,
       firstPhoto,
-      firstImage: firstPhoto,
-      image: firstPhoto,
       images: validImages,
     });
   }
@@ -310,8 +300,6 @@ const extractMetalColors = (p) => {
         colorCodeEnd: resolved.colorCodeEnd,
         hex: resolved.hex,
         firstPhoto: matchedPhoto,
-        firstImage: matchedPhoto,
-        image: matchedPhoto,
         images: matchedImages,
       });
     }
@@ -344,19 +332,11 @@ const formatColorImages = (colorImages, p = null) => {
         metalColorId: {
           _id: resolved.id || undefined,
           name: resolved.name || '',
-          colorCode: resolved.colorCode,
-          colorCodeEnd: resolved.colorCodeEnd,
-        },
-        metalColor: {
-          _id: resolved.id || undefined,
-          name: resolved.name || '',
-          colorCode: resolved.colorCode,
+          colorCode: resolved.colorCode || resolved.hex,
           colorCodeEnd: resolved.colorCodeEnd,
           hex: resolved.hex,
         },
         firstPhoto,
-        firstImage: firstPhoto,
-        image: firstPhoto,
         images: (ci.images || []).map((img) =>
           typeof img === 'string'
             ? { url: img, mediaType: 'image' }
@@ -520,10 +500,7 @@ const formatLookupProduct = (p) => {
           return {
             status: ci.status || 'active',
             metalColorId: ci.metalColorId || null,
-            metalColor: ci.metalColorId || null,
             firstPhoto: photo,
-            firstImage: photo,
-            image: photo,
             images: photo ? [{ url: photo, mediaType: 'image' }] : [],
           };
         })
@@ -543,17 +520,13 @@ const formatLookupProduct = (p) => {
     pricing: String(p.productType || '').toLowerCase() === 'gold' && p.pricing
       ? { ...p.pricing, mrp: p.pricing.salePrice || effectivePrice }
       : (p.pricing || {}),
-    category: resolvedCategory,
     categoryIds: resolvedCategory,
-    status: p.status || 'active',
+    status: p.status || 'draft',
     colorImages: formattedColorImages,
     firstPhoto,
-    firstImage: firstPhoto,
-    image: firstPhoto,
     thumbnail: firstPhoto,
     productType: p.productType || '',
     isOrnate: Boolean(p.isOrnate),
-    cataloguePrice: effectivePrice,
     ornate: p.ornate || {},
   };
 };

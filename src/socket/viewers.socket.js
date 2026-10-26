@@ -185,6 +185,24 @@ function initViewerSocket(server) {
       }
     });
 
+    socket.on('join_user', ({ userId, sessionId }) => {
+      if (userId) {
+        socket.join(`user:${String(userId)}`);
+      }
+      if (sessionId) {
+        socket.join(`session:${String(sessionId)}`);
+      }
+    });
+
+    socket.on('leave_user', ({ userId, sessionId }) => {
+      if (userId) {
+        socket.leave(`user:${String(userId)}`);
+      }
+      if (sessionId) {
+        socket.leave(`session:${String(sessionId)}`);
+      }
+    });
+
     socket.on('disconnect', () => {
       if (currentJoinedProduct) {
         leaveProduct(socket, currentJoinedProduct);
@@ -214,11 +232,48 @@ function initViewerSocket(server) {
     }
   }
 
-  console.log('⚡ Live Viewers Socket initialized');
+  console.log('⚡ Live Viewers & Realtime Sync Socket initialized');
   return io;
+}
+
+/**
+ * Emit wishlist count update to a specific user's socket room
+ */
+function emitWishlistUpdate({ userId, wishlistCount, productId, isWishlisted }) {
+  if (!ioInstance) return;
+  const payload = {
+    wishlistCount: Number(wishlistCount) || 0,
+    productId: productId ? String(productId) : null,
+    isWishlisted: Boolean(isWishlisted),
+    timestamp: Date.now(),
+  };
+  if (userId) {
+    ioInstance.to(`user:${String(userId)}`).emit('wishlist_count_updated', payload);
+  }
+}
+
+/**
+ * Emit cart count update to user and session socket rooms
+ */
+function emitCartUpdate({ userId, sessionId, cartCount, totalItems }) {
+  if (!ioInstance) return;
+  const count = Number(totalItems ?? cartCount ?? 0);
+  const payload = {
+    cartCount: count,
+    totalItems: count,
+    timestamp: Date.now(),
+  };
+  if (userId) {
+    ioInstance.to(`user:${String(userId)}`).emit('cart_count_updated', payload);
+  }
+  if (sessionId) {
+    ioInstance.to(`session:${String(sessionId)}`).emit('cart_count_updated', payload);
+  }
 }
 
 module.exports = {
   initViewerSocket,
   getProductViewerCount,
+  emitWishlistUpdate,
+  emitCartUpdate,
 };

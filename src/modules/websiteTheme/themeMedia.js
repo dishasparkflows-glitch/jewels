@@ -237,7 +237,7 @@ function apply(record, module, rows) {
 // ------------------------------- storefront middleware ----------------------------
 function storefront(module) {
   return async (req, res, next) => {
-    if (req.method !== 'GET' || req.query.themeMedia !== 'true') {
+    if (req.method !== 'GET' || req.query.themeMedia === 'false') {
       return next();
     }
 

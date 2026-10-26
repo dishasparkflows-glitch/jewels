@@ -1,23 +1,88 @@
 const Setting = require('./setting.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
+const footerSettingsService = require('../footerSettings/footerSettings.service');
+const topAnnouncementService = require('../topAnnouncement/topAnnouncement.service');
 
 class SettingService {
   // ------------------------------- get settings ----------------------------
   async getSettings() {
-    return (await Setting.findOne({ 'meta.deletedAt': null }).lean()) || {};
+    let setting = await Setting.findOne({ 'meta.deletedAt': null })
+      .populate('currentThemeId', 'name code status description')
+      .lean();
+
+    if (!setting) return {};
+
+    // If currentThemeId is not set, initialize it with active theme from website themes
+    if (!setting.currentThemeId) {
+      try {
+        const { WebsiteTheme, WebsiteThemeSettings } = require('../websiteTheme/websiteTheme.model');
+        const themeSettings = await WebsiteThemeSettings.findOne({ key: 'storefront' }).lean();
+        const activeTheme = themeSettings?.activeThemeId
+          ? await WebsiteTheme.findOne({ _id: themeSettings.activeThemeId }).select('name code status description').lean()
+          : await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null }).select('name code status description').lean();
+
+        if (activeTheme) {
+          setting.currentThemeId = activeTheme;
+          await Setting.updateOne({ _id: setting._id }, { $set: { currentThemeId: activeTheme._id } });
+        }
+      } catch (_) {}
+    }
+
+    return setting;
+  }
+
+  // ------------------------------- get common layout settings ----------------------------
+  async getCommonSettings() {
+    const [settingsRes, footerRes, announcementRes] = await Promise.allSettled([
+      this.getSettings(),
+      footerSettingsService.getSettings(),
+      topAnnouncementService.getPublic(),
+    ]);
+
+    return {
+      settings: settingsRes.status === 'fulfilled' ? settingsRes.value : {},
+      footerSettings: footerRes.status === 'fulfilled' ? footerRes.value : {},
+      topAnnouncement: announcementRes.status === 'fulfilled' ? announcementRes.value : { isEnabled: false, items: [] },
+    };
   }
 
   // ------------------------------- update settings ----------------------------
   async updateSettings(data) {
     let settings = await Setting.findOne({ 'meta.deletedAt': null });
     if (!settings) {
-      return await Setting.create(data);
+      settings = await Setting.create(data);
+    } else {
+      Object.assign(settings, data);
+      await settings.save();
     }
 
-    Object.assign(settings, data);
-    await settings.save();
-    return settings;
+    // If currentThemeId was updated, sync it with WebsiteThemeSettings and activate the theme
+    if (data.currentThemeId) {
+      try {
+        const { WebsiteTheme, WebsiteThemeSettings } = require('../websiteTheme/websiteTheme.model');
+        await WebsiteThemeSettings.findOneAndUpdate(
+          { key: 'storefront' },
+          { $set: { activeThemeId: data.currentThemeId }, $inc: { revision: 1 } },
+          { upsert: true }
+        );
+        // Set selected theme to active and other themes to draft
+        await WebsiteTheme.updateMany(
+          { _id: { $ne: data.currentThemeId }, status: 'active' },
+          { $set: { status: 'draft' } }
+        );
+        await WebsiteTheme.updateOne(
+          { _id: data.currentThemeId },
+          { $set: { status: 'active' } }
+        );
+      } catch (err) {
+        console.error('Failed to sync theme in settings update:', err);
+      }
+    }
+
+    return await Setting.findById(settings._id)
+      .populate('currentThemeId', 'name code status description')
+      .lean();
   }
 
   // ------------------------------- create setting ----------------------------

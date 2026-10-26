@@ -17,6 +17,16 @@ class WebsiteThemeController {
     ApiResponse.paginated(res, items, pagination, 'Website themes retrieved successfully');
   });
 
+  // ------------------------------- get theme lookup ----------------------------
+  getLookup = catchAsync(async (_req, res) => {
+    const { WebsiteTheme } = require('./websiteTheme.model');
+    const items = await WebsiteTheme.find({ 'meta.deletedAt': null })
+      .select('_id name code status description publishedAt schedule')
+      .sort({ status: 1, name: 1 })
+      .lean();
+    ApiResponse.success(res, items, 'Theme lookup list retrieved successfully');
+  });
+
   // ------------------------------- get one website theme ----------------------------
   getOne = catchAsync(async (req, res) => {
     const item = await websiteThemeService.getById(req.params.id);

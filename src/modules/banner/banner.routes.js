@@ -7,6 +7,7 @@ const { ROLES } = require('../../config/constants');
 
 // Public or storefront lookup endpoints
 router.get('/category-display', bannerController.getCategoryDisplayBanner);
+router.get('/counts', bannerController.getCounts);
 router.get('/lookup', bannerController.getLookup);
 router.get('/', bannerController.getAll);
 router.get('/:id', bannerController.getOne);

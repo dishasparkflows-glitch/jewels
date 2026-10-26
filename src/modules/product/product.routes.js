@@ -1,19 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('./product.controller');
-const { authenticate, authorize } = require('../../middleware/auth.middleware');
+const { authenticate, authorize, optionalAuth } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
 router.post('/pricing-preview', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), productController.previewPricing);
 
 const { getProductViewerCount } = require('../../socket/viewers.socket');
 
-// Public or Storefront / Lookup endpoints
-router.get('/storefront', productController.getStorefrontProducts);
-router.get('/search/storefront', productController.getSearchStorefront);
-router.get('/home', productController.getHomeProducts);
+// Public or Storefront / Lookup endpoints (with optionalAuth to identify logged-in users for inWishlist flag)
+router.get('/storefront', optionalAuth, productController.getStorefrontProducts);
+router.get('/search/storefront', optionalAuth, productController.getSearchStorefront);
+router.get('/home', optionalAuth, productController.getHomeProducts);
+router.get('/filters', productController.getStorefrontFilters);
 router.get('/lookup', productController.getLookup);
-router.get('/sku/:code', productController.getBySkuOrTag);
+router.get('/sku/:code', optionalAuth, productController.getBySkuOrTag);
 router.get('/:id/live-viewers', (req, res) => {
   const count = getProductViewerCount(req.params.id);
   res.json({
@@ -25,8 +26,8 @@ router.get('/:id/live-viewers', (req, res) => {
     },
   });
 });
-router.get('/', productController.getAll);
-router.get('/:id', productController.getOne);
+router.get('/', optionalAuth, productController.getAll);
+router.get('/:id', optionalAuth, productController.getOne);
 
 // Protected Admin endpoints
 router.post(

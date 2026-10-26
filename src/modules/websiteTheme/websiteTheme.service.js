@@ -6,7 +6,7 @@ const Banner = require('../banner/banner.model');
 const Featured = require('../featured/featured.model');
 const { WebsiteTheme, WebsiteThemeSettings, WebsiteThemeHistory } = require('./websiteTheme.model');
 const themeMedia = require('./themeMedia');
-
+const Setting = require('../setting/setting.model');
 const TIMEZONE = 'Asia/Kolkata';
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const SECTION_KEYS = [
@@ -616,12 +616,26 @@ class WebsiteThemeService {
   // ------------------------------- get public config ----------------------------
   async getPublicConfig() {
     const settings = await this.settings();
-    if (!settings.activeThemeId) return { revision: settings.revision, timezone: TIMEZONE, theme: null };
-    const theme = await WebsiteTheme.findOne({ _id: settings.activeThemeId, 'meta.deletedAt': null }).lean();
+    let activeThemeId = settings.activeThemeId;
+
+    if (!activeThemeId) {
+      try {
+        const storeSetting = await Setting.findOne().select('currentThemeId').lean();
+        if (storeSetting?.currentThemeId) activeThemeId = storeSetting.currentThemeId;
+      } catch (_) {}
+    }
+
+    if (!activeThemeId) {
+      const active = await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id').lean();
+      if (active) activeThemeId = active._id;
+    }
+
+    if (!activeThemeId) return { revision: settings.revision, timezone: TIMEZONE, theme: null };
+    const theme = await WebsiteTheme.findOne({ _id: activeThemeId, 'meta.deletedAt': null }).lean();
     return {
       revision: settings.revision,
       timezone: TIMEZONE,
-      theme: theme?.publishedSnapshot ? { ...theme.publishedSnapshot, config: await themeMedia.resolve(theme.publishedSnapshot.config) } : null,
+      theme: theme?.publishedSnapshot ? { ...theme.publishedSnapshot, config: await themeMedia.resolve(theme.publishedSnapshot.config) } : (theme?.config ? { id: String(theme._id), name: theme.name, code: theme.code, config: await themeMedia.resolve(theme.config) } : null),
     };
   }
 

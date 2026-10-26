@@ -49,23 +49,10 @@ class UserService {
     const user = await User.findById(id).select('-auth.password -password').lean();
     if (!user) throw new ApiError(404, 'User not found');
 
-    // Attach addresses from dedicated Address collection
+    // Attach addresses from dedicated Address collection if needed
     try {
       const userAddresses = await addressService.getUserAddresses(id);
-      user.addressesList = userAddresses;
-      if (userAddresses && userAddresses.length > 0) {
-        const shippingDefault =
-          userAddresses.find((a) => a.isShippingDefault || a.isDefault) || userAddresses[0];
-        const billingDefault =
-          userAddresses.find((a) => a.isBillingDefault) || shippingDefault;
-
-        if (!user.addresses) user.addresses = {};
-        user.addresses.billing = billingDefault;
-        user.addresses.shipping = shippingDefault;
-        user.addresses.saved = userAddresses;
-        user.billingAddress = billingDefault;
-        user.shippingAddress = shippingDefault;
-      }
+      user.addressesList = userAddresses || [];
     } catch (e) {
       // Gracefully continue if address lookup fails
     }

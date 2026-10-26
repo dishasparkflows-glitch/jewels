@@ -2,20 +2,53 @@
  * Standard API response helper
  */
 class ApiResponse {
-  static success(res, data = null, message = 'Success', statusCode = 200) {
-    return res.status(statusCode).json({
-      success: true,
-      message,
-      data,
-    });
+  /**
+   * Determine whether the 'data' field should be included in the response.
+   * - GET requests include the 'data' field.
+   * - Non-GET requests (POST, PUT, PATCH, DELETE) return only 'success' and 'message'.
+   * - Essential data-returning endpoints (auth, upload, coupon validation) or explicit forceData retain 'data'.
+   */
+  static shouldIncludeData(res, forceData = false) {
+    if (forceData) return true;
+
+    const method = (res?.req?.method || res?.request?.method || '').toUpperCase();
+    if (method === 'GET') return true;
+
+    const url = (res?.req?.originalUrl || res?.req?.url || '').toLowerCase();
+    const isEssentialDataRoute =
+      url.includes('/auth/login') ||
+      url.includes('/auth/register') ||
+      url.includes('/auth/google') ||
+      url.includes('/upload') ||
+      url.includes('/coupons/validate');
+
+    return isEssentialDataRoute;
   }
 
-  static created(res, data = null, message = 'Created successfully') {
-    return res.status(201).json({
+  static success(res, data = null, message = 'Success', statusCode = 200, forceData = false) {
+    const payload = {
       success: true,
       message,
-      data,
-    });
+    };
+
+    if (this.shouldIncludeData(res, forceData)) {
+      payload.data = data;
+    }
+
+    return res.status(statusCode).json(payload);
+  }
+
+  static created(res, data = null, message = 'Created successfully', forceData = false) {
+    const payload = {
+      success: true,
+      message,
+    };
+
+    if (this.shouldIncludeData(res, forceData)) {
+      payload.data = data;
+    }
+
+    return res.status(201).json(payload);
   }
 
   static paginated(res, data, pagination, message = 'Success', facets) {

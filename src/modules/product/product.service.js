@@ -5,6 +5,13 @@ const {
   calculateProductPricing,
   loadPricingMasters
 } = require('./product.pricing');
+const DiamondType = require('../diamondType/diamondType.model');
+const DiamondClarity = require('../diamondClarity/diamondClarity.model');
+const CaratWeight = require('../caratWeight/caratWeight.model');
+const Featured = require('../featured/featured.model');
+const Wishlist = require('../wishlist/wishlist.model');
+const ProductGroup = require('../productGroup/productGroup.model');
+const productGroupService = require('../productGroup/productGroup.service');
 const { SHOP_FOR_OPTIONS, getShopForGenders } = require('./product.filters');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -100,8 +107,8 @@ class ProductService {
 
   // ------------------------------- create product ----------------------------
   async create(data) {
-    if (data.status === 'active') {
-      data.status = 'approved';
+    if (data.status && data.status !== 'approved' && data.status !== 'draft') {
+      data.status = 'draft';
     }
     if (data.colorImages) {
       data.colorImages = sanitizeColorImages(data.colorImages);
@@ -121,26 +128,24 @@ class ProductService {
     return await Product.create(await this.applyPricing(data));
   }
 
+  async _getWishlistSet(userId) {
+    if (!userId) return new Set();
+    try {
+      const wishlist = await Wishlist.findOne({ userId }).select('productIds').lean();
+      if (!wishlist?.productIds || !Array.isArray(wishlist.productIds)) return new Set();
+      return new Set(wishlist.productIds.map((id) => String(id)));
+    } catch {
+      return new Set();
+    }
+  }
+
   // ------------------------------- get one product ----------------------------
-  async getOne(id) {
+  async getOne(id, userId = null) {
     await this.refreshCalculatedPrices();
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const filter = isObjectId
-      ? {
-          $or: [
-            { _id: id },
-            { 'basicInfo.slug': id },
-            { 'basicInfo.sku': id },
-            { 'ornate.tagNo': id }
-          ]
-        }
-      : {
-          $or: [
-            { 'basicInfo.slug': id },
-            { 'basicInfo.sku': id },
-            { 'ornate.tagNo': id }
-          ]
-        };
+      ? { $or: [{ _id: id }, { 'basicInfo.slug': id }] }
+      : { 'basicInfo.slug': id };
 
     let product = await Product.findOne(filter)
       .populate({
@@ -195,21 +200,6 @@ class ProductService {
       })
       .lean();
 
-    if (!product && !isObjectId) {
-      const candidates = await Product.find({ 'basicInfo.title': { $exists: true, $ne: '' } }).select('_id basicInfo.title').lean();
-      const matched = candidates.find((cand) => {
-        const titleSlug = (cand.basicInfo?.title || '')
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '');
-        return titleSlug === String(id).toLowerCase();
-      });
-      if (matched) {
-        await Product.updateOne({ _id: matched._id }, { $set: { 'basicInfo.slug': id } });
-        return this.getOne(String(matched._id));
-      }
-    }
-
     if (!product) {
       throw new ApiError(404, 'Product not found');
     }
@@ -219,11 +209,14 @@ class ProductService {
       ? product.certificateImage
       : setting?.certificateImage || null;
 
-    return withColorStatuses({ ...product, certificateImage });
+    const wishlistedSet = await this._getWishlistSet(userId);
+    const inWishlist = wishlistedSet.has(String(product._id));
+
+    return withColorStatuses({ ...product, certificateImage, inWishlist });
   }
 
   // ------------------------------- get product by sku or tag ----------------------------
-  async getBySkuOrTag(code) {
+  async getBySkuOrTag(code, userId = null) {
     await this.refreshCalculatedPrices();
     const product = await Product.findOne({
       $or: [{ 'basicInfo.sku': code }, { 'ornate.tagNo': code }]
@@ -237,11 +230,14 @@ class ProductService {
       ? product.certificateImage
       : setting?.certificateImage || null;
 
-    return withColorStatuses({ ...product, certificateImage });
+    const wishlistedSet = await this._getWishlistSet(userId);
+    const inWishlist = wishlistedSet.has(String(product._id));
+
+    return withColorStatuses({ ...product, certificateImage, inWishlist });
   }
 
   // ------------------------------- get all products ----------------------------
-  async getAll(queryParams = {}) {
+  async getAll(queryParams = {}, userId = null) {
     await this.refreshCalculatedPrices();
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -272,8 +268,12 @@ class ProductService {
       ];
     }
 
-    if (queryParams.status) {
+    if (queryParams.view === 'storefront') {
+      filter.status = 'approved';
+    } else if (queryParams.status && queryParams.status !== 'all') {
       filter.status = queryParams.status;
+    } else if (!queryParams.status) {
+      filter.status = 'approved';
     }
 
     if (queryParams.category) {
@@ -293,9 +293,6 @@ class ProductService {
     let groupCards = [];
     if (queryParams.includeGroups === 'true') {
       try {
-        const ProductGroup = require('../productGroup/productGroup.model');
-        const productGroupService = require('../productGroup/productGroup.service');
-
         const activeGroups = await ProductGroup.find({
           status: 'active',
           'meta.deletedAt': null
@@ -395,15 +392,11 @@ class ProductService {
           }
 
           // 3. Filter by status
-          if (queryParams.status && queryParams.status !== 'all') {
-            const reqStatus = String(queryParams.status).toLowerCase();
-            const groupStatus = String(group.status || '').toLowerCase();
+          const reqStatus = queryParams.view === 'storefront' ? 'approved' : queryParams.status;
+          if (reqStatus && reqStatus !== 'all') {
+            const targetStatus = String(reqStatus).toLowerCase();
             const repStatus = String(rep.status || '').toLowerCase();
-            if (reqStatus === 'active') {
-              if (groupStatus !== 'active' && repStatus !== 'active' && repStatus !== 'approved') {
-                continue;
-              }
-            } else if (groupStatus !== reqStatus && repStatus !== reqStatus) {
+            if (repStatus !== targetStatus) {
               continue;
             }
           }
@@ -594,7 +587,7 @@ class ProductService {
       'price_desc': -1,
     }[queryParams.sort];
 
-    let fallbackSort = { 'meta.createdAt': -1, _id: -1 };
+    let fallbackSort = { productType: 1, 'meta.createdAt': -1, _id: -1 };
     if (queryParams.sort === 'name_asc') {
       fallbackSort = { 'basicInfo.title': 1, _id: -1 };
     }
@@ -633,15 +626,36 @@ class ProductService {
       facetsQuery
     ]);
 
+    const wishlistedSet = await this._getWishlistSet(userId);
+    const markInWishlist = (item) => {
+      if (!item) return item;
+      const itemId = String(item._id || item.id || '');
+      return {
+        ...item,
+        inWishlist: wishlistedSet.has(itemId),
+      };
+    };
+
     if (queryParams.includeGroups === 'true' && groupCards.length > 0) {
       const displayedGroupCards = page === 1 ? groupCards : [];
-      const combined = [
+      let combined = [
         ...displayedGroupCards,
         ...items.map(withColorStatuses)
       ];
-      const finalItems = queryParams.view === 'storefront'
+
+      // 1st display gold products, then silver products (unless explicit price sort)
+      const isPriceSort = queryParams.sort && ['price-low', 'price-high', 'price_asc', 'price_desc'].includes(queryParams.sort);
+      if (!isPriceSort) {
+        combined.sort((a, b) => {
+          const isGoldA = (a.productType || a.representative?.productType || '').toLowerCase() === 'gold' ? 0 : 1;
+          const isGoldB = (b.productType || b.representative?.productType || '').toLowerCase() === 'gold' ? 0 : 1;
+          return isGoldA - isGoldB;
+        });
+      }
+
+      const finalItems = (queryParams.view === 'storefront'
         ? combined.map(formatStorefrontProduct)
-        : combined;
+        : combined).map(markInWishlist);
       return {
         items: finalItems,
         pagination: getPaginationMeta(total + groupCards.length, page, limit),
@@ -649,9 +663,17 @@ class ProductService {
       };
     }
 
-    const finalItems = queryParams.view === 'storefront'
+    const finalItems = (queryParams.view === 'storefront'
       ? items.map(formatStorefrontProduct)
-      : items.map(withColorStatuses);
+      : items.map(withColorStatuses)).map(markInWishlist);
+
+    if (!priceSort) {
+      finalItems.sort((a, b) => {
+        const isGoldA = (a.productType || '').toLowerCase() === 'gold' ? 0 : 1;
+        const isGoldB = (b.productType || '').toLowerCase() === 'gold' ? 0 : 1;
+        return isGoldA - isGoldB;
+      });
+    }
 
     return {
       items: finalItems,
@@ -661,19 +683,19 @@ class ProductService {
   }
 
   // ------------------------------- get storefront products (lightweight listing) ----------------------------
-  async getStorefrontProducts(queryParams = {}) {
-    return this.getAll({ ...queryParams, view: 'storefront' });
+  async getStorefrontProducts(queryParams = {}, userId = null) {
+    return this.getAll({ ...queryParams, view: 'storefront' }, userId);
   }
 
   // ------------------------------- get search storefront products (streamlined info) ----------------------------
-  async getSearchStorefront(queryParams = {}) {
+  async getSearchStorefront(queryParams = {}, userId = null) {
     await this.refreshCalculatedPrices();
     const { page, limit, skip } = getPagination(queryParams);
     const searchTerm = (queryParams.search || queryParams.q || '').trim();
 
     const conditions = [
       { 'meta.deletedAt': null },
-      { status: { $in: ['active', 'approved'] } }
+      { status: 'approved' }
     ];
 
     let searchRegex = null;
@@ -740,8 +762,6 @@ class ProductService {
 
     if (includeGroups) {
       try {
-        const ProductGroup = require('../productGroup/productGroup.model');
-        const productGroupService = require('../productGroup/productGroup.service');
         const groupFilter = {
           status: 'active',
           'meta.deletedAt': null
@@ -845,9 +865,13 @@ class ProductService {
       Product.countDocuments(filter)
     ]);
 
+    const wishlistedSet = await this._getWishlistSet(userId);
     const displayedGroupCards = page === 1 ? groupCards.map(formatStorefrontProduct) : [];
     const formattedProducts = rawItems.map(formatStorefrontProduct);
-    const items = [...displayedGroupCards, ...formattedProducts];
+    const items = [...displayedGroupCards, ...formattedProducts].map((item) => ({
+      ...item,
+      inWishlist: wishlistedSet.has(String(item._id || item.id || '')),
+    }));
 
     return {
       items,
@@ -861,12 +885,12 @@ class ProductService {
   }
 
   // ------------------------------- get home products (streamlined info) ----------------------------
-  async getHomeProducts(queryParams = {}) {
+  async getHomeProducts(queryParams = {}, userId = null) {
     await this.refreshCalculatedPrices();
     const limit = Math.min(Number(queryParams.limit) || 24, 50);
     const filter = {
       'meta.deletedAt': null,
-      status: { $in: ['approved', 'active'] }
+      status: 'approved'
     };
 
     if (queryParams.category) {
@@ -890,7 +914,14 @@ class ProductService {
       .limit(limit)
       .lean();
 
-    const formatted = items.map((p) => formatHomeProduct(p));
+    const wishlistedSet = await this._getWishlistSet(userId);
+    const tagWishlist = (list) =>
+      list.map((item) => ({
+        ...item,
+        inWishlist: wishlistedSet.has(String(item._id || item.id || '')),
+      }));
+
+    const formatted = tagWishlist(items.map((p) => formatHomeProduct(p)));
 
     // Curate sections for the home page storefront
     const gold = [];
@@ -1025,8 +1056,8 @@ class ProductService {
 
   // ------------------------------- update product ----------------------------
   async update(id, data) {
-    if (data.status === 'active') {
-      data.status = 'approved';
+    if (data.status && data.status !== 'approved' && data.status !== 'draft') {
+      data.status = 'draft';
     }
     const existing = await Product.findById(id).lean();
     if (!existing) throw new ApiError(404, 'Product not found');
@@ -1080,7 +1111,7 @@ class ProductService {
   async delete(id) {
     const product = await Product.findOneAndUpdate(
       { _id: id },
-      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { $set: { status: 'draft', 'meta.deletedAt': new Date() } },
       { returnDocument: 'after' }
     );
 
@@ -1089,6 +1120,73 @@ class ProductService {
     }
 
     return { message: 'Product deleted successfully', id };
+  }
+
+  // ------------------------------- get storefront filters (single lightweight common API) ----------------------------
+  async getStorefrontFilters(queryParams = {}) {
+    const activeFilter = { 'meta.deletedAt': null, status: 'active' };
+
+    const [diamondTypes, diamondClarities, caratWeights, collections] = await Promise.all([
+      DiamondType.find(activeFilter).sort({ name: 1 }).select('_id name').lean(),
+      DiamondClarity.find(activeFilter).sort({ name: 1 }).select('_id name').lean(),
+      CaratWeight.find(activeFilter).sort({ order: 1, weight: 1, name: 1 }).select('_id name weight').lean(),
+      Featured.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name').lean(),
+    ]);
+
+    // Format clean data arrays returning ONLY frontend needed value and _id
+    const formattedDiamondTypes = diamondTypes.map((item) => ({
+      _id: item._id,
+      name: item.name,
+      value: item.name,
+    }));
+
+    const formattedDiamondClarities = diamondClarities.map((item) => ({
+      _id: item._id,
+      name: item.name,
+      value: item.name,
+    }));
+
+    const formattedCaratWeights = caratWeights.map((item) => ({
+      _id: item._id,
+      name: item.name || (item.weight ? `${item.weight} Ct` : ''),
+      value: item.weight ? `${item.weight} Ct` : (item.name || ''),
+      weight: item.weight,
+    }));
+
+    const formattedCollections = collections.map((item) => ({
+      _id: item._id,
+      name: item.name,
+      title: item.name,
+      value: item.name,
+    }));
+
+    const genders = [
+      { _id: 'Women', name: 'Women', value: 'Women' },
+      { _id: 'Men', name: 'Men', value: 'Men' },
+      { _id: 'Kids', name: 'Kids', value: 'Kids' },
+      { _id: 'Unisex', name: 'Unisex', value: 'Unisex' },
+    ];
+
+    const filterGroups = [
+      { id: 'carat-weights', title: 'Diamond Weight', key: 'carat', options: formattedCaratWeights },
+      { id: 'diamond-types', title: 'Diamond Type', key: 'diamondType', options: formattedDiamondTypes },
+      { id: 'collections', title: 'Collections', key: 'collection', options: formattedCollections },
+      { id: 'diamond-clarities', title: 'Diamond Clarities', key: 'clarity', options: formattedDiamondClarities },
+      { id: 'gender', title: 'Gender', key: 'shopFor', options: genders },
+    ];
+
+    if (queryParams.format === 'array') {
+      return filterGroups;
+    }
+
+    return {
+      diamondTypes: formattedDiamondTypes,
+      diamondClarities: formattedDiamondClarities,
+      caratWeights: formattedCaratWeights,
+      collections: formattedCollections,
+      genders,
+      filters: filterGroups,
+    };
   }
 }
 

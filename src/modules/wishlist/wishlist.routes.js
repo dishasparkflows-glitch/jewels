@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const wishlistController = require('./wishlist.controller');
-const { authenticate } = require('../../middleware/auth.middleware');
+const { authenticate, optionalAuth } = require('../../middleware/auth.middleware');
 
-// All wishlist routes require authentication
+// Public count endpoint (handles optional auth)
+router.get('/counts', optionalAuth, wishlistController.getCounts);
+
+// All other wishlist routes require authentication
 router.use(authenticate);
 
 // Wishlist endpoints

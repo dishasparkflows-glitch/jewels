@@ -6,6 +6,7 @@ const { optionalAuth } = require('../../middleware/auth.middleware');
 // Apply optionalAuth so guest visitors and authenticated users can use the cart
 router.use(optionalAuth);
 
+router.get('/counts', cartController.getCounts);
 router.get('/', cartController.getCart);
 router.post('/add', cartController.addToCart);
 router.put('/quantity', cartController.updateQuantity);

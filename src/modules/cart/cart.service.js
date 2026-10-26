@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Cart = require('./cart.model');
 const Product = require('../product/product.model');
+const Wishlist = require('../wishlist/wishlist.model');
 const ApiError = require('../../utils/ApiError');
 
 class CartService {
@@ -88,14 +89,15 @@ class CartService {
         _id: item._id,
         productId: String(item.productId),
         title: item.title,
+        slug: item.slug || item.product?.basicInfo?.slug || (item.title ? item.title.toLowerCase().trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') : ''),
         price: item.price,
         totalItemPrice: item.totalItemPrice || ((item.price || 0) * (item.quantity || 1)),
         originalPrice: item.originalPrice,
         image: item.image,
         category: item.category,
         quantity: item.quantity,
-        selectedMetal: item.selectedMetal,
-        selectedSize: item.selectedSize,
+        selectedMetal: item.selectedMetal || '',
+        selectedSize: item.selectedSize || '',
         selectedAttributes: item.selectedAttributes || undefined,
         itemTotal: item.totalItemPrice || ((item.price || 0) * (item.quantity || 1)),
         addedAt: item.addedAt,
@@ -126,7 +128,7 @@ class CartService {
     const cart = await this.findOrCreateCart(userId, sessionId);
     await cart.populate({
       path: 'items.product',
-      select: 'title price images category sku status',
+      select: 'basicInfo title price images category sku status metalColorIds colorImages metalColors',
     });
 
     return this.formatCart(cart);
@@ -213,6 +215,9 @@ class CartService {
       cart.items[existingIndex].quantity += parsedQty;
       cart.items[existingIndex].totalItemPrice =
         (Number(cart.items[existingIndex].price) || price) * cart.items[existingIndex].quantity;
+      if (selectedMetal) {
+        cart.items[existingIndex].selectedMetal = selectedMetal;
+      }
       if (selectedAttributes) {
         cart.items[existingIndex].selectedAttributes = selectedAttributes;
       }
@@ -227,7 +232,7 @@ class CartService {
         image: productData.image || (found?.colorImages?.[0]?.images?.[0]?.url || found?.ornate?.ornateImages?.[0]?.url || ''),
         category: productData.category || (found?.categoryIds?.[0] ? String(found.categoryIds[0]) : ''),
         quantity: parsedQty,
-        selectedMetal: selectedMetal || (found?.metalColorIds?.[0] ? String(found.metalColorIds[0]) : ''),
+        selectedMetal: selectedMetal || '',
         selectedSize: selectedSize || (selectedAttributes?.size ? String(selectedAttributes.size) : ''),
         ...(selectedAttributes ? { selectedAttributes } : {}),
         addedAt,
@@ -297,6 +302,38 @@ class CartService {
     cart.items = [];
     await cart.save();
     return this.formatCart(cart);
+  }
+
+  /**
+   * Fast badge counts for Cart & Wishlist without populating product data
+   */
+  async getCounts({ userId, sessionId }) {
+    let cartCount = 0;
+    let wishlistCount = 0;
+
+    let cart = null;
+    if (userId) {
+      cart = await Cart.findOne({ user: userId }).select('items.quantity').lean();
+    }
+    if (!cart && sessionId) {
+      cart = await Cart.findOne({ sessionId }).select('items.quantity').lean();
+    }
+    if (cart?.items && Array.isArray(cart.items)) {
+      cartCount = cart.items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+    }
+
+    if (userId) {
+      const wishlist = await Wishlist.findOne({ userId }).select('productIds').lean();
+      if (wishlist?.productIds && Array.isArray(wishlist.productIds)) {
+        wishlistCount = wishlist.productIds.length;
+      }
+    }
+
+    return {
+      cartCount,
+      wishlistCount,
+      totalItems: cartCount,
+    };
   }
 }
 

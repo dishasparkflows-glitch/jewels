@@ -81,6 +81,12 @@ const settingSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Storefront Theme
+    currentThemeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'WebsiteTheme',
+      default: null,
+    },
   },
   {
     versionKey: false,

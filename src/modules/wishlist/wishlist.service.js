@@ -24,6 +24,16 @@ class WishlistService {
   }
 
   /**
+   * Fast count of wishlist items without populating
+   */
+  async getCount(userId) {
+    if (!userId) return { count: 0, wishlistCount: 0 };
+    const wishlist = await Wishlist.findOne({ userId }).select('productIds').lean();
+    const count = wishlist?.productIds?.length || 0;
+    return { count, wishlistCount: count };
+  }
+
+  /**
    * Get wishlist for user
    */
   async getWishlist(userId) {

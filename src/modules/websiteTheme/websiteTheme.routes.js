@@ -15,6 +15,9 @@ router.get('/themes/history', ...adminOnly, websiteThemeController.history);
 // ------------------------------- get all website themes ----------------------------
 router.get('/themes', ...adminOnly, websiteThemeController.list);
 
+// ------------------------------- get themes lookup ----------------------------
+router.get('/themes/lookup', ...adminOnly, websiteThemeController.getLookup);
+
 // ------------------------------- create website theme ----------------------------
 router.post('/themes', ...adminOnly, websiteThemeController.create);
 

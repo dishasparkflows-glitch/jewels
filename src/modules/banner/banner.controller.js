@@ -20,6 +20,12 @@ class BannerController {
     );
   });
 
+  // ------------------------------- get banner counts by type ----------------------------
+  getCounts = catchAsync(async (req, res) => {
+    const counts = await bannerService.getCounts();
+    ApiResponse.success(res, counts, 'Banner counts retrieved successfully');
+  });
+
   // ------------------------------- get banner lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {
     const items = await bannerService.getLookup(req.query);

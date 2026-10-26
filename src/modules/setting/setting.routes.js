@@ -5,6 +5,7 @@ const { authenticate, authorize } = require('../../middleware/auth.middleware');
 
 // Public or storefront config getter
 router.get('/', settingController.getSettings);
+router.get('/common', settingController.getCommonSettings);
 router.get('/lookup', settingController.getLookup);
 
 // Protected admin settings

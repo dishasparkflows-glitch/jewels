@@ -15,13 +15,13 @@ class ProductController {
 
   // ------------------------------- get home products (streamlined info) ----------------------------
   getHomeProducts = catchAsync(async (req, res) => {
-    const data = await productService.getHomeProducts(req.query);
+    const data = await productService.getHomeProducts(req.query, req.user?._id);
     ApiResponse.success(res, data, 'Home products retrieved successfully');
   });
 
   // ------------------------------- get storefront products (clean lightweight info) ----------------------------
   getStorefrontProducts = catchAsync(async (req, res) => {
-    const { items, pagination, facets } = await productService.getStorefrontProducts(req.query);
+    const { items, pagination, facets } = await productService.getStorefrontProducts(req.query, req.user?._id);
     ApiResponse.paginated(
       res,
       items,
@@ -33,7 +33,7 @@ class ProductController {
 
   // ------------------------------- get search storefront products (clean lightweight info) ----------------------------
   getSearchStorefront = catchAsync(async (req, res) => {
-    const { items, pagination } = await productService.getSearchStorefront(req.query);
+    const { items, pagination } = await productService.getSearchStorefront(req.query, req.user?._id);
     ApiResponse.paginated(
       res,
       items,
@@ -44,7 +44,7 @@ class ProductController {
 
   // ------------------------------- get all products ----------------------------
   getAll = catchAsync(async (req, res) => {
-    const { items, pagination, facets } = await productService.getAll(req.query);
+    const { items, pagination, facets } = await productService.getAll(req.query, req.user?._id);
     ApiResponse.paginated(
       res,
       items,
@@ -52,6 +52,12 @@ class ProductController {
       'Products retrieved successfully',
       facets
     );
+  });
+
+  // ------------------------------- get storefront filters (single lightweight common API) ----------------------------
+  getStorefrontFilters = catchAsync(async (req, res) => {
+    const data = await productService.getStorefrontFilters(req.query);
+    ApiResponse.success(res, data, 'Storefront filters retrieved successfully');
   });
 
   // ------------------------------- get product lookup ----------------------------
@@ -67,13 +73,13 @@ class ProductController {
 
   // ------------------------------- get one product ----------------------------
   getOne = catchAsync(async (req, res) => {
-    const product = await productService.getOne(req.params.id);
+    const product = await productService.getOne(req.params.id, req.user?._id);
     ApiResponse.success(res, product, 'Product retrieved successfully');
   });
 
   // ------------------------------- get product by sku or tag ----------------------------
   getBySkuOrTag = catchAsync(async (req, res) => {
-    const product = await productService.getBySkuOrTag(req.params.code);
+    const product = await productService.getBySkuOrTag(req.params.code, req.user?._id);
     ApiResponse.success(res, product, 'Product retrieved successfully');
   });
 

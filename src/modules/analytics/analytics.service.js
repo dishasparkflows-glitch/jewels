@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const { BetaAnalyticsDataClient } = require('@google-analytics/data');
 const Product = require('../product/product.model');
 
 class AnalyticsService {
@@ -73,7 +74,6 @@ class AnalyticsService {
     }
 
     try {
-      const { BetaAnalyticsDataClient } = require('@google-analytics/data');
       this.client = new BetaAnalyticsDataClient(config.clientOptions);
       this.clientKeyPath = keyPath;
       return this.client;

@@ -276,6 +276,46 @@ class BannerService {
     return this._formatBanner(banner);
   }
 
+  // ------------------------------- get banner counts by type ----------------------------
+  async getCounts() {
+    const filter = { 'meta.deletedAt': null };
+    const counts = await Banner.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: { $toLower: { $ifNull: ['$display.type', 'websitebanner'] } },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const result = {
+      herobanner: 0,
+      collectionbanner: 0,
+      categorybanner: 0,
+      offerbanner: 0,
+      mobileappbanner: 0,
+      bookappointbanner: 0,
+      customizebanner: 0,
+      websitebanner: 0,
+      total: 0,
+    };
+
+    let total = 0;
+    counts.forEach((item) => {
+      const type = item._id || 'websitebanner';
+      if (result[type] !== undefined) {
+        result[type] = item.count;
+      } else {
+        result.websitebanner = (result.websitebanner || 0) + item.count;
+      }
+      total += item.count;
+    });
+    result.total = total;
+
+    return result;
+  }
+
   // ------------------------------- get all banners ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
@@ -345,12 +385,23 @@ class BannerService {
 
     const filter = andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
 
+    let sort = { 'display.order': 1, 'meta.createdAt': -1 };
+    if (queryParams.sortBy === 'order_asc') {
+      sort = { 'display.order': 1, 'meta.createdAt': -1 };
+    } else if (queryParams.sortBy === 'order_desc') {
+      sort = { 'display.order': -1, 'meta.createdAt': -1 };
+    } else if (queryParams.sortBy === 'oldest') {
+      sort = { 'meta.createdAt': 1 };
+    } else if (queryParams.sortBy === 'newest') {
+      sort = { 'meta.createdAt': -1 };
+    }
+
     const [items, total] = await Promise.all([
       Banner.find(filter)
         .populate('display.categoryId', 'name slug')
-      .populate('collectionImages.categoryId', 'name slug')
+        .populate('collectionImages.categoryId', 'name slug')
         .populate('display.menuItemIds', 'title menuSectionId')
-        .sort({ 'display.order': 1, 'meta.createdAt': -1 })
+        .sort(sort)
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -384,7 +435,7 @@ class BannerService {
 
     const platform = ['web', 'mobile'].includes(queryParams.platform) ? queryParams.platform : 'web';
     andConditions.push(platform === 'web'
-      ? { $or: [{ 'display.platform': 'web' }, { 'display.platform': { $exists: false } }] }
+      ? { $or: [{ 'display.platform': 'web' }, { 'display.platform': { $exists: false } }, { 'display.type': 'mobileappbanner' }] }
       : { 'display.platform': platform });
 
     if (queryParams.category) {

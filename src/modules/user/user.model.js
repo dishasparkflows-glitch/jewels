@@ -2,28 +2,6 @@ const mongoose = require('mongoose');
 const metaPlugin = require('../../utils/metaPlugin');
 const bcrypt = require('bcryptjs');
 
-const addressSubSchema = {
-  fullName: { type: String, default: '', trim: true },
-  addressLine: { type: String, default: '', trim: true },
-  city: { type: String, default: '', trim: true },
-  state: { type: String, default: '', trim: true },
-  pincode: { type: String, default: '', trim: true },
-  phone: { type: String, default: '', trim: true },
-};
-
-const savedAddressSubSchema = new mongoose.Schema(
-  {
-    title: { type: String, default: 'Home', trim: true },
-    fullName: { type: String, default: '', trim: true },
-    addressLine: { type: String, default: '', trim: true },
-    city: { type: String, default: '', trim: true },
-    state: { type: String, default: '', trim: true },
-    pincode: { type: String, default: '', trim: true },
-    phone: { type: String, default: '', trim: true },
-  },
-  { _id: true }
-);
-
 const userSchema = new mongoose.Schema(
   {
     profile: {
@@ -59,21 +37,6 @@ const userSchema = new mongoose.Schema(
         type: String,
         default: 'default',
         trim: true,
-      },
-    },
-
-    addresses: {
-      billing: {
-        type: addressSubSchema,
-        default: () => ({}),
-      },
-      shipping: {
-        type: addressSubSchema,
-        default: () => ({}),
-      },
-      saved: {
-        type: [savedAddressSubSchema],
-        default: [],
       },
     },
 
@@ -172,14 +135,6 @@ userSchema.virtual('lastLogin')
   .get(function () { return this.auth?.lastLogin; })
   .set(function (val) { if (!this.auth) this.auth = {}; this.auth.lastLogin = val; });
 
-userSchema.virtual('billingAddress')
-  .get(function () { return this.addresses?.billing; })
-  .set(function (val) { if (!this.addresses) this.addresses = {}; this.addresses.billing = val; });
-
-userSchema.virtual('shippingAddress')
-  .get(function () { return this.addresses?.shipping; })
-  .set(function (val) { if (!this.addresses) this.addresses = {}; this.addresses.shipping = val; });
-
 // Virtual populate for Address collection
 userSchema.virtual('addressesList', {
   ref: 'Address',
@@ -198,7 +153,6 @@ userSchema.virtual('lifetimeValue')
 // Pre-validate hook to map flat fields into nested structure if passed
 userSchema.pre('validate', function (next) {
   if (!this.profile) this.profile = {};
-  if (!this.addresses) this.addresses = {};
   if (!this.auth) this.auth = {};
   if (!this.statistics) this.statistics = {};
 
@@ -224,17 +178,6 @@ userSchema.pre('validate', function (next) {
   if (doc.email && !this.auth.email) this.auth.email = doc.email;
   if (doc.password && !this.auth.password) this.auth.password = doc.password;
   if (doc.lastLogin && !this.auth.lastLogin) this.auth.lastLogin = doc.lastLogin;
-
-  // Map flat address fields if provided at root
-  if (doc.billingAddress && !this.addresses.billing?.fullName) {
-    this.addresses.billing = doc.billingAddress;
-  }
-  if (doc.shippingAddress && !this.addresses.shipping?.fullName) {
-    this.addresses.shipping = doc.shippingAddress;
-  }
-  if (Array.isArray(doc.addresses) && (!this.addresses.saved || this.addresses.saved.length === 0)) {
-    this.addresses.saved = doc.addresses;
-  }
 
   // Map createdBy to meta.createdBy if provided
   if (doc.createdBy && this.meta && !this.meta.createdBy) {

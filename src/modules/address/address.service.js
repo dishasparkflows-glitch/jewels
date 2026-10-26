@@ -1,149 +1,11 @@
 const Address = require('./address.model');
-const User = require('../user/user.model');
 const ApiError = require('../../utils/ApiError');
 
 class AddressService {
   /**
-   * Sync User document addresses embedded fields from Address collection
-   * to maintain full backward compatibility across the codebase.
-   */
-  async syncUserDoc(userId) {
-    try {
-      const addresses = await Address.find({
-        userId,
-        'meta.isDeleted': { $ne: true },
-      }).sort({ isDefault: -1, isShippingDefault: -1, 'meta.createdAt': -1 });
-
-      if (!addresses || addresses.length === 0) {
-        await User.findByIdAndUpdate(userId, {
-          'addresses.billing': {},
-          'addresses.shipping': {},
-          'addresses.saved': [],
-        });
-        return;
-      }
-
-      const shippingDefault =
-        addresses.find((a) => a.isShippingDefault || a.isDefault) || addresses[0];
-      const billingDefault =
-        addresses.find((a) => a.isBillingDefault) || shippingDefault;
-
-      const user = await User.findById(userId).select('profile');
-      const userFullName = user
-        ? `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim()
-        : '';
-
-      const toPlainAddress = (a) => ({
-        _id: a._id,
-        addressType: a.addressType || 'home',
-        title: a.addressType === 'office' ? 'Office' : 'Home',
-        fullName: userFullName,
-        addressLine: a.addressLine || a.street || '',
-        city: a.city || '',
-        state: a.state || '',
-        pincode: a.pincode || '',
-        phone: a.phone || '',
-      });
-
-      await User.findByIdAndUpdate(userId, {
-        'addresses.billing': toPlainAddress(billingDefault),
-        'addresses.shipping': toPlainAddress(shippingDefault),
-        'addresses.saved': addresses.map(toPlainAddress),
-      });
-    } catch (err) {
-      console.warn(`[AddressService] Warning syncing user document: ${err.message}`);
-    }
-  }
-
-  /**
-   * Auto-migrate legacy embedded addresses in User doc to Address collection if none exist
-   */
-  async migrateFromUserDocIfNeeded(userId) {
-    try {
-      const count = await Address.countDocuments({
-        userId,
-        'meta.isDeleted': { $ne: true },
-      });
-      if (count > 0) return;
-
-      const user = await User.findById(userId);
-      if (!user || !user.addresses) return;
-
-      const toCreate = [];
-
-      // Check shipping
-      if (user.addresses.shipping?.fullName && user.addresses.shipping?.addressLine) {
-        toCreate.push({
-          userId,
-          fullName: user.addresses.shipping.fullName,
-          phone: user.addresses.shipping.phone || user.profile?.phone || '9999999999',
-          addressLine: user.addresses.shipping.addressLine,
-          city: user.addresses.shipping.city || 'Gandhinagar',
-          state: user.addresses.shipping.state || 'Gujarat',
-          pincode: user.addresses.shipping.pincode || '382006',
-          addressType: 'home',
-          isDefault: true,
-          isShippingDefault: true,
-          isBillingDefault: !user.addresses.billing?.fullName,
-        });
-      }
-
-      // Check billing
-      if (
-        user.addresses.billing?.fullName &&
-        user.addresses.billing?.addressLine &&
-        user.addresses.billing.addressLine !== user.addresses.shipping?.addressLine
-      ) {
-        toCreate.push({
-          userId,
-          fullName: user.addresses.billing.fullName,
-          phone: user.addresses.billing.phone || user.profile?.phone || '9999999999',
-          addressLine: user.addresses.billing.addressLine,
-          city: user.addresses.billing.city || 'Gandhinagar',
-          state: user.addresses.billing.state || 'Gujarat',
-          pincode: user.addresses.billing.pincode || '382006',
-          addressType: 'office',
-          isDefault: toCreate.length === 0,
-          isShippingDefault: false,
-          isBillingDefault: true,
-        });
-      }
-
-      // Check saved
-      if (Array.isArray(user.addresses.saved)) {
-        for (const s of user.addresses.saved) {
-          if (s?.fullName && s?.addressLine) {
-            toCreate.push({
-              userId,
-              fullName: s.fullName,
-              phone: s.phone || user.profile?.phone || '9999999999',
-              addressLine: s.addressLine,
-              city: s.city || 'Gandhinagar',
-              state: s.state || 'Gujarat',
-              pincode: s.pincode || '382006',
-              addressType: 'home',
-              isDefault: toCreate.length === 0,
-              isShippingDefault: toCreate.length === 0,
-              isBillingDefault: toCreate.length === 0,
-            });
-          }
-        }
-      }
-
-      if (toCreate.length > 0) {
-        await Address.insertMany(toCreate);
-      }
-    } catch (err) {
-      console.warn(`[AddressService] Warning during auto-migration: ${err.message}`);
-    }
-  }
-
-  /**
    * Get all addresses for a user
    */
   async getUserAddresses(userId) {
-    await this.migrateFromUserDocIfNeeded(userId);
-
     const addresses = await Address.find({
       userId,
       'meta.isDeleted': { $ne: true },
@@ -218,7 +80,6 @@ class AddressService {
       isBillingDefault: shouldBeBillingDefault,
     });
 
-    await this.syncUserDoc(userId);
     return address;
   }
 
@@ -269,7 +130,6 @@ class AddressService {
     Object.assign(address, data);
     await address.save();
 
-    await this.syncUserDoc(address.userId);
     return address;
   }
 
@@ -291,7 +151,7 @@ class AddressService {
     }
 
     address.meta = address.meta || {};
-    address.meta.meta = meta.meta || {}; meta.meta.deletedAt = new Date();
+    address.meta.isDeleted = true;
     address.meta.deletedAt = new Date();
     await address.save();
 
@@ -299,6 +159,7 @@ class AddressService {
     if (address.isDefault || address.isShippingDefault || address.isBillingDefault) {
       const fallback = await Address.findOne({
         userId: address.userId,
+        _id: { $ne: addressId },
         'meta.isDeleted': { $ne: true },
       }).sort({ 'meta.createdAt': -1 });
 
@@ -314,7 +175,6 @@ class AddressService {
       }
     }
 
-    await this.syncUserDoc(address.userId);
     return { success: true, message: 'Address removed successfully' };
   }
 
@@ -350,7 +210,6 @@ class AddressService {
     }
 
     await address.save();
-    await this.syncUserDoc(userId);
     return address;
   }
 }

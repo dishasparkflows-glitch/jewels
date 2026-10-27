@@ -1,19 +1,5 @@
 const mongoose = require('mongoose');
 
-const syncMetaSchema = new mongoose.Schema(
-  {
-    firstSyncedAt: { type: Date, default: null },
-    firstSyncedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-    firstSourceProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
-    firstProductIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
-    firstSyncedFields: [{ type: String }],
-    lastSyncedAt: { type: Date, default: null },
-    lastSyncedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-    lastSyncOperationId: { type: mongoose.Schema.Types.ObjectId, default: null },
-    syncVersion: { type: Number, default: 0 },
-  },
-  { _id: false }
-);
 
 const productGroupSchema = new mongoose.Schema(
   {
@@ -60,20 +46,6 @@ const productGroupSchema = new mongoose.Schema(
       enum: ['active', 'inactive'],
       default: 'active',
       index: true,
-    },
-    sync: {
-      type: syncMetaSchema,
-      default: () => ({
-        firstSyncedAt: null,
-        firstSyncedBy: null,
-        firstSourceProductId: null,
-        firstProductIds: [],
-        firstSyncedFields: [],
-        lastSyncedAt: null,
-        lastSyncedBy: null,
-        lastSyncOperationId: null,
-        syncVersion: 0,
-      }),
     },
   },
   {

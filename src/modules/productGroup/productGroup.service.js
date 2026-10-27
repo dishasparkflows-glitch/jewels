@@ -139,17 +139,6 @@ class ProductGroupService {
       primaryProductId: product._id,
       representativeMode: 'auto',
       status: 'active',
-      sync: {
-        firstSyncedAt: null,
-        firstSyncedBy: null,
-        firstSourceProductId: null,
-        firstProductIds: [],
-        firstSyncedFields: [],
-        lastSyncedAt: null,
-        lastSyncedBy: null,
-        lastSyncOperationId: null,
-        syncVersion: 0,
-      },
       meta: {
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -369,10 +358,7 @@ class ProductGroupService {
       productIds: { $in: soldProductIds },
     });
 
-    // 5. Common Groups (total active groups)
-    const common_group = all;
-
-    // 6. Ungrouped (all ornate products count)
+    // 5. Ungrouped (all ornate products count)
     const ungrouped = await Product.countDocuments({
       isOrnate: true,
       'meta.deletedAt': null,
@@ -383,7 +369,6 @@ class ProductGroupService {
       draft,
       approved,
       sold,
-      common_group,
       ungrouped,
     };
   }
@@ -446,24 +431,47 @@ class ProductGroupService {
 
     const total = await ProductGroup.countDocuments(filter);
 
-    const sortMap = {
-      latest: { 'meta.createdAt': -1, _id: -1 },
-      name_asc: { groupName: 1 },
-      name_desc: { groupName: -1 },
-    };
-    const dbSort = sortMap[queryParams.sort] || { 'meta.createdAt': -1, _id: -1 };
-
-    // Fetch groups and populate product info for summaries
-    const rawGroups = await ProductGroup.find(filter)
-      .populate({
+    let rawGroups;
+    if (queryParams.sort === 'single_first' || !queryParams.sort) {
+      const aggregatePipeline = [
+        { $match: filter },
+        {
+          $addFields: {
+            productCount: { $size: { $ifNull: ['$productIds', []] } },
+            isSingle: {
+              $cond: [{ $eq: [{ $size: { $ifNull: ['$productIds', []] } }, 1] }, 0, 1],
+            },
+          },
+        },
+        { $sort: { isSingle: 1, 'meta.createdAt': -1, _id: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+      ];
+      const matched = await ProductGroup.aggregate(aggregatePipeline);
+      rawGroups = await ProductGroup.populate(matched, {
         path: 'productIds',
         select:
           '_id basicInfo pricing specifications ornate colorImages status stockStatus meta',
-      })
-      .sort(dbSort)
-      .skip(skip)
-      .limit(limit)
-      .lean();
+      });
+    } else {
+      const sortMap = {
+        latest: { 'meta.createdAt': -1, _id: -1 },
+        name_asc: { groupName: 1 },
+        name_desc: { groupName: -1 },
+      };
+      const dbSort = sortMap[queryParams.sort] || { 'meta.createdAt': -1, _id: -1 };
+
+      rawGroups = await ProductGroup.find(filter)
+        .populate({
+          path: 'productIds',
+          select:
+            '_id basicInfo pricing specifications ornate colorImages status stockStatus meta',
+        })
+        .sort(dbSort)
+        .skip(skip)
+        .limit(limit)
+        .lean();
+    }
 
     const items = rawGroups.map((g) => {
       const summary = this.computeGroupSummary(g, g.productIds);
@@ -480,7 +488,6 @@ class ProductGroupService {
         status: g.status,
         representativeMode: g.representativeMode,
         primaryProductId: g.primaryProductId,
-        sync: g.sync,
         createdAt: g.meta?.createdAt,
         updatedAt: g.meta?.updatedAt,
         productCount: summary.totalProducts,
@@ -569,22 +576,45 @@ class ProductGroupService {
 
     const total = await ProductGroup.countDocuments(filter);
 
-    const sortMap = {
-      latest: { 'meta.createdAt': -1, _id: -1 },
-      name_asc: { groupName: 1 },
-      name_desc: { groupName: -1 },
-    };
-    const dbSort = sortMap[queryParams.sort] || { 'meta.createdAt': -1, _id: -1 };
-
-    const rawGroups = await ProductGroup.find(filter)
-      .populate({
+    let rawGroups;
+    if (queryParams.sort === 'single_first' || !queryParams.sort) {
+      const aggregatePipeline = [
+        { $match: filter },
+        {
+          $addFields: {
+            productCount: { $size: { $ifNull: ['$productIds', []] } },
+            isSingle: {
+              $cond: [{ $eq: [{ $size: { $ifNull: ['$productIds', []] } }, 1] }, 0, 1],
+            },
+          },
+        },
+        { $sort: { isSingle: 1, 'meta.createdAt': -1, _id: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+      ];
+      const matched = await ProductGroup.aggregate(aggregatePipeline);
+      rawGroups = await ProductGroup.populate(matched, {
         path: 'productIds',
         select: '_id basicInfo images ornate.ornateImages colorImages pricing status stockStatus',
-      })
-      .sort(dbSort)
-      .skip(skip)
-      .limit(limit)
-      .lean();
+      });
+    } else {
+      const sortMap = {
+        latest: { 'meta.createdAt': -1, _id: -1 },
+        name_asc: { groupName: 1 },
+        name_desc: { groupName: -1 },
+      };
+      const dbSort = sortMap[queryParams.sort] || { 'meta.createdAt': -1, _id: -1 };
+
+      rawGroups = await ProductGroup.find(filter)
+        .populate({
+          path: 'productIds',
+          select: '_id basicInfo images ornate.ornateImages colorImages pricing status stockStatus',
+        })
+        .sort(dbSort)
+        .skip(skip)
+        .limit(limit)
+        .lean();
+    }
 
     const items = rawGroups.map((g) => {
       const products = Array.isArray(g.productIds) ? g.productIds : [];
@@ -707,17 +737,7 @@ class ProductGroupService {
       primaryProductId,
       representativeMode,
       status: data.status || 'active',
-      sync: {
-        firstSyncedAt: null,
-        firstSyncedBy: null,
-        firstSourceProductId: null,
-        firstProductIds: [],
-        firstSyncedFields: [],
-        lastSyncedAt: null,
-        lastSyncedBy: null,
-        lastSyncOperationId: null,
-        syncVersion: 0,
-      },
+
       meta: {
         createdBy: userId,
         updatedBy: userId,
@@ -873,9 +893,9 @@ class ProductGroupService {
   }
 
   /**
-   * Explicitly move products from one group to another
+   * Explicitly move products from one group to another or split into individual groups
    */
-  async moveProducts({ sourceGroupId, targetGroupId, newGroupName, productIds, userId = null }) {
+  async moveProducts({ sourceGroupId, targetGroupId, newGroupName, productIds, splitIndividual = false, userId = null }) {
     if (!sourceGroupId) {
       throw new ApiError(400, 'Source group ID is required');
     }
@@ -886,6 +906,15 @@ class ProductGroupService {
     const validIds = (productIds || []).filter((id) => mongoose.isValidObjectId(id));
     if (!validIds.length) {
       throw new ApiError(400, 'No valid product IDs provided to move');
+    }
+
+    // CASE 0: Split selected products into individual separate groups (1 product per group)
+    if (splitIndividual) {
+      return this.splitProductsIntoIndividualGroups({
+        sourceGroupId,
+        productIds: validIds,
+        userId,
+      });
     }
 
     // Pull from source
@@ -933,17 +962,7 @@ class ProductGroupService {
         primaryProductId: validIds[0] || null,
         representativeMode: 'auto',
         status: 'active',
-        sync: {
-          firstSyncedAt: null,
-          firstSyncedBy: null,
-          firstSourceProductId: null,
-          firstProductIds: [],
-          firstSyncedFields: [],
-          lastSyncedAt: null,
-          lastSyncedBy: null,
-          lastSyncOperationId: null,
-          syncVersion: 0,
-        },
+
         meta: {
           createdBy: userId,
           updatedBy: userId,
@@ -986,6 +1005,150 @@ class ProductGroupService {
       sourceGroupId,
       targetGroupId,
       movedCount: validIds.length,
+    };
+  }
+
+  /**
+   * Split products into individual groups (1 product per group) in one single click
+   */
+  async splitProductsIntoIndividualGroups({ sourceGroupId = null, productIds = [], userId = null }) {
+    const validIds = (productIds || []).filter((id) => mongoose.isValidObjectId(id));
+    if (!validIds.length) {
+      throw new ApiError(400, 'No valid product IDs provided to split');
+    }
+
+    let sourceGroup = null;
+    let sourceGroupDeleted = false;
+
+    if (sourceGroupId) {
+      sourceGroup = await ProductGroup.findOne({ _id: sourceGroupId, 'meta.deletedAt': null });
+      if (!sourceGroup) throw new ApiError(404, 'Source group not found');
+
+      const remainingProductIds = (sourceGroup.productIds || []).filter(
+        (id) => !validIds.some((vId) => String(vId) === String(id))
+      );
+
+      if (remainingProductIds.length === 0) {
+        // Source group is now empty — soft delete it so no orphan 0-item group lingers
+        await ProductGroup.findByIdAndUpdate(sourceGroupId, {
+          $set: {
+            productIds: [],
+            primaryProductId: null,
+            'meta.deletedAt': new Date(),
+            'meta.deletedBy': userId,
+          },
+        });
+        sourceGroupDeleted = true;
+      } else {
+        const sourceUpdate = {
+          $set: {
+            productIds: remainingProductIds,
+            'meta.updatedBy': userId,
+            'meta.updatedAt': new Date(),
+          },
+        };
+        if (validIds.some((id) => String(id) === String(sourceGroup.primaryProductId))) {
+          sourceUpdate.$set.primaryProductId = remainingProductIds[0] || null;
+          sourceUpdate.$set.representativeMode = 'auto';
+        }
+        await ProductGroup.findByIdAndUpdate(sourceGroupId, sourceUpdate);
+      }
+    } else {
+      // Pull products from any active groups they might currently belong to
+      await ProductGroup.updateMany(
+        { productIds: { $in: validIds }, 'meta.deletedAt': null },
+        {
+          $pull: { productIds: { $in: validIds } },
+          $set: { 'meta.updatedBy': userId, 'meta.updatedAt': new Date() },
+        }
+      );
+    }
+
+    // Fetch the products to inspect details for auto-naming
+    const products = await Product.find({ _id: { $in: validIds } }).lean();
+    if (!products.length) {
+      throw new ApiError(404, 'No products found matching the provided IDs');
+    }
+
+    // Find the next available group code number
+    const last = await ProductGroup.findOne({}, { groupCode: 1 })
+      .sort({ groupCode: -1 })
+      .collation({ locale: 'en', numericOrdering: true })
+      .lean();
+
+    let currentNum = 1;
+    if (last && last.groupCode) {
+      const match = last.groupCode.match(/CG-(\d+)/i);
+      if (match) {
+        currentNum = parseInt(match[1], 10) + 1;
+      } else {
+        const count = await ProductGroup.countDocuments();
+        currentNum = count + 1;
+      }
+    }
+
+    const createdGroups = [];
+    const now = new Date();
+
+    for (const p of products) {
+      const itemName = (
+        p.basicInfo?.title ||
+        p.title ||
+        p.name ||
+        p.ornate?.customGroupName ||
+        p.ornate?.itemCode ||
+        'Product'
+      ).trim();
+
+      const identifier = (
+        p.ornate?.barcode ||
+        p.barcode ||
+        p.ornate?.tagNo ||
+        p.basicInfo?.sku ||
+        ''
+      ).trim();
+
+      const groupName =
+        identifier && !itemName.toLowerCase().includes(identifier.toLowerCase())
+          ? `${itemName} - ${identifier}`
+          : itemName || identifier || 'Common Group';
+
+      const codeStr = String(currentNum).padStart(6, '0');
+      const groupCode = `CG-${codeStr}`;
+      currentNum++;
+
+      let baseSlug = groupName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      if (!baseSlug) baseSlug = `group-${Date.now().toString(36)}`;
+      const slug = `${baseSlug}-${codeStr.toLowerCase()}`;
+
+      createdGroups.push({
+        groupCode,
+        groupName,
+        slug,
+        description: '',
+        productIds: [p._id],
+        primaryProductId: p._id,
+        representativeMode: 'auto',
+        status: 'active',
+        meta: {
+          createdBy: userId,
+          updatedBy: userId,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+    }
+
+    const inserted = await ProductGroup.insertMany(createdGroups);
+
+    return {
+      message: `Successfully created ${inserted.length} separate group${inserted.length === 1 ? '' : 's'} (1 per product)`,
+      count: inserted.length,
+      createdGroups: inserted,
+      sourceGroupDeleted,
     };
   }
 
@@ -1037,6 +1200,73 @@ class ProductGroupService {
       message: `Successfully approved ${updateResult.modifiedCount} in-stock product(s) in "${group.groupName}"`,
       approvedCount: updateResult.modifiedCount,
       group: updatedGroup,
+    };
+  }
+
+  /**
+   * Bulk approve products across multiple groups
+   * @param {Array<string>} groupIds - List of ProductGroup IDs
+   * @param {string} userId - Admin user ID
+   */
+  async bulkApproveGroups(groupIds = [], userId = null) {
+    if (!Array.isArray(groupIds) || groupIds.length === 0) {
+      throw new ApiError(400, 'Please select at least one group to approve');
+    }
+
+    const validGroupIds = groupIds.filter((id) => mongoose.isValidObjectId(id));
+    if (!validGroupIds.length) {
+      throw new ApiError(400, 'No valid group IDs provided');
+    }
+
+    // Find all active groups
+    const groups = await ProductGroup.find({
+      _id: { $in: validGroupIds },
+      'meta.deletedAt': null,
+    }).select('_id productIds groupName');
+
+    if (!groups.length) {
+      throw new ApiError(404, 'No matching product groups found');
+    }
+
+    // Collect all unique productIds
+    const allProductIds = [];
+    groups.forEach((g) => {
+      if (Array.isArray(g.productIds)) {
+        g.productIds.forEach((pid) => {
+          if (pid) allProductIds.push(pid);
+        });
+      }
+    });
+
+    if (!allProductIds.length) {
+      throw new ApiError(400, 'No products found in the selected groups to approve');
+    }
+
+    // Filter where stockStatus is In Stock and not sold/deleted
+    const filter = {
+      _id: { $in: allProductIds },
+      'meta.deletedAt': null,
+      'ornate.isSold': { $ne: true },
+      $or: [
+        { stockStatus: 'In Stock' },
+        { stockStatus: { $regex: /^in stock$/i } },
+        { stockStatus: { $exists: false } },
+        { stockStatus: null },
+      ],
+    };
+
+    const updateResult = await Product.updateMany(filter, {
+      $set: {
+        status: 'approved',
+        'meta.updatedBy': userId,
+        'meta.updatedAt': new Date(),
+      },
+    });
+
+    return {
+      message: `Successfully approved ${updateResult.modifiedCount} product(s) across ${groups.length} group(s)`,
+      approvedCount: updateResult.modifiedCount,
+      groupsCount: groups.length,
     };
   }
 
@@ -1258,8 +1488,6 @@ class ProductGroupService {
     });
 
     const now = new Date();
-    const isFirstSync = !group.sync?.firstSyncedAt;
-    const nextSyncVersion = (group.sync?.syncVersion || 0) + 1;
 
     // Track per-product diffs for audit log
     const auditChanges = [];
@@ -1318,42 +1546,18 @@ class ProductGroupService {
       await Product.bulkWrite(updateWrites);
     }
 
-    const operationId = new mongoose.Types.ObjectId();
-
-    // 2. Atomically update first-sync metadata IF this is the first sync
-    if (isFirstSync) {
-      await ProductGroup.findOneAndUpdate(
-        { _id: groupId, 'sync.firstSyncedAt': null },
-        {
-          $set: {
-            'sync.firstSyncedAt': now,
-            'sync.firstSyncedBy': userId,
-            'sync.firstSourceProductId': source._id,
-            'sync.firstProductIds': targets.map((t) => t._id),
-            'sync.firstSyncedFields': validFields,
-          },
-        }
-      );
-    }
-
-    // 3. Update latest-sync metadata (never overwriting first-sync metadata)
+    // Update product group modified metadata
     await ProductGroup.findByIdAndUpdate(groupId, {
       $set: {
-        'sync.lastSyncedAt': now,
-        'sync.lastSyncedBy': userId,
-        'sync.lastSyncOperationId': operationId,
         'meta.updatedBy': userId,
         'meta.updatedAt': now,
       },
-      $inc: { 'sync.syncVersion': 1 },
     });
 
     return {
       message: 'Group synchronized successfully',
       operationId,
       updatedCount: targets.length,
-      isFirstSync,
-      syncVersion: nextSyncVersion,
       fields: validFields,
       completedAt: new Date(),
     };

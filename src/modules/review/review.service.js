@@ -35,12 +35,17 @@ class ReviewService {
       ];
     }
 
+    const selectFields = queryParams.status === 'approved' ? '-meta' : '';
+
+    const query = Review.find(filter)
+      .sort({ 'review.reviewDate': -1, 'meta.createdAt': -1 })
+      .skip(skip)
+      .limit(limit);
+
+    if (selectFields) query.select(selectFields);
+
     const [items, total] = await Promise.all([
-      Review.find(filter)
-        .sort({ 'review.reviewDate': -1, 'meta.createdAt': -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+      query.lean(),
       Review.countDocuments(filter),
     ]);
 
@@ -52,7 +57,7 @@ class ReviewService {
     const filter = { 'meta.deletedAt': null, status: 'approved' };
     return await Review.find(filter)
       .sort({ 'review.reviewDate': -1 })
-      .select('_id customer review image status meta')
+      .select('-meta')
       .lean();
   }
 

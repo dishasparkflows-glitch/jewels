@@ -4,7 +4,7 @@ const ApiResponse = require('../../utils/ApiResponse');
 
 class ProductController {
   previewPricing = catchAsync(async (req, res) => {
-    ApiResponse.success(res, await productService.previewPricing(req.body), 'Pricing calculated');
+    ApiResponse.success(res, await productService.previewPricing(req.body), 'Pricing calculated', 200, true);
   });
 
   // ------------------------------- create product ----------------------------

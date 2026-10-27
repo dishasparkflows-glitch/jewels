@@ -273,7 +273,9 @@ class ProductService {
     } else if (queryParams.status && queryParams.status !== 'all') {
       filter.status = queryParams.status;
     } else if (!queryParams.status) {
-      filter.status = 'approved';
+      if (!isOrnateSpecified) {
+        filter.status = 'approved';
+      }
     }
 
     if (queryParams.category) {

@@ -11,6 +11,8 @@ const adminAuth = [authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN)];
 router.get('/tab-counts', adminAuth, productGroupController.getTabCounts);
 router.get('/ungrouped-products', adminAuth, productGroupController.getUngrouped);
 router.get('/summary', adminAuth, productGroupController.getSummary);
+router.post('/bulk-split-individual', adminAuth, productGroupController.bulkSplitIndividual);
+router.post('/bulk-approve', adminAuth, productGroupController.bulkApprove);
 
 // 2. Sync Operations
 router.post('/:id/sync/preview', adminAuth, productGroupController.previewSync);

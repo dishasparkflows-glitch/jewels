@@ -14,16 +14,12 @@ let lastSyncError = null;
  */
 async function triggerOrnateSync(source = 'cron') {
   if (isSyncing) {
-    console.warn(`[Ornate Cron] ⏳ Sync already in progress (triggered by ${source}), skipping duplicate trigger.`);
     return { skipped: true, reason: 'Sync already in progress' };
   }
 
   isSyncing = true;
   lastSyncStatus = 'in_progress';
   const startTime = Date.now();
-  console.log(`\n======================================================`);
-  console.log(`[Ornate Cron] 🚀 Starting Ornate 30-min Sync (${new Date().toISOString()}) [Source: ${source}]`);
-  console.log(`======================================================`);
 
   try {
     const result = await ornateService.runOrnateFullSync();
@@ -34,16 +30,15 @@ async function triggerOrnateSync(source = 'cron') {
       durationMs: Date.now() - startTime,
       results: result.results,
     };
-    lastSyncError = result.success ? null : 'Ornate sync completed with failed records; inspect results for details';
+    lastSyncError = result.success ? null : 'Ornate sync completed with failed records';
     if (!result.success) return { success: false, error: lastSyncError, result: lastSyncResult };
 
-    console.log(`[Ornate Cron] ✅ Full Sync completed successfully in ${Date.now() - startTime}ms`);
     return { success: true, result: lastSyncResult };
   } catch (err) {
     lastSyncTime = new Date();
     lastSyncStatus = 'error';
     lastSyncError = err.message;
-    console.error(`[Ornate Cron] ❌ Full Sync failed:`, err.message);
+    console.error(`[Ornate Cron] Sync failed:`, err.message);
     return { success: false, error: err.message };
   } finally {
     isSyncing = false;
@@ -57,23 +52,13 @@ function startOrnateCron() {
   const isEnabled = process.env.ORNATE_SYNC_ENABLED !== 'false';
   const cronSchedule = process.env.ORNATE_SYNC_CRON || '*/30 * * * *';
 
-  if (!isEnabled) {
-    console.log('[Ornate Cron] ⚠️ Ornate product sync cron is disabled via ORNATE_SYNC_ENABLED=false');
+  if (!isEnabled || cronJob) {
     return;
   }
-
-  if (cronJob) {
-    console.log('[Ornate Cron] Cron job already scheduled.');
-    return;
-  }
-
-  console.log(`[Ornate Cron] ⏰ Scheduling Ornate product sync cron: "${cronSchedule}" (every 30 minutes)`);
 
   cronJob = cron.schedule(cronSchedule, async () => {
     await triggerOrnateSync('scheduled_cron');
   });
-
-  console.log('[Ornate Cron] ✅ Cron job scheduled successfully.');
 }
 
 /**
@@ -83,7 +68,6 @@ function stopOrnateCron() {
   if (cronJob) {
     cronJob.stop();
     cronJob = null;
-    console.log('[Ornate Cron] ⏹️ Ornate sync cron stopped.');
   }
 }
 

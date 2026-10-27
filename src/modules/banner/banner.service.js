@@ -416,42 +416,35 @@ class BannerService {
 
   // ------------------------------- get banner lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const now = new Date();
-    const andConditions = [
-      { status: 'active' },
-      {
-        $nor: [
-          {
-            'display.type': 'offerbanner',
-            endDate: { $ne: null, $exists: true, $lt: now },
-          },
-        ],
-      },
-    ];
+    const filter = {
+      status: 'active',
+      'meta.deletedAt': null,
+    };
 
     if (queryParams.type) {
-      andConditions.push({ 'display.type': queryParams.type });
+      filter['display.type'] = queryParams.type;
     }
-
-    const platform = ['web', 'mobile'].includes(queryParams.platform) ? queryParams.platform : 'web';
-    andConditions.push(platform === 'web'
-      ? { $or: [{ 'display.platform': 'web' }, { 'display.platform': { $exists: false } }, { 'display.type': 'mobileappbanner' }] }
-      : { 'display.platform': platform });
 
     if (queryParams.category) {
-      andConditions.push({ 'display.categoryId': queryParams.category });
+      filter['display.categoryId'] = queryParams.category;
     }
 
-    const filter = andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
+    if (queryParams.platform) {
+      filter.$or = [
+        { 'display.platform': queryParams.platform },
+        { 'display.type': 'mobileappbanner' },
+      ];
+    }
 
     const items = await Banner.find(filter)
+      .select('-meta')
       .populate('display.categoryId', 'name slug')
       .populate('collectionImages.categoryId', 'name slug')
       .populate('display.menuItemIds', 'title menuSectionId')
-      .sort({ 'display.order': 1, 'meta.createdAt': -1 })
+      .sort({ 'display.order': 1, _id: -1 })
       .lean();
 
-    return items.map((item) => this._formatBanner(item));
+    return items;
   }
 
   // ----------------------- get category display banner -----------------------
@@ -477,9 +470,10 @@ class BannerService {
           { 'display.categoryId': categoryId },
         ],
       })
+        .select('-meta')
         .populate('display.categoryId', 'name slug')
-      .populate('collectionImages.categoryId', 'name slug')
-        .sort({ 'display.order': 1, 'meta.createdAt': -1 })
+        .populate('collectionImages.categoryId', 'name slug')
+        .sort({ 'display.order': 1, _id: -1 })
         .lean();
 
       if (categorySpecificOffer) {
@@ -495,9 +489,10 @@ class BannerService {
     const generalOffer = await Banner.findOne({
       $and: [...baseOfferConds, platformCondition],
     })
+      .select('-meta')
       .populate('display.categoryId', 'name slug')
       .populate('collectionImages.categoryId', 'name slug')
-      .sort({ 'display.order': 1, 'meta.createdAt': -1 })
+      .sort({ 'display.order': 1, _id: -1 })
       .lean();
 
     if (generalOffer) {
@@ -518,9 +513,10 @@ class BannerService {
           { 'display.categoryId': categoryId },
         ],
       })
+        .select('-meta')
         .populate('display.categoryId', 'name slug')
-      .populate('collectionImages.categoryId', 'name slug')
-        .sort({ 'display.order': 1, 'meta.createdAt': -1 })
+        .populate('collectionImages.categoryId', 'name slug')
+        .sort({ 'display.order': 1, _id: -1 })
         .lean();
 
       if (categoryBanner) {

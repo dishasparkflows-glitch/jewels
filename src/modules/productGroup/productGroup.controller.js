@@ -62,8 +62,26 @@ class ProductGroupController {
       targetGroupId: req.body.targetGroupId,
       newGroupName: req.body.newGroupName,
       productIds: req.body.productIds,
+      splitIndividual: Boolean(req.body.splitIndividual),
       userId: req.user?._id,
     });
+    ApiResponse.success(res, result, result.message);
+  });
+
+  bulkSplitIndividual = catchAsync(async (req, res) => {
+    const result = await productGroupService.splitProductsIntoIndividualGroups({
+      sourceGroupId: req.body.sourceGroupId || null,
+      productIds: req.body.productIds,
+      userId: req.user?._id,
+    });
+    ApiResponse.success(res, result, result.message);
+  });
+
+  bulkApprove = catchAsync(async (req, res) => {
+    const result = await productGroupService.bulkApproveGroups(
+      req.body.groupIds,
+      req.user?._id
+    );
     ApiResponse.success(res, result, result.message);
   });
 

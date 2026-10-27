@@ -8,8 +8,9 @@ class ApiResponse {
    * - Non-GET requests (POST, PUT, PATCH, DELETE) return only 'success' and 'message'.
    * - Essential data-returning endpoints (auth, upload, coupon validation) or explicit forceData retain 'data'.
    */
-  static shouldIncludeData(res, forceData = false) {
+  static shouldIncludeData(res, forceData = false, data = null) {
     if (forceData) return true;
+    if (data !== null && data !== undefined) return true;
 
     const method = (res?.req?.method || res?.request?.method || '').toUpperCase();
     if (method === 'GET') return true;
@@ -20,7 +21,9 @@ class ApiResponse {
       url.includes('/auth/register') ||
       url.includes('/auth/google') ||
       url.includes('/upload') ||
-      url.includes('/coupons/validate');
+      url.includes('/coupons/validate') ||
+      url.includes('/pricing-preview') ||
+      url.includes('/preview');
 
     return isEssentialDataRoute;
   }
@@ -31,7 +34,7 @@ class ApiResponse {
       message,
     };
 
-    if (this.shouldIncludeData(res, forceData)) {
+    if (this.shouldIncludeData(res, forceData, data)) {
       payload.data = data;
     }
 
@@ -44,7 +47,7 @@ class ApiResponse {
       message,
     };
 
-    if (this.shouldIncludeData(res, forceData)) {
+    if (this.shouldIncludeData(res, forceData, data)) {
       payload.data = data;
     }
 

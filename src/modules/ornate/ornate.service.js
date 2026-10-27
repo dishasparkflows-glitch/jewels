@@ -23,6 +23,8 @@ const {
   resolveCategory,
   extractLabelIdentifiers,
   calculateLabelPrice,
+  normalizeLabelSummary,
+  buildProductIdentifierQuery,
   mapStuddedDetails,
   generateProductSlug,
   buildProductPayloadFromLabel,
@@ -67,22 +69,7 @@ async function getOrnateErpCategories() {
       group.metals.add(label.MetalName.trim());
     }
 
-    const { uniqueLabelID, barcodeNo, labelNo } = extractLabelIdentifiers(label);
-    const { salePrice } = calculateLabelPrice(label);
-
-    group.products.push({
-      uniqueLabelID,
-      barcodeNo,
-      labelNo,
-      itemName: label.ItemName || '',
-      groupName,
-      grossWt: label.GrossWt || 0,
-      netWt: label.NetWt || 0,
-      price: salePrice,
-      metalName: label.MetalName || '',
-      carat: label.Carat || '',
-      inStock: label.InStock ?? 1,
-    });
+    group.products.push(normalizeLabelSummary(label));
   }
 
   const categories = Array.from(groupMap.values()).map(g => ({
@@ -185,12 +172,9 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
       if (!sku) throw new Error('Label has no identifier');
 
       // Check if product already exists in Product table and has images
-      const matchCriteria = [];
-      if (sku) matchCriteria.push({ 'basicInfo.sku': sku });
-      if (tagNo) matchCriteria.push({ 'ornate.tagNo': tagNo });
-      if (barcode) matchCriteria.push({ 'ornate.barcode': barcode });
-
-      const existingProduct = await Product.findOne({ $or: matchCriteria })
+      const existingProduct = await Product.findOne(
+        buildProductIdentifierQuery({ sku, tagNo, barcode })
+      )
         .select('colorImages basicInfo.sku basicInfo.slug ornate pricing')
         .lean();
 
@@ -256,7 +240,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
 
       // Upsert into Product collection with 1 flag: isOrnate: true
       const upsertedProduct = await Product.findOneAndUpdate(
-        { $or: matchCriteria },
+        buildProductIdentifierQuery({ sku, tagNo, barcode }),
         {
           $set: setFields,
           $setOnInsert: {
@@ -329,13 +313,11 @@ async function syncOrnateSoldLabels() {
     const { salePrice } = calculateLabelPrice(label);
 
     const soldProduct = await Product.findOneAndUpdate(
-      {
-        $or: [
-          { 'basicInfo.sku': sku },
-          { 'ornate.tagNo': String(label.LabelNo || uniqueLabelID).trim() },
-          { 'ornate.barcode': String(label.BarcodeNo || uniqueLabelID) },
-        ],
-      },
+      buildProductIdentifierQuery({
+        sku,
+        tagNo: label.LabelNo || uniqueLabelID,
+        barcode: label.BarcodeNo || uniqueLabelID,
+      }),
       {
         $set: cleanPayload({
           stockStatus: 'Out of Stock',
@@ -380,11 +362,7 @@ async function syncOrnateSoldLabels() {
     const result = await Product.updateMany(
       {
         isOrnate: true,
-        $or: [
-          { 'basicInfo.sku': { $in: soldIds } },
-          { 'ornate.barcode': { $in: soldIds } },
-          { 'ornate.tagNo': { $in: soldIds } },
-        ],
+        ...buildProductIdentifierQuery(soldIds),
       },
       {
         $set: {
@@ -416,87 +394,60 @@ async function getOrnateErpSoldLabels() {
     ReqBranchIssue: 'N',
   });
 
-  const rawSoldList = data?.SoldLabel || [];
-  const rawLabelDetail = data?.LabelDetail || [];
-
-  const validSold = rawSoldList.filter(
-    (s) => s && !s.IsBlankTable && (s.UniqueLabelId || s.UniqueLabelID || s.BarcodeNo || s.LabelNo)
-  );
-
-  const validDetails = rawLabelDetail.filter(
-    (l) => l && !l.IsBlankTable && (l.UniqueLabelID || l.BarcodeNo || l.LabelNo)
-  );
-
   const allSoldIds = new Set();
   const combinedItems = [];
 
-  validDetails.forEach(d => {
-    const id = d.UniqueLabelID || d.BarcodeNo || d.LabelNo;
-    if (!id || allSoldIds.has(String(id).toLowerCase())) return;
-    allSoldIds.add(String(id).toLowerCase());
-    const { salePrice } = calculateLabelPrice(d);
-    combinedItems.push({
-      uniqueLabelID: d.UniqueLabelID || id,
-      labelNo: d.LabelNo || '',
-      barcodeNo: d.BarcodeNo || '',
-      itemName: d.ItemName || '',
-      groupName: d.GroupName || '',
-      grossWt: d.GrossWt || 0,
-      netWt: d.NetWt || 0,
-      price: salePrice,
-      metalName: d.MetalName || '',
-      carat: d.Carat || '',
-    });
-  });
+  const addUniqueLabels = (list, defaultName = '') => {
+    for (const item of list || []) {
+      if (!item || item.IsBlankTable) continue;
+      const id = item.UniqueLabelID || item.UniqueLabelId || item.BarcodeNo || item.LabelNo;
+      if (!id) continue;
+      const key = String(id).trim().toLowerCase();
+      if (allSoldIds.has(key)) continue;
+      allSoldIds.add(key);
+      combinedItems.push(normalizeLabelSummary(item, defaultName));
+    }
+  };
 
-  validSold.forEach(s => {
-    const id = s.UniqueLabelId || s.UniqueLabelID || s.BarcodeNo || s.LabelNo;
-    if (!id || allSoldIds.has(String(id).toLowerCase())) return;
-    allSoldIds.add(String(id).toLowerCase());
-    const { salePrice } = calculateLabelPrice(s);
-    combinedItems.push({
-      uniqueLabelID: s.UniqueLabelId || s.UniqueLabelID || id,
-      labelNo: s.LabelNo || '',
-      barcodeNo: s.BarcodeNo || '',
-      itemName: s.ItemName || 'Sold Tag',
-      groupName: s.GroupName || '',
-      grossWt: s.GrossWt || 0,
-      netWt: s.NetWt || 0,
-      price: salePrice,
-      metalName: s.MetalName || '',
-      carat: s.Carat || '',
-    });
-  });
+  addUniqueLabels(data?.LabelDetail);
+  addUniqueLabels(data?.SoldLabel, 'Sold Tag');
+
+  if (combinedItems.length === 0) {
+    return { total: 0, items: [] };
+  }
 
   // Cross-reference with Product collection
   const dbMatch = await Product.find({
     isOrnate: true,
-    $or: [
-      { 'basicInfo.sku': { $in: Array.from(allSoldIds) } },
-      { 'ornate.tagNo': { $in: Array.from(allSoldIds) } },
-      { 'ornate.barcode': { $in: Array.from(allSoldIds) } },
-
-    ],
+    ...buildProductIdentifierQuery(allSoldIds),
   }).select('basicInfo.sku stockStatus status pricing.salePrice ornate').lean();
 
   const dbMap = new Map();
-  dbMatch.forEach(p => {
+  dbMatch.forEach((p) => {
     if (p.basicInfo?.sku) dbMap.set(p.basicInfo.sku.toLowerCase(), p);
     if (p.ornate?.tagNo) dbMap.set(p.ornate.tagNo.toLowerCase(), p);
     if (p.ornate?.barcode) dbMap.set(p.ornate.barcode.toLowerCase(), p);
   });
 
-  const enrichedItems = combinedItems.map(item => {
-    const dbProduct = dbMap.get((item.sku || '').toLowerCase()) ||
-                     dbMap.get((item.uniqueLabelID || '').toLowerCase()) ||
-                     dbMap.get((item.barcodeNo || '').toLowerCase()) ||
-                     dbMap.get((item.labelNo || '').toLowerCase());
+  const enrichedItems = combinedItems.map((item) => {
+    const dbProduct =
+      dbMap.get((item.sku || '').toLowerCase()) ||
+      dbMap.get((item.uniqueLabelID || '').toLowerCase()) ||
+      dbMap.get((item.barcodeNo || '').toLowerCase()) ||
+      dbMap.get((item.labelNo || '').toLowerCase());
+
     return {
       ...item,
-      inDb: !!dbProduct,
+      inDb: Boolean(dbProduct),
       dbStatus: dbProduct ? dbProduct.status : 'not_synced',
       currentInStock: dbProduct ? (dbProduct.ornate?.stockQty ?? 0) : 0,
-      alreadySoldInDb: dbProduct ? (dbProduct.ornate?.isSold || dbProduct.ornate?.stockQty === 0 || dbProduct.stockStatus === 'Out of Stock') : false,
+      alreadySoldInDb: dbProduct
+        ? Boolean(
+            dbProduct.ornate?.isSold ||
+            dbProduct.ornate?.stockQty === 0 ||
+            dbProduct.stockStatus === 'Out of Stock'
+          )
+        : false,
     };
   });
 
@@ -517,11 +468,7 @@ async function syncSpecificSoldLabels(productIds) {
   const result = await Product.updateMany(
     {
       isOrnate: true,
-      $or: [
-        { 'ornate.barcode': { $in: cleanIds } },
-        { 'ornate.tagNo': { $in: cleanIds } },
-      { 'basicInfo.sku': { $in: cleanIds } },
-      ],
+      ...buildProductIdentifierQuery(cleanIds),
     },
     {
       $set: {
@@ -572,11 +519,11 @@ async function syncOrnateMetalRateChanges() {
         await Product.updateOne(
           {
             isOrnate: true,
-            $or: [
-              { 'basicInfo.sku': String(uniqueLabelID) },
-              { 'ornate.barcode': String(label.BarcodeNo || uniqueLabelID) },
-              { 'ornate.tagNo': String(label.LabelNo || uniqueLabelID) },
-            ],
+            ...buildProductIdentifierQuery({
+              sku: uniqueLabelID,
+              barcode: label.BarcodeNo || uniqueLabelID,
+              tagNo: label.LabelNo || uniqueLabelID,
+            }),
           },
           {
             $set: {

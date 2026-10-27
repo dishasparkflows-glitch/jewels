@@ -357,6 +357,67 @@ function buildProductPayloadFromLabel(label, {
   };
 }
 
+/**
+ * Normalizes an Ornate ERP label object into a standard UI/catalog summary format
+ */
+function normalizeLabelSummary(label = {}, defaultName = '') {
+  const { uniqueLabelID, barcodeNo, labelNo, sku, tagNo, barcode } = extractLabelIdentifiers(label);
+  const { salePrice, mrp } = calculateLabelPrice(label);
+  const itemName = label.ItemName || defaultName || '';
+
+  return {
+    uniqueLabelID: uniqueLabelID || label.UniqueLabelId || sku,
+    labelNo: labelNo || '',
+    barcodeNo: barcodeNo || '',
+    itemName,
+    groupName: label.GroupName || '',
+    grossWt: Number(label.GrossWt) || 0,
+    netWt: Number(label.NetWt) || 0,
+    price: salePrice,
+    mrp,
+    metalName: label.MetalName || '',
+    carat: label.Carat || '',
+    inStock: label.InStock ?? 1,
+    sku,
+    tagNo,
+    barcode,
+  };
+}
+
+/**
+ * Builds an $or query clause matching products across basicInfo.sku, ornate.barcode, and ornate.tagNo.
+ * Accepts an array/Set of string IDs, a single ID string, or an object { sku, tagNo, barcode }.
+ */
+function buildProductIdentifierQuery(identifiers) {
+  if (identifiers instanceof Set || Array.isArray(identifiers)) {
+    const list = Array.from(identifiers).map((id) => String(id).trim()).filter(Boolean);
+    return {
+      $or: [
+        { 'basicInfo.sku': { $in: list } },
+        { 'ornate.barcode': { $in: list } },
+        { 'ornate.tagNo': { $in: list } },
+      ],
+    };
+  }
+
+  if (typeof identifiers === 'object' && identifiers !== null) {
+    const orArr = [];
+    if (identifiers.sku) orArr.push({ 'basicInfo.sku': String(identifiers.sku).trim() });
+    if (identifiers.tagNo) orArr.push({ 'ornate.tagNo': String(identifiers.tagNo).trim() });
+    if (identifiers.barcode) orArr.push({ 'ornate.barcode': String(identifiers.barcode).trim() });
+    if (orArr.length > 0) return { $or: orArr };
+  }
+
+  const singleId = String(identifiers || '').trim();
+  return {
+    $or: [
+      { 'basicInfo.sku': singleId },
+      { 'ornate.barcode': singleId },
+      { 'ornate.tagNo': singleId },
+    ],
+  };
+}
+
 module.exports = {
   ORNATE_BASE_URL,
   ORNATE_USERNAME,
@@ -372,6 +433,8 @@ module.exports = {
   resolveCategory,
   extractLabelIdentifiers,
   calculateLabelPrice,
+  normalizeLabelSummary,
+  buildProductIdentifierQuery,
   mapStuddedDetails,
   generateProductSlug,
   buildProductPayloadFromLabel,

@@ -147,58 +147,52 @@ class ProductService {
       ? { $or: [{ _id: id }, { 'basicInfo.slug': id }] }
       : { 'basicInfo.slug': id };
 
-    let product = await Product.findOne(filter)
-      .populate({
-        path: 'categoryIds',
-        select: 'name slug sizeChart',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'metalColorIds',
-        select: 'name code colorCode colorCodeEnd',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'metalPurityIds',
-        select: 'name karat metalType',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'colorImages.metalColorId',
-        select: 'name code colorCode colorCodeEnd',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'variants.metalColorId',
-        select: 'name code colorCode colorCodeEnd',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'variants.metalPurityId',
-        select: 'name karat metalType',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'variants.diamondTypeId',
-        select: 'name',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'variants.diamondShapeId',
-        select: 'name',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'variants.diamondColorId',
-        select: 'name',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'variants.diamondClarityId',
-        select: 'name',
-        strictPopulate: false
-      })
-      .lean();
+    const populateOptions = [
+      { path: 'categoryIds', select: 'name slug sizeChart', strictPopulate: false },
+      { path: 'metalColorIds', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
+      { path: 'metalPurityIds', select: 'name karat metalType', strictPopulate: false },
+      { path: 'colorImages.metalColorId', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
+      { path: 'variants.metalColorId', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
+      { path: 'variants.metalPurityId', select: 'name karat metalType', strictPopulate: false },
+      { path: 'variants.diamondTypeId', select: 'name', strictPopulate: false },
+      { path: 'variants.diamondShapeId', select: 'name', strictPopulate: false },
+      { path: 'variants.diamondColorId', select: 'name', strictPopulate: false },
+      { path: 'variants.diamondClarityId', select: 'name', strictPopulate: false },
+    ];
+
+    let productQuery = Product.findOne(filter);
+    for (const pop of populateOptions) {
+      productQuery = productQuery.populate(pop);
+    }
+    let product = await productQuery.lean();
+
+    // Fallback 1: If not found and id ends with group sequence (e.g. -000030), try stripping the sequence
+    if (!product && typeof id === 'string' && /-\d{6}$/.test(id)) {
+      const strippedSlug = id.replace(/-\d{6}$/, '');
+      let fallbackQuery = Product.findOne({ 'basicInfo.slug': strippedSlug });
+      for (const pop of populateOptions) {
+        fallbackQuery = fallbackQuery.populate(pop);
+      }
+      product = await fallbackQuery.lean();
+    }
+
+    // Fallback 2: Check ProductGroup by slug, groupCode, or _id
+    if (!product) {
+      const groupFilter = isObjectId
+        ? { $or: [{ _id: id }, { slug: id }, { groupCode: id }], 'meta.deletedAt': null }
+        : { $or: [{ slug: id }, { groupCode: id }], 'meta.deletedAt': null };
+      const group = await ProductGroup.findOne(groupFilter).lean();
+      if (group) {
+        const targetProdId = group.primaryProductId || (Array.isArray(group.productIds) ? group.productIds[0] : null);
+        if (targetProdId) {
+          let groupProductQuery = Product.findOne({ _id: targetProdId });
+          for (const pop of populateOptions) {
+            groupProductQuery = groupProductQuery.populate(pop);
+          }
+          product = await groupProductQuery.lean();
+        }
+      }
+    }
 
     if (!product) {
       throw new ApiError(404, 'Product not found');
@@ -495,16 +489,22 @@ class ProductService {
             }
           }
 
+          const repSlug = rep.basicInfo?.slug || (group.slug ? group.slug.replace(/-\d{6}$/, '') : '');
+          const cleanGroupTitle = (group.productIds?.length === 1 && rep.basicInfo?.title)
+            ? rep.basicInfo.title
+            : (group.groupName ? group.groupName.replace(/\s+-\s+\d+$/, '') : group.groupName);
+
           groupCards.push({
             _id: group._id,
             isGroup: true,
             groupCode: group.groupCode,
-            groupName: group.groupName,
-            name: group.groupName,
-            slug: group.slug || rep.basicInfo?.slug,
+            groupName: cleanGroupTitle,
+            name: cleanGroupTitle,
+            title: cleanGroupTitle,
+            slug: repSlug,
             basicInfo: {
-              title: group.groupName,
-              slug: group.slug || rep.basicInfo?.slug,
+              title: cleanGroupTitle,
+              slug: repSlug,
               description: group.description || rep.basicInfo?.description || '',
               gender: groupGender,
             },
@@ -813,12 +813,24 @@ class ProductService {
             if (!allMenuIds.includes(String(queryParams.menuItem))) continue;
           }
 
+          const repSlug = rep.basicInfo?.slug || (group.slug ? group.slug.replace(/-\d{6}$/, '') : '');
+          const cleanGroupTitle = (group.productIds?.length === 1 && rep.basicInfo?.title)
+            ? rep.basicInfo.title
+            : (group.name || group.groupName ? (group.name || group.groupName).replace(/\s+-\s+\d+$/, '') : '');
+
           groupCards.push({
             ...rep,
             _id: group._id,
             id: group._id,
-            groupName: group.name,
-            slug: group.slug || rep.basicInfo?.slug,
+            groupName: cleanGroupTitle,
+            name: cleanGroupTitle,
+            title: cleanGroupTitle,
+            slug: repSlug,
+            basicInfo: {
+              ...(rep.basicInfo || {}),
+              title: cleanGroupTitle,
+              slug: repSlug,
+            },
             isGroup: true,
             variantCount: group.productIds.length,
             colorImages: rep.colorImages,
@@ -1102,6 +1114,25 @@ class ProductService {
           409,
           `Product with SKU "${data.basicInfo.sku}" already exists`
         );
+      }
+    }
+
+    const isOrnate = Boolean(data.isOrnate ?? existing.isOrnate);
+    if (isOrnate) {
+      const title = data.basicInfo?.title ?? existing.basicInfo?.title;
+      const barcode = data.ornate?.barcode ?? existing.ornate?.barcode ?? data.barcode ?? existing.barcode;
+      if (title) {
+        const fallbackId = data.basicInfo?.sku ?? existing.basicInfo?.sku ?? '';
+        const slugBase = barcode ? `${title}-${barcode}` : (fallbackId ? `${title}-${fallbackId}` : title);
+        const newSlug = slugBase
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        if (data.basicInfo) {
+          data.basicInfo.slug = newSlug;
+        } else {
+          data['basicInfo.slug'] = newSlug;
+        }
       }
     }
 

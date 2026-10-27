@@ -1108,21 +1108,18 @@ class ProductGroupService {
         ''
       ).trim();
 
-      const groupName =
-        identifier && !itemName.toLowerCase().includes(identifier.toLowerCase())
-          ? `${itemName} - ${identifier}`
-          : itemName || identifier || 'Common Group';
+      const groupName = itemName || identifier || 'Common Group';
 
       const codeStr = String(currentNum).padStart(6, '0');
       const groupCode = `CG-${codeStr}`;
       currentNum++;
 
-      let baseSlug = groupName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      if (!baseSlug) baseSlug = `group-${Date.now().toString(36)}`;
-      const slug = `${baseSlug}-${codeStr.toLowerCase()}`;
+      const slug = p.basicInfo?.slug || (
+        (identifier ? `${itemName}-${identifier}` : itemName)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+      );
 
       createdGroups.push({
         groupCode,

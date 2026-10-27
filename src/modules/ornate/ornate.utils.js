@@ -210,10 +210,13 @@ function mapStuddedDetails(studdedDetails = [], uniqueLabelID = '', barcodeNo = 
 }
 
 /**
- * Generates SEO slug from title and SKU
+ * Generates SEO slug from title and barcode (or SKU/identifier)
  */
-function generateProductSlug(title = '', sku = '') {
-  return `${title}-${sku}`
+function generateProductSlug(title = '', identifier = '') {
+  const cleanTitle = String(title || '').trim();
+  const cleanId = String(identifier || '').trim();
+  const raw = cleanId ? `${cleanTitle}-${cleanId}` : cleanTitle;
+  return raw
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
@@ -278,8 +281,9 @@ function buildProductPayloadFromLabel(label, {
   const diamondAmt = Number(label.DiamondAmt) || 0;
   const itemCode = label.ItemMstId ? String(label.ItemMstId) : '';
 
-  const generatedSlug = generateProductSlug(title, sku);
-  const activeSlug = existingProduct?.basicInfo?.slug || generatedSlug;
+  const barcodeValue = barcode || label.BarcodeNo || '';
+  const generatedSlug = generateProductSlug(title, barcodeValue || sku);
+  const activeSlug = generatedSlug;
 
   const availableImages = Array.isArray(newlyUploadedImages) && newlyUploadedImages.length > 0
     ? newlyUploadedImages

@@ -341,11 +341,20 @@ productSchema.pre('save', function (next) {
     this.isOrnate = true;
   }
   const activeTitle = this.basicInfo?.title;
-  if (this.basicInfo && !this.basicInfo.slug && activeTitle) {
-    this.basicInfo.slug = activeTitle
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+  if (this.basicInfo && activeTitle) {
+    if (isOrnate) {
+      const barcode = this.ornate?.barcode;
+      const slugBase = barcode ? `${activeTitle}-${barcode}` : (this.basicInfo.sku ? `${activeTitle}-${this.basicInfo.sku}` : activeTitle);
+      this.basicInfo.slug = slugBase
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    } else if (!this.basicInfo.slug) {
+      this.basicInfo.slug = activeTitle
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
   }
   if (Array.isArray(this.colorImages)) {
     this.colorImages.forEach((ci) => {

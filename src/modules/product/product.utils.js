@@ -353,8 +353,22 @@ const formatColorImages = (colorImages, p = null) => {
 const formatStorefrontProduct = (p) => {
   if (!p) return null;
   const isGroup = Boolean(p.isGroup);
-  const title = p.basicInfo?.title || p.groupName || p.name || 'Untitled product';
-  const slug = p.basicInfo?.slug || p.slug || '';
+  let title = p.basicInfo?.title || p.groupName || p.name || 'Untitled product';
+  let slug = p.basicInfo?.slug || p.slug || '';
+
+  // Clean trailing sequence numbers if present (e.g. -000030)
+  if (slug && /-\d{6}$/.test(slug)) {
+    slug = slug.replace(/-\d{6}$/, '');
+  }
+
+  // If title was auto-generated with " - <barcode>" on single-product items, clean it
+  if (title && (p.variantCount <= 1 || !isGroup) && title.includes(' - ')) {
+    const parts = title.split(' - ');
+    if (parts.length === 2 && /^\d+$/.test(parts[1].trim())) {
+      title = parts[0].trim();
+    }
+  }
+
   const description = p.basicInfo?.description || p.description || '';
   const images = extractProductImages(p);
 

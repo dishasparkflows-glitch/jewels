@@ -330,10 +330,10 @@ async function syncOrnateSoldLabels() {
         $setOnInsert: cleanPayload({
           'basicInfo.title': label.ItemName || `Ornate Item ${sku}`,
           'basicInfo.sku': sku,
-          'basicInfo.slug': (label.ItemName || `Ornate Item ${sku}` + '-' + sku)
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, ''),
+          'basicInfo.slug': generateProductSlug(
+            label.ItemName || `Ornate Item ${sku}`,
+            (label.BarcodeNo ? String(label.BarcodeNo).trim() : '') || sku
+          ),
           status: 'draft',
           'ornate.tagNo': String(label.LabelNo || uniqueLabelID),
           'ornate.barcode': String(label.BarcodeNo || uniqueLabelID),

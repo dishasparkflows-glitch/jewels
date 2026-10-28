@@ -34,9 +34,32 @@ function buildNavigation(categories, sections, items) {
   }));
 }
 
+function normalizeSizeChart(data) {
+  if (!data || data.sizeChart === undefined) return;
+  if (typeof data.sizeChart === 'string') {
+    const url = data.sizeChart.trim();
+    let key = data.sizeChartKey || '';
+    if (!key && url) {
+      const match = url.match(/categories\/[^\s?#]+/);
+      if (match) key = match[0];
+    }
+    data.sizeChart = { url, key };
+  } else if (data.sizeChart && typeof data.sizeChart === 'object') {
+    const url = (data.sizeChart.url || '').trim();
+    let key = (data.sizeChart.key || data.sizeChartKey || '').trim();
+    if (!key && url) {
+      const match = url.match(/categories\/[^\s?#]+/);
+      if (match) key = match[0];
+    }
+    data.sizeChart = { url, key };
+  }
+  delete data.sizeChartKey;
+}
+
 class CategoryService {
   // ------------------------------- create category ----------------------------
   async create(data) {
+    normalizeSizeChart(data);
     return await Category.create(data);
   }
 
@@ -89,6 +112,7 @@ class CategoryService {
 
   // ------------------------------- update category ----------------------------
   async update(id, data) {
+    normalizeSizeChart(data);
     const item = await Category.findOneAndUpdate(
       { _id: id },
       { $set: data },

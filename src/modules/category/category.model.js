@@ -56,8 +56,8 @@ const categorySchema = new mongoose.Schema(
       key: { type: String, trim: true },
     },
     sizeChart: {
-      url: String,
-      key: String,
+      url: { type: String, trim: true, default: '' },
+      key: { type: String, trim: true, default: '' },
     },
     status: {
       type: String,

@@ -326,6 +326,10 @@ class BannerService {
       andConditions.push({ status: queryParams.status });
     }
 
+    if (queryParams.themeId) {
+      andConditions.push({ themeId: queryParams.themeId });
+    }
+
     // 1. Exclude expired offer banners unless explicitly included
     if (queryParams.includeExpired !== 'true' && queryParams.includeExpired !== true) {
       andConditions.push({
@@ -665,3 +669,4 @@ class BannerService {
 }
 
 module.exports = new BannerService();
+

@@ -4,7 +4,7 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const Category = require('../category/category.model');
 const Banner = require('../banner/banner.model');
 const Featured = require('../featured/featured.model');
-const { WebsiteTheme, WebsiteThemeSettings, WebsiteThemeHistory } = require('./websiteTheme.model');
+const { WebsiteTheme, WebsiteThemeSettings } = require('./websiteTheme.model');
 const themeMedia = require('./themeMedia');
 const Setting = require('../setting/setting.model');
 const TIMEZONE = 'Asia/Kolkata';
@@ -159,16 +159,8 @@ class WebsiteThemeService {
     for (const category of config.categoryAppearances || []) validateAsset(category.icon);
   }
 
-  async writeHistory(theme, action, actorId, details = '', revision = 0) {
-    return WebsiteThemeHistory.create({
-      themeId: theme?._id || null,
-      themeName: theme?.name || '',
-      action,
-      actorId: actorId || null,
-      revision,
-      snapshot: theme ? (['published', 'scheduled', 'activated', 'expired', 'rolled_back'].includes(action) ? theme.publishedSnapshot || snapshotOf(theme) : snapshotOf(theme)) : null,
-      details,
-    });
+  async writeHistory() {
+    return null;
   }
 
   // ------------------------------- create website theme ----------------------------
@@ -640,10 +632,8 @@ class WebsiteThemeService {
   }
 
   // ------------------------------- get theme publishing history ----------------------------
-  async getHistory(id) {
-    const filter = {};
-    if (id) filter.themeId = id;
-    return WebsiteThemeHistory.find(filter).sort({ createdAt: -1 }).limit(100).populate('actorId', 'name email').lean();
+  async getHistory() {
+    return [];
   }
 
   // ------------------------------- reconcile theme schedule ----------------------------

@@ -55,6 +55,12 @@ const featuredSchema = new mongoose.Schema(
         ref: 'MenuItem',
       },
     ],
+    productIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product',
+      },
+    ],
   },
   {
     versionKey: false,

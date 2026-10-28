@@ -87,6 +87,35 @@ const settingSchema = new mongoose.Schema(
       ref: 'WebsiteTheme',
       default: null,
     },
+
+    // Social Proof & Urgency
+    socialProof: {
+      showSoldCounter: { type: Boolean, default: true },
+      soldTimeHours: { type: Number, default: 3, min: 1, max: 72 },
+      defaultSoldCount: { type: Number, default: 24 },
+      showReviews: { type: Boolean, default: true },
+      defaultReviewCount: { type: Number, default: 13 },
+      defaultRating: { type: Number, default: 5, min: 1, max: 5 },
+    },
+
+    // Social Media Links
+    socialMedia: {
+      instagram: {
+        type: String,
+        default: 'https://www.instagram.com/neirah.officials?igsh=MWRrcDE3YnlhaTd6eg%3D%3D&utm_source=qr',
+        trim: true,
+      },
+      facebook: {
+        type: String,
+        default: 'https://www.facebook.com/share/1Cosh9cg8h/?mibextid=wwXIfr',
+        trim: true,
+      },
+      youtube: { type: String, default: '', trim: true },
+      pinterest: { type: String, default: '', trim: true },
+      twitter: { type: String, default: '', trim: true },
+      linkedin: { type: String, default: '', trim: true },
+      whatsapp: { type: String, default: '', trim: true },
+    },
   },
   {
     versionKey: false,

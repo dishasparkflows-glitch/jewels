@@ -10,6 +10,7 @@ class FeaturedService {
       data.name = data.name.trim();
       const existing = await Featured.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
+        'meta.deletedAt': null,
       });
       if (existing) {
         throw new ApiError(409, `Featured item "${data.name}" already exists`);
@@ -18,8 +19,9 @@ class FeaturedService {
       data.name = '';
     }
 
-    const productIds = data.products || [];
-    if (Array.isArray(productIds) && productIds.length > 0) {
+    const productIds = data.productIds || data.products || [];
+    if (Array.isArray(productIds)) {
+      data.productIds = productIds;
       data.productCount = productIds.length;
     }
 
@@ -28,41 +30,31 @@ class FeaturedService {
     }
 
     const item = await Featured.create(data);
-
-    if (Array.isArray(productIds) && productIds.length > 0) {
-      await Product.updateMany(
-        { _id: { $in: productIds } },
-        { $addToSet: { featuredIds: item._id } }
-      );
-    }
-
     return item;
   }
 
   // ------------------------------- get one featured item ----------------------------
-
   async getOne(id) {
-    const item = await Featured.findOne({ _id: id })
+    const item = await Featured.findOne({ _id: id, 'meta.deletedAt': null })
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
+      .populate('productIds', '_id basicInfo pricing images colorImages')
       .lean();
     if (!item) {
       throw new ApiError(404, 'Featured item not found');
     }
-    const matchingProducts = await Product.find({
-      featuredIds: id,
-    }).select('_id basicInfo pricing images').lean();
+    const products = item.productIds || [];
+    const pIds = products.map((p) => (p._id ? p._id.toString() : p.toString()));
 
     return {
       ...item,
-      productCount: item.productCount || matchingProducts.length,
-      products: matchingProducts,
-      productIds: matchingProducts.map((p) => p._id.toString()),
+      productCount: item.productCount || pIds.length,
+      products,
+      productIds: pIds,
     };
   }
 
   // ------------------------------- get all featured items ----------------------------
-
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -81,6 +73,7 @@ class FeaturedService {
       Featured.find(filter)
         .populate('categoryId', 'name type slug')
         .populate('menuItemIds', 'title')
+        .populate('productIds', '_id basicInfo pricing images colorImages')
         .sort({ order: 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
@@ -88,24 +81,21 @@ class FeaturedService {
       Featured.countDocuments(filter),
     ]);
 
-    const itemsWithCounts = await Promise.all(
-      items.map(async (item) => {
-        const matchingProducts = await Product.find({
-          featuredIds: item._id,
-        }).select('_id').lean();
-        return {
-          ...item,
-          productCount: item.productCount !== undefined && item.productCount !== 0 ? item.productCount : matchingProducts.length,
-          productIds: matchingProducts.map((p) => p._id.toString()),
-        };
-      })
-    );
+    const formattedItems = items.map((item) => {
+      const pIds = Array.isArray(item.productIds)
+        ? item.productIds.map((p) => (p._id ? p._id.toString() : p.toString()))
+        : [];
+      return {
+        ...item,
+        productCount: item.productCount !== undefined && item.productCount !== 0 ? item.productCount : pIds.length,
+        productIds: pIds,
+      };
+    });
 
-    return { items: itemsWithCounts, pagination: getPaginationMeta(total, page, limit) };
+    return { items: formattedItems, pagination: getPaginationMeta(total, page, limit) };
   }
 
   // ------------------------------- get featured item lookup ----------------------------
-
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null, status: 'active' };
     if (queryParams.placement) {
@@ -114,35 +104,28 @@ class FeaturedService {
 
     return await Featured.find(filter)
       .sort({ order: 1, name: 1 })
-      .select('_id name placement image position status productCount')
+      .select('_id name placement image position status productCount productIds')
       .lean();
   }
 
   // ------------------------------- update featured item ----------------------------
-
   async update(id, data) {
     if (data.name && data.name.trim()) {
       data.name = data.name.trim();
       const existing = await Featured.findOne({
         name: new RegExp(`^${data.name}$`, 'i'),
         _id: { $ne: id },
+        'meta.deletedAt': null,
       });
       if (existing) {
         throw new ApiError(409, `Featured item "${data.name}" already exists`);
       }
     }
 
-    const productIds = data.products;
+    const productIds = data.productIds !== undefined ? data.productIds : data.products;
     if (Array.isArray(productIds)) {
+      data.productIds = productIds;
       data.productCount = productIds.length;
-      await Product.updateMany(
-        { featuredIds: id, _id: { $nin: productIds } },
-        { $pull: { featuredIds: id } }
-      );
-      await Product.updateMany(
-        { _id: { $in: productIds } },
-        { $addToSet: { featuredIds: id } }
-      );
     }
 
     if (data.categoryId === '') {
@@ -156,13 +139,22 @@ class FeaturedService {
     )
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
+      .populate('productIds', '_id basicInfo pricing images colorImages')
       .lean();
 
     if (!item) {
       throw new ApiError(404, 'Featured item not found');
     }
 
-    return item;
+    const products = item.productIds || [];
+    const pIds = products.map((p) => (p._id ? p._id.toString() : p.toString()));
+
+    return {
+      ...item,
+      productCount: item.productCount || pIds.length,
+      products,
+      productIds: pIds,
+    };
   }
 
   // ------------------------------- reorder featured items ----------------------------
@@ -182,7 +174,6 @@ class FeaturedService {
   }
 
   // ------------------------------- delete featured item ----------------------------
-
   async delete(id) {
     const item = await Featured.findOneAndUpdate(
       { _id: id },
@@ -193,8 +184,6 @@ class FeaturedService {
     if (!item) {
       throw new ApiError(404, 'Featured item not found');
     }
-
-    await Product.updateMany({ featuredIds: id }, { $pull: { featuredIds: id } });
 
     return { message: 'Featured item deleted successfully', id };
   }

@@ -58,7 +58,7 @@ const bannerSchema = new mongoose.Schema(
       },
       platform: {
         type: String,
-        enum: ['web', 'mobile'],
+        enum: ['web', 'mobile', 'common'],
         default: 'web',
         index: true,
       },

@@ -6,61 +6,26 @@ const ApiError = require('../../utils/ApiError');
 
 class CartService {
   /**
-   * Helper: Find existing cart by userId or sessionId
-   * If both exist, merge guest items into user cart
+   * Helper: Find existing cart by userId
    */
-  async findOrCreateCart(userId, sessionId) {
-    if (!userId && !sessionId) {
-      sessionId = `guest_${new mongoose.Types.ObjectId().toString()}`;
+  async findOrCreateCart(userId) {
+    if (!userId) {
+      return null;
     }
 
-    let userCart = null;
-    let sessionCart = null;
-
-    if (userId) {
-      userCart = await Cart.findOne({ user: userId });
-    }
-
-    if (sessionId) {
-      sessionCart = await Cart.findOne({ sessionId });
-    }
-
-    // Merge session cart into user cart if user is authenticated
-    if (userCart && sessionCart && String(userCart._id) !== String(sessionCart._id)) {
-      for (const guestItem of sessionCart.items) {
-        const existingIndex = userCart.items.findIndex(
-          (item) =>
-            String(item.productId) === String(guestItem.productId) &&
-            (item.selectedMetal || '') === (guestItem.selectedMetal || '')
-        );
-
-        if (existingIndex > -1) {
-          userCart.items[existingIndex].quantity += guestItem.quantity;
-        } else {
-          userCart.items.push(guestItem);
-        }
-      }
-      await userCart.save();
-      await Cart.deleteOne({ _id: sessionCart._id });
-      return userCart;
-    }
+    let userCart = await Cart.findOne({
+      $or: [{ user: userId }, { userId }],
+      'meta.deletedAt': null,
+    });
 
     if (userCart) {
       return userCart;
     }
 
-    if (sessionCart) {
-      if (userId) {
-        sessionCart.user = userId;
-        await sessionCart.save();
-      }
-      return sessionCart;
-    }
-
     // Create brand new cart
     const newCart = new Cart({
-      user: userId || null,
-      sessionId: sessionId || null,
+      user: userId,
+      userId: userId,
       items: [],
     });
 
@@ -72,6 +37,19 @@ class CartService {
    * Format cart output with calculated totals
    */
   formatCart(cart) {
+    if (!cart) {
+      return {
+        cartId: null,
+        userId: null,
+        items: [],
+        totalItems: 0,
+        subtotal: 0,
+        shipping: 0,
+        tax: 0,
+        total: 0,
+      };
+    }
+
     const items = cart.items || [];
     const totalItems = items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
     const subtotal = items.reduce(
@@ -113,19 +91,16 @@ class CartService {
   /**
    * Get current cart
    */
-  async getCart({ userId, sessionId }) {
-    if (!userId && !sessionId) {
-      return {
-        items: [],
-        totalItems: 0,
-        subtotal: 0,
-        shipping: 0,
-        tax: 0,
-        total: 0,
-      };
+  async getCart({ userId } = {}) {
+    if (!userId) {
+      return this.formatCart(null);
     }
 
-    const cart = await this.findOrCreateCart(userId, sessionId);
+    const cart = await this.findOrCreateCart(userId);
+    if (!cart) {
+      return this.formatCart(null);
+    }
+
     await cart.populate({
       path: 'items.product',
       select: 'basicInfo title price images category sku status metalColorIds colorImages metalColors',
@@ -137,9 +112,13 @@ class CartService {
   /**
    * Add item to cart
    */
-  async addToCart({ userId, sessionId, productData, quantity = 1, options = {} }) {
+  async addToCart({ userId, productData, quantity = 1, options = {} } = {}) {
     if (!productData || (!productData.productId && !productData.id && !productData._id)) {
       throw new ApiError(400, 'Product ID is required');
+    }
+
+    if (!userId) {
+      throw new ApiError(401, 'Please log in to add items to your cart');
     }
 
     const productIdStr = String(productData.productId || productData.id || productData._id).trim();
@@ -148,11 +127,13 @@ class CartService {
     const selectedSize = options.selectedSize || productData.selectedSize || '';
     const addedAt = productData.addedAt ? new Date(productData.addedAt) : new Date();
 
-    const cart = await this.findOrCreateCart(userId, sessionId);
-    if (userId) {
-      cart.userId = userId;
-      cart.user = userId;
+    const cart = await this.findOrCreateCart(userId);
+    if (!cart) {
+      throw new ApiError(500, 'Failed to initialize cart');
     }
+
+    cart.userId = userId;
+    cart.user = userId;
 
     let productRef = null;
     let found = null;
@@ -246,14 +227,20 @@ class CartService {
   /**
    * Update item quantity
    */
-  async updateQuantity({ userId, sessionId, productId, quantity, options = {} }) {
+  async updateQuantity({ userId, productId, quantity, options = {} } = {}) {
     if (!productId) {
       throw new ApiError(400, 'Product ID is required');
+    }
+    if (!userId) {
+      throw new ApiError(401, 'Please log in to update cart items');
     }
 
     const productIdStr = String(productId).trim();
     const newQty = parseInt(quantity, 10);
-    const cart = await this.findOrCreateCart(userId, sessionId);
+    const cart = await this.findOrCreateCart(userId);
+    if (!cart) {
+      throw new ApiError(404, 'Cart not found');
+    }
 
     const index = cart.items.findIndex(
       (item) =>
@@ -277,13 +264,19 @@ class CartService {
   /**
    * Remove item from cart
    */
-  async removeItem({ userId, sessionId, productId }) {
+  async removeItem({ userId, productId } = {}) {
     if (!productId) {
       throw new ApiError(400, 'Product ID is required');
     }
+    if (!userId) {
+      throw new ApiError(401, 'Please log in to remove cart items');
+    }
 
     const productIdStr = String(productId).trim();
-    const cart = await this.findOrCreateCart(userId, sessionId);
+    const cart = await this.findOrCreateCart(userId);
+    if (!cart) {
+      return this.formatCart(null);
+    }
 
     cart.items = cart.items.filter(
       (item) =>
@@ -297,33 +290,39 @@ class CartService {
   /**
    * Clear cart
    */
-  async clearCart({ userId, sessionId }) {
-    const cart = await this.findOrCreateCart(userId, sessionId);
-    cart.items = [];
-    await cart.save();
-    return this.formatCart(cart);
+  async clearCart({ userId } = {}) {
+    if (!userId) {
+      return this.formatCart(null);
+    }
+    const cart = await this.findOrCreateCart(userId);
+    if (cart) {
+      cart.items = [];
+      await cart.save();
+      return this.formatCart(cart);
+    }
+    return this.formatCart(null);
   }
 
   /**
    * Fast badge counts for Cart & Wishlist without populating product data
    */
-  async getCounts({ userId, sessionId }) {
+  async getCounts({ userId } = {}) {
     let cartCount = 0;
     let wishlistCount = 0;
 
-    let cart = null;
     if (userId) {
-      cart = await Cart.findOne({ user: userId }).select('items.quantity').lean();
-    }
-    if (!cart && sessionId) {
-      cart = await Cart.findOne({ sessionId }).select('items.quantity').lean();
-    }
-    if (cart?.items && Array.isArray(cart.items)) {
-      cartCount = cart.items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
-    }
+      const cart = await Cart.findOne({
+        $or: [{ user: userId }, { userId }],
+        'meta.deletedAt': null,
+      }).select('items.quantity').lean();
 
-    if (userId) {
-      const wishlist = await Wishlist.findOne({ userId }).select('productIds').lean();
+      if (cart?.items && Array.isArray(cart.items)) {
+        cartCount = cart.items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+      }
+
+      const wishlist = await Wishlist.findOne({ userId, 'meta.deletedAt': null })
+        .select('productIds')
+        .lean();
       if (wishlist?.productIds && Array.isArray(wishlist.productIds)) {
         wishlistCount = wishlist.productIds.length;
       }

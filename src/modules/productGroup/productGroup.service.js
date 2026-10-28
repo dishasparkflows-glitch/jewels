@@ -6,11 +6,18 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 // Allowed synchronizable fields mapping
 const ALLOWED_SYNC_FIELDS = {
+  gender: { path: 'basicInfo.gender', label: 'Gender' },
   description: { path: 'basicInfo.description', label: 'Description' },
+  seo: { path: 'seo', label: 'SEO Metadata' },
+  categoryIds: { path: 'categoryIds', label: 'Categories' },
+  colorImages: { path: 'colorImages', label: 'Color & Studio Images' },
+  visibility: { path: 'visibility', label: 'Visibility' },
+  productSpecifications: { path: 'productSpecifications', label: 'Product Specifications' },
+  descriptionSections: { path: 'descriptionSections', label: 'Description Sections' },
+  // Compatibility aliases
   title: { path: 'basicInfo.title', label: 'Title' },
   salePrice: { path: 'pricing.salePrice', label: 'Sale Price' },
-  images: { path: 'colorImages', label: 'Product Images' },
-  descriptionSections: { path: 'descriptionSections', label: 'Description Sections' },
+  images: { path: 'colorImages', label: 'Color & Studio Images' },
 };
 
 const PROTECTED_FIELDS = [
@@ -1089,6 +1096,7 @@ class ProductGroupService {
 
     const createdGroups = [];
     const now = new Date();
+    const usedSlugs = new Set();
 
     for (const p of products) {
       const itemName = (
@@ -1100,26 +1108,42 @@ class ProductGroupService {
         'Product'
       ).trim();
 
-      const identifier = (
+      const barcode = (
         p.ornate?.barcode ||
         p.barcode ||
+        ''
+      ).trim();
+
+      const identifier = (
+        barcode ||
         p.ornate?.tagNo ||
         p.basicInfo?.sku ||
         ''
       ).trim();
 
-      const groupName = itemName || identifier || 'Common Group';
+      // Store groupName with barcode: e.g. "92.5 L.RING - 1000000889451"
+      const groupName = identifier && !itemName.toLowerCase().includes(identifier.toLowerCase())
+        ? `${itemName} - ${identifier}`
+        : (itemName || identifier || 'Common Group');
 
       const codeStr = String(currentNum).padStart(6, '0');
       const groupCode = `CG-${codeStr}`;
       currentNum++;
 
-      const slug = p.basicInfo?.slug || (
-        (identifier ? `${itemName}-${identifier}` : itemName)
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '')
-      );
+      const baseSlug = (
+        identifier && !itemName.toLowerCase().includes(identifier.toLowerCase())
+          ? `${itemName}-${identifier}`
+          : (p.basicInfo?.slug || itemName || identifier || 'group')
+      )
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+      let slug = baseSlug || `group-${Date.now().toString(36)}`;
+      if (usedSlugs.has(slug)) {
+        slug = `${baseSlug}-${groupCode.toLowerCase()}`;
+      }
+      usedSlugs.add(slug);
 
       createdGroups.push({
         groupCode,
@@ -1380,21 +1404,36 @@ class ProductGroupService {
         let beforeVal;
         let afterVal;
 
-        if (f === 'description') {
+        if (f === 'gender') {
+          beforeVal = target.basicInfo?.gender || [];
+          afterVal = source.basicInfo?.gender || [];
+        } else if (f === 'description') {
           beforeVal = target.basicInfo?.description || '';
           afterVal = source.basicInfo?.description || '';
+        } else if (f === 'seo') {
+          beforeVal = target.seo || {};
+          afterVal = source.seo || {};
+        } else if (f === 'categoryIds') {
+          beforeVal = target.categoryIds || [];
+          afterVal = source.categoryIds || [];
+        } else if (f === 'colorImages' || f === 'images') {
+          beforeVal = target.colorImages || [];
+          afterVal = source.colorImages || [];
+        } else if (f === 'visibility') {
+          beforeVal = target.visibility || { web: true, app: true };
+          afterVal = source.visibility || { web: true, app: true };
+        } else if (f === 'productSpecifications') {
+          beforeVal = target.productSpecifications || [];
+          afterVal = source.productSpecifications || [];
+        } else if (f === 'descriptionSections') {
+          beforeVal = target.descriptionSections || [];
+          afterVal = source.descriptionSections || [];
         } else if (f === 'title') {
           beforeVal = target.basicInfo?.title || '';
           afterVal = source.basicInfo?.title || '';
         } else if (f === 'salePrice') {
           beforeVal = target.pricing?.salePrice || 0;
           afterVal = source.pricing?.salePrice || 0;
-        } else if (f === 'images') {
-          beforeVal = target.colorImages || [];
-          afterVal = source.colorImages || [];
-        } else if (f === 'descriptionSections') {
-          beforeVal = target.descriptionSections || [];
-          afterVal = source.descriptionSections || [];
         }
 
         changes.push({
@@ -1471,16 +1510,26 @@ class ProductGroupService {
     // Build update mutation object from source values
     const updatePayload = {};
     validFields.forEach((f) => {
-      if (f === 'description') {
+      if (f === 'gender') {
+        updatePayload['basicInfo.gender'] = source.basicInfo?.gender || [];
+      } else if (f === 'description') {
         updatePayload['basicInfo.description'] = source.basicInfo?.description || '';
+      } else if (f === 'seo') {
+        updatePayload.seo = source.seo || {};
+      } else if (f === 'categoryIds') {
+        updatePayload.categoryIds = source.categoryIds || [];
+      } else if (f === 'colorImages' || f === 'images') {
+        updatePayload.colorImages = source.colorImages || [];
+      } else if (f === 'visibility') {
+        updatePayload.visibility = source.visibility || { web: true, app: true };
+      } else if (f === 'productSpecifications') {
+        updatePayload.productSpecifications = source.productSpecifications || [];
+      } else if (f === 'descriptionSections') {
+        updatePayload.descriptionSections = source.descriptionSections || [];
       } else if (f === 'title') {
         updatePayload['basicInfo.title'] = source.basicInfo?.title || '';
       } else if (f === 'salePrice') {
         updatePayload['pricing.salePrice'] = source.pricing?.salePrice || 0;
-      } else if (f === 'images') {
-        updatePayload.colorImages = source.colorImages || [];
-      } else if (f === 'descriptionSections') {
-        updatePayload.descriptionSections = source.descriptionSections || [];
       }
     });
 
@@ -1495,21 +1544,36 @@ class ProductGroupService {
       validFields.forEach((f) => {
         let beforeVal;
         let afterVal;
-        if (f === 'description') {
+        if (f === 'gender') {
+          beforeVal = target.basicInfo?.gender || [];
+          afterVal = source.basicInfo?.gender || [];
+        } else if (f === 'description') {
           beforeVal = target.basicInfo?.description || '';
           afterVal = source.basicInfo?.description || '';
+        } else if (f === 'seo') {
+          beforeVal = target.seo || {};
+          afterVal = source.seo || {};
+        } else if (f === 'categoryIds') {
+          beforeVal = target.categoryIds || [];
+          afterVal = source.categoryIds || [];
+        } else if (f === 'colorImages' || f === 'images') {
+          beforeVal = target.colorImages || [];
+          afterVal = source.colorImages || [];
+        } else if (f === 'visibility') {
+          beforeVal = target.visibility || { web: true, app: true };
+          afterVal = source.visibility || { web: true, app: true };
+        } else if (f === 'productSpecifications') {
+          beforeVal = target.productSpecifications || [];
+          afterVal = source.productSpecifications || [];
+        } else if (f === 'descriptionSections') {
+          beforeVal = target.descriptionSections || [];
+          afterVal = source.descriptionSections || [];
         } else if (f === 'title') {
           beforeVal = target.basicInfo?.title || '';
           afterVal = source.basicInfo?.title || '';
         } else if (f === 'salePrice') {
           beforeVal = target.pricing?.salePrice || 0;
           afterVal = source.pricing?.salePrice || 0;
-        } else if (f === 'images') {
-          beforeVal = target.colorImages || [];
-          afterVal = source.colorImages || [];
-        } else if (f === 'descriptionSections') {
-          beforeVal = target.descriptionSections || [];
-          afterVal = source.descriptionSections || [];
         }
 
         fieldChanges.push({ field: f, before: beforeVal, after: afterVal });

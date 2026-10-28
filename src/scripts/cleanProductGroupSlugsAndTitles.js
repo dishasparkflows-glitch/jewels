@@ -32,10 +32,14 @@ async function cleanGroups() {
     // Check if group is single-product
     if (group.productIds?.length === 1) {
       const prodId = group.primaryProductId || group.productIds[0];
-      const prod = await Product.findById(prodId).select('basicInfo ornate').lean();
+      const prod = await Product.findById(prodId).select('basicInfo ornate barcode').lean();
       if (prod) {
-        if (prod.basicInfo?.title) {
-          newName = prod.basicInfo.title;
+        const title = (prod.basicInfo?.title || group.groupName || '').trim();
+        const barcode = (prod.ornate?.barcode || prod.barcode || prod.ornate?.tagNo || '').trim();
+        if (barcode && !title.toLowerCase().includes(barcode.toLowerCase())) {
+          newName = `${title} - ${barcode}`;
+        } else {
+          newName = title || group.groupName;
         }
         if (prod.basicInfo?.slug) {
           newSlug = prod.basicInfo.slug;

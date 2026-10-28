@@ -3,35 +3,29 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 
 class CartController {
-  // Helper to extract user identity or session
+  // Helper to extract user identity
   getIdentity(req) {
-    const userId = req.user?._id || null;
-    const sessionId =
-      req.headers['x-session-id'] ||
-      req.query.sessionId ||
-      req.body.sessionId ||
-      null;
-
-    return { userId, sessionId };
+    const userId = req.user?._id || req.body?.userId || req.query?.userId || null;
+    return { userId };
   }
 
   // ------------------------------- get cart & wishlist counts ----------------------------
   getCounts = catchAsync(async (req, res) => {
-    const { userId, sessionId } = this.getIdentity(req);
-    const data = await cartService.getCounts({ userId, sessionId });
+    const { userId } = this.getIdentity(req);
+    const data = await cartService.getCounts({ userId });
     ApiResponse.success(res, data, 'Counts retrieved successfully');
   });
 
   // ------------------------------- get cart ----------------------------
   getCart = catchAsync(async (req, res) => {
-    const { userId, sessionId } = this.getIdentity(req);
-    const data = await cartService.getCart({ userId, sessionId });
+    const { userId } = this.getIdentity(req);
+    const data = await cartService.getCart({ userId });
     ApiResponse.success(res, data, 'Cart retrieved successfully');
   });
 
   // ------------------------------- add to cart ----------------------------
   addToCart = catchAsync(async (req, res) => {
-    const { userId: authUserId, sessionId } = this.getIdentity(req);
+    const { userId: authUserId } = this.getIdentity(req);
     const {
       productId,
       quantity = 1,
@@ -64,7 +58,6 @@ class CartController {
 
     const data = await cartService.addToCart({
       userId: effectiveUserId,
-      sessionId,
       productData: {
         productId: resolvedProductId,
         price: resolvedPrice,
@@ -85,7 +78,6 @@ class CartController {
       const { emitCartUpdate } = require('../../socket/viewers.socket');
       emitCartUpdate({
         userId: effectiveUserId,
-        sessionId,
         totalItems: data.totalItems,
       });
     } catch {}
@@ -95,12 +87,11 @@ class CartController {
 
   // ------------------------------- update quantity ----------------------------
   updateQuantity = catchAsync(async (req, res) => {
-    const { userId, sessionId } = this.getIdentity(req);
+    const { userId } = this.getIdentity(req);
     const { productId, quantity, options } = req.body;
 
     const data = await cartService.updateQuantity({
       userId,
-      sessionId,
       productId: productId || req.params.productId,
       quantity,
       options,
@@ -110,7 +101,6 @@ class CartController {
       const { emitCartUpdate } = require('../../socket/viewers.socket');
       emitCartUpdate({
         userId,
-        sessionId,
         totalItems: data.totalItems,
       });
     } catch {}
@@ -120,12 +110,11 @@ class CartController {
 
   // ------------------------------- remove item ----------------------------
   removeItem = catchAsync(async (req, res) => {
-    const { userId, sessionId } = this.getIdentity(req);
+    const { userId } = this.getIdentity(req);
     const { productId } = req.params;
 
     const data = await cartService.removeItem({
       userId,
-      sessionId,
       productId,
     });
 
@@ -133,7 +122,6 @@ class CartController {
       const { emitCartUpdate } = require('../../socket/viewers.socket');
       emitCartUpdate({
         userId,
-        sessionId,
         totalItems: data.totalItems,
       });
     } catch {}
@@ -143,14 +131,13 @@ class CartController {
 
   // ------------------------------- clear cart ----------------------------
   clearCart = catchAsync(async (req, res) => {
-    const { userId, sessionId } = this.getIdentity(req);
-    const data = await cartService.clearCart({ userId, sessionId });
+    const { userId } = this.getIdentity(req);
+    const data = await cartService.clearCart({ userId });
 
     try {
       const { emitCartUpdate } = require('../../socket/viewers.socket');
       emitCartUpdate({
         userId,
-        sessionId,
         totalItems: 0,
       });
     } catch {}

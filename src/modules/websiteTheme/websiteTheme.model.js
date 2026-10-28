@@ -149,18 +149,7 @@ const websiteThemeSettingsSchema = new mongoose.Schema({
   revision: { type: Number, default: 0 },
 }, { versionKey: false, timestamps: true });
 
-const websiteThemeHistorySchema = new mongoose.Schema({
-  themeId: { type: mongoose.Schema.Types.ObjectId, ref: 'WebsiteTheme', default: null },
-  themeName: { type: String, default: '' },
-  action: { type: String, enum: ['created', 'duplicated', 'updated', 'scheduled', 'published', 'activated', 'expired', 'rolled_back', 'archived', 'deleted'], required: true },
-  actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  revision: { type: Number, default: 0 },
-  snapshot: { type: mongoose.Schema.Types.Mixed, default: null },
-  details: { type: String, default: '' },
-}, { versionKey: false, timestamps: true });
-
 module.exports = {
   WebsiteTheme: mongoose.models.WebsiteTheme || mongoose.model('WebsiteTheme', websiteThemeSchema, 'website_themes'),
   WebsiteThemeSettings: mongoose.models.WebsiteThemeSettings || mongoose.model('WebsiteThemeSettings', websiteThemeSettingsSchema, 'website_theme_settings'),
-  WebsiteThemeHistory: mongoose.models.WebsiteThemeHistory || mongoose.model('WebsiteThemeHistory', websiteThemeHistorySchema, 'website_theme_histories'),
 };

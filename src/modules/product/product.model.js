@@ -17,7 +17,6 @@ const basicInfoSchema = new mongoose.Schema({
 }, { _id: false });
 
 const pricingSchema = new mongoose.Schema({
-  calculationMode: { type: String, enum: ['manual', 'automatic'], default: 'manual' },
   baseCarat: { type: Number, min: 0, default: 1 },
   gstPercentage: { type: Number, min: 0, default: 3 },
   mrp: { type: Number, default: 0 },
@@ -90,13 +89,6 @@ const productSchema = new mongoose.Schema(
       type: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Category',
-      }],
-      default: undefined,
-    },
-    featuredIds: {
-      type: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Featured',
       }],
       default: undefined,
     },
@@ -311,6 +303,20 @@ const productSchema = new mongoose.Schema(
         description: { type: String, trim: true },
       }],
       default: undefined,
+    },
+
+    // ── Social Proof & Urgency (Demo Metrics) ─────────────────
+    demoMetrics: {
+      soldCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      reviewCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
     },
   },
   {

@@ -84,11 +84,6 @@ const cartSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
-    sessionId: {
-      type: String,
-      default: null,
-      index: true,
-    },
     items: [cartItemSchema],
   },
   {
@@ -96,7 +91,7 @@ const cartSchema = new mongoose.Schema(
   }
 );
 
-cartSchema.index({ user: 1, sessionId: 1 });
+cartSchema.index({ user: 1 });
 
 cartSchema.plugin(metaPlugin);
 

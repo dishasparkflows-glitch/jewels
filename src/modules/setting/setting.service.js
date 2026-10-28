@@ -29,6 +29,28 @@ class SettingService {
       } catch (_) {}
     }
 
+    if (!setting.socialProof) {
+      setting.socialProof = {
+        showSoldCounter: true,
+        soldTimeHours: 3,
+        defaultSoldCount: 24,
+        showReviews: true,
+        defaultReviewCount: 13,
+        defaultRating: 5,
+      };
+    }
+
+    if (!setting.socialMedia) {
+      setting.socialMedia = {
+        instagram: 'https://www.instagram.com/neirah.officials?igsh=MWRrcDE3YnlhaTd6eg%3D%3D&utm_source=qr',
+        facebook: 'https://www.facebook.com/share/1Cosh9cg8h/?mibextid=wwXIfr',
+        youtube: '',
+        pinterest: '',
+        twitter: '',
+        linkedin: '',
+        whatsapp: '',
+      };
+    }
     return setting;
   }
 
@@ -53,6 +75,20 @@ class SettingService {
     if (!settings) {
       settings = await Setting.create(data);
     } else {
+      if (data.socialMedia) {
+        settings.socialMedia = {
+          ...(settings.socialMedia?.toObject ? settings.socialMedia.toObject() : (settings.socialMedia || {})),
+          ...data.socialMedia,
+        };
+        settings.markModified('socialMedia');
+      }
+      if (data.socialProof) {
+        settings.socialProof = {
+          ...(settings.socialProof?.toObject ? settings.socialProof.toObject() : (settings.socialProof || {})),
+          ...data.socialProof,
+        };
+        settings.markModified('socialProof');
+      }
       Object.assign(settings, data);
       await settings.save();
     }

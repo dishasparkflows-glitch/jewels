@@ -19,15 +19,29 @@ const getPagination = (query) => {
 /**
  * Build pagination meta for response
  */
-const getPaginationMeta = (totalDocs, page, limit) => {
-  const totalPages = Math.ceil(totalDocs / limit);
+const getPaginationMeta = (totalDocsOrObj, pageArg, limitArg) => {
+  let totalDocs = totalDocsOrObj;
+  let page = pageArg;
+  let limit = limitArg;
+
+  if (typeof totalDocsOrObj === 'object' && totalDocsOrObj !== null) {
+    totalDocs = totalDocsOrObj.totalDocs ?? totalDocsOrObj.total ?? 0;
+    page = totalDocsOrObj.page ?? pageArg ?? 1;
+    limit = totalDocsOrObj.limit ?? limitArg ?? PAGINATION.DEFAULT_LIMIT;
+  }
+
+  const safeLimit = Math.max(1, parseInt(limit) || PAGINATION.DEFAULT_LIMIT);
+  const safeTotalDocs = Math.max(0, parseInt(totalDocs) || 0);
+  const safePage = Math.max(1, parseInt(page) || 1);
+  const totalPages = Math.ceil(safeTotalDocs / safeLimit) || 1;
+
   return {
-    currentPage: page,
+    currentPage: safePage,
     totalPages,
-    totalDocs,
-    limit,
-    hasNextPage: page < totalPages,
-    hasPrevPage: page > 1,
+    totalDocs: safeTotalDocs,
+    limit: safeLimit,
+    hasNextPage: safePage < totalPages,
+    hasPrevPage: safePage > 1,
   };
 };
 

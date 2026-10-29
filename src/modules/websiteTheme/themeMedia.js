@@ -242,16 +242,41 @@ function storefront(module) {
     }
 
     try {
-      // Resolve lazily to avoid a circular import with WebsiteThemeService, which
-      // imports this module for save/resolve operations.
+      const themeMediaMappingService = require('./themeMediaMapping.service');
       const websiteThemeService = require('./websiteTheme.service');
       const publicConfig = await websiteThemeService.getPublicConfig();
       const rows = publicConfig.theme?.config?.mediaOverrides || [];
       const originalJson = res.json.bind(res);
 
-      res.json = (body) => {
-        const clonedBody = JSON.parse(JSON.stringify(body));
-        return originalJson(apply(clonedBody, module, rows));
+      res.json = async function (body) {
+        try {
+          if (!body || typeof body !== 'object') {
+            return originalJson(body);
+          }
+
+          let clonedBody = JSON.parse(JSON.stringify(body));
+
+          // 1. Resolve dynamic ThemeMediaMapping records for the active theme
+          if (Array.isArray(clonedBody.data)) {
+            clonedBody.data = await themeMediaMappingService.resolveRecordsForStorefront(module, clonedBody.data);
+          } else if (Array.isArray(clonedBody.data?.items)) {
+            clonedBody.data.items = await themeMediaMappingService.resolveRecordsForStorefront(module, clonedBody.data.items);
+          } else if (Array.isArray(clonedBody)) {
+            clonedBody = await themeMediaMappingService.resolveRecordsForStorefront(module, clonedBody);
+          } else if (clonedBody.data && typeof clonedBody.data === 'object' && clonedBody.data._id) {
+            clonedBody.data = await themeMediaMappingService.resolveRecordsForStorefront(module, clonedBody.data);
+          }
+
+          // 2. Legacy fallback
+          if (rows.length > 0) {
+            clonedBody = apply(clonedBody, module, rows);
+          }
+
+          return originalJson(clonedBody);
+        } catch (err) {
+          console.error('[ThemeMedia storefront resolution error]', err);
+          return originalJson(body);
+        }
       };
 
       next();

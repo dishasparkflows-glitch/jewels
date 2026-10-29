@@ -298,12 +298,7 @@ class GalleryService {
       counts,
       themes: themesLookup,
       total,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum) || 1,
-      },
+      pagination: getPaginationMeta(total, pageNum, limitNum),
     };
   }
 

@@ -107,7 +107,7 @@ class AnalyticsService {
     const client = this.getClient();
 
     if (!client) {
-      const sample = this._getSampleOverview();
+      const sample = this._getSampleOverview(startDate);
       return {
         configured: false,
         propertyId: config.propertyId,
@@ -131,9 +131,10 @@ class AnalyticsService {
 
       // 2. Previous period for trend calculation (same number of days)
       const prevStartDate = this._getPreviousPeriodStartDate(startDate);
+      const prevEndDate = startDate === 'today' ? 'yesterday' : startDate;
       const [prevResponse] = await client.runReport({
         property: `properties/${config.propertyId}`,
-        dateRanges: [{ startDate: prevStartDate, endDate: startDate }],
+        dateRanges: [{ startDate: prevStartDate, endDate: prevEndDate }],
         metrics: [
           { name: 'totalUsers' },
           { name: 'sessions' },
@@ -190,27 +191,30 @@ class AnalyticsService {
     if (!client) {
       return {
         configured: false,
-        timeline: this._getSampleTimeline(),
+        timeline: this._getSampleTimeline(startDate),
       };
     }
 
     try {
+      const isToday = startDate === 'today';
+      const dimensionName = isToday ? 'hour' : 'date';
       const [response] = await client.runReport({
         property: `properties/${config.propertyId}`,
         dateRanges: [{ startDate, endDate }],
-        dimensions: [{ name: 'date' }],
+        dimensions: [{ name: dimensionName }],
         metrics: [
           { name: 'activeUsers' },
           { name: 'sessions' },
           { name: 'screenPageViews' },
         ],
-        orderBys: [{ dimension: { dimensionName: 'date' }, desc: false }],
+        orderBys: [{ dimension: { dimensionName }, desc: false }],
       });
 
       const timeline = (response.rows || []).map((row) => {
         const rawDate = row.dimensionValues[0]?.value || '';
-        // Format YYYYMMDD to YYYY-MM-DD
-        const formattedDate = rawDate.length === 8
+        const formattedDate = isToday
+          ? `${rawDate.padStart(2, '0')}:00`
+          : rawDate.length === 8
           ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
           : rawDate;
 
@@ -228,7 +232,7 @@ class AnalyticsService {
       return {
         configured: false,
         error: err.message,
-        timeline: this._getSampleTimeline(),
+        timeline: this._getSampleTimeline(startDate),
       };
     }
   }
@@ -465,7 +469,23 @@ class AnalyticsService {
     }
   }
 
-  _getSampleOverview() {
+  _getSampleOverview(startDate = '30daysAgo') {
+    if (startDate === 'today') {
+      return {
+        summary: {
+          totalUsers: 148,
+          totalSessions: 220,
+          pageViews: 690,
+          averageSessionDuration: '3m 12s',
+          engagementRate: '71.2%',
+          trends: {
+            users: '+8.4%',
+            sessions: '+12.1%',
+            pageViews: '+15.3%',
+          },
+        },
+      };
+    }
     return {
       summary: {
         totalUsers: 1420,
@@ -482,10 +502,23 @@ class AnalyticsService {
     };
   }
 
-  _getSampleTimeline() {
+  _getSampleTimeline(startDate = '30daysAgo') {
     const list = [];
     const now = new Date();
-    for (let i = 14; i >= 0; i--) {
+    if (startDate === 'today') {
+      const hours = ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'];
+      for (let i = 0; i < hours.length; i++) {
+        list.push({
+          date: hours[i],
+          users: 8 + Math.floor(Math.sin(i) * 5) + (i % 3) * 3,
+          sessions: 12 + Math.floor(Math.sin(i) * 6) + (i % 3) * 4,
+          pageViews: 35 + Math.floor(Math.sin(i) * 15) + (i % 3) * 10,
+        });
+      }
+      return list;
+    }
+    const days = startDate === '7daysAgo' ? 7 : startDate === '90daysAgo' ? 90 : 14;
+    for (let i = days; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
       const iso = d.toISOString().split('T')[0];
@@ -524,6 +557,7 @@ class AnalyticsService {
   }
 
   _getPreviousPeriodStartDate(startDate) {
+    if (startDate === 'today') return 'yesterday';
     if (startDate === '7daysAgo') return '14daysAgo';
     if (startDate === '30daysAgo') return '60daysAgo';
     if (startDate === '90daysAgo') return '180daysAgo';

@@ -59,6 +59,8 @@ const productGroupSchema = new mongoose.Schema(
 
 productGroupSchema.index({ slug: 1 });
 productGroupSchema.index({ productIds: 1 });
+productGroupSchema.index({ primaryProductId: 1 });
+productGroupSchema.index({ status: 1, 'meta.deletedAt': 1 });
 productGroupSchema.index({ 'meta.createdAt': -1 });
 
 productGroupSchema.pre('save', function (next) {

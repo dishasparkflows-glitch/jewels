@@ -126,7 +126,13 @@ class ProductService {
       }
     }
 
-    return await Product.create(await this.applyPricing(data));
+    const created = await Product.create(await this.applyPricing(data));
+    try {
+      await productGroupService.refreshAffectedGroups(created._id);
+    } catch (err) {
+      console.error('Error refreshing groups after product creation:', err);
+    }
+    return created;
   }
 
   async _getWishlistSet(userId) {
@@ -367,269 +373,71 @@ class ProductService {
       ];
     }
 
-    // Grouping support: if includeGroups is requested, group products into representative group cards
-    let groupCards = [];
-    if (queryParams.includeGroups === 'true') {
+    // Grouping support using existing product_groups collection (zero $lookup, zero cache collection)
+    let groupMetaByRepId = new Map();
+    const shouldIncludeGroups = queryParams.includeGroups === 'true' || queryParams.includeGroups === true || queryParams.view === 'storefront';
+    if (shouldIncludeGroups) {
       try {
-        const activeGroups = await ProductGroup.find({
+        // 1. Find all active groups (filter by category if requested)
+        const groupFilter = {
           status: 'active',
-          'meta.deletedAt': null
-        })
-          .populate({
-            path: 'productIds',
-            select:
-              '_id basicInfo pricing specifications ornate colorImages metalColorIds status stockStatus productType isOrnate categoryIds menuItemIds meta',
-            populate: {
-              path: 'metalColorIds colorImages.metalColorId',
-              select: 'name colorCode colorCodeEnd code hex'
-            }
-          })
+          'meta.deletedAt': null,
+        };
+
+        if (queryParams.category) {
+          const catProductIds = await Product.find({
+            categoryIds: queryParams.category,
+            'meta.deletedAt': null,
+          }).distinct('_id');
+
+          groupFilter.$or = [
+            { categoryId: queryParams.category },
+            { productIds: { $in: catProductIds } },
+          ];
+        }
+
+        const activeGroups = await ProductGroup.find(groupFilter)
+          .select('_id groupCode groupName slug description productIds primaryProductId representativeMode categoryId')
           .lean();
 
-        const groupedProductIds = [];
-
+        // 2. Resolve representative product IDs for active groups
+        const repProductIds = [];
         for (const group of activeGroups) {
-          if (!group.productIds || !group.productIds.length) continue;
-          group.productIds.forEach((p) => {
-            if (p?._id) groupedProductIds.push(p._id);
-          });
-
-          const summary = productGroupService.computeGroupSummary(
-            group,
-            group.productIds
-          );
-          if (!summary.representative) continue;
-
-          const rep = summary.representative;
-          const allCategoryIds = [
-            ...new Set(
-              group.productIds.flatMap((p) => (p.categoryIds || []).map(String))
-            )
-          ];
-          const allMenuItemIds = [
-            ...new Set(
-              group.productIds.flatMap((p) => (p.menuItemIds || []).map(String))
-            )
-          ];
-          const allGenders = [
-            ...new Set(
-              group.productIds.flatMap((p) => {
-                const g = p.basicInfo?.gender;
-                return Array.isArray(g) ? g : g ? [g] : [];
-              })
-            )
-          ];
-
-          const repCategoryIds = (rep.categoryIds || []).map(String);
-          const repMenuItemIds = (rep.menuItemIds || []).map(String);
-          const repGenders = Array.isArray(rep.basicInfo?.gender)
-            ? rep.basicInfo.gender
-            : rep.basicInfo?.gender
-            ? [rep.basicInfo.gender]
-            : Array.isArray(rep.gender)
-            ? rep.gender
-            : rep.gender
-            ? [rep.gender]
-            : [];
-
-          const groupCategoryIds = [
-            ...new Set([
-              ...allCategoryIds,
-              ...repCategoryIds,
-              ...(group.categoryId ? [String(group.categoryId)] : [])
-            ])
-          ];
-          const groupMenuItemIds = [
-            ...new Set([
-              ...allMenuItemIds,
-              ...repMenuItemIds,
-              ...(group.menuItemId ? [String(group.menuItemId)] : [])
-            ])
-          ];
-          const groupGender = [
-            ...new Set([
-              ...allGenders.map(String),
-              ...repGenders.map(String)
-            ])
-          ];
-
-          // 1. Filter by category
-          if (queryParams.category) {
-            const requestedCat = String(queryParams.category);
-            if (!groupCategoryIds.includes(requestedCat)) {
-              continue;
-            }
+          let repId = group.primaryProductId;
+          if (!repId && group.productIds?.length) {
+            repId = await productGroupService.recalculateGroupRepresentative(group._id);
           }
-
-          // 2. Filter by menuItem
-          if (queryParams.menuItem) {
-            const requestedMenuItem = String(queryParams.menuItem);
-            if (!groupMenuItemIds.includes(requestedMenuItem)) {
-              continue;
-            }
-          }
-
-          // 3. Filter by status
-          const reqStatus = queryParams.view === 'storefront' ? 'approved' : queryParams.status;
-          if (reqStatus && reqStatus !== 'all') {
-            const targetStatus = String(reqStatus).toLowerCase();
-            const repStatus = String(rep.status || '').toLowerCase();
-            if (repStatus !== targetStatus) {
-              continue;
-            }
-          }
-
-          // 4. Filter by productType
-          if (queryParams.productType && queryParams.productType !== 'all') {
-            const reqPt = String(queryParams.productType).toLowerCase();
-            const repPt = String(rep.productType || '').toLowerCase();
-            const hasPt = group.productIds.some(
-              (p) => String(p.productType || '').toLowerCase() === reqPt
-            ) || repPt === reqPt;
-            if (!hasPt) {
-              continue;
-            }
-            if (reqPt === 'silver' && !isOrnateSpecified) {
-              const hasNonOrnateSilver = group.productIds.some(
-                (p) => String(p.productType || '').toLowerCase() === 'silver' && p.isOrnate !== true
-              ) || (repPt === 'silver' && rep.isOrnate !== true);
-              if (!hasNonOrnateSilver) {
-                continue;
-              }
-            }
-          }
-
-          // 5. Filter by isOrnate
-          if (isOrnateSpecified) {
-            const isO = queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
-            const matchesOrnate = isO
-              ? (rep.isOrnate === true || group.productIds.some((p) => p.isOrnate === true))
-              : (rep.isOrnate !== true || group.productIds.some((p) => p.isOrnate !== true));
-            if (!matchesOrnate) {
-              continue;
-            }
-          }
-
-          // 6. Filter by shopFor / gender
-          const shopForGenders = getShopForGenders(queryParams.shopFor);
-          if (shopForGenders.length > 0) {
-            const matchesShopFor = groupGender.some((g) =>
-              shopForGenders.some((sfg) => String(sfg).toLowerCase() === String(g).toLowerCase())
-            );
-            if (!matchesShopFor) {
-              continue;
-            }
-          }
-          if (queryParams.gender) {
-            const targetGender = String(queryParams.gender).toLowerCase();
-            const matchesGender = groupGender.some(
-              (g) => String(g).toLowerCase() === targetGender
-            );
-            if (!matchesGender) {
-              continue;
-            }
-          }
-
-          // 7. Filter by search
-          if (queryParams.search) {
-            const term = queryParams.search.trim().toLowerCase();
-            const matchesSearch =
-              (group.groupName && group.groupName.toLowerCase().includes(term)) ||
-              (group.groupCode && group.groupCode.toLowerCase().includes(term)) ||
-              (group.description && group.description.toLowerCase().includes(term)) ||
-              (rep.basicInfo?.title && rep.basicInfo.title.toLowerCase().includes(term)) ||
-              (rep.basicInfo?.sku && rep.basicInfo.sku.toLowerCase().includes(term)) ||
-              group.productIds.some(
-                (p) =>
-                  (p.basicInfo?.title && p.basicInfo.title.toLowerCase().includes(term)) ||
-                  (p.basicInfo?.sku && p.basicInfo.sku.toLowerCase().includes(term)) ||
-                  (p.ornate?.tagNo && p.ornate.tagNo.toLowerCase().includes(term)) ||
-                  (p.ornate?.itemCode && p.ornate.itemCode.toLowerCase().includes(term)) ||
-                  (p.ornate?.groupName && p.ornate.groupName.toLowerCase().includes(term))
-              );
-            if (!matchesSearch) {
-              continue;
-            }
-          }
-
-          // 8. Filter by price range
-          const effectiveGroupPrice = summary.representativePrice || summary.maxPrice || 0;
-          if (queryParams.minPrice !== undefined && queryParams.minPrice !== '') {
-            const minP = Number(queryParams.minPrice);
-            if (Number.isFinite(minP)) {
-              if (effectiveGroupPrice < minP && (summary.maxPrice || 0) < minP) {
-                continue;
-              }
-            }
-          }
-          if (queryParams.maxPrice !== undefined && queryParams.maxPrice !== '') {
-            const maxP = Number(queryParams.maxPrice);
-            if (Number.isFinite(maxP)) {
-              if (effectiveGroupPrice > maxP && (summary.minPrice || 0) > maxP) {
-                continue;
-              }
-            }
-          }
-
-          const repSlug = rep.basicInfo?.slug || (group.slug ? group.slug.replace(/-\d{6}$/, '') : '');
-          const cleanGroupTitle = (group.productIds?.length === 1 && rep.basicInfo?.title)
-            ? rep.basicInfo.title
-            : (group.groupName ? group.groupName.replace(/\s+-\s+\d+$/, '') : group.groupName);
-
-          groupCards.push({
-            _id: group._id,
-            isGroup: true,
-            groupCode: group.groupCode,
-            groupName: cleanGroupTitle,
-            name: cleanGroupTitle,
-            title: cleanGroupTitle,
-            slug: repSlug,
-            basicInfo: {
-              title: cleanGroupTitle,
-              slug: repSlug,
-              description: group.description || rep.basicInfo?.description || '',
-              gender: groupGender,
-            },
-            pricing: {
-              salePrice: summary.representativePrice,
-              mrp: rep.pricing?.mrp || summary.representativePrice,
-              minPrice: summary.minPrice,
-              maxPrice: summary.maxPrice
-            },
-            variantCount: summary.eligibleCount,
-            colorImages: rep.colorImages,
-            metalColorIds: rep.metalColorIds,
-            metalColors: rep.metalColors,
-            images: rep.images,
-            ornate: rep.ornate,
-            stockStatus: rep.stockStatus,
-            status: 'approved',
-            productType: rep.productType,
-            isOrnate: rep.isOrnate,
-            categoryIds: groupCategoryIds,
-            menuItemIds: groupMenuItemIds,
-            gender: groupGender,
-            memberProductIds: group.productIds.map((p) => p._id),
-            representative: rep,
-            meta: group.meta
-          });
-        }
-
-        if (queryParams.sort) {
-          if (queryParams.sort === 'price-low' || queryParams.sort === 'price_asc') {
-            groupCards.sort((a, b) => (a.pricing?.salePrice || 0) - (b.pricing?.salePrice || 0));
-          } else if (queryParams.sort === 'price-high' || queryParams.sort === 'price_desc') {
-            groupCards.sort((a, b) => (b.pricing?.salePrice || 0) - (a.pricing?.salePrice || 0));
-          } else if (queryParams.sort === 'name_asc') {
-            groupCards.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          if (repId) {
+            repProductIds.push(repId);
+            groupMetaByRepId.set(String(repId), group);
           }
         }
 
-        if (groupedProductIds.length > 0) {
-          filter._id = { $nin: groupedProductIds };
+        // 3. Union of all member product IDs across all active groups
+        const allGroupedMemberIds = await ProductGroup.distinct('productIds', {
+          status: 'active',
+          'meta.deletedAt': null,
+        });
+
+        // 4. Construct listing condition: representatives of active groups + eligible standalone products
+        const standaloneFilter = {
+          _id: { $nin: allGroupedMemberIds },
+        };
+        if (queryParams.category) {
+          standaloneFilter.categoryIds = queryParams.category;
+        }
+
+        filter.$or = [
+          { _id: { $in: repProductIds } },
+          standaloneFilter,
+        ];
+
+        // Clear top-level categoryIds as it is handled by the $or branches
+        if (queryParams.category) {
+          delete filter.categoryIds;
         }
       } catch (err) {
-        console.error('Error folding groups in getAll:', err);
+        console.error('Error querying grouped products in getAll:', err);
       }
     }
 
@@ -720,41 +528,33 @@ class ProductService {
       };
     };
 
-    if (queryParams.includeGroups === 'true' && groupCards.length > 0) {
-      const displayedGroupCards = page === 1 ? groupCards : [];
-      let combined = [
-        ...displayedGroupCards,
-        ...items.map(withColorStatuses)
-      ];
-
-      // 1st display gold products, then silver products (unless explicit price sort)
-      const isPriceSort = queryParams.sort && ['price-low', 'price-high', 'price_asc', 'price_desc'].includes(queryParams.sort);
-      if (!isPriceSort) {
-        combined.sort((a, b) => {
-          const isGoldA = (a.productType || a.representative?.productType || '').toLowerCase() === 'gold' ? 0 : 1;
-          const isGoldB = (b.productType || b.representative?.productType || '').toLowerCase() === 'gold' ? 0 : 1;
-          return isGoldA - isGoldB;
-        });
+    const enrichedItems = (items || []).map((rawItem) => {
+      const item = { ...rawItem };
+      const group = groupMetaByRepId.get(String(item._id));
+      if (group) {
+        item.isGroup = true;
+        item.groupCode = group.groupCode;
+        item.groupName = group.groupName;
+        item.title = group.groupName || item.basicInfo?.title;
+        item.name = group.groupName || item.basicInfo?.title;
+        if (item.basicInfo) {
+          item.basicInfo = { ...item.basicInfo, title: group.groupName || item.basicInfo?.title };
+        }
+        item.memberProductIds = group.productIds;
+        item.variantCount = group.productIds ? group.productIds.length : 1;
       }
-
-      const finalItems = (queryParams.view === 'storefront'
-        ? combined.map(formatStorefrontProduct)
-        : combined).map(markInWishlist);
-      return {
-        items: finalItems,
-        pagination: getPaginationMeta(total + groupCards.length, page, limit),
-        facets: shopFor ? { shopFor } : undefined
-      };
-    }
+      return withColorStatuses(item);
+    });
 
     const finalItems = (queryParams.view === 'storefront'
-      ? items.map(formatStorefrontProduct)
-      : items.map(withColorStatuses)).map(markInWishlist);
+      ? enrichedItems.map(formatStorefrontProduct)
+      : enrichedItems).map(markInWishlist);
 
-    if (!priceSort) {
+    const isPriceSort = queryParams.sort && ['price-low', 'price-high', 'price_asc', 'price_desc'].includes(queryParams.sort);
+    if (!isPriceSort) {
       finalItems.sort((a, b) => {
-        const isGoldA = (a.productType || '').toLowerCase() === 'gold' ? 0 : 1;
-        const isGoldB = (b.productType || '').toLowerCase() === 'gold' ? 0 : 1;
+        const isGoldA = (a.productType || a.representative?.productType || '').toLowerCase() === 'gold' ? 0 : 1;
+        const isGoldB = (b.productType || b.representative?.productType || '').toLowerCase() === 'gold' ? 0 : 1;
         return isGoldA - isGoldB;
       });
     }
@@ -792,12 +592,6 @@ class ProductService {
           { 'basicInfo.slug': searchRegex },
           { 'basicInfo.sku': searchRegex },
           { 'basicInfo.description': searchRegex },
-          { 'ornate.tagNo': searchRegex },
-          { 'ornate.itemCode': searchRegex },
-          { 'ornate.barcode': searchRegex },
-          { 'ornate.groupName': searchRegex },
-          { 'ornate.customGroupName': searchRegex },
-          { 'ornate.metalName': searchRegex },
           { productType: searchRegex }
         ]
       });
@@ -840,100 +634,65 @@ class ProductService {
     }
 
     // Support representative group cards when requested (defaults to true for storefront)
-    let groupCards = [];
-    const includeGroups = queryParams.includeGroups === 'true' || queryParams.includeGroups === true;
-    const groupedProductIds = [];
+    let groupMetaByRepId = new Map();
+    const includeGroups = queryParams.includeGroups === 'true' || queryParams.includeGroups === true || queryParams.includeGroups === undefined;
 
     if (includeGroups) {
       try {
         const groupFilter = {
           status: 'active',
-          'meta.deletedAt': null
+          'meta.deletedAt': null,
         };
-        if (searchRegex) {
-          groupFilter.name = searchRegex;
+
+        if (queryParams.category) {
+          const catProductIds = await Product.find({
+            categoryIds: queryParams.category,
+            'meta.deletedAt': null,
+          }).distinct('_id');
+
+          groupFilter.$or = [
+            { categoryId: queryParams.category },
+            { productIds: { $in: catProductIds } },
+          ];
         }
 
         const activeGroups = await ProductGroup.find(groupFilter)
-          .populate({
-            path: 'productIds',
-            select:
-              '_id basicInfo pricing specifications ornate colorImages metalColorIds status stockStatus productType isOrnate categoryIds menuItemIds meta',
-            populate: {
-              path: 'metalColorIds colorImages.metalColorId',
-              select: 'name colorCode colorCodeEnd code hex'
-            }
-          })
+          .select('_id groupCode groupName slug description productIds primaryProductId representativeMode categoryId')
           .lean();
 
+        const repProductIds = [];
         for (const group of activeGroups) {
-          if (!group.productIds || !group.productIds.length) continue;
-          group.productIds.forEach((p) => {
-            if (p?._id) groupedProductIds.push(p._id);
-          });
-
-          const summary = productGroupService.computeGroupSummary(
-            group,
-            group.productIds
-          );
-          if (!summary.representative) continue;
-          const rep = summary.representative;
-
-          if (queryParams.category) {
-            const allCatIds = [
-              ...group.productIds.flatMap((p) => (p.categoryIds || []).map(String)),
-              ...(group.categoryId ? [String(group.categoryId)] : [])
-            ];
-            if (!allCatIds.includes(String(queryParams.category))) continue;
+          let repId = group.primaryProductId;
+          if (!repId && group.productIds?.length) {
+            repId = await productGroupService.recalculateGroupRepresentative(group._id);
           }
-
-          if (queryParams.menuItem) {
-            const allMenuIds = [
-              ...group.productIds.flatMap((p) => (p.menuItemIds || []).map(String)),
-              ...(group.menuItemId ? [String(group.menuItemId)] : [])
-            ];
-            if (!allMenuIds.includes(String(queryParams.menuItem))) continue;
+          if (repId) {
+            repProductIds.push(repId);
+            groupMetaByRepId.set(String(repId), group);
           }
-
-          const repSlug = rep.basicInfo?.slug || (group.slug ? group.slug.replace(/-\d{6}$/, '') : '');
-          const cleanGroupTitle = (group.productIds?.length === 1 && rep.basicInfo?.title)
-            ? rep.basicInfo.title
-            : (group.name || group.groupName ? (group.name || group.groupName).replace(/\s+-\s+\d+$/, '') : '');
-
-          groupCards.push({
-            ...rep,
-            _id: group._id,
-            id: group._id,
-            groupName: cleanGroupTitle,
-            name: cleanGroupTitle,
-            title: cleanGroupTitle,
-            slug: repSlug,
-            basicInfo: {
-              ...(rep.basicInfo || {}),
-              title: cleanGroupTitle,
-              slug: repSlug,
-            },
-            isGroup: true,
-            variantCount: group.productIds.length,
-            colorImages: rep.colorImages,
-            metalColorIds: rep.metalColorIds,
-            metalColors: rep.metalColors,
-            images: rep.colorImages?.flatMap((c) => c.images?.map((img) => img.url)) || [],
-            pricing: {
-              ...rep.pricing,
-              minPrice: summary.minPrice,
-              maxPrice: summary.maxPrice,
-              salePrice: summary.minPrice
-            }
-          });
         }
-      } catch (groupErr) {
-        // Silently continue without groups if error occurs
-      }
-    }
 
-    if (groupedProductIds.length > 0) {
-      conditions.push({ _id: { $nin: groupedProductIds } });
+        const allGroupedMemberIds = await ProductGroup.distinct('productIds', {
+          status: 'active',
+          'meta.deletedAt': null,
+        });
+
+        const standaloneFilter = {
+          _id: { $nin: allGroupedMemberIds },
+        };
+        if (queryParams.category) {
+          standaloneFilter.categoryIds = queryParams.category;
+        }
+
+        conditions.push({
+          $or: [
+            { _id: { $in: repProductIds } },
+            standaloneFilter,
+          ],
+        });
+      } catch (groupErr) {
+        console.error('Error in search storefront group query:', groupErr);
+      }
     }
 
     const filter = conditions.length === 1 ? conditions[0] : { $and: conditions };
@@ -962,16 +721,32 @@ class ProductService {
     ]);
 
     const wishlistedSet = await this._getWishlistSet(userId);
-    const displayedGroupCards = page === 1 ? groupCards.map(formatStorefrontProduct) : [];
-    const formattedProducts = rawItems.map(formatStorefrontProduct);
-    const items = [...displayedGroupCards, ...formattedProducts].map((item) => ({
+    const enrichedItems = (rawItems || []).map((rawItem) => {
+      const item = { ...rawItem };
+      const group = groupMetaByRepId.get(String(item._id));
+      if (group) {
+        item.isGroup = true;
+        item.groupCode = group.groupCode;
+        item.groupName = group.groupName;
+        item.title = group.groupName || item.basicInfo?.title;
+        item.name = group.groupName || item.basicInfo?.title;
+        if (item.basicInfo) {
+          item.basicInfo = { ...item.basicInfo, title: group.groupName || item.basicInfo?.title };
+        }
+        item.memberProductIds = group.productIds;
+        item.variantCount = group.productIds ? group.productIds.length : 1;
+      }
+      return item;
+    });
+
+    const items = enrichedItems.map(formatStorefrontProduct).map((item) => ({
       ...item,
       inWishlist: wishlistedSet.has(String(item._id || item.id || '')),
     }));
 
     return {
       items,
-      pagination: getPaginationMeta(total + groupCards.length, page, limit)
+      pagination: getPaginationMeta(total, page, limit)
     };
   }
 
@@ -1022,7 +797,6 @@ class ProductService {
     // Curate sections for the home page storefront
     const gold = [];
     const silver = [];
-    const platinum = [];
 
     items.forEach((raw, i) => {
       const f = formatted[i];
@@ -1034,45 +808,25 @@ class ProductService {
         gold.push(f);
       } else if (isSilver) {
         silver.push(f);
-      } else if (type === 'platinum') {
-        platinum.push(f);
       } else {
         gold.push(f);
       }
     });
 
-    // Preferred order matching home page "Most Loved on Neirah"
-    const preferredOrder = [
-      'round diamond channel set huggie hoop',
-      'round cut diamond statement huggie hoop',
-      'round & baguette diamond halo huggie hoop',
-      'diamond mixed cut geometric cluster hoop',
-      'round cut diamond gold heart drop hoop'
-    ];
-
-    const sortedGold = [...gold].sort((a, b) => {
-      const aTitle = (a.basicInfo?.title || a.title || '').toLowerCase();
-      const bTitle = (b.basicInfo?.title || b.title || '').toLowerCase();
-      const aIdx = preferredOrder.findIndex((prefix) => aTitle.includes(prefix));
-      const bIdx = preferredOrder.findIndex((prefix) => bTitle.includes(prefix));
-      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-      if (aIdx !== -1) return -1;
-      if (bIdx !== -1) return 1;
-      return 0;
-    });
-
-    const goldList = sortedGold.length > 0 ? sortedGold.slice(0, 8) : formatted.filter((p) => p.productType === 'gold').slice(0, 8);
+    const goldList = gold.slice(0, 8);
     const mostLovedList = [...goldList];
     if (mostLovedList.length < 8) {
       formatted.forEach((item) => {
-        if (mostLovedList.length < 8 && !mostLovedList.some((g) => String(g._id || g.id) === String(item._id || item.id))) {
+        if (
+          mostLovedList.length < 8 &&
+          !mostLovedList.some((g) => String(g._id || g.id) === String(item._id || item.id))
+        ) {
           mostLovedList.push(item);
         }
       });
     }
 
-    const silverList = silver.length > 0 ? silver.slice(0, 8) : formatted.filter((p) => p.productType === 'silver').slice(0, 8);
-    const platinumList = platinum.length > 0 ? platinum.slice(0, 8) : [];
+    const silverList = silver.slice(0, 8);
     const trendingList = formatted.slice(0, 8);
 
     return {
@@ -1080,13 +834,11 @@ class ProductService {
       sections: {
         gold: mostLovedList,
         mostLoved: mostLovedList,
-        platinum: platinumList,
         silver: silverList,
         trending: trendingList
       },
       gold: mostLovedList,
       mostLoved: mostLovedList,
-      platinum: platinumList,
       silver: silverList,
       trending: trendingList,
       total: formatted.length
@@ -1226,6 +978,12 @@ class ProductService {
       throw new ApiError(404, 'Product not found');
     }
 
+    try {
+      await productGroupService.refreshAffectedGroups(product._id);
+    } catch (err) {
+      console.error(`Error refreshing groups after product update (${id}):`, err);
+    }
+
     return product;
   }
 
@@ -1239,6 +997,12 @@ class ProductService {
 
     if (!product) {
       throw new ApiError(404, 'Product not found');
+    }
+
+    try {
+      await productGroupService.refreshAffectedGroups(id);
+    } catch (err) {
+      console.error(`Error refreshing groups after product delete (${id}):`, err);
     }
 
     return { message: 'Product deleted successfully', id };

@@ -38,6 +38,24 @@ const PROTECTED_FIELDS = [
 ];
 
 class ProductGroupService {
+  constructor() {
+    this._queues = new Map();
+  }
+
+  /**
+   * Sequential promise queue per key to serialize concurrent updates safely
+   */
+  _enqueue(key, fn) {
+    const prev = this._queues.get(key) || Promise.resolve();
+    const next = prev.catch(() => {}).then(fn);
+    this._queues.set(key, next);
+    next.finally(() => {
+      if (this._queues.get(key) === next) {
+        this._queues.delete(key);
+      }
+    });
+    return next;
+  }
   /**
    * Generate next sequential group code (e.g. CG-000001)
    */
@@ -122,6 +140,7 @@ class ProductGroupService {
       matchingGroup.meta = matchingGroup.meta || {};
       matchingGroup.meta.updatedAt = new Date();
       await matchingGroup.save();
+      await this.recalculateGroupRepresentative(matchingGroup._id);
       return matchingGroup;
     }
 
@@ -152,6 +171,7 @@ class ProductGroupService {
       },
     });
 
+    await this.recalculateGroupRepresentative(newGroup._id);
     return newGroup;
   }
 
@@ -164,14 +184,157 @@ class ProductGroupService {
     const isSold = product.ornate?.isSold || product.stockStatus === 'Sold' || product.status === 'sold';
     if (isSold) return false;
     const isApproved = product.status === 'approved' || product.status === 'active';
-    return isApproved;
+    if (!isApproved) return false;
+    if (product.visibility?.web === false) return false;
+    return true;
   }
 
   /**
-   * Extract effective product price
+   * Check if product is in stock
+   */
+  isProductInStock(product) {
+    if (!product) return false;
+    if (product.ornate?.isSold) return false;
+    if (product.stockStatus === 'Sold' || product.stockStatus === 'Out of Stock' || product.status === 'sold') {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Extract effective product price using canonical formula
    */
   getProductPrice(product) {
     return Number(product?.pricing?.salePrice || product?.pricing?.mrp || product?.ornate?.goldAmt || 0);
+  }
+
+  /**
+   * Select canonical representative product according to business rules:
+   * 1. Manual mode: preserve group.primaryProductId if still valid and eligible.
+   * 2. Auto mode:
+   *    - Highest-priced eligible product.
+   *    - In-stock products preferred.
+   *    - If all out of stock, fallback to eligible out-of-stock.
+   *    - Deterministic tie-breaker by _id.
+   */
+  selectRepresentative(group, memberProducts = []) {
+    const list = Array.isArray(memberProducts) ? memberProducts : [];
+    const nonDeleted = list.filter((p) => p && !p.meta?.deletedAt);
+    const eligibleProducts = nonDeleted.filter((p) => this.isProductEligible(p));
+
+    // 1. Manual mode check
+    if (group?.representativeMode === 'manual' && group?.primaryProductId) {
+      const manualProduct = eligibleProducts.find(
+        (p) => String(p._id) === String(group.primaryProductId)
+      );
+      if (manualProduct) {
+        return manualProduct;
+      }
+    }
+
+    // 2. Candidate pool for auto selection
+    const candidatePool = eligibleProducts.length > 0 ? eligibleProducts : nonDeleted;
+    if (candidatePool.length === 0) return null;
+
+    // Separate in-stock vs out-of-stock
+    const inStockPool = candidatePool.filter((p) => this.isProductInStock(p));
+    const targetPool = inStockPool.length > 0 ? inStockPool : candidatePool;
+
+    const sorted = [...targetPool].sort((a, b) => {
+      // Primary: Stock preference
+      const aStock = this.isProductInStock(a) ? 1 : 0;
+      const bStock = this.isProductInStock(b) ? 1 : 0;
+      if (bStock !== aStock) return bStock - aStock;
+
+      // Secondary: Highest price
+      const priceDiff = this.getProductPrice(b) - this.getProductPrice(a);
+      if (priceDiff !== 0) return priceDiff;
+
+      // Tertiary: Deterministic tie-breaker
+      return String(a._id).localeCompare(String(b._id));
+    });
+
+    return sorted[0] || null;
+  }
+
+  /**
+   * Recalculate primaryProductId for a group and save it directly in product_groups.
+   * Thread-safe sequential execution per groupId.
+   */
+  async recalculateGroupRepresentative(groupId) {
+    if (!groupId) return null;
+    return this._enqueue(`group:${String(groupId)}`, async () => {
+      try {
+        const group = await ProductGroup.findById(groupId).lean();
+        if (!group || group.meta?.deletedAt || group.status !== 'active' || !group.productIds?.length) {
+          if (group?.primaryProductId) {
+            await ProductGroup.updateOne({ _id: groupId }, { $set: { primaryProductId: null } });
+          }
+          return null;
+        }
+
+        const memberProducts = await Product.find({
+          _id: { $in: group.productIds },
+          'meta.deletedAt': null,
+        }).lean();
+
+        if (!memberProducts.length) {
+          if (group.primaryProductId) {
+            await ProductGroup.updateOne({ _id: groupId }, { $set: { primaryProductId: null } });
+          }
+          return null;
+        }
+
+        const rep = this.selectRepresentative(group, memberProducts);
+        const repId = rep?._id || null;
+
+        if (String(group.primaryProductId || '') !== String(repId || '')) {
+          await ProductGroup.updateOne({ _id: groupId }, { $set: { primaryProductId: repId } });
+        }
+        return repId;
+      } catch (err) {
+        console.error(`[ProductGroupService] Error recalculating representative for group ${groupId}:`, err);
+        return null;
+      }
+    });
+  }
+
+  /**
+   * Refresh representatives of any active group containing a changed product.
+   */
+  async refreshAffectedGroups(productId) {
+    if (!productId) return;
+    try {
+      const affected = await ProductGroup.find({
+        productIds: productId,
+        status: 'active',
+        'meta.deletedAt': null,
+      }).select('_id').lean();
+
+      for (const g of affected) {
+        await this.recalculateGroupRepresentative(g._id);
+      }
+    } catch (err) {
+      console.error(`[ProductGroupService] Error refreshing affected groups for product ${productId}:`, err);
+    }
+  }
+
+  /**
+   * Rebuild / validate primaryProductId across all active groups in product_groups.
+   */
+  async recalculateAllRepresentatives() {
+    const activeGroups = await ProductGroup.find({
+      status: 'active',
+      'meta.deletedAt': null,
+    }).select('_id productIds primaryProductId representativeMode');
+
+    let updated = 0;
+    for (const g of activeGroups) {
+      const repId = await this.recalculateGroupRepresentative(g._id);
+      if (repId) updated++;
+    }
+
+    return { totalGroups: activeGroups.length, updatedRepresentatives: updated };
   }
 
   /**
@@ -179,31 +342,11 @@ class ProductGroupService {
    */
   computeGroupSummary(group, products = []) {
     const list = Array.isArray(products) ? products : [];
-    const eligibleProducts = list.filter((p) => this.isProductEligible(p));
+    const nonDeleted = list.filter((p) => p && !p.meta?.deletedAt);
+    const eligibleProducts = nonDeleted.filter((p) => this.isProductEligible(p));
 
-    const candidatePool = eligibleProducts.length > 0 ? eligibleProducts : list;
-
-    let representative = null;
-
-    // 1. Manual mode
-    if (group.representativeMode === 'manual' && group.primaryProductId) {
-      const manualProduct = list.find(
-        (p) => String(p._id) === String(group.primaryProductId)
-      );
-      if (manualProduct && this.isProductEligible(manualProduct)) {
-        representative = manualProduct;
-      }
-    }
-
-    // 2. Auto fallback: highest salePrice among eligible, deterministic tie-breaker by _id
-    if (!representative && candidatePool.length > 0) {
-      const sorted = [...candidatePool].sort((a, b) => {
-        const priceDiff = this.getProductPrice(b) - this.getProductPrice(a);
-        if (priceDiff !== 0) return priceDiff;
-        return String(a._id).localeCompare(String(b._id));
-      });
-      representative = sorted[0];
-    }
+    const candidatePool = eligibleProducts.length > 0 ? eligibleProducts : nonDeleted;
+    const representative = this.selectRepresentative(group, list);
 
     // Price range calculation
     let minPrice = 0;
@@ -753,6 +896,7 @@ class ProductGroupService {
       },
     });
 
+    await this.recalculateGroupRepresentative(group._id);
     return this.getGroupById(group._id);
   }
 
@@ -813,6 +957,7 @@ class ProductGroupService {
     }
 
     await group.save();
+    await this.recalculateGroupRepresentative(group._id);
     return this.getGroupById(group._id);
   }
 
@@ -842,6 +987,7 @@ class ProductGroupService {
     if (isEmpty) {
       // Hard delete: permanently remove empty group document from database
       await ProductGroup.findByIdAndDelete(group._id);
+      await this.recalculateGroupRepresentative(group._id);
 
       return {
         message: 'Empty product group permanently deleted.',
@@ -858,6 +1004,7 @@ class ProductGroupService {
         'meta.deletedBy': userId,
       },
     });
+    await this.recalculateGroupRepresentative(group._id);
 
     return {
       message: 'Product group deleted successfully. Member products were preserved.',
@@ -900,6 +1047,7 @@ class ProductGroupService {
       $set: { 'meta.updatedBy': userId, 'meta.updatedAt': new Date() },
     });
 
+    await this.recalculateGroupRepresentative(groupId);
     return this.getGroupById(groupId);
   }
 
@@ -922,6 +1070,8 @@ class ProductGroupService {
 
     await ProductGroup.findByIdAndUpdate(groupId, update);
 
+    await this.recalculateGroupRepresentative(groupId);
+    await this.refreshAffectedGroups(productId);
     return this.getGroupById(groupId);
   }
 
@@ -1032,6 +1182,9 @@ class ProductGroupService {
       $addToSet: { productIds: { $each: validIds } },
       $set: { 'meta.updatedBy': userId, 'meta.updatedAt': new Date() },
     });
+
+    await this.recalculateGroupRepresentative(sourceGroupId);
+    await this.recalculateGroupRepresentative(targetGroupId);
 
     return {
       message: `Successfully moved ${validIds.length} product(s) to ${targetGroup.groupName}`,
@@ -1191,6 +1344,13 @@ class ProductGroupService {
 
     const inserted = await ProductGroup.insertMany(createdGroups);
 
+    if (sourceGroupId) {
+      await this.recalculateGroupRepresentative(sourceGroupId);
+    }
+    for (const grp of inserted) {
+      await this.recalculateGroupRepresentative(grp._id);
+    }
+
     return {
       message: `Successfully created ${inserted.length} separate group${inserted.length === 1 ? '' : 's'} (1 per product)`,
       count: inserted.length,
@@ -1240,6 +1400,8 @@ class ProductGroupService {
         'meta.updatedAt': new Date(),
       },
     });
+
+    await this.recalculateGroupRepresentative(groupId);
 
     const updatedGroup = await this.getGroupById(groupId);
 
@@ -1309,6 +1471,10 @@ class ProductGroupService {
         'meta.updatedAt': new Date(),
       },
     });
+
+    for (const g of groups) {
+      await this.recalculateGroupRepresentative(g._id);
+    }
 
     return {
       message: `Successfully approved ${updateResult.modifiedCount} product(s) across ${groups.length} group(s)`,
@@ -1498,6 +1664,7 @@ class ProductGroupService {
    * Execute validated synchronization and commit first-sync / sync-log metadata
    */
   async executeSync({ groupId, sourceProductId, targetProductIds = [], fields = [], userId = null }) {
+    const operationId = new mongoose.Types.ObjectId().toString();
     const group = await ProductGroup.findOne({ _id: groupId, 'meta.deletedAt': null });
     if (!group) throw new ApiError(404, 'Product group not found');
 
@@ -1640,6 +1807,8 @@ class ProductGroupService {
         'meta.updatedAt': now,
       },
     });
+
+    await this.recalculateGroupRepresentative(groupId);
 
     return {
       message: 'Group synchronized successfully',

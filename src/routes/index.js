@@ -116,6 +116,7 @@ router.use('/reviews', reviewRoutes);
 router.use('/settings', settingRoutes);
 router.use('/website', websiteThemeRoutes);
 router.use('/website-themes', websiteThemeRoutes);
+router.use('/themes', websiteThemeRoutes);
 router.use('/gallery', galleryRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/static-pages', staticPageRoutes);

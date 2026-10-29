@@ -52,6 +52,10 @@ const settingSchema = new mongoose.Schema(
       url: { type: String, default: '' },
       key: { type: String, default: '' },
     },
+    loginModalImage: {
+      url: { type: String, default: '' },
+      key: { type: String, default: '' },
+    },
     trustBadges: [{
       title: { type: String, trim: true, default: '' },
       image: {
@@ -68,24 +72,88 @@ const settingSchema = new mongoose.Schema(
     },
 
     // Monetary Settlement
-    bankName: {
-      type: String,
-      trim: true,
-    },
-    bankAccountNumber: {
-      type: String,
-      trim: true,
-    },
-    ifscCode: {
-      type: String,
-      trim: true,
+    bankDetails: {
+      bankName: {
+        type: String,
+        trim: true,
+      },
+      bankAccountNumber: {
+        type: String,
+        trim: true,
+      },
+      ifscCode: {
+        type: String,
+        trim: true,
+      },
     },
 
-    // Storefront Theme
+    // Storefront Theme & Colors (Object for buttons, header, top bar, footer)
     currentThemeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'WebsiteTheme',
       default: null,
+    },
+    themeColors: {
+      buttonColor: {
+        type: String,
+        trim: true,
+        default: '#1f3a2b',
+      },
+      buttonHoverColor: {
+        type: String,
+        trim: true,
+        default: '#162b20',
+      },
+      buttonTextColor: {
+        type: String,
+        trim: true,
+        default: '#ffffff',
+      },
+      topBarBgColor: {
+        type: String,
+        trim: true,
+        default: '#60574d',
+      },
+      topBarTextColor: {
+        type: String,
+        trim: true,
+        default: '#ffffff',
+      },
+      headerBgColor: {
+        type: String,
+        trim: true,
+        default: '#22201e',
+      },
+      headerTextColor: {
+        type: String,
+        trim: true,
+        default: '#ffffff',
+      },
+      footerBgColor: {
+        type: String,
+        trim: true,
+        default: '#0f0d0b',
+      },
+      footerTextColor: {
+        type: String,
+        trim: true,
+        default: '#c8b89e',
+      },
+    },
+    buttonColor: {
+      type: String,
+      trim: true,
+      default: '#1f3a2b',
+    },
+    buttonHoverColor: {
+      type: String,
+      trim: true,
+      default: '#162b20',
+    },
+    buttonTextColor: {
+      type: String,
+      trim: true,
+      default: '#ffffff',
     },
 
     // Social Proof & Urgency

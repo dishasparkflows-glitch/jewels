@@ -350,11 +350,12 @@ class ProductService {
       ];
     }
 
+    const resolvedStatus = queryParams.status === 'active' ? 'approved' : queryParams.status;
     if (queryParams.view === 'storefront') {
       filter.status = 'approved';
-    } else if (queryParams.status && queryParams.status !== 'all') {
-      filter.status = queryParams.status;
-    } else if (!queryParams.status) {
+    } else if (resolvedStatus && resolvedStatus !== 'all') {
+      filter.status = resolvedStatus;
+    } else if (!resolvedStatus) {
       if (!isOrnateSpecified) {
         filter.status = 'approved';
       }
@@ -851,9 +852,10 @@ class ProductService {
     const { page, limit, skip } = getPagination(queryParams);
     const conditions = [{ 'meta.deletedAt': null }];
 
-    if (queryParams.status && queryParams.status !== 'all') {
-      conditions.push({ status: queryParams.status });
-    } else if (!queryParams.status) {
+    const resolvedLookupStatus = queryParams.status === 'active' ? 'approved' : queryParams.status;
+    if (resolvedLookupStatus && resolvedLookupStatus !== 'all') {
+      conditions.push({ status: resolvedLookupStatus });
+    } else if (!resolvedLookupStatus) {
       conditions.push({ status: 'approved' });
     }
 

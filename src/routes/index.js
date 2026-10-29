@@ -57,6 +57,8 @@ const websiteThemeRoutes = require('../modules/websiteTheme/websiteTheme.routes'
 const analyticsRoutes = require('../modules/analytics/analytics.routes');
 const staticPageRoutes = require('../modules/staticPage/staticPage.routes');
 const galleryRoutes = require('../modules/gallery/gallery.routes');
+const orderRoutes = require('../modules/order/order.routes');
+const paymentRoutes = require('../modules/payment/payment.routes');
 const productController = require('../modules/product/product.controller');
 
 // Mount routes
@@ -70,6 +72,8 @@ router.use('/product-groups', productGroupRoutes);
 router.use('/ornate', ornateRoutes);
 router.use('/wishlist', wishlistRoutes);
 router.use('/cart', cartRoutes);
+router.use('/orders', orderRoutes);
+router.use('/payments', paymentRoutes);
 router.use('/whatsapp', whatsappRoutes);
 router.use('/banners', bannerRoutes);
 router.use('/top-announcements', topAnnouncementRoutes);

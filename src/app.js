@@ -36,8 +36,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'X-Session-Id'],
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '10mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
+app.use(express.urlencoded({ extended: true, limit: '10mb', verify: (req, res, buf) => { if (!req.rawBody) req.rawBody = buf; } }));
 app.use(express.raw({ type: ['image/*', 'video/*', 'application/octet-stream'], limit: '50mb' }));
 
 // ─── Logging ───────────────────────────────────────────────────

@@ -85,7 +85,7 @@ const configSchema = new mongoose.Schema({
     module: { type: String, enum: ['banner', 'category', 'featured'], required: true },
     recordId: { type: mongoose.Schema.Types.ObjectId, required: true },
     slot: { type: String, required: true },
-    assetId: { type: mongoose.Schema.Types.ObjectId, ref: 'ThemeMediaAsset', required: true },
+    assetId: { type: mongoose.Schema.Types.ObjectId, default: null },
   }, { _id: false })], default: [] },
   colors: {
     primary: { type: String, default: '#8B6C3A' },

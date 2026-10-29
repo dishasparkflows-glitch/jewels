@@ -3,7 +3,6 @@ const ApiResponse = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
 const cloudflareR2 = require('../../utils/cloudflareR2');
 const { keyFromUrl } = require('../../utils/media');
-const { Asset: ThemeAsset } = require('../websiteTheme/themeMedia');
 
 // ------------------------------- get presigned url ----------------------------
 const getPresignedUrl = catchAsync(async (req, res) => {
@@ -76,10 +75,7 @@ const getFile = catchAsync(async (req, res) => {
 const deleteFile = catchAsync(async (req, res) => {
   const { filepath, key, keys } = req.body;
   const candidates = Array.isArray(keys) && keys.length ? keys : [key || filepath];
-  const assetKeys = candidates.filter(Boolean).map((value) => keyFromUrl(value) || value);
-  if (await ThemeAsset.exists({ key: { $in: assetKeys } })) {
-    throw new ApiError(409, 'Theme assets are retained for published versions and history. Remove the theme assignment instead.');
-  }
+
   if (Array.isArray(keys) && keys.length > 0) {
     await Promise.all(keys.map((k) => cloudflareR2.deleteFile(k)));
     return ApiResponse.success(res, null, `${keys.length} files deleted from Cloudflare R2 successfully`);

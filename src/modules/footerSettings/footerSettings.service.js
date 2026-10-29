@@ -5,7 +5,14 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class FooterSettingsService {
   // ------------------------------- get footer settings ----------------------------
   async getSettings() {
-    return (await FooterSettings.findOne({ 'meta.deletedAt': null }).lean()) || {};
+    const settings = (await FooterSettings.findOne({ 'meta.deletedAt': null }).lean()) || {};
+    if (settings && settings.copyright) {
+      const currentYear = new Date().getFullYear();
+      settings.copyright = settings.copyright
+        .replace(/\{year\}/gi, currentYear)
+        .replace(/(©|\(C\)|Copyright)\s*\d{4}/gi, `$1 ${currentYear}`);
+    }
+    return settings;
   }
 
   // ------------------------------- update footer settings ----------------------------

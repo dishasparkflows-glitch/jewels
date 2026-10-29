@@ -188,42 +188,79 @@ class ThemeMediaMappingService {
       // Determine titles & fallbacks based on module
       let title = '';
       let subtitle = '';
+      let slotLabel = '';
+      let targetLink = '';
       let originalDesktopImage = null;
       let originalMobileImage = null;
       let originalIcon = null;
       let originalBanner = null;
 
       if (normModule === 'category') {
-        title = rec.name;
+        title = rec.name || 'Category';
         subtitle = rec.slug ? `/${rec.slug}` : '';
+        slotLabel = 'Category Page & Navigation';
         originalIcon = rec.icon?.url || null;
         originalBanner = rec.banner?.url || null;
         originalDesktopImage = originalBanner || originalIcon;
+        targetLink = rec.slug ? `/category/${rec.slug}` : '';
       } else if (normModule === 'celebrate') {
-        title = rec.name || 'Featured Item';
-        subtitle = rec.placement || 'Celebrate & Gifts';
+        title = rec.name || rec.title || 'Featured Showcase Card';
+        subtitle = rec.placement || 'Celebrate & Gifts Section';
+        slotLabel = 'Homepage Celebrate Card';
         originalDesktopImage = rec.image?.url || null;
         originalMobileImage = rec.image?.url || null;
+        targetLink = rec.link || '';
       } else {
         // Banner
-        title = rec.content?.title || `${rec.display?.type || 'Banner'}`;
-        subtitle = rec.content?.subtitle || rec.display?.position || '';
+        const orderNum = (rec.display?.order ?? rec.order ?? 0) + 1;
+        const bannerType = rec.display?.type || normModule;
+        const typeLabels = {
+          herobanner: 'Homepage Hero Banner',
+          collectionbanner: 'Collection Showcase Banner',
+          offerbanner: 'Special Offer Banner',
+          mobileappbanner: 'Mobile App Download Banner',
+          customizebanner: 'Custom / Bespoke Banner',
+          websitebanner: 'Website General Banner',
+          bookappointbanner: 'Book Appointment Banner',
+        };
+        const friendlyTypeName = typeLabels[bannerType] || bannerType;
+
+        slotLabel = `${friendlyTypeName} · Slide #${orderNum}`;
+        title = rec.content?.title || slotLabel;
+        subtitle =
+          rec.content?.subtitle && rec.content?.subtitle !== 'none'
+            ? rec.content.subtitle
+            : rec.display?.collectionGroup
+            ? `Collection Group: ${rec.display.collectionGroup.toUpperCase()}`
+            : rec.display?.position
+            ? `Position: ${rec.display.position}`
+            : `Storefront Display Slide #${orderNum}`;
         originalDesktopImage = rec.image?.url || null;
         originalMobileImage = rec.mobileImage?.url || rec.image?.url || null;
+        targetLink = rec.link || rec.content?.link || rec.appStoreUrl || '';
       }
 
       return {
         _id: rec._id,
         title,
         subtitle,
+        slotLabel,
+        targetLink,
         type: rec.display?.type || rec.placement || normModule,
         platform: rec.display?.platform || 'web',
         order: rec.display?.order ?? rec.order ?? 0,
         status: rec.status || 'active',
+        collectionGroup: rec.display?.collectionGroup || null,
         originalDesktopImage,
         originalMobileImage,
         originalIcon,
         originalBanner,
+        originalMedia: {
+          desktopImageUrl: originalDesktopImage,
+          mobileImageUrl: originalMobileImage,
+          iconUrl: originalIcon,
+          bannerUrl: originalBanner,
+        },
         collectionImages: rec.collectionImages || [],
         isMapped,
         mappings: recMappings.map((m) => ({

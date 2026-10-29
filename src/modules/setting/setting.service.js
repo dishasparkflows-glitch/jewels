@@ -29,6 +29,38 @@ class SettingService {
       } catch (_) {}
     }
 
+    if (!setting.buttonColor) {
+      setting.buttonColor = '#1f3a2b';
+      setting.buttonHoverColor = '#162b20';
+      setting.buttonTextColor = '#ffffff';
+    }
+
+    if (!setting.themeColors) {
+      setting.themeColors = {
+        buttonColor: setting.buttonColor || '#1f3a2b',
+        buttonHoverColor: setting.buttonHoverColor || '#162b20',
+        buttonTextColor: setting.buttonTextColor || '#ffffff',
+        topBarBgColor: '#60574d',
+        topBarTextColor: '#ffffff',
+        headerBgColor: '#22201e',
+        headerTextColor: '#ffffff',
+        footerBgColor: '#0f0d0b',
+        footerTextColor: '#c8b89e',
+      };
+    } else {
+      setting.themeColors = {
+        buttonColor: setting.themeColors.buttonColor || setting.buttonColor || '#1f3a2b',
+        buttonHoverColor: setting.themeColors.buttonHoverColor || setting.buttonHoverColor || '#162b20',
+        buttonTextColor: setting.themeColors.buttonTextColor || setting.buttonTextColor || '#ffffff',
+        topBarBgColor: setting.themeColors.topBarBgColor || '#60574d',
+        topBarTextColor: setting.themeColors.topBarTextColor || '#ffffff',
+        headerBgColor: setting.themeColors.headerBgColor || '#22201e',
+        headerTextColor: setting.themeColors.headerTextColor || '#ffffff',
+        footerBgColor: setting.themeColors.footerBgColor || '#0f0d0b',
+        footerTextColor: setting.themeColors.footerTextColor || '#c8b89e',
+      };
+    }
+
     if (!setting.socialProof) {
       setting.socialProof = {
         showSoldCounter: true,
@@ -51,6 +83,19 @@ class SettingService {
         whatsapp: '',
       };
     }
+
+    if (!setting.bankDetails) {
+      setting.bankDetails = {
+        bankName: setting.bankName || '',
+        bankAccountNumber: setting.bankAccountNumber || '',
+        ifscCode: setting.ifscCode || '',
+      };
+    } else {
+      setting.bankName = setting.bankDetails.bankName || '';
+      setting.bankAccountNumber = setting.bankDetails.bankAccountNumber || '';
+      setting.ifscCode = setting.bankDetails.ifscCode || '';
+    }
+
     return setting;
   }
 
@@ -89,6 +134,41 @@ class SettingService {
         };
         settings.markModified('socialProof');
       }
+      if (data.themeColors) {
+        settings.themeColors = {
+          ...(settings.themeColors?.toObject ? settings.themeColors.toObject() : (settings.themeColors || {})),
+          ...data.themeColors,
+        };
+        if (data.themeColors.buttonColor) settings.buttonColor = data.themeColors.buttonColor;
+        if (data.themeColors.buttonHoverColor) settings.buttonHoverColor = data.themeColors.buttonHoverColor;
+        if (data.themeColors.buttonTextColor) settings.buttonTextColor = data.themeColors.buttonTextColor;
+        settings.markModified('themeColors');
+      } else if (data.buttonColor || data.buttonHoverColor || data.buttonTextColor) {
+        settings.themeColors = {
+          ...(settings.themeColors?.toObject ? settings.themeColors.toObject() : (settings.themeColors || {})),
+          ...(data.buttonColor ? { buttonColor: data.buttonColor } : {}),
+          ...(data.buttonHoverColor ? { buttonHoverColor: data.buttonHoverColor } : {}),
+          ...(data.buttonTextColor ? { buttonTextColor: data.buttonTextColor } : {}),
+        };
+        settings.markModified('themeColors');
+      }
+
+      if (data.bankDetails) {
+        settings.bankDetails = {
+          ...(settings.bankDetails?.toObject ? settings.bankDetails.toObject() : (settings.bankDetails || {})),
+          ...data.bankDetails,
+        };
+        settings.markModified('bankDetails');
+      } else if (data.bankName !== undefined || data.bankAccountNumber !== undefined || data.ifscCode !== undefined) {
+        settings.bankDetails = {
+          ...(settings.bankDetails?.toObject ? settings.bankDetails.toObject() : (settings.bankDetails || {})),
+          ...(data.bankName !== undefined ? { bankName: data.bankName } : {}),
+          ...(data.bankAccountNumber !== undefined ? { bankAccountNumber: data.bankAccountNumber } : {}),
+          ...(data.ifscCode !== undefined ? { ifscCode: data.ifscCode } : {}),
+        };
+        settings.markModified('bankDetails');
+      }
+
       Object.assign(settings, data);
       await settings.save();
     }
@@ -116,9 +196,40 @@ class SettingService {
       }
     }
 
-    return await Setting.findById(settings._id)
+    if (data.buttonColor) {
+      try {
+        const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');
+        const themeId = data.currentThemeId || settings.currentThemeId;
+        if (themeId) {
+          await WebsiteTheme.updateOne(
+            { _id: themeId },
+            { $set: { 'config.colors.primary': data.buttonColor } }
+          );
+        }
+      } catch (err) {
+        console.error('Failed to sync button color to theme:', err);
+      }
+    }
+
+    const updated = await Setting.findById(settings._id)
       .populate('currentThemeId', 'name code status description')
       .lean();
+
+    if (updated) {
+      if (!updated.bankDetails) {
+        updated.bankDetails = {
+          bankName: updated.bankName || '',
+          bankAccountNumber: updated.bankAccountNumber || '',
+          ifscCode: updated.ifscCode || '',
+        };
+      } else {
+        updated.bankName = updated.bankDetails.bankName || '';
+        updated.bankAccountNumber = updated.bankDetails.bankAccountNumber || '';
+        updated.ifscCode = updated.bankDetails.ifscCode || '';
+      }
+    }
+
+    return updated;
   }
 
   // ------------------------------- create setting ----------------------------

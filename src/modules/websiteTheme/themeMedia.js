@@ -6,27 +6,8 @@ const Banner = require('../banner/banner.model');
 const Category = require('../category/category.model');
 const Featured = require('../featured/featured.model');
 
-// ------------------------------- Theme Media Asset Schema & Model ----------------------------
-// Immutable objects: replacing an image creates a new asset; published themes retain the old one.
-const themeMediaAssetSchema = new mongoose.Schema(
-  {
-    key: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    url: {
-      type: String,
-      required: true,
-    },
-  },
-  {
-    timestamps: true,
-    collection: 'theme_media_assets',
-  }
-);
-
-const Asset = mongoose.models.ThemeMediaAsset || mongoose.model('ThemeMediaAsset', themeMediaAssetSchema, 'theme_media_assets');
+// ------------------------------- Theme Media Targets ----------------------------
+// (Legacy ThemeMediaAsset collection removed in favor of ThemeMediaMapping)
 
 // ------------------------------- Target Models Resolver ----------------------------
 const getTargetModels = () => ({
@@ -89,12 +70,7 @@ async function save(themeId, body, actorId) {
     if (typeof key !== 'string' || !/^website-themes\/[a-zA-Z0-9._/-]+$/.test(key) || key.includes('..')) {
       throw new ApiError(400, 'Invalid theme upload key');
     }
-
-    asset = await Asset.findOneAndUpdate(
-      { key },
-      { $setOnInsert: { key, url: publicUrl(key) } },
-      { upsert: true, new: true }
-    );
+    asset = { _id: new mongoose.Types.ObjectId(), key, url: publicUrl(key) };
   }
 
   // Compare-and-swap prevents one uploader from silently overwriting another mapping.
@@ -136,8 +112,7 @@ async function resolve(config) {
   if (!config) return config;
 
   const rows = config.mediaOverrides || [];
-  const assets = await Asset.find({ _id: { $in: rows.map((row) => row.assetId) } }).lean();
-  const byId = new Map(assets.map((asset) => [String(asset._id), asset]));
+  const byId = new Map();
   const records = new Map();
   const models = getTargetModels();
 
@@ -287,7 +262,6 @@ function storefront(module) {
 }
 
 module.exports = {
-  Asset,
   save,
   resolve,
   apply,

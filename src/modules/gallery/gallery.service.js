@@ -3,7 +3,6 @@ const Gallery = require('./gallery.model');
 const Banner = require('../banner/banner.model');
 const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');
 const Featured = require('../featured/featured.model');
-const { Asset: ThemeAsset } = require('../websiteTheme/themeMedia');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -93,18 +92,7 @@ class GalleryService {
         }
       }
 
-      const assets = await ThemeAsset.find({}).lean();
-      for (const asset of assets) {
-        if (asset.url && !galleryDocs.some((d) => d.image?.url === asset.url)) {
-          galleryDocs.push({
-            themeId: null,
-            placement: 'asset',
-            platform: 'common',
-            image: { url: asset.url, key: asset.key || '' },
-            status: 'active',
-          });
-        }
-      }
+
 
       if (galleryDocs.length > 0) {
         await Gallery.insertMany(galleryDocs);

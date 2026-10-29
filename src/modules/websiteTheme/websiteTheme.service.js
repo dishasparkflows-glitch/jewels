@@ -36,7 +36,6 @@ class WebsiteThemeService {
   async validateConfig(config = {}, { requireComplete = false, requireActiveBanners = false } = {}) {
     for (const row of config.mediaOverrides || []) {
       await themeMedia.validateTarget(row.module, row.recordId, row.slot);
-      if (!await themeMedia.Asset.exists({ _id: row.assetId })) throw new ApiError(400, 'Theme image asset is missing');
     }
     const colors = config.colors || {};
     for (const [key, value] of Object.entries(colors)) {
@@ -406,11 +405,10 @@ class WebsiteThemeService {
     const selectedCategoryIds = new Set(categoryAppearances.map((c) => String(c.categoryId?._id || c.categoryId || '')).filter(Boolean));
     const mediaOverrides = config.mediaOverrides || [];
 
-    const [allBanners, allFeatured, allCategories, allAssets] = await Promise.all([
+    const [allBanners, allFeatured, allCategories] = await Promise.all([
       Banner.find({ 'meta.deletedAt': null }).lean(),
       Featured.find({ 'meta.deletedAt': null }).lean(),
       Category.find({ 'meta.deletedAt': null }).select('name slug icon banner promoBanners').lean(),
-      themeMedia.Asset.find({}).sort({ createdAt: -1 }).limit(100).lean(),
     ]);
 
     const items = [];
@@ -565,29 +563,7 @@ class WebsiteThemeService {
       }
     });
 
-    allAssets.forEach((asset) => {
-      if (!asset.url) return;
-      const isOverride = mediaOverrides.some((o) => String(o.assetId) === String(asset._id));
-      if (!seenUrls.has(asset.url) || isOverride) {
-        items.push({
-          id: String(asset._id),
-          url: asset.url,
-          key: asset.key || '',
-          name: extractName(asset.url, 'Theme Asset'),
-          mediaType: 'image',
-          variant: 'universal',
-          module: 'themeAsset',
-          filterType: isOverride ? 'all' : 'unused',
-          recordId: String(asset._id),
-          recordTitle: 'Theme Asset Upload',
-          slot: 'asset',
-          usageLocation: isOverride ? 'Theme Override' : 'Unassigned / Media Library',
-          isUsed: isOverride,
-          status: 'active',
-        });
-        seenUrls.add(asset.url);
-      }
-    });
+
 
     return {
       items,

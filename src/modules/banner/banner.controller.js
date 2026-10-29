@@ -57,6 +57,29 @@ class BannerController {
     ApiResponse.success(res, { id: result.id }, result.message);
   });
 
+  // ------------------------------- get themes lookup for banners ----------------------------
+  getThemesLookup = catchAsync(async (_req, res) => {
+    const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');
+    const items = await WebsiteTheme.find({ 'meta.deletedAt': null })
+      .select('_id name code status description publishedAt schedule')
+      .sort({ status: 1, name: 1 })
+      .lean();
+    ApiResponse.success(res, items, 'Theme lookup list retrieved successfully');
+  });
+
+  // ------------------------------- get theme placement wise images ----------------------------
+  getThemeImages = catchAsync(async (req, res) => {
+    const galleryService = require('../gallery/gallery.service');
+    const { themeId, placement, type, platform, limit } = req.query;
+    const data = await galleryService.listImages({
+      themeId,
+      placement: placement || type,
+      platform,
+      limit: limit ? parseInt(limit, 10) : 100,
+    });
+    ApiResponse.success(res, data.items || [], 'Theme images retrieved successfully');
+  });
+
   // ----------------------- manual trigger offer cleanup ---------------------
   cleanupExpiredOffers = catchAsync(async (req, res) => {
     const result = await bannerService.autoDeleteExpiredOffers();

@@ -35,7 +35,7 @@ class ProductGroupController {
 
   delete = catchAsync(async (req, res) => {
     const result = await productGroupService.deleteGroup(req.params.id, req.user?._id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, { id: result.id, hardDeleted: result.hardDeleted }, result.message);
   });
 
   addProducts = catchAsync(async (req, res) => {

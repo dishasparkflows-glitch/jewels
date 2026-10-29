@@ -51,7 +51,7 @@ function sanitizeBannerPayload(data) {
   }
 
   // Root fields
-  for (const field of ['themeId', 'link', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status']) {
+  for (const field of ['themeId', 'targetAudience', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status']) {
     if (!isNullOrEmpty(data[field])) {
       clean[field] = sanitizeStr(data[field]);
     }
@@ -152,7 +152,7 @@ function buildBannerUpdateOps(data) {
   }
 
   // Root fields
-  const simpleFields = ['themeId', 'link', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status'];
+  const simpleFields = ['themeId', 'targetAudience', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status'];
   for (const field of simpleFields) {
     if (data[field] !== undefined) {
       if (isNullOrEmpty(data[field])) {

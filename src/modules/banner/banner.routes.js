@@ -9,6 +9,10 @@ const { ROLES } = require('../../config/constants');
 router.get('/category-display', bannerController.getCategoryDisplayBanner);
 router.get('/counts', bannerController.getCounts);
 router.get('/lookup', bannerController.getLookup);
+router.get('/themes/lookup', bannerController.getThemesLookup);
+router.get('/themes-lookup', bannerController.getThemesLookup);
+router.get('/theme-images', bannerController.getThemeImages);
+
 router.get('/', bannerController.getAll);
 router.get('/:id', bannerController.getOne);
 

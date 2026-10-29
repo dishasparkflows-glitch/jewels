@@ -211,10 +211,10 @@ class GalleryService {
     if (platform && platform !== 'all') {
       if (platform === 'common') {
         filter.platform = 'common';
-      } else if (platform === 'web') {
-        filter.platform = { $in: ['web', 'common'] };
+      } else if (platform === 'web' || platform === 'desktop') {
+        filter.platform = { $in: ['web', 'desktop', 'common'] };
       } else if (platform === 'app' || platform === 'mobile') {
-        filter.platform = { $in: ['app', 'common'] };
+        filter.platform = { $in: ['app', 'mobile', 'common'] };
       }
     }
 

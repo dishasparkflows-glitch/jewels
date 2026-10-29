@@ -817,26 +817,52 @@ class ProductGroupService {
   }
 
   /**
-   * Soft delete product group (never deletes products)
+   * Delete product group:
+   * - If group is empty (0 products), hard delete (permanently remove document from DB)
+   * - Otherwise (has member products), soft delete (sets status: inactive and meta.deletedAt, preserving products)
    */
   async deleteGroup(id, userId = null) {
-    const group = await ProductGroup.findOneAndUpdate(
-      { _id: id, 'meta.deletedAt': null },
-      {
-        $set: {
-          status: 'inactive',
-          'meta.deletedAt': new Date(),
-          'meta.deletedBy': userId,
-        },
-      },
-      { returnDocument: 'after' }
-    );
+    let group = await ProductGroup.findOne({ _id: id, 'meta.deletedAt': null });
+    if (!group) {
+      group = await ProductGroup.findById(id);
+      if (!group) throw new ApiError(404, 'Product group not found');
+    }
 
-    if (!group) throw new ApiError(404, 'Product group not found');
+    const productIds = Array.isArray(group.productIds) ? group.productIds : [];
+    let activeProductsCount = 0;
+    if (productIds.length > 0) {
+      activeProductsCount = await Product.countDocuments({
+        _id: { $in: productIds },
+        'meta.deletedAt': null,
+      });
+    }
+
+    const isEmpty = productIds.length === 0 || activeProductsCount === 0;
+
+    if (isEmpty) {
+      // Hard delete: permanently remove empty group document from database
+      await ProductGroup.findByIdAndDelete(group._id);
+
+      return {
+        message: 'Empty product group permanently deleted.',
+        id: group._id,
+        hardDeleted: true,
+      };
+    }
+
+    // Otherwise: Soft delete group, preserving member products
+    await ProductGroup.findByIdAndUpdate(group._id, {
+      $set: {
+        status: 'inactive',
+        'meta.deletedAt': new Date(),
+        'meta.deletedBy': userId,
+      },
+    });
 
     return {
       message: 'Product group deleted successfully. Member products were preserved.',
-      id,
+      id: group._id,
+      hardDeleted: false,
     };
   }
 

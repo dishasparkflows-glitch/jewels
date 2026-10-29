@@ -70,8 +70,9 @@ const bannerSchema = new mongoose.Schema(
         default: 0,
       },
     },
-    link: {
+    targetAudience: {
       type: String,
+      default: 'all',
       trim: true,
     },
     appStoreUrl: {
@@ -134,7 +135,7 @@ const bannerSchema = new mongoose.Schema(
 
 // Pre-save cleanup to ensure no default '' or null values are stored
 bannerSchema.pre('save', function (next) {
-  ['themeId', 'link', 'appStoreUrl', 'googlePlayUrl', 'startDate', 'endDate'].forEach((field) => {
+  ['themeId', 'targetAudience', 'appStoreUrl', 'googlePlayUrl', 'startDate', 'endDate'].forEach((field) => {
     if (this[field] === '' || this[field] === null) {
       this[field] = undefined;
     }

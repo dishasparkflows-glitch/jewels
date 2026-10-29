@@ -514,12 +514,26 @@ class ProductGroupService {
       'meta.deletedAt': null,
     });
 
+    // 6. 1-Product Groups (groups containing exactly 1 product)
+    const single = await ProductGroup.countDocuments({
+      ...baseGroupFilter,
+      productIds: { $size: 1 },
+    });
+
+    // 7. Multi-Product Groups (groups containing 2+ products)
+    const multi = await ProductGroup.countDocuments({
+      ...baseGroupFilter,
+      'productIds.1': { $exists: true },
+    });
+
     return {
       all,
       draft,
       approved,
       sold,
       ungrouped,
+      single,
+      multi,
     };
   }
 
@@ -579,10 +593,48 @@ class ProductGroupService {
       }
     }
 
+    // Filter by group type (single product vs multiple products)
+    if (queryParams.groupType === 'single') {
+      const singleCondition = { productIds: { $size: 1 } };
+      if (filter.$and) {
+        filter.$and.push(singleCondition);
+      } else {
+        filter.$and = [singleCondition];
+      }
+    } else if (queryParams.groupType === 'multi') {
+      const multiCondition = { 'productIds.1': { $exists: true } };
+      if (filter.$and) {
+        filter.$and.push(multiCondition);
+      } else {
+        filter.$and = [multiCondition];
+      }
+    }
+
     const total = await ProductGroup.countDocuments(filter);
 
     let rawGroups;
-    if (queryParams.sort === 'single_first' || !queryParams.sort) {
+    if (queryParams.sort === 'multi_first') {
+      const aggregatePipeline = [
+        { $match: filter },
+        {
+          $addFields: {
+            productCount: { $size: { $ifNull: ['$productIds', []] } },
+            isMulti: {
+              $cond: [{ $gt: [{ $size: { $ifNull: ['$productIds', []] } }, 1] }, 0, 1],
+            },
+          },
+        },
+        { $sort: { isMulti: 1, 'meta.createdAt': -1, _id: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+      ];
+      const matched = await ProductGroup.aggregate(aggregatePipeline);
+      rawGroups = await ProductGroup.populate(matched, {
+        path: 'productIds',
+        select:
+          '_id basicInfo pricing specifications ornate colorImages status stockStatus meta',
+      });
+    } else if (queryParams.sort === 'single_first' || !queryParams.sort) {
       const aggregatePipeline = [
         { $match: filter },
         {
@@ -721,6 +773,23 @@ class ProductGroupService {
         delete filter.productIds;
       } else {
         filter.$or = searchConditions;
+      }
+    }
+
+    // Filter by group type (single product vs multiple products)
+    if (queryParams.groupType === 'single') {
+      const singleCondition = { productIds: { $size: 1 } };
+      if (filter.$and) {
+        filter.$and.push(singleCondition);
+      } else {
+        filter.$and = [singleCondition];
+      }
+    } else if (queryParams.groupType === 'multi') {
+      const multiCondition = { 'productIds.1': { $exists: true } };
+      if (filter.$and) {
+        filter.$and.push(multiCondition);
+      } else {
+        filter.$and = [multiCondition];
       }
     }
 

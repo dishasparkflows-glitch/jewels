@@ -54,11 +54,6 @@ class ProductController {
     );
   });
 
-  // ------------------------------- get storefront filters (single lightweight common API) ----------------------------
-  getStorefrontFilters = catchAsync(async (req, res) => {
-    const data = await productService.getStorefrontFilters(req.query);
-    ApiResponse.success(res, data, 'Storefront filters retrieved successfully');
-  });
 
   // ------------------------------- get product lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {

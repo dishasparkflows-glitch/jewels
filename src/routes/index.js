@@ -59,15 +59,15 @@ const staticPageRoutes = require('../modules/staticPage/staticPage.routes');
 const galleryRoutes = require('../modules/gallery/gallery.routes');
 const orderRoutes = require('../modules/order/order.routes');
 const paymentRoutes = require('../modules/payment/payment.routes');
-const productController = require('../modules/product/product.controller');
+const filterRoutes = require('../modules/filter/filter.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/addresses', addressRoutes);
 router.use('/products', productRoutes);
-router.get('/filters', productController.getStorefrontFilters);
-router.get('/storefront/filters', productController.getStorefrontFilters);
+router.use('/filters', filterRoutes);
+router.use('/category-filters', filterRoutes);
 router.use('/product-groups', productGroupRoutes);
 router.use('/ornate', ornateRoutes);
 router.use('/wishlist', wishlistRoutes);

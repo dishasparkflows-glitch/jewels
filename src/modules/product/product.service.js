@@ -10,6 +10,7 @@ const DiamondClarity = require('../diamondClarity/diamondClarity.model');
 const CaratWeight = require('../caratWeight/caratWeight.model');
 const Featured = require('../featured/featured.model');
 const Wishlist = require('../wishlist/wishlist.model');
+const Category = require('../category/category.model');
 const ProductGroup = require('../productGroup/productGroup.model');
 const productGroupService = require('../productGroup/productGroup.service');
 const { SHOP_FOR_OPTIONS, getShopForGenders } = require('./product.filters');
@@ -362,7 +363,27 @@ class ProductService {
     }
 
     if (queryParams.category) {
-      filter.categoryIds = queryParams.category;
+      const catInputs = String(queryParams.category).split(',').map((s) => s.trim()).filter(Boolean);
+      const validIds = catInputs.filter((id) => mongoose.isValidObjectId(id));
+      const slugsOrNames = catInputs.filter((id) => !mongoose.isValidObjectId(id));
+
+      let resolvedCategoryIds = [...validIds];
+      if (slugsOrNames.length) {
+        const catDocs = await Category.find({
+          $or: [
+            { slug: { $in: slugsOrNames.map((s) => s.toLowerCase()) } },
+            { name: { $in: slugsOrNames.map((s) => new RegExp(`^${s}$`, 'i')) } },
+          ],
+          'meta.deletedAt': null,
+        }).distinct('_id');
+        resolvedCategoryIds = [...new Set([...resolvedCategoryIds, ...catDocs.map(String)])];
+      }
+
+      if (resolvedCategoryIds.length === 1) {
+        filter.categoryIds = resolvedCategoryIds[0];
+      } else if (resolvedCategoryIds.length > 1) {
+        filter.categoryIds = { $in: resolvedCategoryIds };
+      }
     }
 
     if (queryParams.menuItem) {
@@ -456,6 +477,172 @@ class ProductService {
     const facetFilter = { ...filter };
     const genders = getShopForGenders(queryParams.shopFor);
     if (genders.length) filter['basicInfo.gender'] = { $in: genders };
+
+    // Dynamic Filter: Diamond Type
+    if (queryParams.diamondType) {
+      const types = String(queryParams.diamondType).split(',').map((s) => s.trim()).filter(Boolean);
+      if (types.length) {
+        const dtDocs = await DiamondType.find({
+          $or: [
+            { _id: { $in: types.filter((t) => mongoose.isValidObjectId(t)) } },
+            { name: { $in: types.map((t) => new RegExp(`^${t}$`, 'i')) } },
+          ],
+        }).distinct('_id');
+        const typeIds = dtDocs.length ? dtDocs : types.filter((t) => mongoose.isValidObjectId(t));
+        const regexList = types.map((t) => new RegExp(t, 'i'));
+
+        filter.$and = [
+          ...(filter.$and || []),
+          {
+            $or: [
+              ...(typeIds.length ? [
+                { 'centerDiamondRows.diamondTypeId': { $in: typeIds } },
+                { 'sideDiamondRows.diamondTypeId': { $in: typeIds } },
+                { 'variants.diamondTypeId': { $in: typeIds } },
+              ] : []),
+              { 'basicInfo.title': { $in: regexList } },
+              { 'basicInfo.description': { $in: regexList } },
+            ],
+          },
+        ];
+      }
+    }
+
+    // Dynamic Filter: Diamond Clarity
+    if (queryParams.clarity) {
+      const clarities = String(queryParams.clarity).split(',').map((s) => s.trim()).filter(Boolean);
+      if (clarities.length) {
+        const dcDocs = await DiamondClarity.find({
+          $or: [
+            { _id: { $in: clarities.filter((c) => mongoose.isValidObjectId(c)) } },
+            { name: { $in: clarities.map((c) => new RegExp(`^${c}$`, 'i')) } },
+          ],
+        }).distinct('_id');
+        const clarityIds = dcDocs.length ? dcDocs : clarities.filter((c) => mongoose.isValidObjectId(c));
+        const regexList = clarities.map((c) => new RegExp(c, 'i'));
+
+        filter.$and = [
+          ...(filter.$and || []),
+          {
+            $or: [
+              ...(clarityIds.length ? [
+                { 'centerDiamondRows.diamondClarityId': { $in: clarityIds } },
+                { 'sideDiamondRows.diamondClarityId': { $in: clarityIds } },
+                { 'variants.diamondClarityId': { $in: clarityIds } },
+              ] : []),
+              { 'basicInfo.title': { $in: regexList } },
+              { 'basicInfo.description': { $in: regexList } },
+            ],
+          },
+        ];
+      }
+    }
+
+    // Dynamic Filter: Carat Weight
+    if (queryParams.carat) {
+      const carats = String(queryParams.carat).split(',').map((s) => s.trim()).filter(Boolean);
+      if (carats.length) {
+        const numericCarats = carats
+          .map((c) => parseFloat(c.replace(/[^\d.]/g, '')))
+          .filter((n) => !isNaN(n));
+        const orBranches = [];
+        if (numericCarats.length) {
+          numericCarats.forEach((num) => {
+            orBranches.push(
+              { 'centerDiamondRows.caratWeight': { $gte: num - 0.25, $lte: num + 0.25 } },
+              { 'variants.caratWeight': { $gte: num - 0.25, $lte: num + 0.25 } },
+              { 'pricing.baseCarat': { $gte: num - 0.25, $lte: num + 0.25 } }
+            );
+          });
+        }
+        carats.forEach((c) => {
+          orBranches.push({ 'basicInfo.title': new RegExp(c, 'i') });
+        });
+        if (orBranches.length) {
+          filter.$and = [...(filter.$and || []), { $or: orBranches }];
+        }
+      }
+    }
+
+    // Dynamic Filter: Collections
+    if (queryParams.collection) {
+      const collectionVals = String(queryParams.collection).split(',').map((s) => s.trim()).filter(Boolean);
+      if (collectionVals.length) {
+        const featuredItems = await Featured.find({
+          $or: [
+            { _id: { $in: collectionVals.filter((v) => mongoose.isValidObjectId(v)) } },
+            { name: { $in: collectionVals.map((v) => new RegExp(`^${v}$`, 'i')) } },
+          ],
+        }).select('productIds name').lean();
+
+        const pIds = featuredItems.flatMap((f) => (f.productIds || []).map((id) => (id._id || id)));
+        const regexList = collectionVals.map((v) => new RegExp(v, 'i'));
+
+        filter.$and = [
+          ...(filter.$and || []),
+          {
+            $or: [
+              ...(pIds.length ? [{ _id: { $in: pIds } }] : []),
+              { 'ornate.groupName': { $in: regexList } },
+              { 'ornate.customGroupName': { $in: regexList } },
+              { 'basicInfo.title': { $in: regexList } },
+            ],
+          },
+        ];
+      }
+    }
+
+    // Dynamic Filter: Metal
+    if (queryParams.metal) {
+      const metals = String(queryParams.metal).split(',').map((s) => s.trim()).filter(Boolean);
+      if (metals.length) {
+        const orBranches = [];
+        for (const m of metals) {
+          const reg = new RegExp(m, 'i');
+          if (/silver/i.test(m)) {
+            orBranches.push({ productType: 'silver' });
+            orBranches.push({ 'ornate.metalName': reg });
+          } else if (/gold/i.test(m)) {
+            orBranches.push({ productType: 'gold' });
+            orBranches.push({ 'ornate.metalName': reg });
+          } else if (/platinum/i.test(m)) {
+            orBranches.push({ 'ornate.metalName': reg });
+          }
+
+          try {
+            const MetalColorModel = mongoose.model('MetalColor');
+            const matchingColors = await MetalColorModel.find({ name: reg }).distinct('_id');
+            if (matchingColors.length) {
+              orBranches.push({ metalColorIds: { $in: matchingColors } });
+              orBranches.push({ 'variants.metalColorId': { $in: matchingColors } });
+              orBranches.push({ 'colorImages.metalColorId': { $in: matchingColors } });
+            }
+          } catch (_) {}
+          orBranches.push({ 'basicInfo.title': reg });
+        }
+        if (orBranches.length) {
+          filter.$and = [...(filter.$and || []), { $or: orBranches }];
+        }
+      }
+    }
+
+    // Dynamic Filter: Availability / Stock
+    const stockParam = queryParams.stockStatus || queryParams.availability;
+    if (stockParam) {
+      const statuses = String(stockParam).split(',').map((s) => s.trim()).filter(Boolean);
+      if (statuses.length) {
+        const orBranches = [
+          { stockStatus: { $in: statuses } },
+        ];
+        if (statuses.includes('In Stock')) {
+          orBranches.push({ 'ornate.isSold': false, 'ornate.stockQty': { $gt: 0 } });
+        }
+        if (statuses.includes('Out of Stock')) {
+          orBranches.push({ $or: [{ 'ornate.isSold': true }, { 'ornate.stockQty': { $lte: 0 } }] });
+        }
+        filter.$and = [...(filter.$and || []), { $or: orBranches }];
+      }
+    }
     const facetsQuery =
       queryParams.includeFacets === 'true'
         ? Promise.all(
@@ -766,7 +953,27 @@ class ProductService {
     };
 
     if (queryParams.category) {
-      filter.categoryIds = queryParams.category;
+      const catInputs = String(queryParams.category).split(',').map((s) => s.trim()).filter(Boolean);
+      const validIds = catInputs.filter((id) => mongoose.isValidObjectId(id));
+      const slugsOrNames = catInputs.filter((id) => !mongoose.isValidObjectId(id));
+
+      let resolvedCategoryIds = [...validIds];
+      if (slugsOrNames.length) {
+        const catDocs = await Category.find({
+          $or: [
+            { slug: { $in: slugsOrNames.map((s) => s.toLowerCase()) } },
+            { name: { $in: slugsOrNames.map((s) => new RegExp(`^${s}$`, 'i')) } },
+          ],
+          'meta.deletedAt': null,
+        }).distinct('_id');
+        resolvedCategoryIds = [...new Set([...resolvedCategoryIds, ...catDocs.map(String)])];
+      }
+
+      if (resolvedCategoryIds.length === 1) {
+        filter.categoryIds = resolvedCategoryIds[0];
+      } else if (resolvedCategoryIds.length > 1) {
+        filter.categoryIds = { $in: resolvedCategoryIds };
+      }
     }
     if (queryParams.metalName) {
       filter.$or = [
@@ -1010,71 +1217,10 @@ class ProductService {
     return { message: 'Product deleted successfully', id };
   }
 
-  // ------------------------------- get storefront filters (single lightweight common API) ----------------------------
+  // ------------------------------- get storefront filters (delegates to dedicated filters table) ----------------------------
   async getStorefrontFilters(queryParams = {}) {
-    const activeFilter = { 'meta.deletedAt': null, status: 'active' };
-
-    const [diamondTypes, diamondClarities, caratWeights, collections] = await Promise.all([
-      DiamondType.find(activeFilter).sort({ name: 1 }).select('_id name').lean(),
-      DiamondClarity.find(activeFilter).sort({ name: 1 }).select('_id name').lean(),
-      CaratWeight.find(activeFilter).sort({ order: 1, weight: 1, name: 1 }).select('_id name weight').lean(),
-      Featured.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name').lean(),
-    ]);
-
-    // Format clean data arrays returning ONLY frontend needed value and _id
-    const formattedDiamondTypes = diamondTypes.map((item) => ({
-      _id: item._id,
-      name: item.name,
-      value: item.name,
-    }));
-
-    const formattedDiamondClarities = diamondClarities.map((item) => ({
-      _id: item._id,
-      name: item.name,
-      value: item.name,
-    }));
-
-    const formattedCaratWeights = caratWeights.map((item) => ({
-      _id: item._id,
-      name: item.name || (item.weight ? `${item.weight} Ct` : ''),
-      value: item.weight ? `${item.weight} Ct` : (item.name || ''),
-      weight: item.weight,
-    }));
-
-    const formattedCollections = collections.map((item) => ({
-      _id: item._id,
-      name: item.name,
-      title: item.name,
-      value: item.name,
-    }));
-
-    const genders = [
-      { _id: 'Women', name: 'Women', value: 'Women' },
-      { _id: 'Men', name: 'Men', value: 'Men' },
-      { _id: 'Kids', name: 'Kids', value: 'Kids' },
-      { _id: 'Unisex', name: 'Unisex', value: 'Unisex' },
-    ];
-
-    const filterGroups = [
-      { id: 'carat-weights', title: 'Diamond Weight', key: 'carat', options: formattedCaratWeights },
-      { id: 'diamond-types', title: 'Diamond Type', key: 'diamondType', options: formattedDiamondTypes },
-      { id: 'collections', title: 'Collections', key: 'collection', options: formattedCollections },
-      { id: 'diamond-clarities', title: 'Diamond Clarities', key: 'clarity', options: formattedDiamondClarities },
-      { id: 'gender', title: 'Gender', key: 'shopFor', options: genders },
-    ];
-
-    if (queryParams.format === 'array') {
-      return filterGroups;
-    }
-
-    return {
-      diamondTypes: formattedDiamondTypes,
-      diamondClarities: formattedDiamondClarities,
-      caratWeights: formattedCaratWeights,
-      collections: formattedCollections,
-      genders,
-      filters: filterGroups,
-    };
+    const filterService = require('../filter/filter.service');
+    return filterService.getStorefrontFilters(queryParams);
   }
 }
 

@@ -29,73 +29,6 @@ class SettingService {
       } catch (_) {}
     }
 
-    if (!setting.buttonColor) {
-      setting.buttonColor = '#1f3a2b';
-      setting.buttonHoverColor = '#162b20';
-      setting.buttonTextColor = '#ffffff';
-    }
-
-    if (!setting.themeColors) {
-      setting.themeColors = {
-        buttonColor: setting.buttonColor || '#1f3a2b',
-        buttonHoverColor: setting.buttonHoverColor || '#162b20',
-        buttonTextColor: setting.buttonTextColor || '#ffffff',
-        topBarBgColor: '#60574d',
-        topBarTextColor: '#ffffff',
-        headerBgColor: '#22201e',
-        headerTextColor: '#ffffff',
-        footerBgColor: '#0f0d0b',
-        footerTextColor: '#c8b89e',
-      };
-    } else {
-      setting.themeColors = {
-        buttonColor: setting.themeColors.buttonColor || setting.buttonColor || '#1f3a2b',
-        buttonHoverColor: setting.themeColors.buttonHoverColor || setting.buttonHoverColor || '#162b20',
-        buttonTextColor: setting.themeColors.buttonTextColor || setting.buttonTextColor || '#ffffff',
-        topBarBgColor: setting.themeColors.topBarBgColor || '#60574d',
-        topBarTextColor: setting.themeColors.topBarTextColor || '#ffffff',
-        headerBgColor: setting.themeColors.headerBgColor || '#22201e',
-        headerTextColor: setting.themeColors.headerTextColor || '#ffffff',
-        footerBgColor: setting.themeColors.footerBgColor || '#0f0d0b',
-        footerTextColor: setting.themeColors.footerTextColor || '#c8b89e',
-      };
-    }
-
-    if (!setting.socialProof) {
-      setting.socialProof = {
-        showSoldCounter: true,
-        soldTimeHours: 3,
-        defaultSoldCount: 24,
-        showReviews: true,
-        defaultReviewCount: 13,
-        defaultRating: 5,
-      };
-    }
-
-    if (!setting.socialMedia) {
-      setting.socialMedia = {
-        instagram: 'https://www.instagram.com/neirah.officials?igsh=MWRrcDE3YnlhaTd6eg%3D%3D&utm_source=qr',
-        facebook: 'https://www.facebook.com/share/1Cosh9cg8h/?mibextid=wwXIfr',
-        youtube: '',
-        pinterest: '',
-        twitter: '',
-        linkedin: '',
-        whatsapp: '',
-      };
-    }
-
-    if (!setting.bankDetails) {
-      setting.bankDetails = {
-        bankName: setting.bankName || '',
-        bankAccountNumber: setting.bankAccountNumber || '',
-        ifscCode: setting.ifscCode || '',
-      };
-    } else {
-      setting.bankName = setting.bankDetails.bankName || '';
-      setting.bankAccountNumber = setting.bankDetails.bankAccountNumber || '';
-      setting.ifscCode = setting.bankDetails.ifscCode || '';
-    }
-
     return setting;
   }
 
@@ -134,14 +67,37 @@ class SettingService {
         };
         settings.markModified('socialProof');
       }
+      if (data.businessDetails) {
+        settings.businessDetails = {
+          ...(settings.businessDetails?.toObject ? settings.businessDetails.toObject() : (settings.businessDetails || {})),
+          ...data.businessDetails,
+        };
+        settings.markModified('businessDetails');
+      } else if (
+        data.companyName !== undefined ||
+        data.emailAddress !== undefined ||
+        data.mobileNumber !== undefined ||
+        data.storeAddress !== undefined ||
+        data.gstCode !== undefined ||
+        data.panCode !== undefined
+      ) {
+        settings.businessDetails = {
+          ...(settings.businessDetails?.toObject ? settings.businessDetails.toObject() : (settings.businessDetails || {})),
+          ...(data.companyName !== undefined ? { companyName: data.companyName } : {}),
+          ...(data.emailAddress !== undefined ? { emailAddress: data.emailAddress } : {}),
+          ...(data.mobileNumber !== undefined ? { mobileNumber: data.mobileNumber } : {}),
+          ...(data.storeAddress !== undefined ? { storeAddress: data.storeAddress } : {}),
+          ...(data.gstCode !== undefined ? { gstCode: data.gstCode } : {}),
+          ...(data.panCode !== undefined ? { panCode: data.panCode } : {}),
+        };
+        settings.markModified('businessDetails');
+      }
+
       if (data.themeColors) {
         settings.themeColors = {
           ...(settings.themeColors?.toObject ? settings.themeColors.toObject() : (settings.themeColors || {})),
           ...data.themeColors,
         };
-        if (data.themeColors.buttonColor) settings.buttonColor = data.themeColors.buttonColor;
-        if (data.themeColors.buttonHoverColor) settings.buttonHoverColor = data.themeColors.buttonHoverColor;
-        if (data.themeColors.buttonTextColor) settings.buttonTextColor = data.themeColors.buttonTextColor;
         settings.markModified('themeColors');
       } else if (data.buttonColor || data.buttonHoverColor || data.buttonTextColor) {
         settings.themeColors = {
@@ -215,20 +171,6 @@ class SettingService {
       .populate('currentThemeId', 'name code status description')
       .lean();
 
-    if (updated) {
-      if (!updated.bankDetails) {
-        updated.bankDetails = {
-          bankName: updated.bankName || '',
-          bankAccountNumber: updated.bankAccountNumber || '',
-          ifscCode: updated.ifscCode || '',
-        };
-      } else {
-        updated.bankName = updated.bankDetails.bankName || '';
-        updated.bankAccountNumber = updated.bankDetails.bankAccountNumber || '';
-        updated.ifscCode = updated.bankDetails.ifscCode || '';
-      }
-    }
-
     return updated;
   }
 
@@ -267,7 +209,7 @@ class SettingService {
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null };
     return await Setting.find(filter)
-      .select('_id companyName emailAddress mobileNumber')
+      .select('_id businessDetails')
       .lean();
   }
 

@@ -4,29 +4,31 @@ const metaPlugin = require('../../utils/metaPlugin');
 const settingSchema = new mongoose.Schema(
   {
     // Business & Identity
-    companyName: {
-      type: String,
-      trim: true,
-    },
-    emailAddress: {
-      type: String,
-      trim: true,
-    },
-    mobileNumber: {
-      type: String,
-      trim: true,
-    },
-    storeAddress: {
-      type: String,
-      trim: true,
-    },
-    gstCode: {
-      type: String,
-      trim: true,
-    },
-    panCode: {
-      type: String,
-      trim: true,
+    businessDetails: {
+      companyName: {
+        type: String,
+        trim: true,
+      },
+      emailAddress: {
+        type: String,
+        trim: true,
+      },
+      mobileNumber: {
+        type: String,
+        trim: true,
+      },
+      storeAddress: {
+        type: String,
+        trim: true,
+      },
+      gstCode: {
+        type: String,
+        trim: true,
+      },
+      panCode: {
+        type: String,
+        trim: true,
+      },
     },
     returnPeriodDays: {
       type: Number,
@@ -97,12 +99,12 @@ const settingSchema = new mongoose.Schema(
       buttonColor: {
         type: String,
         trim: true,
-        default: '#1f3a2b',
+        default: '#8b6f4e',
       },
       buttonHoverColor: {
         type: String,
         trim: true,
-        default: '#162b20',
+        default: '#755c3e',
       },
       buttonTextColor: {
         type: String,
@@ -112,7 +114,7 @@ const settingSchema = new mongoose.Schema(
       topBarBgColor: {
         type: String,
         trim: true,
-        default: '#60574d',
+        default: '#201e1b',
       },
       topBarTextColor: {
         type: String,
@@ -122,7 +124,7 @@ const settingSchema = new mongoose.Schema(
       headerBgColor: {
         type: String,
         trim: true,
-        default: '#22201e',
+        default: '#201e1b',
       },
       headerTextColor: {
         type: String,
@@ -139,21 +141,6 @@ const settingSchema = new mongoose.Schema(
         trim: true,
         default: '#c8b89e',
       },
-    },
-    buttonColor: {
-      type: String,
-      trim: true,
-      default: '#1f3a2b',
-    },
-    buttonHoverColor: {
-      type: String,
-      trim: true,
-      default: '#162b20',
-    },
-    buttonTextColor: {
-      type: String,
-      trim: true,
-      default: '#ffffff',
     },
 
     // Social Proof & Urgency

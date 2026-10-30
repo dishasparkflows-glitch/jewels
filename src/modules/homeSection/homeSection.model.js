@@ -185,4 +185,4 @@ const homeSectionSchema = new mongoose.Schema(
 
 homeSectionSchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('HomeSection', homeSectionSchema);
+module.exports = mongoose.model('HomeSection', homeSectionSchema, 'home_sections');

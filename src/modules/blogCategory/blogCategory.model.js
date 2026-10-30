@@ -52,4 +52,4 @@ blogCategorySchema.pre('save', function (next) {
 
 blogCategorySchema.plugin(metaPlugin);
 
-module.exports = mongoose.model('BlogCategory', blogCategorySchema);
+module.exports = mongoose.model('BlogCategory', blogCategorySchema, 'blog_categories');

@@ -69,15 +69,21 @@ class FeaturedService {
       filter.name = new RegExp(queryParams.search, 'i');
     }
 
+    const populateProducts = queryParams.populateProducts === 'true';
+
+    let query = Featured.find(filter)
+      .populate('categoryId', 'name type slug')
+      .populate('menuItemIds', 'title')
+      .sort({ order: 1, 'meta.createdAt': -1 })
+      .skip(skip)
+      .limit(limit);
+
+    if (populateProducts) {
+      query = query.populate('productIds', '_id basicInfo pricing images colorImages');
+    }
+
     const [items, total] = await Promise.all([
-      Featured.find(filter)
-        .populate('categoryId', 'name type slug')
-        .populate('menuItemIds', 'title')
-        .populate('productIds', '_id basicInfo pricing images colorImages')
-        .sort({ order: 1, 'meta.createdAt': -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+      query.lean(),
       Featured.countDocuments(filter),
     ]);
 
@@ -97,14 +103,21 @@ class FeaturedService {
 
   // ------------------------------- get featured item lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const filter = { 'meta.deletedAt': null, status: 'active' };
+    const filter = { 'meta.deletedAt': null };
+
+    if (queryParams.status) {
+      filter.status = queryParams.status;
+    } else {
+      filter.status = 'active';
+    }
+
     if (queryParams.placement) {
       filter.placement = new RegExp(`^${queryParams.placement}$`, 'i');
     }
 
     return await Featured.find(filter)
       .sort({ order: 1, name: 1 })
-      .select('_id name placement image position status productCount productIds')
+      .select('_id name placement image order status categoryId')
       .lean();
   }
 

@@ -12,7 +12,6 @@ const { getProductViewerCount } = require('../../socket/viewers.socket');
 router.get('/storefront', optionalAuth, productController.getStorefrontProducts);
 router.get('/search/storefront', optionalAuth, productController.getSearchStorefront);
 router.get('/home', optionalAuth, productController.getHomeProducts);
-router.get('/filters', productController.getStorefrontFilters);
 router.get('/lookup', productController.getLookup);
 router.get('/sku/:code', optionalAuth, productController.getBySkuOrTag);
 router.get('/:id/live-viewers', (req, res) => {

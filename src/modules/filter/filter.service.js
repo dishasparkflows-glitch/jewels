@@ -133,13 +133,11 @@ class FilterService {
         let isEnabled = f.enabled !== false;
         let order = f.order || 0;
         let customTitle = f.title;
-        let defaultValue = f.defaultValue || f.title;
 
         if (config) {
           isEnabled = config.enabled !== false;
           if (config.order !== undefined) order = config.order;
           if (config.customTitle) customTitle = config.customTitle;
-          if (config.defaultValue) defaultValue = config.defaultValue;
         }
 
         return {
@@ -149,8 +147,6 @@ class FilterService {
           customTitle: config?.customTitle || '',
           key: f.key,
           type: f.type,
-          description: f.description,
-          defaultValue,
           order,
           enabled: isEnabled,
           options: loadedOptions[f.filterId] || [],
@@ -174,8 +170,6 @@ class FilterService {
         customTitle: '',
         key: f.key,
         type: f.type,
-        description: f.description,
-        defaultValue: f.defaultValue || f.title,
         order: f.order,
         enabled: f.enabled !== false,
         options: loadedOptions[f.filterId] || [],
@@ -190,21 +184,40 @@ class FilterService {
     };
   }
 
-  // ── Storefront Filters with backward compatibility ──
+  // ── Storefront Filters (only clean, required, enabled filters) ──
   async getStorefrontFilters(queryParams = {}) {
     const result = await this.getFilters(queryParams);
-    const loadedOptions = await loadAllFilterOptions();
 
-    // Include backward-compatible arrays and options map
+    // Keep only enabled filters that have valid options (or range filters)
+    const cleanFilters = (result.filters || [])
+      .filter((f) => {
+        if (f.enabled === false) return false;
+        if (f.type === 'checkbox' && (!f.options || f.options.length === 0)) return false;
+        return true;
+      })
+      .map((f) => ({
+        id: f.id || f.filterId,
+        filterId: f.filterId || f.id,
+        title: f.title,
+        key: f.key,
+        type: f.type,
+        order: f.order,
+        enabled: true,
+        options: (f.options || []).map((opt) => ({
+          _id: String(opt._id),
+          name: opt.name || opt.title || opt.value,
+          value: opt.value || opt.name || opt.slug,
+          ...(opt.slug ? { slug: opt.slug } : {}),
+          ...(opt.weight !== undefined ? { weight: opt.weight } : {}),
+        })),
+      }))
+      .sort((a, b) => a.order - b.order);
+
     return {
-      ...result,
-      diamondTypes: loadedOptions['diamond-types'] || [],
-      diamondClarities: loadedOptions['diamond-clarities'] || [],
-      caratWeights: loadedOptions['carat-weights'] || [],
-      collections: loadedOptions['collections'] || [],
-      genders: loadedOptions['gender'] || [],
-      metals: loadedOptions['metal'] || [],
-      jewelleryTypes: loadedOptions['jewellery-types'] || [],
+      categoryId: result.categoryId,
+      categoryName: result.categoryName,
+      categorySlug: result.categorySlug,
+      filters: cleanFilters,
     };
   }
 
@@ -237,7 +250,6 @@ class FilterService {
         enabled: item.enabled !== false,
         order: item.order !== undefined ? Number(item.order) : i + 1,
         customTitle: item.customTitle ? String(item.customTitle).trim() : '',
-        defaultValue: item.defaultValue ? String(item.defaultValue).trim() : (item.title || filterDoc.title),
       };
 
       if (existingIndex >= 0) {
@@ -274,7 +286,6 @@ class FilterService {
           enabled: cfg ? cfg.enabled !== false : true,
           order: cfg?.order !== undefined ? cfg.order : idx + 1,
           customTitle: cfg?.customTitle || '',
-          defaultValue: cfg?.defaultValue || f.defaultValue || f.title,
         };
       }).sort((a, b) => a.order - b.order);
 
@@ -284,8 +295,6 @@ class FilterService {
         title: f.title,
         key: f.key,
         type: f.type,
-        description: f.description,
-        defaultValue: f.defaultValue || f.title,
         order: f.order,
         enabled: f.enabled !== false,
         categories: categoriesWithConfig,
@@ -319,7 +328,6 @@ class FilterService {
         enabled: item.enabled !== false,
         order: item.order !== undefined ? Number(item.order) : idx + 1,
         customTitle: item.customTitle ? String(item.customTitle).trim() : '',
-        defaultValue: item.defaultValue ? String(item.defaultValue).trim() : (filter.defaultValue || filter.title),
       };
     });
 

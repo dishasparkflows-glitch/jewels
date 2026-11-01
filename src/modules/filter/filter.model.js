@@ -26,11 +26,6 @@ const categoryConfigSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
-    defaultValue: {
-      type: String,
-      trim: true,
-      default: '',
-    },
   },
   { _id: false }
 );
@@ -59,16 +54,6 @@ const filterSchema = new mongoose.Schema(
       type: String,
       enum: ['checkbox', 'range', 'radio', 'select'],
       default: 'checkbox',
-    },
-    description: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    defaultValue: {
-      type: String,
-      trim: true,
-      default: '',
     },
     order: {
       type: Number,

@@ -51,37 +51,40 @@ function sanitizeBannerPayload(data) {
   }
 
   // Root fields
-  for (const field of ['themeId', 'targetAudience', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status']) {
+  for (const field of ['themeId', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status']) {
     if (!isNullOrEmpty(data[field])) {
       clean[field] = sanitizeStr(data[field]);
     }
   }
 
-  // Image
-  if (data.image && typeof data.image === 'object' && !isNullOrEmpty(data.image.url)) {
-    const cleanImg = { url: sanitizeStr(data.image.url) };
-    if (!isNullOrEmpty(data.image.key)) {
-      cleanImg.key = sanitizeStr(data.image.key);
+  // Unified Media / Image
+  const incomingMedia = data.media || data.image;
+  if (incomingMedia && typeof incomingMedia === 'object' && !isNullOrEmpty(incomingMedia.url)) {
+    const isVid = incomingMedia.mediaType === 'video' || data.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(incomingMedia.url);
+    const mType = isVid ? 'video' : (incomingMedia.mediaType || data.mediaType || 'image');
+    const cleanMedia = {
+      url: sanitizeStr(incomingMedia.url),
+      mediaType: mType,
+    };
+    if (!isNullOrEmpty(incomingMedia.key)) {
+      cleanMedia.key = sanitizeStr(incomingMedia.key);
     }
-    clean.image = cleanImg;
+    clean.image = cleanMedia;
+    clean.media = cleanMedia;
+    clean.mediaType = mType;
   }
 
   // Mobile Image
   if (data.mobileImage && typeof data.mobileImage === 'object' && !isNullOrEmpty(data.mobileImage.url)) {
-    const cleanMobileImg = { url: sanitizeStr(data.mobileImage.url) };
+    const isMobileVid = data.mobileImage.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(data.mobileImage.url);
+    const cleanMobileImg = {
+      url: sanitizeStr(data.mobileImage.url),
+      mediaType: isMobileVid ? 'video' : (data.mobileImage.mediaType || 'image'),
+    };
     if (!isNullOrEmpty(data.mobileImage.key)) {
       cleanMobileImg.key = sanitizeStr(data.mobileImage.key);
     }
     clean.mobileImage = cleanMobileImg;
-  }
-
-  // Video
-  if (data.video && typeof data.video === 'object' && !isNullOrEmpty(data.video.url)) {
-    const cleanVid = { url: sanitizeStr(data.video.url) };
-    if (!isNullOrEmpty(data.video.key)) {
-      cleanVid.key = sanitizeStr(data.video.key);
-    }
-    clean.video = cleanVid;
   }
 
   // CollectionImages
@@ -152,7 +155,7 @@ function buildBannerUpdateOps(data) {
   }
 
   // Root fields
-  const simpleFields = ['themeId', 'targetAudience', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status'];
+  const simpleFields = ['themeId', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status'];
   for (const field of simpleFields) {
     if (data[field] !== undefined) {
       if (isNullOrEmpty(data[field])) {
@@ -163,16 +166,23 @@ function buildBannerUpdateOps(data) {
     }
   }
 
-  // Image
-  if (data.image !== undefined) {
-    if (isNullOrEmpty(data.image) || isNullOrEmpty(data.image.url)) {
+  // Unified Media / Image
+  if (data.media !== undefined || data.image !== undefined) {
+    const incomingMedia = data.media !== undefined ? data.media : data.image;
+    if (isNullOrEmpty(incomingMedia) || isNullOrEmpty(incomingMedia.url)) {
       $unset['image'] = 1;
-    } else {
-      const cleanImg = { url: sanitizeStr(data.image.url) };
-      if (!isNullOrEmpty(data.image.key)) {
-        cleanImg.key = sanitizeStr(data.image.key);
-      }
-      $set['image'] = cleanImg;
+      $unset['media'] = 1;
+    } else if (typeof incomingMedia === 'object') {
+      const isVid = incomingMedia.mediaType === 'video' || data.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(incomingMedia.url);
+      const mType = isVid ? 'video' : (incomingMedia.mediaType || data.mediaType || 'image');
+      const cleanMedia = {
+        url: sanitizeStr(incomingMedia.url),
+        mediaType: mType,
+      };
+      if (!isNullOrEmpty(incomingMedia.key)) cleanMedia.key = sanitizeStr(incomingMedia.key);
+      $set['image'] = cleanMedia;
+      $set['media'] = cleanMedia;
+      $set['mediaType'] = mType;
     }
   }
 
@@ -180,39 +190,15 @@ function buildBannerUpdateOps(data) {
   if (data.mobileImage !== undefined) {
     if (isNullOrEmpty(data.mobileImage) || isNullOrEmpty(data.mobileImage.url)) {
       $unset['mobileImage'] = 1;
-    } else {
-      const cleanMobileImg = { url: sanitizeStr(data.mobileImage.url) };
-      if (!isNullOrEmpty(data.mobileImage.key)) {
-        cleanMobileImg.key = sanitizeStr(data.mobileImage.key);
-      }
-      $set['mobileImage'] = cleanMobileImg;
+    } else if (typeof data.mobileImage === 'object') {
+      const isMobileVid = data.mobileImage.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(data.mobileImage.url);
+      const cleanMobile = {
+        url: sanitizeStr(data.mobileImage.url),
+        mediaType: isMobileVid ? 'video' : (data.mobileImage.mediaType || 'image'),
+      };
+      if (!isNullOrEmpty(data.mobileImage.key)) cleanMobile.key = sanitizeStr(data.mobileImage.key);
+      $set['mobileImage'] = cleanMobile;
     }
-  }
-
-  // Video
-  if (data.video !== undefined) {
-    if (isNullOrEmpty(data.video) || isNullOrEmpty(data.video.url)) {
-      $unset['video'] = 1;
-    } else {
-      const cleanVid = { url: sanitizeStr(data.video.url) };
-      if (!isNullOrEmpty(data.video.key)) {
-        cleanVid.key = sanitizeStr(data.video.key);
-      }
-      $set['video'] = cleanVid;
-    }
-  }
-
-  // If mediaType is explicitly set, unset the opposite media
-  if (data.mediaType === 'image') {
-    $unset['video'] = 1;
-  } else if (data.mediaType === 'video') {
-    $unset['image'] = 1;
-    $unset['collectionImages'] = 1;
-  }
-
-  // If display.type is explicitly set and not collectionbanner, unset collectionImages
-  if (data.display?.type && data.display.type !== 'collectionbanner') {
-    $unset['collectionImages'] = 1;
   }
 
   // CollectionImages
@@ -247,7 +233,26 @@ function buildBannerUpdateOps(data) {
 class BannerService {
   _formatBanner(banner) {
     if (!banner) return null;
-    return banner.toObject ? banner.toObject() : banner;
+    const doc = banner.toObject ? banner.toObject() : { ...banner };
+    const m = doc.media || doc.image;
+    if (m && typeof m === 'object' && m.url) {
+      const isVid = m.mediaType === 'video' || doc.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(m.url);
+      const mType = isVid ? 'video' : (m.mediaType || doc.mediaType || 'image');
+      const unifiedMedia = {
+        url: m.url,
+        key: m.key,
+        mediaType: mType,
+      };
+      doc.image = unifiedMedia;
+      doc.media = unifiedMedia;
+      doc.mediaType = mType;
+    }
+    if (doc.mobileImage && typeof doc.mobileImage === 'object' && doc.mobileImage.url) {
+      if (!doc.mobileImage.mediaType) {
+        doc.mobileImage.mediaType = /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(doc.mobileImage.url) ? 'video' : 'image';
+      }
+    }
+    return doc;
   }
 
   // ------------------------------- create banner ----------------------------

@@ -10,14 +10,24 @@ class PaymentService {
   /**
    * Return gateway configuration and active providers for client checkout
    */
-  getPaymentConfig() {
-    const defaultGateway = (process.env.DEFAULT_PAYMENT_GATEWAY || 'razorpay').toLowerCase();
+  async getPaymentConfig() {
+    let defaultGateway = 'razorpay';
+    try {
+      const Setting = require('../setting/setting.model');
+      const setting = await Setting.findOne({ 'meta.deletedAt': null }).select('paymentProvider').lean();
+      if (setting?.paymentProvider) {
+        defaultGateway = setting.paymentProvider.toLowerCase();
+      } else if (process.env.DEFAULT_PAYMENT_GATEWAY) {
+        defaultGateway = process.env.DEFAULT_PAYMENT_GATEWAY.toLowerCase();
+      }
+    } catch {
+      defaultGateway = (process.env.DEFAULT_PAYMENT_GATEWAY || 'razorpay').toLowerCase();
+    }
+
     const activeProviders = providersRegistry.getActiveProviders().map((p) => p.getPublicConfig());
 
     return {
-      defaultProvider: activeProviders.some((p) => p.id === defaultGateway)
-        ? defaultGateway
-        : activeProviders[0]?.id || 'razorpay',
+      defaultProvider: defaultGateway,
       availableProviders: activeProviders,
     };
   }

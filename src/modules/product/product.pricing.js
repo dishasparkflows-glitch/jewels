@@ -1,4 +1,13 @@
 const ApiError = require('../../utils/ApiError');
+const GoldPrice = require('../goldPrice/goldPrice.model');
+const MetalPurity = require('../metalPurity/metalPurity.model');
+const MetalColor = require('../metalColor/metalColor.model');
+const CenterDiamondPrice = require('../centerDiamondPrice/centerDiamondPrice.model');
+const SideDiamondPrice = require('../sideDiamondPrice/sideDiamondPrice.model');
+const DiamondType = require('../diamondType/diamondType.model');
+const DiamondColor = require('../diamondColor/diamondColor.model');
+const DiamondClarity = require('../diamondClarity/diamondClarity.model');
+const DiamondShape = require('../diamondShape/diamondShape.model');
 
 const id = (value) => String(value?._id || value || '');
 const round = (value, places = 2) =>
@@ -279,34 +288,15 @@ async function loadPricingMasters() {
     clarities,
     shapes,
   ] = await Promise.all([
-    require('../goldPrice/goldPrice.model')
-      .findOne()
-      .sort({ updatedAt: -1 })
-      .lean(),
-    require('../metalPurity/metalPurity.model')
-      .find({ status: 'active', 'meta.deletedAt': null })
-      .lean(),
-    require('../metalColor/metalColor.model')
-      .find({ 'meta.deletedAt': null })
-      .lean(),
-    require('../centerDiamondPrice/centerDiamondPrice.model')
-      .find({ 'meta.deletedAt': null })
-      .lean(),
-    require('../sideDiamondPrice/sideDiamondPrice.model')
-      .find({ 'meta.deletedAt': null })
-      .lean(),
-    require('../diamondType/diamondType.model')
-      .find({ 'meta.deletedAt': null })
-      .lean(),
-    require('../diamondColor/diamondColor.model')
-      .find({ 'meta.deletedAt': null })
-      .lean(),
-    require('../diamondClarity/diamondClarity.model')
-      .find({ 'meta.deletedAt': null })
-      .lean(),
-    require('../diamondShape/diamondShape.model')
-      .find({ 'meta.deletedAt': null })
-      .lean(),
+    GoldPrice.findOne().sort({ updatedAt: -1 }).lean(),
+    MetalPurity.find({ status: 'active', 'meta.deletedAt': null }).lean(),
+    MetalColor.find({ 'meta.deletedAt': null }).lean(),
+    CenterDiamondPrice.find({ 'meta.deletedAt': null }).lean(),
+    SideDiamondPrice.find({ 'meta.deletedAt': null }).lean(),
+    DiamondType.find({ 'meta.deletedAt': null }).lean(),
+    DiamondColor.find({ 'meta.deletedAt': null }).lean(),
+    DiamondClarity.find({ 'meta.deletedAt': null }).lean(),
+    DiamondShape.find({ 'meta.deletedAt': null }).lean(),
   ]);
   return {
     gold,

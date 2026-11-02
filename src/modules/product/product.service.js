@@ -7,7 +7,6 @@ const {
 } = require('./product.pricing');
 const DiamondType = require('../diamondType/diamondType.model');
 const DiamondClarity = require('../diamondClarity/diamondClarity.model');
-const CaratWeight = require('../caratWeight/caratWeight.model');
 const Featured = require('../featured/featured.model');
 const Wishlist = require('../wishlist/wishlist.model');
 const Category = require('../category/category.model');
@@ -16,12 +15,14 @@ const productGroupService = require('../productGroup/productGroup.service');
 const { SHOP_FOR_OPTIONS, getShopForGenders } = require('./product.filters');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
+const cloudflareR2 = require('../../utils/cloudflareR2');
 const {
   withColorStatuses,
   sanitizeColorImages,
   isPricingUnchanged,
   formatHomeProduct,
   formatStorefrontProduct,
+  formatStorefrontProductDetail,
   formatLookupProduct,
   buildProductSearchFilter,
   buildProductTypeFilter,
@@ -31,6 +32,74 @@ const {
 } = require('./product.utils');
 
 class ProductService {
+  async _populateMediaSizes(product) {
+    if (!product) return;
+    let hasUpdates = false;
+
+    if (Array.isArray(product.colorImages)) {
+      for (const colorGroup of product.colorImages) {
+        if (Array.isArray(colorGroup.images)) {
+          await Promise.all(
+            colorGroup.images.map(async (img) => {
+              if ((!img.fileSize || !img.size) && (img.key || img.url)) {
+                try {
+                  const meta = await cloudflareR2.getFileMetadata(img.key || img.url);
+                  if (meta && meta.fileSize) {
+                    img.fileSize = meta.fileSize;
+                    img.size = meta.size;
+                    img.allowCompression = meta.allowCompression;
+                    hasUpdates = true;
+                  }
+                } catch {
+                  // ignore
+                }
+              } else if (img.fileSize && !img.size) {
+                const isKb = img.fileSize < 1024 * 1024;
+                img.size = isKb ? `${Math.round(img.fileSize / 1024)} KB` : `${(img.fileSize / (1024 * 1024)).toFixed(1)} MB`;
+                img.allowCompression = !isKb;
+              }
+            })
+          );
+        }
+      }
+    }
+
+    if (Array.isArray(product.ornate?.ornateImages)) {
+      await Promise.all(
+        product.ornate.ornateImages.map(async (img) => {
+          if ((!img.fileSize || !img.size) && (img.key || img.url)) {
+            try {
+              const meta = await cloudflareR2.getFileMetadata(img.key || img.url);
+              if (meta && meta.fileSize) {
+                img.fileSize = meta.fileSize;
+                img.size = meta.size;
+                img.allowCompression = meta.allowCompression;
+                hasUpdates = true;
+              }
+            } catch {
+              // ignore
+            }
+          }
+        })
+      );
+    }
+
+    if (hasUpdates && product._id) {
+      try {
+        await Product.updateOne(
+          { _id: product._id },
+          {
+            $set: {
+              ...(product.colorImages ? { colorImages: product.colorImages } : {}),
+              ...(product.ornate?.ornateImages ? { 'ornate.ornateImages': product.ornate.ornateImages } : {}),
+            },
+          }
+        );
+      } catch (err) {
+        console.warn('[ProductService] Failed to persist media sizes:', err.message);
+      }
+    }
+  }
   async previewPricing(data) {
     return calculateProductPricing(data, await loadPricingMasters());
   }
@@ -148,12 +217,12 @@ class ProductService {
   }
 
   // ------------------------------- get one product ----------------------------
-  async getOne(id, userId = null) {
+  async getOne(id, userId = null, { isAdmin = false } = {}) {
     await this.refreshCalculatedPrices();
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const filter = isObjectId
-      ? { $or: [{ _id: id }, { 'basicInfo.slug': id }] }
-      : { 'basicInfo.slug': id };
+      ? { $or: [{ _id: id }, { 'basicInfo.slug': id }, { 'basicInfo.sku': id }, { 'ornate.tagNo': id }] }
+      : { $or: [{ 'basicInfo.slug': id }, { 'basicInfo.sku': id }, { 'ornate.tagNo': id }] };
 
     const populateOptions = this._getProductPopulateOptions();
 
@@ -204,20 +273,53 @@ class ProductService {
     const inWishlist = wishlistedSet.has(String(product._id));
     const sizeChart = await this._extractSizeChart(product);
 
-    return withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart });
+    const fullProduct = withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart });
+    return isAdmin ? fullProduct : formatStorefrontProductDetail(fullProduct);
   }
 
   // ------------------------------- get product by sku or tag ----------------------------
-  async getBySkuOrTag(code, userId = null) {
+  async getBySkuOrTag(code, userId = null, { isAdmin = false } = {}) {
     await this.refreshCalculatedPrices();
+    const isObjectId = mongoose.Types.ObjectId.isValid(code);
     const populateOptions = this._getProductPopulateOptions();
-    let productQuery = Product.findOne({
-      $or: [{ 'basicInfo.sku': code }, { 'ornate.tagNo': code }]
-    });
+    let productQuery = Product.findOne(
+      isObjectId
+        ? { $or: [{ _id: code }, { 'basicInfo.sku': code }, { 'ornate.tagNo': code }, { 'basicInfo.slug': code }] }
+        : { $or: [{ 'basicInfo.sku': code }, { 'ornate.tagNo': code }, { 'basicInfo.slug': code }] }
+    );
     for (const pop of populateOptions) {
       productQuery = productQuery.populate(pop);
     }
-    const product = await productQuery.lean();
+    let product = await productQuery.lean();
+
+    // Fallback 1: If not found and code ends with group sequence (e.g. -000030), try stripping the sequence
+    if (!product && typeof code === 'string' && /-\d{6}$/.test(code)) {
+      const strippedSlug = code.replace(/-\d{6}$/, '');
+      let fallbackQuery = Product.findOne({ 'basicInfo.slug': strippedSlug });
+      for (const pop of populateOptions) {
+        fallbackQuery = fallbackQuery.populate(pop);
+      }
+      product = await fallbackQuery.lean();
+    }
+
+    // Fallback 2: Check ProductGroup by slug, groupCode, or _id
+    if (!product) {
+      const groupFilter = isObjectId
+        ? { $or: [{ _id: code }, { slug: code }, { groupCode: code }], 'meta.deletedAt': null }
+        : { $or: [{ slug: code }, { groupCode: code }], 'meta.deletedAt': null };
+      const group = await ProductGroup.findOne(groupFilter).lean();
+      if (group) {
+        const targetProdId = group.primaryProductId || (Array.isArray(group.productIds) ? group.productIds[0] : null);
+        if (targetProdId) {
+          let groupProductQuery = Product.findOne({ _id: targetProdId });
+          for (const pop of populateOptions) {
+            groupProductQuery = groupProductQuery.populate(pop);
+          }
+          product = await groupProductQuery.lean();
+        }
+      }
+    }
+
     if (!product) {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
     }
@@ -231,7 +333,8 @@ class ProductService {
     const inWishlist = wishlistedSet.has(String(product._id));
     const sizeChart = await this._extractSizeChart(product);
 
-    return withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart });
+    const fullProduct = withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart });
+    return isAdmin ? fullProduct : formatStorefrontProductDetail(fullProduct);
   }
 
   // Shared populate options for full product detail views
@@ -1162,7 +1265,13 @@ class ProductService {
     if (isOrnate) {
       const title = data.basicInfo?.title ?? existing.basicInfo?.title;
       const barcode = data.ornate?.barcode ?? existing.ornate?.barcode ?? data.barcode ?? existing.barcode;
-      if (title) {
+      // Only regenerate slug if the product has no slug yet, or if title/barcode actually changed
+      const existingSlug = existing.basicInfo?.slug;
+      const titleChanged = data.basicInfo?.title && data.basicInfo.title !== existing.basicInfo?.title;
+      const barcodeChanged = (data.ornate?.barcode ?? data.barcode) &&
+        (data.ornate?.barcode ?? data.barcode) !== (existing.ornate?.barcode ?? existing.barcode);
+      const needsSlug = !existingSlug || titleChanged || barcodeChanged;
+      if (title && needsSlug) {
         const fallbackId = data.basicInfo?.sku ?? existing.basicInfo?.sku ?? '';
         const slugBase = barcode ? `${title}-${barcode}` : (fallbackId ? `${title}-${fallbackId}` : title);
         const newSlug = slugBase
@@ -1173,6 +1282,21 @@ class ProductService {
           data.basicInfo.slug = newSlug;
         } else {
           data['basicInfo.slug'] = newSlug;
+        }
+      }
+    }
+
+    // Preserve existing slug when basicInfo is updated without an explicit slug, or generate from title
+    if (data.basicInfo && !data.basicInfo.slug) {
+      if (existing.basicInfo?.slug) {
+        data.basicInfo.slug = existing.basicInfo.slug;
+      } else {
+        const titleForSlug = data.basicInfo.title || existing.basicInfo?.title;
+        if (titleForSlug) {
+          data.basicInfo.slug = titleForSlug
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
         }
       }
     }

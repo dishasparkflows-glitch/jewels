@@ -1,6 +1,6 @@
 const axios = require('axios');
 const IntegrationToken = require('./integrationToken.model');
-const { encryptToken, decryptToken } = require('../../utils/encryption');
+const { decryptToken } = require('../../utils/encryption');
 const { normalizeUrl } = require('./whatsapp.utils');
 const ApiError = require('../../utils/ApiError');
 

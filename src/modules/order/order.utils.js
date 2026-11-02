@@ -1,0 +1,249 @@
+const Setting = require('../setting/setting.model');
+const ApiError = require('../../utils/ApiError');
+
+/**
+ * Generate a unique human-readable order number: NJ-YYYYMMDD-XXXXXX
+ */
+function generateOrderNumber() {
+  const today = new Date();
+  const datePart = today.toISOString().slice(0, 10).replace(/-/g, '');
+  const randomPart = Math.floor(100000 + Math.random() * 900000);
+  return `NJ-${datePart}-${randomPart}`;
+}
+
+/**
+ * Resolve active payment provider from Setting or env
+ */
+async function resolvePaymentProvider(requestedProvider) {
+  let configured = 'razorpay';
+  try {
+    const setting = await Setting.findOne({ 'meta.deletedAt': null }).select('paymentProvider').lean();
+    if (setting?.paymentProvider) {
+      configured = setting.paymentProvider.toLowerCase();
+    } else if (process.env.DEFAULT_PAYMENT_GATEWAY) {
+      configured = process.env.DEFAULT_PAYMENT_GATEWAY.toLowerCase();
+    }
+  } catch {
+    configured = (process.env.DEFAULT_PAYMENT_GATEWAY || 'razorpay').toLowerCase();
+  }
+  return (requestedProvider || configured).toLowerCase();
+}
+
+/**
+ * Format and validate order items directly using known schema fields without redundant conditions
+ */
+function formatOrderItems(items = []) {
+  return items.map((item) => {
+    const qty = Math.max(1, Number(item.quantity) || 1);
+    const price = Number(item.price) || 0;
+    return {
+      productId: item.productId,
+      title: item.title,
+      price,
+      quantity: qty,
+      totalItemPrice: item.totalItemPrice !== undefined ? Number(item.totalItemPrice) : price * qty,
+      originalPrice: item.originalPrice !== undefined ? item.originalPrice : null,
+      image: item.image || null,
+      category: item.category || '',
+      selectedMetal: item.selectedMetal || '',
+      selectedSize: item.selectedSize || '',
+      selectedAttributes: item.selectedAttributes || null,
+    };
+  });
+}
+
+/**
+ * Map cart items from saved Cart model directly to order items structure
+ */
+function mapCartItemsToOrderItems(cartItems = []) {
+  return cartItems.map((cartItem) => {
+    const qty = Math.max(1, Number(cartItem.quantity) || 1);
+    const price = Number(cartItem.price) || 0;
+    return {
+      productId: cartItem.productId,
+      title: cartItem.title,
+      price,
+      quantity: qty,
+      totalItemPrice: price * qty,
+      originalPrice: cartItem.originalPrice || null,
+      image: cartItem.image || null,
+      category: cartItem.category || '',
+      selectedMetal: cartItem.selectedMetal || '',
+      selectedSize: cartItem.selectedSize || '',
+      selectedAttributes: cartItem.selectedAttributes || null,
+    };
+  });
+}
+
+/**
+ * Calculate order subtotal from formatted items
+ */
+function calculateOrderSubtotal(items = []) {
+  return items.reduce((acc, curr) => acc + (Number(curr.totalItemPrice) || 0), 0);
+}
+
+/**
+ * Calculate shipping charges (free over ₹5000)
+ */
+function calculateOrderShipping(subtotal) {
+  return subtotal > 5000 || subtotal === 0 ? 0 : 250;
+}
+
+/**
+ * Calculate GST (3% on fine jewellery)
+ */
+function calculateOrderTax(subtotal) {
+  return Math.round(subtotal * 0.03);
+}
+
+/**
+ * Calculate complete pricing breakdown including shipping, tax, discounts, and COD amounts
+ */
+function calculateOrderPricing({ subtotal, discount = 0, paymentMethod = 'online', codFee = 0 }) {
+  const shipping = calculateOrderShipping(subtotal);
+  const tax = calculateOrderTax(subtotal);
+  const total = Math.max(0, subtotal + shipping + tax - discount);
+
+  let codDueNow = 0;
+  let codRemaining = 0;
+
+  if (paymentMethod === 'cod') {
+    codDueNow = Math.min(total, Number(codFee || 0));
+    codRemaining = Math.max(0, total - codDueNow);
+  }
+
+  return {
+    subtotal,
+    shipping,
+    tax,
+    discount,
+    total,
+    codDueNow,
+    codRemaining,
+    paidAmount: 0,
+  };
+}
+
+/**
+ * Extract shipping address snapshot from input payload or user profile
+ */
+function buildShippingAddress(data, user = null) {
+  return data.shippingAddress || {
+    firstName: data.firstName || user?.profile?.firstName || '',
+    lastName: data.lastName || user?.profile?.lastName || '',
+    fullName: [data.firstName || user?.profile?.firstName, data.lastName || user?.profile?.lastName].filter(Boolean).join(' '),
+    email: data.email || user?.auth?.email || '',
+    phone: data.phone || user?.profile?.phone || '',
+    countryCode: data.countryCode || '+91',
+    addressLine: data.addressLine || data.street || '',
+    apartment: data.apartment || '',
+    city: data.city || '',
+    state: data.state || '',
+    postalCode: data.postalCode || data.pincode || '',
+    country: data.country || 'India',
+  };
+}
+
+/**
+ * Validate required shipping address fields
+ */
+function validateShippingAddress(shippingAddress) {
+  if (!shippingAddress.addressLine || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postalCode) {
+    throw new ApiError(400, 'Complete shipping address is required (addressLine, city, state, postalCode).');
+  }
+  if (!shippingAddress.phone) {
+    throw new ApiError(400, 'Phone number is required for shipping.');
+  }
+}
+
+/**
+ * Extract customer information snapshot for the order
+ */
+function buildCustomerInfo(shippingAddress, user = null) {
+  return {
+    firstName: shippingAddress.firstName || user?.profile?.firstName || '',
+    lastName: shippingAddress.lastName || user?.profile?.lastName || '',
+    email: shippingAddress.email || user?.auth?.email || '',
+    phone: shippingAddress.phone || user?.profile?.phone || '',
+  };
+}
+
+/**
+ * Authorization check: only order owner, admin, or super_admin can view/modify
+ */
+function checkOrderAccess(order, user = null) {
+  if (user && user.role !== 'admin' && user.role !== 'super_admin') {
+    const orderOwner = order.userId;
+    if (orderOwner && orderOwner.toString() !== user._id.toString()) {
+      throw new ApiError(403, 'You do not have permission to access this order');
+    }
+  }
+}
+
+/**
+ * Build MongoDB query filter for user order history
+ */
+function buildUserOrderFilters(userId, queryParams = {}) {
+  const filter = {
+    'meta.deletedAt': null,
+    userId,
+  };
+
+  if (queryParams.orderStatus) {
+    filter.orderStatus = queryParams.orderStatus;
+  }
+  if (queryParams.paymentStatus) {
+    filter['payment.status'] = queryParams.paymentStatus;
+  }
+
+  return filter;
+}
+
+/**
+ * Build MongoDB query filter for admin order management
+ */
+function buildAdminOrderFilters(queryParams = {}) {
+  const filter = { 'meta.deletedAt': null };
+
+  if (queryParams.orderStatus) {
+    filter.orderStatus = queryParams.orderStatus;
+  }
+  if (queryParams.paymentStatus) {
+    filter['payment.status'] = queryParams.paymentStatus;
+  }
+  if (queryParams.paymentProvider) {
+    filter['payment.provider'] = queryParams.paymentProvider;
+  }
+  if (queryParams.paymentMethod) {
+    filter['payment.method'] = queryParams.paymentMethod;
+  }
+  if (queryParams.search) {
+    const reg = new RegExp(queryParams.search, 'i');
+    filter.$or = [
+      { orderNumber: reg },
+      { 'customer.firstName': reg },
+      { 'customer.lastName': reg },
+      { 'customer.email': reg },
+      { 'customer.phone': reg },
+    ];
+  }
+
+  return filter;
+}
+
+module.exports = {
+  generateOrderNumber,
+  resolvePaymentProvider,
+  formatOrderItems,
+  mapCartItemsToOrderItems,
+  calculateOrderSubtotal,
+  calculateOrderShipping,
+  calculateOrderTax,
+  calculateOrderPricing,
+  buildShippingAddress,
+  validateShippingAddress,
+  buildCustomerInfo,
+  checkOrderAccess,
+  buildUserOrderFilters,
+  buildAdminOrderFilters,
+};

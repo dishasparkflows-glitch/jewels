@@ -10,9 +10,15 @@ class DiamondController {
   });
 
   bulkCreate = catchAsync(async (req, res) => {
-    const items = req.body.items || req.body;
+    const items = req.body.items || req.body.diamonds || req.body;
     const result = await diamondService.bulkCreate(items);
-    ApiResponse.created(res, result, `Successfully created ${result.length} diamond variants`);
+    ApiResponse.created(res, result, `Successfully processed diamond variants`);
+  });
+
+  validate = catchAsync(async (req, res) => {
+    const diamonds = req.body.diamonds || req.body.items || req.body;
+    const result = await diamondService.validate(diamonds);
+    ApiResponse.success(res, result, 'Diamond validation completed');
   });
 
   // ------------------------------- get all diamonds ----------------------------

@@ -5,7 +5,7 @@ const ApiResponse = require('../../utils/ApiResponse');
 class PaymentController {
   // ------------------------------- Get Payment Config ----------------------------
   getConfig = catchAsync(async (req, res) => {
-    const config = paymentService.getPaymentConfig();
+    const config = await paymentService.getPaymentConfig();
     ApiResponse.success(res, config, 'Payment configuration retrieved successfully');
   });
 

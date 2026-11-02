@@ -4,15 +4,10 @@ const mediaField = require('../../utils/mediaField');
 
 const orderItemSchema = new mongoose.Schema(
   {
-    product: {
+    productId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
-      default: null,
-    },
-    productId: {
-      type: String,
       required: true,
-      trim: true,
     },
     title: {
       type: String,
@@ -86,7 +81,7 @@ const orderSchema = new mongoose.Schema(
       index: true,
       trim: true,
     },
-    user: {
+    userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       default: null,
@@ -166,10 +161,6 @@ const orderSchema = new mongoose.Schema(
     notes: {
       type: String,
       default: '',
-    },
-    source: {
-      type: String,
-      default: 'storefront',
     },
   },
   {

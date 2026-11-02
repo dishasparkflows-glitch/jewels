@@ -216,7 +216,7 @@ class CCAvenueService extends BasePaymentProvider {
       customParams: {
         orderId: order._id.toString(),
         orderNumber: order.orderNumber,
-        userId: order.user ? order.user.toString() : '',
+        userId: (order.userId || order.user) ? (order.userId || order.user).toString() : '',
       },
     });
 

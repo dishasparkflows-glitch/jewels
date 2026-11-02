@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const footerSettingsController = require('./footerSettings.controller');
-const { authenticate, authorize } = require('../../middleware/auth.middleware');
+const { authenticate } = require('../../middleware/auth.middleware');
 
 // Public or Admin footer settings getter
 router.get('/settings', footerSettingsController.getSettings);

@@ -70,11 +70,6 @@ const bannerSchema = new mongoose.Schema(
         default: 0,
       },
     },
-    targetAudience: {
-      type: String,
-      default: 'all',
-      trim: true,
-    },
     appStoreUrl: {
       type: String,
       trim: true,
@@ -87,11 +82,28 @@ const bannerSchema = new mongoose.Schema(
       _id: false,
       url: String,
       key: String,
+      mediaType: {
+        type: String,
+        default: 'image',
+      },
+    },
+    media: {
+      _id: false,
+      url: String,
+      key: String,
+      mediaType: {
+        type: String,
+        default: 'image',
+      },
     },
     mobileImage: {
       _id: false,
       url: String,
       key: String,
+      mediaType: {
+        type: String,
+        default: 'image',
+      },
     },
     collectionImages: {
       type: [{
@@ -101,11 +113,6 @@ const bannerSchema = new mongoose.Schema(
         key: { type: String },
       }],
       default: undefined,
-    },
-    video: {
-      _id: false,
-      url: String,
-      key: String,
     },
     mediaType: {
       type: String,
@@ -163,27 +170,33 @@ bannerSchema.pre('save', function (next) {
     }
   }
 
-  if (this.image) {
-    if (!this.image.url) {
-      this.image = undefined;
-    } else if (this.image.key === '' || this.image.key === null) {
-      this.image.key = undefined;
-    }
+  // Unified media & image synchronization
+  const incomingMedia = this.media || this.image;
+  if (incomingMedia && incomingMedia.url) {
+    const isVid = (incomingMedia.mediaType === 'video') || (this.mediaType === 'video') || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(incomingMedia.url);
+    const mType = isVid ? 'video' : (incomingMedia.mediaType || this.mediaType || 'image');
+    const unified = {
+      url: incomingMedia.url,
+      key: incomingMedia.key || undefined,
+      mediaType: mType,
+    };
+    this.image = unified;
+    this.media = unified;
+    this.mediaType = mType;
+  } else {
+    this.image = undefined;
+    this.media = undefined;
   }
 
   if (this.mobileImage) {
     if (!this.mobileImage.url) {
       this.mobileImage = undefined;
-    } else if (this.mobileImage.key === '' || this.mobileImage.key === null) {
-      this.mobileImage.key = undefined;
-    }
-  }
-
-  if (this.video) {
-    if (!this.video.url) {
-      this.video = undefined;
-    } else if (this.video.key === '' || this.video.key === null) {
-      this.video.key = undefined;
+    } else {
+      const isMobileVid = (this.mobileImage.mediaType === 'video') || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(this.mobileImage.url);
+      this.mobileImage.mediaType = isMobileVid ? 'video' : (this.mobileImage.mediaType || 'image');
+      if (this.mobileImage.key === '' || this.mobileImage.key === null) {
+        this.mobileImage.key = undefined;
+      }
     }
   }
 

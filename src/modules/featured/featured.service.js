@@ -1,5 +1,4 @@
 const Featured = require('./featured.model');
-const Product = require('../product/product.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 

@@ -30,18 +30,6 @@ const settingSchema = new mongoose.Schema(
         trim: true,
       },
     },
-    returnPeriodDays: {
-      type: Number,
-    },
-    returnPolicy: {
-      type: String,
-      trim: true,
-    },
-    shippingPolicy: {
-      type: String,
-      default: '',
-      trim: true,
-    },
     logoImage: {
       url: { type: String, default: '' },
       key: { type: String, default: '' },
@@ -71,6 +59,14 @@ const settingSchema = new mongoose.Schema(
       quality: { type: Number, min: 50, max: 100, default: 82 },
       maxDimension: { type: Number, min: 600, max: 4000, default: 2400 },
       format: { type: String, enum: ['image/webp', 'image/jpeg'], default: 'image/webp' },
+    },
+
+    // Payment Gateway & Settlement
+    paymentProvider: {
+      type: String,
+      enum: ['razorpay', 'ccavenue', 'cashfree', 'phonepe'],
+      default: 'razorpay',
+      trim: true,
     },
 
     // Monetary Settlement

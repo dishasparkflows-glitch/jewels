@@ -2,37 +2,59 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
 const cloudflareR2 = require('../../utils/cloudflareR2');
-const { keyFromUrl } = require('../../utils/media');
 
 // ------------------------------- get presigned url ----------------------------
 const getPresignedUrl = catchAsync(async (req, res) => {
-  const { module: rawModule, folder, contentType, productId, subfolder, files } = req.body;
-  const targetModule = rawModule || folder;
+  const isDirectArray = Array.isArray(req.body);
+  const body = isDirectArray ? {} : (req.body || {});
+  const rawFiles = isDirectArray ? req.body : (body.files || body.items);
+  const rawModule = body.module || body.folder || req.query?.module || req.query?.folder;
+  const targetModule = rawModule || (isDirectArray && (rawFiles[0]?.module || rawFiles[0]?.folder));
 
-  if (!targetModule) {
+  if (!targetModule && (!rawFiles || !rawFiles.length || !(rawFiles[0]?.module || rawFiles[0]?.folder))) {
     throw new ApiError(400, 'Module is required. Examples: "user", "category", "product", "navigation"');
   }
   const expiresIn = 3600;
 
-  if (files !== undefined) {
-    if (!Array.isArray(files) || files.length === 0) {
+  if (rawFiles !== undefined) {
+    if (!Array.isArray(rawFiles) || rawFiles.length === 0) {
       throw new ApiError(400, 'Files must be a non-empty array');
     }
-    if (files.some((file) => !file || typeof file.contentType !== 'string' || !file.contentType.trim())) {
-      throw new ApiError(400, 'Every file must include a contentType');
-    }
 
-    const results = await Promise.all(files.map(async (file, index) => ({
-      index,
-      ...(file.name ? { name: file.name } : {}),
-      ...await cloudflareR2.getPresignedPutUrl({
-        module: targetModule,
-        contentType: file.contentType,
-        productId,
-        subfolder,
+    const inferContentType = (file) => {
+      const type = file.contentType || file.type;
+      if (type && typeof type === 'string' && type.trim()) return type.trim().toLowerCase();
+      const name = file.name || file.filename || '';
+      if (/\.png$/i.test(name)) return 'image/png';
+      if (/\.webp$/i.test(name)) return 'image/webp';
+      if (/\.mp4$/i.test(name)) return 'video/mp4';
+      if (/\.webm$/i.test(name)) return 'video/webm';
+      if (/\.(mov|m4v)$/i.test(name)) return 'video/quicktime';
+      if (/\.gif$/i.test(name)) return 'image/gif';
+      if (/\.avif$/i.test(name)) return 'image/avif';
+      return 'image/jpeg';
+    };
+
+    const results = await Promise.all(rawFiles.map(async (file, index) => {
+      const itemModule = file.module || file.folder || targetModule;
+      const itemProductId = file.productId || body.productId;
+      const itemSubfolder = file.subfolder || body.subfolder;
+      const itemContentType = inferContentType(file);
+
+      const presigned = await cloudflareR2.getPresignedPutUrl({
+        module: itemModule,
+        contentType: itemContentType,
+        productId: itemProductId,
+        subfolder: itemSubfolder,
         expiresIn,
-      }),
-    })));
+      });
+
+      return {
+        index,
+        ...(file.name ? { name: file.name } : {}),
+        ...presigned,
+      };
+    }));
 
     return ApiResponse.success(
       res,
@@ -44,9 +66,9 @@ const getPresignedUrl = catchAsync(async (req, res) => {
 
   const result = await cloudflareR2.getPresignedPutUrl({
     module: targetModule,
-    contentType,
-    productId,
-    subfolder,
+    contentType: body.contentType,
+    productId: body.productId,
+    subfolder: body.subfolder,
     expiresIn,
   });
 
@@ -89,4 +111,37 @@ const deleteFile = catchAsync(async (req, res) => {
   return ApiResponse.success(res, null, 'File deleted from Cloudflare R2 successfully');
 });
 
-module.exports = { getPresignedUrl, getFile, deleteFile };
+// ------------------------------- get file info / size from R2 ----------------------------
+const getFileInfo = catchAsync(async (req, res) => {
+  const { key, url, keys, urls } = req.method === 'POST' ? req.body : req.query;
+  const targetList = Array.isArray(keys) ? keys : Array.isArray(urls) ? urls : [key || url].filter(Boolean);
+
+  if (targetList.length === 0) {
+    throw new ApiError(400, 'File key or url is required');
+  }
+
+  if (targetList.length === 1 && !Array.isArray(keys) && !Array.isArray(urls)) {
+    const meta = await cloudflareR2.getFileMetadata(targetList[0]);
+    if (!meta) {
+      throw new ApiError(404, 'File metadata could not be retrieved from Cloudflare R2');
+    }
+    return ApiResponse.success(res, { ...meta, requestedKey: targetList[0] }, 'File metadata retrieved successfully');
+  }
+
+  const results = await Promise.all(
+    targetList.map(async (item) => {
+      try {
+        const meta = await cloudflareR2.getFileMetadata(item);
+        return meta
+          ? { ...meta, requestedKey: item }
+          : { key: item, requestedKey: item, error: 'Could not fetch metadata' };
+      } catch (err) {
+        return { key: item, requestedKey: item, error: err.message };
+      }
+    })
+  );
+
+  return ApiResponse.success(res, results, 'Batch file metadata retrieved successfully');
+});
+
+module.exports = { getPresignedUrl, getFile, deleteFile, getFileInfo };

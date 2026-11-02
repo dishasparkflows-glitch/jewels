@@ -5,6 +5,7 @@ const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
 // Public or storefront endpoints
+router.post('/validate', diamondController.validate);
 router.get('/attributes', diamondController.getDiamondOptions);
 router.get('/lookup', diamondController.getLookup);
 router.get('/sku/:sku', diamondController.getBySku);

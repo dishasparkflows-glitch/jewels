@@ -15,6 +15,7 @@ router.get('/search/storefront', optionalAuth, productController.getSearchStoref
 router.get('/home', optionalAuth, productController.getHomeProducts);
 router.get('/lookup', productController.getLookup);
 router.get('/sku/:code', optionalAuth, productController.getBySkuOrTag);
+router.get('/:id', optionalAuth, productController.getOne);
 router.get('/:id/live-viewers', (req, res) => {
   const count = getProductViewerCount(req.params.id);
   res.json({
@@ -27,7 +28,6 @@ router.get('/:id/live-viewers', (req, res) => {
   });
 });
 router.get('/', optionalAuth, productController.getAll);
-router.get('/:id', optionalAuth, productController.getOne);
 
 // Protected Admin endpoints
 router.post(

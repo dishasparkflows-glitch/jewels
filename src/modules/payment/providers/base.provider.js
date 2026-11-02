@@ -77,10 +77,11 @@ class BasePaymentProvider {
     await order.save();
 
     // Clear cart if this order belongs to a registered user
-    if (order.user) {
+    const orderUser = order.userId || order.user;
+    if (orderUser) {
       try {
         await Cart.updateOne(
-          { $or: [{ user: order.user }, { userId: order.user }] },
+          { $or: [{ user: orderUser }, { userId: orderUser }] },
           { $set: { items: [] } }
         );
       } catch (err) {

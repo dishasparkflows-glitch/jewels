@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const settingController = require('./setting.controller');
-const { authenticate, authorize } = require('../../middleware/auth.middleware');
+const { authenticate } = require('../../middleware/auth.middleware');
 
 // Public or storefront config getter
 router.get('/', settingController.getSettings);

@@ -39,33 +39,103 @@ class DiamondService {
     return await Diamond.create(data);
   }
 
-  // ------------------------------- bulk create diamonds ----------------------------
+  // ------------------------------- bulk create / upsert diamonds ----------------------------
   async bulkCreate(items) {
     if (!Array.isArray(items) || items.length === 0) {
       throw new ApiError(400, 'Please provide an array of diamonds');
     }
 
-    const created = [];
-    for (const item of items) {
-      if (!item.shapeId && item.shape) item.shapeId = item.shape;
-      if (!item.colorId && item.color) item.colorId = item.color;
-      if (!item.clarityId && item.clarity) item.clarityId = item.clarity;
-      if (!item.typeId && item.type) item.typeId = item.type;
+    const bulkOps = items.map((d) => {
+      const typeId = d.typeId || d.type;
+      const shapeId = d.shapeId || d.shape;
+      const colorId = d.colorId || d.color;
+      const clarityId = d.clarityId || d.clarity;
 
-      if (item.sku) {
-        item.sku = item.sku.trim();
-        const existing = await Diamond.findOne({ sku: item.sku });
-        if (existing) {
-          item.sku = `${item.sku}-${Date.now().toString().slice(-4)}`;
-        }
-      } else {
-        item.sku = `DIA-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const doc = {
+        sku: String(d.sku || '').trim(),
+        title: String(d.title || '').trim(),
+        description: d.description || '',
+        price: parseFloat(d.price) || 0,
+        rate: parseFloat(d.ratePerCarat || d.rate) || 0,
+        carat: parseFloat(d.carat) || 0,
+        typeId,
+        shapeId,
+        colorId,
+        clarityId,
+        status: d.status || 'active',
+      };
+
+      if (d.image?.url) {
+        doc.image = { url: d.image.url, key: d.image.key, public_id: d.image.public_id };
       }
 
-      const doc = await Diamond.create(item);
-      created.push(doc);
+      const update = { $set: doc };
+      if (d._id) {
+        return {
+          updateOne: {
+            filter: { _id: d._id },
+            update,
+            upsert: true,
+          },
+        };
+      }
+      return {
+        updateOne: {
+          filter: { sku: doc.sku },
+          update,
+          upsert: true,
+        },
+      };
+    });
+
+    const result = await Diamond.bulkWrite(bulkOps);
+    return {
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount,
+      upsertedCount: result.upsertedCount,
+      insertedCount: result.insertedCount,
+      count: items.length,
+    };
+  }
+
+  // ------------------------------- batch validate diamonds ----------------------------
+  async validate(diamonds = []) {
+    if (!Array.isArray(diamonds) || diamonds.length === 0) {
+      return { existingDiamonds: [] };
     }
-    return created;
+
+    const orConditions = [];
+    for (const d of diamonds) {
+      const caratNum = parseFloat(d.carat);
+      const typeId = d.typeId || d.type;
+      const shapeId = d.shapeId || d.shape;
+      const colorId = d.colorId || d.color;
+      const clarityId = d.clarityId || d.clarity;
+
+      if (!isNaN(caratNum) && typeId && shapeId && colorId && clarityId) {
+        orConditions.push({
+          carat: caratNum,
+          typeId,
+          shapeId,
+          colorId,
+          clarityId,
+        });
+      }
+      if (d.sku && typeof d.sku === 'string' && d.sku.trim()) {
+        orConditions.push({ sku: d.sku.trim() });
+      }
+    }
+
+    if (orConditions.length === 0) {
+      return { existingDiamonds: [] };
+    }
+
+    const existing = await Diamond.find({
+      $or: orConditions,
+      'meta.deletedAt': null,
+    }).populate(getSafePopulates()).lean();
+
+    return { existingDiamonds: existing };
   }
 
   // ------------------------------- get one diamond ----------------------------

@@ -133,10 +133,6 @@ const productSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
-    certificateImage: {
-      url: { type: String, default: '' },
-      key: { type: String, default: '' },
-    },
     colorImages: {
       type: [{
         status: {

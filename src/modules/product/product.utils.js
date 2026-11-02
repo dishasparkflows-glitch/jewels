@@ -76,10 +76,23 @@ const withColorStatuses = (product) => {
         (typeof ci.image === 'string' ? ci.image : '') ||
         '';
       const resolved = resolveMetalColorInfo(ci.metalColorId || ci.metalColor, product);
+
+      const sanitizedImages = (ci.images || []).map((img) => {
+        if (!img) return null;
+        const url = typeof img === 'string' ? img : img.url;
+        if (!url) return null;
+        const mediaType = (typeof img === 'object' && img.mediaType) ? img.mediaType : 'image';
+        return {
+          url,
+          mediaType,
+        };
+      }).filter(Boolean);
+
       const item = { ...ci };
       delete item.metalColor;
       return {
         ...item,
+        images: sanitizedImages,
         status: item.status ?? 'active',
         metalColorId: resolved.name
           ? {
@@ -94,22 +107,151 @@ const withColorStatuses = (product) => {
       };
     });
   }
+
+  if (Array.isArray(product.ornate?.ornateImages)) {
+    product.ornate.ornateImages = product.ornate.ornateImages.map((img) => {
+      if (!img) return null;
+      const url = typeof img === 'string' ? img : img.url;
+      if (!url) return null;
+      const mediaType = (typeof img === 'object' && img.mediaType) ? img.mediaType : 'image';
+      return {
+        url,
+        mediaType,
+      };
+    }).filter(Boolean);
+  }
+
+  if (Array.isArray(product.images)) {
+    product.images = product.images.map((img) => {
+      if (!img) return null;
+      const url = typeof img === 'string' ? img : img.url;
+      if (!url) return null;
+      const mediaType = (typeof img === 'object' && img.mediaType) ? img.mediaType : 'image';
+      return {
+        url,
+        mediaType,
+      };
+    }).filter(Boolean);
+  }
+
+  if (Array.isArray(product.variants)) {
+    product.variants = product.variants.map((v) => {
+      if (!v) return null;
+      return {
+        _id: v._id,
+        sku: v.sku || '',
+        combination: v.combination || '',
+        price: v.price ?? null,
+        stock: v.stock ?? 0,
+        metalPurityId: v.metalPurityId || null,
+        metalColorId: v.metalColorId || null,
+        diamondTypeId: v.diamondTypeId || null,
+        diamondShapeId: v.diamondShapeId || null,
+        diamondColorId: v.diamondColorId || null,
+        diamondClarityId: v.diamondClarityId || null,
+        caratWeight: v.caratWeight ?? v.centerDiamondWeight ?? null,
+        centerDiamondWeight: v.centerDiamondWeight ?? v.caratWeight ?? null,
+        metalWeight: v.metalWeight ?? null,
+        labourCharge: v.labourCharge ?? null,
+        certificateCharge: v.certificateCharge ?? null,
+      };
+    }).filter(Boolean);
+  }
+
   if (!product.metalColors || !product.metalColors.length) {
     product.metalColors = extractMetalColors(product);
   }
   return product;
 };
 
-// Remove empty or non-ObjectId metalColorId from colorImages entries
+// Sanitize and validate colorImages entries for database persistence
 const sanitizeColorImages = (colorImages) => {
   if (!Array.isArray(colorImages)) return colorImages;
   return colorImages.map((ci) => {
+    if (!ci || typeof ci !== 'object') return null;
     const item = { ...ci };
-    if (!item.metalColorId || !mongoose.isValidObjectId(item.metalColorId)) {
+
+    // Sanitize metalColorId
+    if (item.metalColorId && typeof item.metalColorId === 'object') {
+      const extractedId = item.metalColorId._id || item.metalColorId.id;
+      if (extractedId && mongoose.isValidObjectId(extractedId)) {
+        item.metalColorId = extractedId;
+      } else {
+        delete item.metalColorId;
+      }
+    } else if (!item.metalColorId || !mongoose.isValidObjectId(item.metalColorId)) {
       delete item.metalColorId;
     }
+
+    // Sanitize variantIcon to prevent nested objects or empty invalid values
+    if (item.variantIcon) {
+      if (typeof item.variantIcon === 'string') {
+        const trimmed = item.variantIcon.trim();
+        item.variantIcon = trimmed ? { url: trimmed, key: '' } : undefined;
+      } else if (typeof item.variantIcon === 'object') {
+        let vUrl = item.variantIcon.url;
+        while (vUrl && typeof vUrl === 'object') {
+          vUrl = vUrl.url;
+        }
+        if (typeof vUrl === 'string' && vUrl.trim()) {
+          item.variantIcon = {
+            url: vUrl.trim(),
+            key: typeof item.variantIcon.key === 'string' ? item.variantIcon.key : '',
+          };
+        } else {
+          delete item.variantIcon;
+        }
+      } else {
+        delete item.variantIcon;
+      }
+    }
+
+    // Sanitize vtoImage
+    if (item.vtoImage) {
+      if (typeof item.vtoImage === 'string') {
+        const trimmed = item.vtoImage.trim();
+        item.vtoImage = trimmed ? { url: trimmed, key: '' } : undefined;
+      } else if (typeof item.vtoImage === 'object') {
+        let vUrl = item.vtoImage.url;
+        while (vUrl && typeof vUrl === 'object') {
+          vUrl = vUrl.url;
+        }
+        if (typeof vUrl === 'string' && vUrl.trim()) {
+          item.vtoImage = {
+            url: vUrl.trim(),
+            key: typeof item.vtoImage.key === 'string' ? item.vtoImage.key : '',
+          };
+        } else {
+          delete item.vtoImage;
+        }
+      } else {
+        delete item.vtoImage;
+      }
+    }
+
+    // Sanitize images
+    if (Array.isArray(item.images)) {
+      item.images = item.images.map((img) => {
+        if (!img) return null;
+        if (typeof img === 'string') {
+          const trimmed = img.trim();
+          return trimmed ? { url: trimmed, mediaType: 'image' } : null;
+        }
+        if (typeof img === 'object') {
+          const url = typeof img.url === 'string' ? img.url.trim() : '';
+          if (!url) return null;
+          return {
+            url,
+            key: typeof img.key === 'string' ? img.key : '',
+            mediaType: img.mediaType || (url.endsWith('.mp4') ? 'video' : 'image'),
+          };
+        }
+        return null;
+      }).filter(Boolean);
+    }
+
     return item;
-  });
+  }).filter(Boolean);
 };
 
 const PRICING_COMPARISON_KEYS = [
@@ -445,6 +587,129 @@ const formatHomeProduct = (p) => {
 };
 
 /**
+ * Format full product detail view for storefront PDP
+ * Returns ONLY the fields needed by the customer/storefront
+ * Strips internal cost prices, formulas, supplier margins, pricingKeys, etc.
+ */
+const formatStorefrontProductDetail = (p) => {
+  if (!p) return null;
+
+  const title = p.basicInfo?.title || p.name || p.title || '';
+  const slug = p.basicInfo?.slug || p.slug || '';
+  const sku = p.basicInfo?.sku || p.sku || '';
+  const description = p.basicInfo?.description || p.description || '';
+  const gender = p.basicInfo?.gender || p.gender || [];
+
+  const salePrice = Number(p.pricing?.salePrice || 0);
+  const isGold = String(p.productType || '').toLowerCase() === 'gold';
+  const mrp = isGold ? salePrice : Number(p.pricing?.mrp || salePrice || 0);
+  const images = extractProductImages(p);
+  const image = images[0] || '';
+  const metalColors = extractMetalColors(p);
+
+  // Return ONLY fields required by frontend PDP and customer checkout
+  const variants = Array.isArray(p.variants)
+    ? p.variants.map((v) => ({
+        _id: v._id,
+        id: v._id,
+        sku: v.sku || '',
+        combination: v.combination || '',
+        price: Number(v.price || 0),
+        stock: v.stock !== undefined ? v.stock : 10,
+        metalPurityId: v.metalPurityId || null,
+        metalColorId: v.metalColorId || null,
+        diamondTypeId: v.diamondTypeId || null,
+        diamondShapeId: v.diamondShapeId || null,
+        diamondColorId: v.diamondColorId || null,
+        diamondClarityId: v.diamondClarityId || null,
+        caratWeight: Number(v.caratWeight || 0),
+        centerDiamondWeight: Number(v.centerDiamondWeight || v.caratWeight || 0),
+        metalWeight: Number(v.metalWeight || 0),
+        // Breakdown fields for customer price transparency table
+        certificateCharge: Number(v.certificateCharge || 0),
+        labourCharge: Number(v.labourCharge || v.computedMakingCharge || 0),
+        metalRate: Number(v.metalRate || 0),
+        metalCost: Number(v.metalCost || 0),
+        diamondCost: Number(v.diamondCost || v.centerDiamondCost || 0),
+        subtotal: Number(v.subtotal || 0),
+      }))
+    : [];
+
+  const centerDiamondRows = Array.isArray(p.centerDiamondRows)
+    ? p.centerDiamondRows.map((r) => ({
+        caratWeight: Number(r.caratWeight || 0),
+        diamondTypeId: r.diamondTypeId || null,
+        diamondShapeId: r.diamondShapeId || null,
+        diamondColorId: r.diamondColorId || null,
+        diamondClarityId: r.diamondClarityId || null,
+      }))
+    : [];
+
+  return {
+    _id: p._id,
+    id: p._id,
+    name: title,
+    title,
+    slug,
+    images,
+    image,
+    metalColors,
+    basicInfo: {
+      title,
+      slug,
+      sku,
+      description,
+      gender,
+    },
+    productType: p.productType || 'gold',
+    isOrnate: Boolean(p.isOrnate),
+    categoryIds: Array.isArray(p.categoryIds) ? p.categoryIds : [],
+    metalColorIds: Array.isArray(p.metalColorIds) ? p.metalColorIds : [],
+    metalPurityIds: Array.isArray(p.metalPurityIds) ? p.metalPurityIds : [],
+    colorImages: Array.isArray(p.colorImages) ? p.colorImages : [],
+    sizes: p.sizes || p.availableSizes || [],
+    availableSizes: p.availableSizes || p.sizes || [],
+    pricing: {
+      salePrice,
+      mrp,
+      calculatedPrice: Number(p.pricing?.calculatedPrice || salePrice || 0),
+      gstPercentage: Number(p.pricing?.gstPercentage ?? 3),
+      minPrice: Number(p.pricing?.minPrice || salePrice || 0),
+      maxPrice: Number(p.pricing?.maxPrice || mrp || salePrice || 0),
+    },
+    specifications: {
+      metalWeight: Number(p.specifications?.metalWeight || 0),
+      grossWeight: Number(p.specifications?.grossWeight || 0),
+      netWeight: Number(p.specifications?.netWeight || 0),
+      metalName: p.specifications?.metalName || '',
+      diamondWeight: Number(p.specifications?.diamondWeight || 0),
+    },
+    productSpecifications: Array.isArray(p.productSpecifications) ? p.productSpecifications : [],
+    descriptionSections: Array.isArray(p.descriptionSections) ? p.descriptionSections : [],
+    centerDiamondRows,
+    variants,
+    demoMetrics: {
+      soldCount: Number(p.demoMetrics?.soldCount ?? 0),
+      reviewCount: Number(p.demoMetrics?.reviewCount ?? 0),
+    },
+    certificateImage: p.certificateImage || null,
+    inWishlist: Boolean(p.inWishlist),
+    sizeChart: p.sizeChart || null,
+    relatedProducts: Array.isArray(p.relatedProducts) ? p.relatedProducts : [],
+    stockStatus: p.stockStatus || 'In Stock',
+    seo: p.seo || undefined,
+    ...(p.ornate ? {
+      ornate: {
+        tagNo: p.ornate.tagNo,
+        barcode: p.ornate.barcode,
+        itemCode: p.ornate.itemCode,
+        ornateImages: p.ornate.ornateImages,
+      }
+    } : {}),
+  };
+};
+
+/**
  * Helper to format product lookup results for dropdowns / admin selection
  */
 const formatLookupProduct = (p) => {
@@ -637,6 +902,7 @@ module.exports = {
   isPricingUnchanged,
   formatHomeProduct,
   formatStorefrontProduct,
+  formatStorefrontProductDetail,
   extractProductImages,
   extractMetalColors,
   formatColorImages,

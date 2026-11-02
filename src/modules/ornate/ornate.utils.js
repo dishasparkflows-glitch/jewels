@@ -1,10 +1,10 @@
 const axios = require('axios');
 const Category = require('../category/category.model');
 
-const ORNATE_BASE_URL = process.env.ORNATE_BASE_URL || 'http://142.79.228.244:2507/OnlineJewelleryShopping';
-const ORNATE_USERNAME = process.env.ORNATE_USERNAME || 'admin';
-const ORNATE_PASSWORD = process.env.ORNATE_PASSWORD || 'admin@123';
-const ORNATE_TIMEOUT = Number(process.env.ORNATE_TIMEOUT) || 45000;
+const ORNATE_BASE_URL = process.env.ORNATE_BASE_URL;
+const ORNATE_USERNAME = process.env.ORNATE_USERNAME;
+const ORNATE_PASSWORD = process.env.ORNATE_PASSWORD;
+const ORNATE_TIMEOUT = Number(process.env.ORNATE_TIMEOUT);
 
 // ------------------------------- session & token cache ----------------------------
 let lastSessionId = '0';

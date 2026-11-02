@@ -4,7 +4,7 @@ const Banner = require('../banner/banner.model');
 const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');
 const Featured = require('../featured/featured.model');
 const ApiError = require('../../utils/ApiError');
-const { getPagination, getPaginationMeta } = require('../../utils/pagination');
+const { getPaginationMeta } = require('../../utils/pagination');
 
 class GalleryService {
   /**
@@ -317,12 +317,9 @@ class GalleryService {
       type,
       platform = 'common',
       image,
+      images,
       status = 'active',
     } = payload;
-
-    if (!image || !image.url) {
-      throw new ApiError(400, 'Image URL is required');
-    }
 
     const actualPlacement = placement || type || 'herobanner';
 
@@ -334,16 +331,49 @@ class GalleryService {
       }
     }
 
-    const galleryItem = await Gallery.create({
+    // Support both single image and multiple images batch creation
+    const rawImages = Array.isArray(images) && images.length > 0
+      ? images
+      : (image ? [image] : []);
+
+    const validImages = rawImages
+      .map((item) => {
+        if (!item) return null;
+        if (typeof item === 'string') return { url: item, key: '' };
+        if (item.url) return { url: item.url, key: item.key || '' };
+        return null;
+      })
+      .filter(Boolean);
+
+    if (validImages.length === 0) {
+      throw new ApiError(400, 'At least one valid image is required');
+    }
+
+    if (validImages.length === 1) {
+      const single = validImages[0];
+      const galleryItem = await Gallery.create({
+        themeId: theme?._id || null,
+        placement: actualPlacement,
+        platform,
+        image: { url: single.url, key: single.key || '' },
+        status: status || 'active',
+        meta: { createdBy: actorId, createdAt: new Date() },
+      });
+      return galleryItem;
+    }
+
+    // Multiple images: store as separate database records
+    const docs = validImages.map((img) => ({
       themeId: theme?._id || null,
       placement: actualPlacement,
       platform,
-      image: { url: image.url, key: image.key || '' },
+      image: { url: img.url, key: img.key || '' },
       status: status || 'active',
       meta: { createdBy: actorId, createdAt: new Date() },
-    });
+    }));
 
-    return galleryItem;
+    const galleryItems = await Gallery.insertMany(docs);
+    return galleryItems;
   }
 
   /**

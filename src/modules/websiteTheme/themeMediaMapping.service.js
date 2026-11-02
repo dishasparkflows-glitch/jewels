@@ -6,7 +6,7 @@ const Banner = require('../banner/banner.model');
 const Featured = require('../featured/featured.model');
 const Category = require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
-const { getPagination, getPaginationMeta } = require('../../utils/pagination');
+const { getPaginationMeta } = require('../../utils/pagination');
 
 // Supported modules metadata & normalized key resolver
 const MODULES_CONFIG = {

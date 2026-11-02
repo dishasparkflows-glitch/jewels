@@ -217,7 +217,7 @@ class ProductService {
   }
 
   // ------------------------------- get one product ----------------------------
-  async getOne(id, userId = null, { isAdmin = false } = {}) {
+  async getOne(id, userId = null) {
     await this.refreshCalculatedPrices();
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const filter = isObjectId
@@ -273,12 +273,11 @@ class ProductService {
     const inWishlist = wishlistedSet.has(String(product._id));
     const sizeChart = await this._extractSizeChart(product);
 
-    const fullProduct = withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart });
-    return isAdmin ? fullProduct : formatStorefrontProductDetail(fullProduct);
+    return withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart });
   }
 
   // ------------------------------- get product by sku or tag ----------------------------
-  async getBySkuOrTag(code, userId = null, { isAdmin = false } = {}) {
+  async getBySkuOrTag(code, userId = null) {
     await this.refreshCalculatedPrices();
     const isObjectId = mongoose.Types.ObjectId.isValid(code);
     const populateOptions = this._getProductPopulateOptions();
@@ -334,7 +333,7 @@ class ProductService {
     const sizeChart = await this._extractSizeChart(product);
 
     const fullProduct = withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart });
-    return isAdmin ? fullProduct : formatStorefrontProductDetail(fullProduct);
+    return formatStorefrontProductDetail(fullProduct);
   }
 
   // Shared populate options for full product detail views

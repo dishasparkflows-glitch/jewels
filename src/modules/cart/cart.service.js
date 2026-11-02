@@ -14,7 +14,7 @@ class CartService {
     }
 
     let userCart = await Cart.findOne({
-      $or: [{ user: userId }, { userId }],
+      userId,
       'meta.deletedAt': null,
     });
 
@@ -24,8 +24,7 @@ class CartService {
 
     // Create brand new cart
     const newCart = new Cart({
-      user: userId,
-      userId: userId,
+      userId,
       items: [],
     });
 
@@ -62,12 +61,12 @@ class CartService {
 
     return {
       cartId: cart._id,
-      userId: cart.userId || cart.user || null,
+      userId: cart.userId,
       items: items.map((item) => ({
         _id: item._id,
-        productId: String(item.productId),
+        productId: item.productId,
         title: item.title,
-        slug: item.slug || item.product?.basicInfo?.slug || (item.title ? item.title.toLowerCase().trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') : ''),
+        slug: item.title ? item.title.toLowerCase().trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') : '',
         price: item.price,
         totalItemPrice: item.totalItemPrice || ((item.price || 0) * (item.quantity || 1)),
         originalPrice: item.originalPrice,
@@ -101,11 +100,6 @@ class CartService {
       return this.formatCart(null);
     }
 
-    await cart.populate({
-      path: 'items.product',
-      select: 'basicInfo title price images category sku status metalColorIds colorImages metalColors',
-    });
-
     return this.formatCart(cart);
   }
 
@@ -113,7 +107,7 @@ class CartService {
    * Add item to cart
    */
   async addToCart({ userId, productData, quantity = 1, options = {} } = {}) {
-    if (!productData || (!productData.productId && !productData.id && !productData._id)) {
+    if (!productData?.productId) {
       throw new ApiError(400, 'Product ID is required');
     }
 
@@ -121,7 +115,7 @@ class CartService {
       throw new ApiError(401, 'Please log in to add items to your cart');
     }
 
-    const productIdStr = String(productData.productId || productData.id || productData._id).trim();
+    const productId = productData.productId;
     const parsedQty = Math.max(1, parseInt(quantity, 10) || 1);
     const selectedMetal = options.selectedMetal || productData.selectedMetal || '';
     const selectedSize = options.selectedSize || productData.selectedSize || '';
@@ -133,14 +127,11 @@ class CartService {
     }
 
     cart.userId = userId;
-    cart.user = userId;
 
-    let productRef = null;
     let found = null;
-    if (mongoose.Types.ObjectId.isValid(productIdStr)) {
-      found = await Product.findById(productIdStr).lean();
+    if (mongoose.Types.ObjectId.isValid(productId)) {
+      found = await Product.findById(productId).lean();
       if (found) {
-        productRef = found._id;
         if (!productData.title) productData.title = found.basicInfo?.title;
         if (!productData.price) productData.price = found.pricing?.salePrice || found.pricing?.mrp;
         if (!productData.image) {
@@ -181,7 +172,7 @@ class CartService {
 
     // Check if this product & metal combination or matching variant exists in cart
     const existingIndex = cart.items.findIndex((item) => {
-      const sameProduct = String(item.productId) === productIdStr;
+      const sameProduct = String(item.productId) === String(productId);
       if (!sameProduct) return false;
       if (selectedAttributes?.metalColor && item.selectedAttributes?.metalColor) {
         if (String(item.selectedAttributes.metalColor) !== String(selectedAttributes.metalColor)) return false;
@@ -204,8 +195,7 @@ class CartService {
       }
     } else {
       cart.items.push({
-        product: productRef,
-        productId: productIdStr,
+        productId,
         title: productData.title || found?.basicInfo?.title || '',
         price,
         totalItemPrice,
@@ -243,8 +233,7 @@ class CartService {
     }
 
     const index = cart.items.findIndex(
-      (item) =>
-        String(item.productId) === productIdStr || String(item._id) === productIdStr
+      (item) => String(item.productId) === productIdStr || String(item._id) === productIdStr
     );
 
     if (index === -1) {
@@ -279,8 +268,7 @@ class CartService {
     }
 
     cart.items = cart.items.filter(
-      (item) =>
-        String(item.productId) !== productIdStr && String(item._id) !== productIdStr
+      (item) => String(item.productId) !== productIdStr && String(item._id) !== productIdStr
     );
 
     await cart.save();
@@ -312,7 +300,7 @@ class CartService {
 
     if (userId) {
       const cart = await Cart.findOne({
-        $or: [{ user: userId }, { userId }],
+        userId,
         'meta.deletedAt': null,
       }).select('items.quantity').lean();
 

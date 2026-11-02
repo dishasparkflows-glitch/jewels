@@ -635,15 +635,7 @@ const formatStorefrontProductDetail = (p) => {
       }))
     : [];
 
-  const centerDiamondRows = Array.isArray(p.centerDiamondRows)
-    ? p.centerDiamondRows.map((r) => ({
-        caratWeight: Number(r.caratWeight || 0),
-        diamondTypeId: r.diamondTypeId || null,
-        diamondShapeId: r.diamondShapeId || null,
-        diamondColorId: r.diamondColorId || null,
-        diamondClarityId: r.diamondClarityId || null,
-      }))
-    : [];
+  const centerDiamondRows = Array.isArray(p.centerDiamondRows) ? p.centerDiamondRows : [];
 
   return {
     _id: p._id,
@@ -670,6 +662,7 @@ const formatStorefrontProductDetail = (p) => {
     sizes: p.sizes || p.availableSizes || [],
     availableSizes: p.availableSizes || p.sizes || [],
     pricing: {
+      ...(p.pricing || {}),
       salePrice,
       mrp,
       calculatedPrice: Number(p.pricing?.calculatedPrice || salePrice || 0),
@@ -687,6 +680,7 @@ const formatStorefrontProductDetail = (p) => {
     productSpecifications: Array.isArray(p.productSpecifications) ? p.productSpecifications : [],
     descriptionSections: Array.isArray(p.descriptionSections) ? p.descriptionSections : [],
     centerDiamondRows,
+    sideDiamondRows: Array.isArray(p.sideDiamondRows) ? p.sideDiamondRows : [],
     variants,
     demoMetrics: {
       soldCount: Number(p.demoMetrics?.soldCount ?? 0),

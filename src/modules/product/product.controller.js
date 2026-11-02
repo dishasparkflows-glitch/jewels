@@ -250,15 +250,13 @@ class ProductController {
 
   // ------------------------------- get one product ----------------------------
   getOne = catchAsync(async (req, res) => {
-    const isAdmin = Boolean(req.user && ['super_admin', 'admin'].includes(req.user.role));
-    const product = await productService.getOne(req.params.id, req.user?._id, { isAdmin });
+    const product = await productService.getOne(req.params.id, req.user?._id);
     ApiResponse.success(res, product, 'Product retrieved successfully');
   });
 
   // ------------------------------- get product by sku or tag ----------------------------
   getBySkuOrTag = catchAsync(async (req, res) => {
-    const isAdmin = Boolean(req.user && ['super_admin', 'admin'].includes(req.user.role) && req.query.admin === 'true');
-    const product = await productService.getBySkuOrTag(req.params.code, req.user?._id, { isAdmin });
+    const product = await productService.getBySkuOrTag(req.params.code, req.user?._id);
     ApiResponse.success(res, product, 'Product retrieved successfully');
   });
 

@@ -1,6 +1,7 @@
 const cartService = require('./cart.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const { emitCartUpdate } = require('../../socket/viewers.socket');
 
 class CartController {
   // Helper to extract user identity
@@ -36,16 +37,15 @@ class CartController {
       selectedAttributes,
       userId,
       options,
-      product,
     } = req.body;
 
     const effectiveUserId = authUserId || userId || null;
-    const resolvedProductId = productId || product?.productId || product?.id || product?._id || options?.productId;
-    const resolvedPrice = price !== undefined ? Number(price) : (options?.price !== undefined ? Number(options.price) : Number(product?.price || 0));
+    const resolvedProductId = productId || options?.productId;
+    const resolvedPrice = price !== undefined ? Number(price) : (options?.price !== undefined ? Number(options.price) : 0);
     const resolvedTotalItemPrice = totalItemPrice !== undefined ? Number(totalItemPrice) : (options?.totalItemPrice !== undefined ? Number(options.totalItemPrice) : resolvedPrice);
-    const resolvedMetal = selectedMetal || options?.selectedMetal || product?.selectedMetal || '';
-    const resolvedSize = selectedSize || options?.selectedSize || options?.size || product?.selectedSize || '';
-    const rawAttributes = selectedAttributes || options?.selectedAttributes || product?.selectedAttributes || null;
+    const resolvedMetal = selectedMetal || options?.selectedMetal || '';
+    const resolvedSize = selectedSize || options?.selectedSize || options?.size || '';
+    const rawAttributes = selectedAttributes || options?.selectedAttributes || null;
 
     // Only keep selectedAttributes if it has non-null/non-empty values
     let resolvedAttributes = null;
@@ -75,7 +75,6 @@ class CartController {
     });
 
     try {
-      const { emitCartUpdate } = require('../../socket/viewers.socket');
       emitCartUpdate({
         userId: effectiveUserId,
         totalItems: data.totalItems,
@@ -98,7 +97,6 @@ class CartController {
     });
 
     try {
-      const { emitCartUpdate } = require('../../socket/viewers.socket');
       emitCartUpdate({
         userId,
         totalItems: data.totalItems,
@@ -119,7 +117,6 @@ class CartController {
     });
 
     try {
-      const { emitCartUpdate } = require('../../socket/viewers.socket');
       emitCartUpdate({
         userId,
         totalItems: data.totalItems,
@@ -135,7 +132,6 @@ class CartController {
     const data = await cartService.clearCart({ userId });
 
     try {
-      const { emitCartUpdate } = require('../../socket/viewers.socket');
       emitCartUpdate({
         userId,
         totalItems: 0,

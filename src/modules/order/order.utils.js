@@ -60,7 +60,7 @@ function mapCartItemsToOrderItems(cartItems = []) {
     const qty = Math.max(1, Number(cartItem.quantity) || 1);
     const price = Number(cartItem.price) || 0;
     return {
-      productId: cartItem.productId,
+      productId: cartItem.productId?._id || cartItem.productId,
       title: cartItem.title,
       price,
       quantity: qty,

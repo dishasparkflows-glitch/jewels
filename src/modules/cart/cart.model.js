@@ -3,15 +3,10 @@ const metaPlugin = require('../../utils/metaPlugin');
 
 const cartItemSchema = new mongoose.Schema(
   {
-    product: {
+    productId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
-      default: null,
-    },
-    productId: {
-      type: String,
-      required: [true, 'Product ID is required'],
-      trim: true,
+      required: true,
     },
     title: {
       type: String,
@@ -78,19 +73,12 @@ const cartSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      default: null,
-    },
     items: [cartItemSchema],
   },
   {
     versionKey: false,
   }
 );
-
-cartSchema.index({ user: 1 });
 
 cartSchema.plugin(metaPlugin);
 

@@ -33,7 +33,8 @@ class ProductController {
       let goldRatePerGram = 0;
 
       const primaryCenterCarat = centerDiamonds[0]?.caratWeight || 0;
-      const baseCarat = req.body.baseCarat !== undefined ? parseFloat(req.body.baseCarat) : primaryCenterCarat;
+      const parsedBaseCarat = parseFloat(req.body.baseCarat);
+      const baseCarat = (!isNaN(parsedBaseCarat) && parsedBaseCarat > 0) ? parsedBaseCarat : (primaryCenterCarat || 1);
 
       if (metalPurity && goldPriceMaster) {
         if (!isCalculated) {

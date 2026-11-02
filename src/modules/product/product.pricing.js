@@ -123,12 +123,17 @@ function calculateProductPricing(product, masters) {
   );
   if (!baseWeight)
     throw new ApiError(400, 'Enter a positive base 14KT metal weight');
-  const baseCarat = number(settings.baseCarat, 'Base center carat', 1);
+  const centers = product.centerDiamondRows || [];
+  const minCenterCarat = centers.length
+    ? Math.min(...centers.map((c) => Number(c.caratWeight || 0)).filter((c) => c > 0))
+    : 1;
+  const fallbackBaseCarat = (Number.isFinite(minCenterCarat) && minCenterCarat > 0) ? minCenterCarat : 1;
+  const configuredBaseCarat = number(settings.baseCarat, 'Base center carat', 0);
+  const baseCarat = configuredBaseCarat > 0 ? configuredBaseCarat : fallbackBaseCarat;
   const labourRate = number(settings.baseLabourCharge, 'Labour rate per gram');
   const certificate = number(settings.certificateCharge, 'Certificate charge');
   const markup = number(settings.otherAmountPercentage, 'Markup percentage');
   const gstPercent = number(settings.gstPercentage, 'GST percentage', 3);
-  const centers = product.centerDiamondRows || [];
   const sides = product.sideDiamondRows || [];
   const purities = (product.metalPurityIds || []).map((value) =>
     masters.purities.find((p) => id(p) === id(value))

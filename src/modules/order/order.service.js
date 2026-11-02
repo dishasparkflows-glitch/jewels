@@ -39,8 +39,7 @@ class OrderService {
     if (items.length === 0 && effectiveUserId) {
       const cart = await Cart.findOne({
         userId: effectiveUserId,
-        'meta.deletedAt': null,
-      }).lean();
+      }).populate('items.productId').lean();
 
       if (cart && Array.isArray(cart.items) && cart.items.length > 0) {
         items = mapCartItemsToOrderItems(cart.items);

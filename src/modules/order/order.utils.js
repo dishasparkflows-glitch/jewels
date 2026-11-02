@@ -59,15 +59,25 @@ function mapCartItemsToOrderItems(cartItems = []) {
   return cartItems.map((cartItem) => {
     const qty = Math.max(1, Number(cartItem.quantity) || 1);
     const price = Number(cartItem.price) || 0;
+    const prod = cartItem.productId && typeof cartItem.productId === 'object' ? cartItem.productId : null;
+    const prodId = prod?._id || cartItem.productId;
+    const title = prod?.basicInfo?.title || cartItem.title || '';
+    const firstImg =
+      prod?.colorImages?.[0]?.images?.[0] ||
+      prod?.ornate?.ornateImages?.[0] ||
+      prod?.images?.[0];
+    const image = typeof firstImg === 'string' ? firstImg : firstImg?.url || cartItem.image?.url || cartItem.image || null;
+    const category = prod?.categoryIds?.[0] ? String(prod.categoryIds[0]) : cartItem.category || '';
+
     return {
-      productId: cartItem.productId?._id || cartItem.productId,
-      title: cartItem.title,
+      productId: prodId,
+      title,
       price,
       quantity: qty,
-      totalItemPrice: price * qty,
-      originalPrice: cartItem.originalPrice || null,
-      image: cartItem.image || null,
-      category: cartItem.category || '',
+      totalItemPrice: Number(cartItem.totalItemPrice) || (price * qty),
+      originalPrice: prod?.pricing?.mrp || cartItem.originalPrice || null,
+      image,
+      category,
       selectedMetal: cartItem.selectedMetal || '',
       selectedSize: cartItem.selectedSize || '',
       selectedAttributes: cartItem.selectedAttributes || null,

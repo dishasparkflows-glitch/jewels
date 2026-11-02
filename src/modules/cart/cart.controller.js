@@ -103,7 +103,7 @@ class CartController {
       });
     } catch {}
 
-    ApiResponse.success(res, data, 'Cart quantity updated');
+    ApiResponse.success(res, null, 'Cart quantity updated');
   });
 
   // ------------------------------- remove item ----------------------------

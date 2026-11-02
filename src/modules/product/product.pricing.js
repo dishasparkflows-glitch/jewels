@@ -15,6 +15,38 @@ const dimensions = [
   'diamondColorId',
   'diamondClarityId'
 ];
+// --- NEW LOGIC: PROGRESSIVE PERCENTAGE INCREASE WITH 5% EXTRA WEIGHT ADDED GLOBALLY ---
+const calculateEffectiveWeight = (metalWeight, metalPurity, centerDiamondCarat = 0, baseCarat = 1) => {
+  const baseWeight = parseFloat(metalWeight) || 0;
+  if (!metalPurity) {
+    return Math.round(((baseWeight * 1.05) + Number.EPSILON) * 1000) / 1000;
+  }
+
+  const karat = typeof metalPurity === 'object' ? (metalPurity.karat || 0) : Number(metalPurity || 0);
+  const metalType = typeof metalPurity === 'object' ? metalPurity.metalType : 'Gold';
+
+  if (metalType === 'Gold' || (!metalType && karat)) {
+    const baseKarat = 14;
+    const targetKarat = karat || 0;
+
+    const basePurityPercent = (baseKarat / 24) * 100;
+    const targetPurityPercent = (targetKarat / 24) * 100;
+    const diffPercent = targetPurityPercent - basePurityPercent;
+
+    let karatWeight = baseWeight * (1 + (diffPercent / 100));
+
+    const caratVal = parseFloat(centerDiamondCarat) || 0;
+    const baseCaratVal = parseFloat(baseCarat) || 0;
+    const extraWeight = caratVal > 0 ? (caratVal - baseCaratVal) * (karatWeight * 0.08) : 0;
+
+    const finalWeightWithCarat = karatWeight + extraWeight;
+    const finalWeightWith5Percent = finalWeightWithCarat * 1.05;
+    return Math.round((finalWeightWith5Percent + Number.EPSILON) * 1000) / 1000;
+  }
+
+  return Math.round(((baseWeight * 1.05) + Number.EPSILON) * 1000) / 1000;
+};
+
 const signature = (row) =>
   row
     ? [
@@ -36,32 +68,48 @@ function stoneRate(row, rates, side) {
   const pieces = side ? number(row.pieces, 'Side diamond pieces') : 1;
   if (!pieces || !Number.isInteger(pieces))
     throw new ApiError(400, 'Side diamond pieces must be a positive integer');
-  if (row.rateSource === 'manual' || (row.rateSource !== 'master' && Number(side ? row.priceINR : row.pricePerCarat) > 0)) {
+
+  const providedRate = Number(side ? row.priceINR : row.pricePerCarat);
+  if (row.rateSource === 'manual' || (row.rateSource !== 'master' && providedRate > 0)) {
     const rate = number(
-      side ? row.priceINR : row.pricePerCarat,
+      providedRate,
       'Manual diamond rate'
     );
     if (!rate) throw new ApiError(400, 'Enter a positive manual diamond rate');
     return rate;
   }
   const size = carat;
-  if (side && (number(row.sizeFrom, 'Sieve size from') > number(row.sizeTo, 'Sieve size to')))
+  const perPieceCarat = side && pieces > 0 ? carat / pieces : carat;
+  if (side && row.sizeFrom !== undefined && row.sizeTo !== undefined && row.sizeFrom !== '' && row.sizeTo !== '' && (number(row.sizeFrom, 'Sieve size from') > number(row.sizeTo, 'Sieve size to')))
     throw new ApiError(400, 'Sieve size from must not exceed size to');
-  const matches = rates.filter(
+  let matches = rates.filter(
     (rate) =>
       dimensions.every((key) => id(rate[key]) === id(row[key])) &&
       (side
-        ? Number(row.sizeFrom) === Number(rate.sizeFrom) && Number(row.sizeTo) === Number(rate.sizeTo)
+        ? ((row.sizeFrom !== undefined && row.sizeTo !== undefined && row.sizeFrom !== '' && row.sizeTo !== '' && Number(row.sizeFrom) === Number(rate.sizeFrom) && Number(row.sizeTo) === Number(rate.sizeTo)) ||
+           (perPieceCarat >= Number(rate.sizeFrom) && perPieceCarat <= Number(rate.sizeTo)))
         : size >= Number(rate.sizeFrom) && size <= Number(rate.sizeTo))
   );
-  if (matches.length !== 1)
+
+  // Fallback for side diamonds to match by dimensions if size range was not matched
+  if (matches.length === 0 && side) {
+    matches = rates.filter((rate) => dimensions.every((key) => id(rate[key]) === id(row[key])));
+  }
+
+  if (matches.length !== 1) {
+    if (providedRate > 0) {
+      return providedRate;
+    }
     throw new ApiError(
       400,
       `${side ? 'Side' : 'Center'} diamond rate ${matches.length ? 'is ambiguous' : 'is missing'} for ${size} ct; check the pricing master or choose a manual rate`
     );
+  }
   const rate = number(matches[0].priceINR, 'Diamond master rate');
-  if (!rate)
+  if (!rate) {
+    if (providedRate > 0) return providedRate;
     throw new ApiError(400, 'Diamond master rate must be greater than zero');
+  }
   return rate;
 }
 
@@ -137,11 +185,12 @@ function calculateProductPricing(product, masters) {
           if (legacy.length > 1) throw new ApiError(400, 'Multiple saved variants match this quality. Reconcile color-specific stock before converting to purity-only variants');
           previous = legacy[0];
         }
-        const karatWeight = baseWeight * (1 + (Number(purity.karat) - 14) / 24);
-        const scaling = center
-          ? 1 + (Number(center.caratWeight) - baseCarat) * 0.08
-          : 1;
-        const metalWeight = round(karatWeight * scaling * 1.05, 3);
+        const metalWeight = calculateEffectiveWeight(
+          baseWeight,
+          purity,
+          center ? Number(center.caratWeight || 0) : 0,
+          baseCarat
+        );
         if (metalWeight <= 0)
           throw new ApiError(
             400,
@@ -269,4 +318,4 @@ async function loadPricingMasters() {
   };
 }
 
-module.exports = { calculateProductPricing, loadPricingMasters };
+module.exports = { calculateProductPricing, loadPricingMasters, calculateEffectiveWeight };

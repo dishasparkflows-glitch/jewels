@@ -5,6 +5,7 @@ const { authenticate, authorize, optionalAuth } = require('../../middleware/auth
 const { ROLES } = require('../../config/constants');
 
 router.post('/pricing-preview', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), productController.previewPricing);
+router.post('/calculate', optionalAuth, productController.calculateProductPrice);
 
 const { getProductViewerCount } = require('../../socket/viewers.socket');
 

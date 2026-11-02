@@ -66,6 +66,8 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/addresses', addressRoutes);
 router.use('/products', productRoutes);
+router.use('/product', productRoutes);
+router.use('/admin/product', productRoutes);
 router.use('/filters', filterRoutes);
 router.use('/category-filters', filterRoutes);
 router.use('/product-groups', productGroupRoutes);

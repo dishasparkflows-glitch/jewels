@@ -667,7 +667,9 @@ const formatStorefrontProductDetail = (p) => {
     categoryIds: Array.isArray(p.categoryIds) ? p.categoryIds : [],
     metalPurityIds: Array.isArray(p.metalPurityIds) ? p.metalPurityIds : [],
     colorImages,
-    sizes: Array.isArray(p.sizes) ? p.sizes : (Array.isArray(p.sizeIds) ? p.sizeIds : []),
+    sizes: Array.isArray(p.sizeIds) && p.sizeIds.length > 0 && typeof p.sizeIds[0] === 'object'
+      ? p.sizeIds.map((s) => ({ _id: String(s._id || s.id), name: s.name }))
+      : (Array.isArray(p.sizes) ? p.sizes : (Array.isArray(p.sizeIds) ? p.sizeIds : [])),
     pricing: {
       ...(p.pricing || {}),
       salePrice,
@@ -897,6 +899,7 @@ const buildPriceRangeConditions = (queryParams, effectivePrice) => {
 const getProductPopulateOptions = () => {
   return [
     { path: 'categoryIds', select: 'name slug sizeChart', strictPopulate: false },
+    { path: 'sizeIds', select: 'name _id', strictPopulate: false },
     { path: 'metalColorIds', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
     { path: 'metalPurityIds', select: 'name karat metalType', strictPopulate: false },
     { path: 'colorImages.metalColorId', select: 'name code colorCode colorCodeEnd', strictPopulate: false },

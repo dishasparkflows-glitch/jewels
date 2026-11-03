@@ -28,11 +28,11 @@ class SmsService {
   async sendSignupConfirmation(user) {
     const variables = {
       name: user.profile?.firstName || '',
-      email: user.auth?.email || user.email || '',
+      email: user.auth?.email || '',
     };
     const message = applyVariables(process.env.SMS_SIGNUP_MESSAGE, variables);
     return this.sendSms({
-      to: user.profile?.phone || user.phone,
+      to: user.profile?.phone,
       message,
       templateId: process.env.NETSMS_SIGNUP_TEMPLATE_ID,
       variables,

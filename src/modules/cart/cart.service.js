@@ -20,9 +20,7 @@ const cartPopulateOptions = [
 ];
 
 class CartService {
-  /**
-   * Helper: Find existing cart by userId
-   */
+  // ------------------------------- find or create cart ----------------------------
   async findOrCreateCart(userId) {
     if (!userId) {
       return null;
@@ -44,9 +42,7 @@ class CartService {
     return newCart;
   }
 
-  /**
-   * Format cart output with calculated totals
-   */
+  // ------------------------------- format cart ----------------------------
   formatCart(cart) {
     if (!cart) {
       return {
@@ -152,9 +148,7 @@ class CartService {
     };
   }
 
-  /**
-   * Get current cart
-   */
+  // ------------------------------- get cart ----------------------------
   async getCart({ userId } = {}) {
     if (!userId) {
       return this.formatCart(null);
@@ -169,9 +163,7 @@ class CartService {
     return this.formatCart(cart);
   }
 
-  /**
-   * Add item to cart
-   */
+  // ------------------------------- add to cart ----------------------------
   async addToCart({ userId, productData, quantity = 1, options = {} } = {}) {
     const rawProductId = productData?.productId || productData?.product || options?.productId;
     if (!rawProductId) {
@@ -274,9 +266,7 @@ class CartService {
     return this.formatCart(cart);
   }
 
-  /**
-   * Update item quantity
-   */
+  // ------------------------------- update quantity ----------------------------
   async updateQuantity({ userId, productId, quantity, options = {} } = {}) {
     if (!productId) {
       throw new ApiError(400, 'Product ID is required');
@@ -311,9 +301,7 @@ class CartService {
     return { totalItems: cart.items.length };
   }
 
-  /**
-   * Remove item from cart
-   */
+  // ------------------------------- remove item ----------------------------
   async removeItem({ userId, productId } = {}) {
     if (!productId) {
       throw new ApiError(400, 'Product ID is required');
@@ -337,9 +325,7 @@ class CartService {
     return this.formatCart(cart);
   }
 
-  /**
-   * Clear cart
-   */
+  // ------------------------------- clear cart ----------------------------
   async clearCart({ userId } = {}) {
     if (!userId) {
       return this.formatCart(null);
@@ -353,9 +339,7 @@ class CartService {
     return this.formatCart(null);
   }
 
-  /**
-   * Fast badge counts for Cart & Wishlist without populating product data
-   */
+  // ------------------------------- get counts ----------------------------
   async getCounts({ userId } = {}) {
     let cartCount = 0;
     let wishlistCount = 0;

@@ -1,16 +1,17 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../user/user.model');
 const ApiError = require('../../utils/ApiError');
 const { JWT_SECRET, JWT_EXPIRES_IN } = require('../../config/constants');
 const smsService = require('../sms/sms.service');
+const { sendEmail } = require('../../utils/emailService');
+const { getPasswordResetHtml } = require('../../template');
 
 class AuthService {
   // ------------------------------- generate auth token ----------------------------
   generateToken(user) {
-    const userEmail = user.auth?.email || user.email;
+    const userEmail = user.auth?.email || '';
     return jwt.sign(
       { id: user._id, email: userEmail, role: user.role },
       JWT_SECRET,
@@ -20,13 +21,11 @@ class AuthService {
 
   // ------------------------------- register user ----------------------------
   async register(data) {
-    const email = (data.email || data.auth?.email || '').trim().toLowerCase();
-    const existingUser = await User.findOne({
-      $or: [{ 'auth.email': email }, { email }],
-    });
+    const email = (data.auth?.email || '').trim().toLowerCase();
+    const existingUser = await User.findOne({ 'auth.email': email });
     if (existingUser) throw new ApiError(409, 'Email already registered');
 
-    const user = await User.create({ ...data, email });
+    const user = await User.create(data);
     try {
       await smsService.sendSignupConfirmation(user);
     } catch (error) {
@@ -36,7 +35,6 @@ class AuthService {
 
     const userObj = user.toObject();
     if (userObj.auth) delete userObj.auth.password;
-    delete userObj.password;
     return { user: userObj, token };
   }
 
@@ -48,26 +46,14 @@ class AuthService {
 
     if (isEmail) {
       const normalizedEmail = identifier.toLowerCase();
-      const buildEmailFilter = (targetEmail) => ({
-        $or: [{ 'auth.email': targetEmail }, { email: targetEmail }],
-      });
-      user = await User.findOne(buildEmailFilter(normalizedEmail)).select('+auth.password +password');
-      if (!user) {
-        if (normalizedEmail.includes('krushnkant')) {
-          user = await User.findOne(buildEmailFilter(normalizedEmail.replace('krushnkant', 'krushnikant'))).select('+auth.password +password');
-        } else if (normalizedEmail.includes('krushnikant')) {
-          user = await User.findOne(buildEmailFilter(normalizedEmail.replace('krushnikant', 'krushnkant'))).select('+auth.password +password');
-        }
-      }
+      user = await User.findOne({ 'auth.email': normalizedEmail }).select('+auth.password');
     } else {
       const digits = identifier.replace(/\D/g, '');
       if (digits.length < 7 || digits.length > 15) throw new ApiError(401, 'Invalid mobile number or password');
       const localDigits = digits.length > 10 && digits.startsWith('91') ? digits.slice(2) : digits;
       const phonePattern = localDigits.split('').map((digit) => `${digit}\\D*`).join('');
       const phoneRegex = new RegExp(`(?:^|\\D)(?:91\\D*)?${phonePattern}$`);
-      user = await User.findOne({
-        $or: [{ 'profile.phone': phoneRegex }, { phone: phoneRegex }],
-      }).select('+auth.password +password');
+      user = await User.findOne({ 'profile.phone': phoneRegex }).select('+auth.password');
     }
 
     if (!user) throw new ApiError(401, 'Invalid email/mobile number or password');
@@ -80,13 +66,11 @@ class AuthService {
     const now = new Date();
     if (!user.auth) user.auth = {};
     user.auth.lastLogin = now;
-    user.lastLogin = now;
     await user.save();
 
     const token = this.generateToken(user);
     const userObj = user.toObject();
     if (userObj.auth) delete userObj.auth.password;
-    delete userObj.password;
 
     return { user: userObj, token };
   }
@@ -143,7 +127,6 @@ class AuthService {
       delete userObj.auth.passwordResetTokenHash;
       delete userObj.auth.passwordResetExpires;
     }
-    delete userObj.password;
     return { user: userObj, token };
   }
 
@@ -154,32 +137,35 @@ class AuthService {
       message: 'If an account exists for that email, a password reset link has been sent.',
     };
     const user = await User.findOne({ 'auth.email': normalizedEmail });
-    if (!user) return genericResponse;
+    if (!user) {
+      console.warn(`[PasswordReset] Request for non-existent email: "${normalizedEmail}"`);
+      return genericResponse;
+    }
 
     const token = crypto.randomBytes(32).toString('hex');
     user.auth.passwordResetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
     user.auth.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save();
 
-    const resetUrl = new URL('/reset-password', process.env.FRONTEND_URL || 'http://localhost:5174');
+    const clientUrl = (process.env.FRONTEND_URL).replace(/\/+$/, '');
+    const resetUrl = new URL(`${clientUrl}/reset-password`);
     resetUrl.searchParams.set('token', token);
-    const port = Number(process.env.SMTP_PORT || 587);
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port,
-      secure: port === 465,
-      auth: { user: process.env.SMTP_EMAIL, pass: process.env.SMTP_PASSWORD },
-    });
 
     try {
-      await transporter.sendMail({
-        from: process.env.FROM_EMAIL || process.env.SMTP_EMAIL,
+      const resetUrlStr = resetUrl.toString();
+      const storeName = process.env.STORE_NAME || 'Jai Shree Krishna Fab';
+
+      await sendEmail({
         to: normalizedEmail,
-        subject: 'Reset your Neirah password',
-        text: `Use this link to reset your password: ${resetUrl.toString()}
-This link expires in one hour.`,
-        html: `<p>We received a request to reset your Neirah account password.</p><p><a href="${resetUrl.toString()}">Reset your password</a></p><p>This link expires in one hour. If you did not request this, you can ignore this email.</p>`,
+        subject: `Reset your password - ${storeName}`,
+        text: `Use this link to reset your password: ${resetUrlStr}\nThis link expires in one hour.`,
+        html: getPasswordResetHtml({
+          resetUrl: resetUrlStr,
+          storeName,
+          expiresIn: '1 hour',
+        }),
       });
+      console.log(`[PasswordReset] Reset email successfully sent to ${normalizedEmail}`);
     } catch (error) {
       user.auth.passwordResetTokenHash = undefined;
       user.auth.passwordResetExpires = undefined;
@@ -212,7 +198,7 @@ This link expires in one hour.`,
 
   // ------------------------------- change password ----------------------------
   async changePassword(userId, currentPassword, newPassword) {
-    const user = await User.findById(userId).select('+auth.password +password');
+    const user = await User.findById(userId).select('+auth.password');
     if (!user) throw new ApiError(404, 'User not found');
 
     const isMatch = await user.comparePassword(currentPassword);
@@ -220,7 +206,6 @@ This link expires in one hour.`,
 
     if (!user.auth) user.auth = {};
     user.auth.password = newPassword;
-    user.password = newPassword;
     await user.save();
 
     return { message: 'Password changed successfully' };

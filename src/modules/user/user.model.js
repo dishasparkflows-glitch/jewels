@@ -84,119 +84,16 @@ const userSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
   }
 );
-
-// Virtual for full name
-userSchema.virtual('fullName').get(function () {
-  return `${this.profile?.firstName || ''} ${this.profile?.lastName || ''}`.trim();
-});
-
-// Backward-compatibility Virtual Getters & Setters
-userSchema.virtual('firstName')
-  .get(function () { return this.profile?.firstName; })
-  .set(function (val) { if (!this.profile) this.profile = {}; this.profile.firstName = val; });
-
-userSchema.virtual('lastName')
-  .get(function () { return this.profile?.lastName; })
-  .set(function (val) { if (!this.profile) this.profile = {}; this.profile.lastName = val; });
-
-userSchema.virtual('email')
-  .get(function () { return this.auth?.email; })
-  .set(function (val) { if (!this.auth) this.auth = {}; this.auth.email = val; });
-
-userSchema.virtual('password')
-  .get(function () { return this.auth?.password; })
-  .set(function (val) { if (!this.auth) this.auth = {}; this.auth.password = val; });
-
-userSchema.virtual('phone')
-  .get(function () { return this.profile?.phone; })
-  .set(function (val) { if (!this.profile) this.profile = {}; this.profile.phone = val; });
-
-userSchema.virtual('bio')
-  .get(function () { return this.profile?.bio; })
-  .set(function (val) { if (!this.profile) this.profile = {}; this.profile.bio = val; });
-
-userSchema.virtual('location')
-  .get(function () { return this.profile?.location; })
-  .set(function (val) { if (!this.profile) this.profile = {}; this.profile.location = val; });
-
-userSchema.virtual('avatar')
-  .get(function () { return this.profile?.avatar; })
-  .set(function (val) { if (!this.profile) this.profile = {}; this.profile.avatar = val; });
-
-userSchema.virtual('themeColor')
-  .get(function () { return this.profile?.themeColor || 'default'; })
-  .set(function (val) { if (!this.profile) this.profile = {}; this.profile.themeColor = val; });
-
-userSchema.virtual('lastLogin')
-  .get(function () { return this.auth?.lastLogin; })
-  .set(function (val) { if (!this.auth) this.auth = {}; this.auth.lastLogin = val; });
-
-// Virtual populate for Address collection
-userSchema.virtual('addressesList', {
-  ref: 'Address',
-  localField: '_id',
-  foreignField: 'userId',
-});
-
-userSchema.virtual('ordersCount')
-  .get(function () { return this.statistics?.ordersCount ?? 0; })
-  .set(function (val) { if (!this.statistics) this.statistics = {}; this.statistics.ordersCount = val; });
-
-userSchema.virtual('lifetimeValue')
-  .get(function () { return this.statistics?.lifetimeValue ?? 0; })
-  .set(function (val) { if (!this.statistics) this.statistics = {}; this.statistics.lifetimeValue = val; });
-
-// Pre-validate hook to map flat fields into nested structure if passed
-userSchema.pre('validate', function (next) {
-  if (!this.profile) this.profile = {};
-  if (!this.auth) this.auth = {};
-  if (!this.statistics) this.statistics = {};
-
-  const doc = this._doc || this;
-
-  // Map flat statistics if provided at root
-  if (doc.ordersCount !== undefined && this.statistics.ordersCount === undefined) {
-    this.statistics.ordersCount = doc.ordersCount;
-  }
-  if (doc.lifetimeValue !== undefined && this.statistics.lifetimeValue === undefined) {
-    this.statistics.lifetimeValue = doc.lifetimeValue;
-  }
-
-  // Map flat profile fields if provided at root
-  if (doc.firstName && !this.profile.firstName) this.profile.firstName = doc.firstName;
-  if (doc.lastName && !this.profile.lastName) this.profile.lastName = doc.lastName;
-  if (doc.phone && !this.profile.phone) this.profile.phone = doc.phone;
-  if (doc.bio !== undefined && !this.profile.bio) this.profile.bio = doc.bio;
-  if (doc.location !== undefined && !this.profile.location) this.profile.location = doc.location;
-  if (doc.avatar !== undefined && !this.profile.avatar) this.profile.avatar = doc.avatar;
-
-  // Map flat auth fields if provided at root
-  if (doc.email && !this.auth.email) this.auth.email = doc.email;
-  if (doc.password && !this.auth.password) this.auth.password = doc.password;
-  if (doc.lastLogin && !this.auth.lastLogin) this.auth.lastLogin = doc.lastLogin;
-
-  // Map createdBy to meta.createdBy if provided
-  if (doc.createdBy && this.meta && !this.meta.createdBy) {
-    this.meta.createdBy = doc.createdBy;
-  }
-
-  next();
-});
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
   if (!this.auth) this.auth = {};
 
-  const isAuthModified = this.isModified('auth.password');
-  const isDirectModified = this.isModified('password');
+  if (!this.isModified('auth.password')) return next();
 
-  if (!isAuthModified && !isDirectModified) return next();
-
-  const pwd = this.auth?.password || this.password;
+  const pwd = this.auth.password;
   if (!pwd) return next();
 
   // If already hashed with bcrypt ($2a$, $2b$, or $2y$), skip
@@ -208,38 +105,8 @@ userSchema.pre('save', async function (next) {
 
 // Compare password method
 userSchema.methods.comparePassword = async function (candidatePassword) {
-  const currentPassword = this.auth?.password || this.password;
+  const currentPassword = this.auth?.password;
   if (!currentPassword) return false;
-
-  // Developer convenience: Allow both User@123 and Admin@123 for Krushnakant's account
-  const emailStr = this.auth?.email || this.email || '';
-  if (
-    emailStr &&
-    (emailStr.includes('jayswalkrushn') || emailStr.includes('krushnakant')) &&
-    (candidatePassword === 'User@123' || candidatePassword === 'Admin@123')
-  ) {
-    return true;
-  }
-
-  // Developer convenience: Allow 12345678 and User@123 for Disha's account
-  if (
-    emailStr &&
-    emailStr.includes('disha') &&
-    (candidatePassword === '12345678' || candidatePassword === 'User@123')
-  ) {
-    return true;
-  }
-
-  // Handle plain-text fallback (e.g. from seed insertMany) and self-heal by upgrading to hash
-  if (!/^\$2[aby]\$\d{2}\$/.test(currentPassword)) {
-    if (candidatePassword === currentPassword) {
-      if (!this.auth) this.auth = {};
-      this.auth.password = candidatePassword;
-      await this.save();
-      return true;
-    }
-    return false;
-  }
 
   return bcrypt.compare(candidatePassword, currentPassword);
 };

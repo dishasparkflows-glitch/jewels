@@ -8,6 +8,7 @@ const { startWebsiteThemeCron } = require('./modules/websiteTheme/websiteTheme.c
 
 const http = require('http');
 const { initViewerSocket } = require('./socket/viewers.socket');
+const { verifyTransporter } = require('./utils/emailService');
 
 const PORT = process.env.PORT || 5000;
 
@@ -21,6 +22,11 @@ connectDB().then(() => {
 
   // Activate scheduled storefront themes and apply campaign expiry fallbacks.
   startWebsiteThemeCron();
+
+  // Verify SMTP Nodemailer connection
+  verifyTransporter().catch((err) => {
+    console.warn('⚠️ SMTP Transporter verification notice:', err.message);
+  });
 
   const server = http.createServer(app);
   initViewerSocket(server);

@@ -28,7 +28,10 @@ const {
   buildProductTypeFilter,
   buildLookupProductTypeFilter,
   getEffectivePriceExpression,
-  buildPriceRangeConditions
+  buildPriceRangeConditions,
+  getProductPopulateOptions,
+  extractSizeChart,
+  formatSizeChart,
 } = require('./product.utils');
 
 class ProductService {
@@ -336,89 +339,16 @@ class ProductService {
     return formatStorefrontProductDetail(fullProduct);
   }
 
-  // Shared populate options for full product detail views
   _getProductPopulateOptions() {
-    return [
-      { path: 'categoryIds', select: 'name slug sizeChart', strictPopulate: false },
-      { path: 'metalColorIds', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
-      { path: 'metalPurityIds', select: 'name karat metalType', strictPopulate: false },
-      { path: 'colorImages.metalColorId', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
-      { path: 'variants.metalColorId', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
-      { path: 'variants.metalPurityId', select: 'name karat metalType', strictPopulate: false },
-      { path: 'variants.diamondTypeId', select: 'name', strictPopulate: false },
-      { path: 'variants.diamondShapeId', select: 'name', strictPopulate: false },
-      { path: 'variants.diamondColorId', select: 'name', strictPopulate: false },
-      { path: 'variants.diamondClarityId', select: 'name', strictPopulate: false },
-    ];
+    return getProductPopulateOptions();
   }
 
-  // Extract size chart from populated categoryIds or category model
   async _extractSizeChart(product) {
-    if (!product) return null;
-    const Category = require('../category/category.model');
-    const categories = Array.isArray(product.categoryIds)
-      ? product.categoryIds
-      : product.category
-      ? [product.category]
-      : [];
-
-    for (const cat of categories) {
-      if (cat && typeof cat === 'object') {
-        const sc = cat.sizeChart;
-        const scUrl = typeof sc === 'object' ? sc?.url : sc;
-        if (scUrl) {
-          return this._formatSizeChart(sc, cat.name);
-        }
-      }
-    }
-
-    // Fallback: check raw unpopulated category ObjectIds
-    const rawIds = categories
-      .map((c) => (c && typeof c === 'object' ? c._id : c))
-      .filter((id) => mongoose.Types.ObjectId.isValid(id));
-
-    if (rawIds.length > 0) {
-      const foundCat = await Category.findOne({
-        _id: { $in: rawIds },
-        $or: [
-          { 'sizeChart.url': { $exists: true, $nin: ['', null] } },
-          { sizeChart: { $type: 'string', $nin: ['', null] } },
-        ],
-      }).select('name sizeChart').lean();
-
-      if (foundCat?.sizeChart) {
-        return this._formatSizeChart(foundCat.sizeChart, foundCat.name);
-      }
-    }
-
-    return null;
+    return extractSizeChart(product);
   }
 
   _formatSizeChart(chart, categoryName = '') {
-    if (!chart) return null;
-    const rawUrl = typeof chart === 'object' ? chart.url : chart;
-    const rawKey = typeof chart === 'object' ? chart.key : '';
-    if (!rawUrl) return null;
-    const trimmed = String(rawUrl).trim();
-    if (!trimmed) return null;
-    const resolvedUrl =
-      trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')
-        ? trimmed
-        : `/${trimmed}`;
-    const isPdf = /\.pdf($|\?)/i.test(resolvedUrl);
-
-    let key = rawKey;
-    if (!key && resolvedUrl) {
-      const match = resolvedUrl.match(/categories\/[^\s?#]+/);
-      if (match) key = match[0];
-    }
-
-    return {
-      url: resolvedUrl,
-      key: key || '',
-      categoryName: categoryName || 'Jewelry',
-      isPdf,
-    };
+    return formatSizeChart(chart, categoryName);
   }
 
   // ------------------------------- get all products ----------------------------
@@ -825,8 +755,6 @@ class ProductService {
         item.isGroup = true;
         item.groupCode = group.groupCode;
         item.groupName = group.groupName;
-        item.title = group.groupName || item.basicInfo?.title;
-        item.name = group.groupName || item.basicInfo?.title;
         if (item.basicInfo) {
           item.basicInfo = { ...item.basicInfo, title: group.groupName || item.basicInfo?.title };
         }
@@ -1018,8 +946,6 @@ class ProductService {
         item.isGroup = true;
         item.groupCode = group.groupCode;
         item.groupName = group.groupName;
-        item.title = group.groupName || item.basicInfo?.title;
-        item.name = group.groupName || item.basicInfo?.title;
         if (item.basicInfo) {
           item.basicInfo = { ...item.basicInfo, title: group.groupName || item.basicInfo?.title };
         }
@@ -1338,12 +1264,6 @@ class ProductService {
     }
 
     return { message: 'Product deleted successfully', id };
-  }
-
-  // ------------------------------- get storefront filters (delegates to dedicated filters table) ----------------------------
-  async getStorefrontFilters(queryParams = {}) {
-    const filterService = require('../filter/filter.service');
-    return filterService.getStorefrontFilters(queryParams);
   }
 }
 

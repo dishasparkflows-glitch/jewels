@@ -29,6 +29,16 @@ const settingSchema = new mongoose.Schema(
         type: String,
         trim: true,
       },
+      playStoreUrl: {
+        type: String,
+        trim: true,
+        default: '',
+      },
+      appStoreUrl: {
+        type: String,
+        trim: true,
+        default: '',
+      },
     },
     logoImage: {
       url: { type: String, default: '' },

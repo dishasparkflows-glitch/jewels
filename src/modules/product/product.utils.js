@@ -1,21 +1,6 @@
 const mongoose = require('mongoose');
 const ApiError = require('../../utils/ApiError');
 
-const MASTER_METAL_COLORS = {
-  '6ac90ab42c5692d9e254a047': { name: 'Yellow Gold', colorCode: '#E5C07B', colorCodeEnd: '#D4AF37', hex: '#E5C07B' },
-  '6ac90ab42c5692d9e254a048': { name: 'White Gold', colorCode: '#F3F4F6', colorCodeEnd: '#E5E7EB', hex: '#F3F4F6' },
-  '6ac90ab42c5692d9e254a049': { name: 'Rose Gold', colorCode: '#E8B4B8', colorCodeEnd: '#B76E79', hex: '#E8B4B8' },
-};
-
-const COLOR_HEX_DEFAULTS = {
-  'white gold': '#dedede',
-  'rose gold': '#e8b4b8',
-  'yellow gold': '#e5c07b',
-  silver: '#d4d4d4',
-  platinum: '#e5e4e2',
-  gold: '#d4b85b',
-};
-
 const resolveMetalColorInfo = (cObj, p = null) => {
   const isObj = typeof cObj === 'object' && cObj !== null;
   let id = isObj ? String(cObj._id || cObj.id || '') : (typeof cObj === 'string' && /^[a-f0-9]{24}$/i.test(cObj) ? cObj : '');
@@ -23,14 +8,11 @@ const resolveMetalColorInfo = (cObj, p = null) => {
   let colorCode = isObj ? (cObj.colorCode || cObj.hex || cObj.code || '') : '';
   let colorCodeEnd = isObj ? (cObj.colorCodeEnd || '') : '';
 
-  // If missing name or colorCode, try resolving from p.metalColorIds or p.metalColors
+  // If missing name or colorCode, try resolving from p.metalColorIds
   if ((!name || !colorCode) && p) {
-    const list = [
-      ...(Array.isArray(p.metalColorIds) ? p.metalColorIds : []),
-      ...(Array.isArray(p.metalColors) ? p.metalColors : []),
-      ...(Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []),
-      ...(Array.isArray(p.representative?.metalColors) ? p.representative.metalColors : []),
-    ];
+    const list = Array.isArray(p.metalColorIds) && p.metalColorIds.length > 0
+      ? p.metalColorIds
+      : (Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []);
     for (const mc of list) {
       if (!mc) continue;
       const mcIsObj = typeof mc === 'object' && mc !== null;
@@ -46,19 +28,9 @@ const resolveMetalColorInfo = (cObj, p = null) => {
     }
   }
 
-  // Fallback to master metal colors if id known
-  if (id && MASTER_METAL_COLORS[id]) {
-    const m = MASTER_METAL_COLORS[id];
-    if (!name) name = m.name;
-    if (!colorCode) colorCode = m.colorCode;
-    if (!colorCodeEnd) colorCodeEnd = m.colorCodeEnd;
-  }
+  const hex = colorCode || '';
 
-  // Fallback hex
-  const fallbackHex = COLOR_HEX_DEFAULTS[(name || '').toLowerCase()] || '#d4d4d4';
-  const hex = colorCode || fallbackHex;
-
-  return { id, name, colorCode: colorCode || hex, colorCodeEnd, hex };
+  return { id, name, colorCode, colorCodeEnd, hex };
 };
 
 // Lean and aggregate results do not apply schema defaults to existing records.
@@ -391,13 +363,10 @@ const extractMetalColors = (p) => {
     });
   }
 
-  // 2. Also process metalColorIds & metalColors
-  const sourceMetalColors = [
-    ...(Array.isArray(p.metalColorIds) ? p.metalColorIds : []),
-    ...(Array.isArray(p.metalColors) ? p.metalColors : []),
-    ...(Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []),
-    ...(Array.isArray(p.representative?.metalColors) ? p.representative.metalColors : []),
-  ];
+  // 2. Also process metalColorIds
+  const sourceMetalColors = Array.isArray(p.metalColorIds) && p.metalColorIds.length > 0
+    ? p.metalColorIds
+    : (Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []);
 
   for (const mc of sourceMetalColors) {
     if (!mc) continue;
@@ -522,7 +491,7 @@ const formatStorefrontProduct = (p) => {
 
   const categoryIds = Array.isArray(p.categoryIds) ? p.categoryIds : (p.categoryIds ? [p.categoryIds] : []);
   const menuItemIds = Array.isArray(p.menuItemIds) ? p.menuItemIds : (p.menuItemIds ? [p.menuItemIds] : []);
-  const gender = p.gender || p.basicInfo?.gender || [];
+  const gender = p.basicInfo?.gender || [];
 
   const metalColors = extractMetalColors(p);
   const colorImages = formatColorImages(p.colorImages || p.representative?.colorImages || [], p);
@@ -552,8 +521,6 @@ const formatStorefrontProduct = (p) => {
   return {
     _id: p._id,
     id: p._id,
-    title,
-    slug,
     images,
     image: images[0] || '',
     metalColors,
@@ -575,7 +542,6 @@ const formatStorefrontProduct = (p) => {
     variantCount: p.variantCount || 0,
     categoryIds,
     menuItemIds,
-    gender,
     productType: p.productType || '',
     stockStatus: p.stockStatus || '',
     selectedAttributes,
@@ -594,11 +560,11 @@ const formatHomeProduct = (p) => {
 const formatStorefrontProductDetail = (p) => {
   if (!p) return null;
 
-  const title = p.basicInfo?.title || p.name || p.title || '';
-  const slug = p.basicInfo?.slug || p.slug || '';
-  const sku = p.basicInfo?.sku || p.sku || '';
-  const description = p.basicInfo?.description || p.description || '';
-  const gender = p.basicInfo?.gender || p.gender || [];
+  const title = p.basicInfo?.title || '';
+  const slug = p.basicInfo?.slug || '';
+  const sku = p.basicInfo?.sku || '';
+  const description = p.basicInfo?.description || '';
+  const gender = p.basicInfo?.gender || [];
 
   const salePrice = Number(p.pricing?.salePrice || 0);
   const isGold = String(p.productType || '').toLowerCase() === 'gold';
@@ -640,9 +606,6 @@ const formatStorefrontProductDetail = (p) => {
   return {
     _id: p._id,
     id: p._id,
-    name: title,
-    title,
-    slug,
     images,
     image,
     metalColors,
@@ -659,8 +622,7 @@ const formatStorefrontProductDetail = (p) => {
     metalColorIds: Array.isArray(p.metalColorIds) ? p.metalColorIds : [],
     metalPurityIds: Array.isArray(p.metalPurityIds) ? p.metalPurityIds : [],
     colorImages: Array.isArray(p.colorImages) ? p.colorImages : [],
-    sizes: p.sizes || p.availableSizes || [],
-    availableSizes: p.availableSizes || p.sizes || [],
+    sizes: Array.isArray(p.sizes) ? p.sizes : (Array.isArray(p.sizeIds) ? p.sizeIds : []),
     pricing: {
       ...(p.pricing || {}),
       salePrice,
@@ -672,10 +634,6 @@ const formatStorefrontProductDetail = (p) => {
     },
     specifications: {
       metalWeight: Number(p.specifications?.metalWeight || 0),
-      grossWeight: Number(p.specifications?.grossWeight || 0),
-      netWeight: Number(p.specifications?.netWeight || 0),
-      metalName: p.specifications?.metalName || '',
-      diamondWeight: Number(p.specifications?.diamondWeight || 0),
     },
     productSpecifications: Array.isArray(p.productSpecifications) ? p.productSpecifications : [],
     descriptionSections: Array.isArray(p.descriptionSections) ? p.descriptionSections : [],
@@ -689,7 +647,6 @@ const formatStorefrontProductDetail = (p) => {
     certificateImage: p.certificateImage || null,
     inWishlist: Boolean(p.inWishlist),
     sizeChart: p.sizeChart || null,
-    relatedProducts: Array.isArray(p.relatedProducts) ? p.relatedProducts : [],
     stockStatus: p.stockStatus || 'In Stock',
     seo: p.seo || undefined,
     ...(p.ornate ? {
@@ -890,6 +847,98 @@ const buildPriceRangeConditions = (queryParams, effectivePrice) => {
   return priceConditions;
 };
 
+/**
+ * Shared populate options for full product detail views
+ */
+const getProductPopulateOptions = () => {
+  return [
+    { path: 'categoryIds', select: 'name slug sizeChart', strictPopulate: false },
+    { path: 'metalColorIds', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
+    { path: 'metalPurityIds', select: 'name karat metalType', strictPopulate: false },
+    { path: 'colorImages.metalColorId', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
+    { path: 'variants.metalColorId', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
+    { path: 'variants.metalPurityId', select: 'name karat metalType', strictPopulate: false },
+    { path: 'variants.diamondTypeId', select: 'name', strictPopulate: false },
+    { path: 'variants.diamondShapeId', select: 'name', strictPopulate: false },
+    { path: 'variants.diamondColorId', select: 'name', strictPopulate: false },
+    { path: 'variants.diamondClarityId', select: 'name', strictPopulate: false },
+  ];
+};
+
+/**
+ * Formats size chart payload with normalized URL, key, and PDF flag
+ */
+const formatSizeChart = (chart, categoryName = '') => {
+  if (!chart) return null;
+  const rawUrl = typeof chart === 'object' ? chart.url : chart;
+  const rawKey = typeof chart === 'object' ? chart.key : '';
+  if (!rawUrl) return null;
+  const trimmed = String(rawUrl).trim();
+  if (!trimmed) return null;
+  const resolvedUrl =
+    trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')
+      ? trimmed
+      : `/${trimmed}`;
+  const isPdf = /\.pdf($|\?)/i.test(resolvedUrl);
+
+  let key = rawKey;
+  if (!key && resolvedUrl) {
+    const match = resolvedUrl.match(/categories\/[^\s?#]+/);
+    if (match) key = match[0];
+  }
+
+  return {
+    url: resolvedUrl,
+    key: key || '',
+    categoryName: categoryName || 'Jewelry',
+    isPdf,
+  };
+};
+
+/**
+ * Extract size chart from populated categoryIds or category model
+ */
+const extractSizeChart = async (product) => {
+  if (!product) return null;
+  const Category = require('../category/category.model');
+  const categories = Array.isArray(product.categoryIds)
+    ? product.categoryIds
+    : product.category
+    ? [product.category]
+    : [];
+
+  for (const cat of categories) {
+    if (cat && typeof cat === 'object') {
+      const sc = cat.sizeChart;
+      const scUrl = typeof sc === 'object' ? sc?.url : sc;
+      if (scUrl) {
+        return formatSizeChart(sc, cat.name);
+      }
+    }
+  }
+
+  // Fallback: check raw unpopulated category ObjectIds
+  const rawIds = categories
+    .map((c) => (c && typeof c === 'object' ? c._id : c))
+    .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+  if (rawIds.length > 0) {
+    const foundCat = await Category.findOne({
+      _id: { $in: rawIds },
+      $or: [
+        { 'sizeChart.url': { $exists: true, $nin: ['', null] } },
+        { sizeChart: { $type: 'string', $nin: ['', null] } },
+      ],
+    }).select('name sizeChart').lean();
+
+    if (foundCat?.sizeChart) {
+      return formatSizeChart(foundCat.sizeChart, foundCat.name);
+    }
+  }
+
+  return null;
+};
+
 module.exports = {
   withColorStatuses,
   sanitizeColorImages,
@@ -906,4 +955,7 @@ module.exports = {
   buildLookupProductTypeFilter,
   getEffectivePriceExpression,
   buildPriceRangeConditions,
+  getProductPopulateOptions,
+  extractSizeChart,
+  formatSizeChart,
 };

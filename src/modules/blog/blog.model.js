@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const metaPlugin = require('../../utils/metaPlugin');
 
-const blogSchema = new mongoose.Schema(
+const basicInfoSchema = new mongoose.Schema(
   {
     title: {
       type: String,
@@ -24,29 +24,10 @@ const blogSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
-    blogCategory: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'BlogCategory',
-      required: [true, 'Please select a blog category'],
-      index: true,
-    },
-    image: {
-      url: { type: String, trim: true, default: '' },
-      key: { type: String, trim: true, default: '' },
-      alt: { type: String, trim: true, default: '' },
-      name: { type: String, trim: true, default: '' },
-      size: { type: String, trim: true, default: '' },
-    },
     readTime: {
       type: String,
       trim: true,
       default: '3 min read',
-    },
-    status: {
-      type: String,
-      enum: ['active', 'inactive'],
-      default: 'active',
-      index: true,
     },
     publishDate: {
       type: Date,
@@ -57,12 +38,12 @@ const blogSchema = new mongoose.Schema(
       trim: true,
       default: 'Neirah Atelier',
     },
-    tags: [
-      {
-        type: String,
-        trim: true,
-      },
-    ],
+  },
+  { _id: false }
+);
+
+const seoSchema = new mongoose.Schema(
+  {
     metaTitle: {
       type: String,
       trim: true,
@@ -73,10 +54,50 @@ const blogSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
-    allowComments: {
-      type: Boolean,
-      default: true,
+    metaKeywords: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+  },
+  { _id: false }
+);
+
+const blogSchema = new mongoose.Schema(
+  {
+    basicInfo: {
+      type: basicInfoSchema,
+      required: true,
+      default: () => ({}),
     },
+    blogCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BlogCategory',
+      required: [true, 'Please select a blog category'],
+      index: true,
+    },
+    image: {
+      url: { type: String, trim: true, default: '' },
+      key: { type: String, trim: true, default: '' },
+      alt: { type: String, trim: true, default: '' },
+    },
+    seo: {
+      type: seoSchema,
+      default: () => ({}),
+    },
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'active',
+      index: true,
+    },
+    tags: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
     showInHomepage: {
       type: Boolean,
       default: true,
@@ -88,39 +109,11 @@ const blogSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+    timestamps: false,
   }
 );
 
 blogSchema.index({ 'meta.createdAt': -1 });
-
-// Automatically compute slug, shortDescription, and readTime if omitted
-blogSchema.pre('save', function (next) {
-  if (!this.slug && this.title) {
-    this.slug = this.title
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
-
-  // Auto-generate shortDescription from HTML description if empty
-  if (!this.shortDescription && this.description) {
-    const plainText = this.description.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    this.shortDescription = plainText.length > 160 ? plainText.substring(0, 157) + '...' : plainText;
-  }
-
-  // Auto-calculate read time if missing or blank
-  if ((!this.readTime || !this.readTime.trim()) && this.description) {
-    const plainText = this.description.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    const words = plainText ? plainText.split(/\s+/).length : 0;
-    const mins = Math.max(1, Math.ceil(words / 200));
-    this.readTime = `${mins} min read`;
-  }
-
-  next();
-});
 
 blogSchema.plugin(metaPlugin);
 

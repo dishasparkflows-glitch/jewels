@@ -73,22 +73,20 @@ class CartService {
       items: items.map((item) => {
         const prod = (item.productId && typeof item.productId === 'object' && item.productId._id)
           ? item.productId
-          : (item.product && typeof item.product === 'object' && item.product._id ? item.product : null);
-        const prodId = prod?._id || item.productId || item.product;
-        const title = prod?.basicInfo?.title || item.title || '';
+          : null;
+        const prodId = prod?._id || item.productId;
+        const title = prod?.basicInfo?.title || '';
         const firstImg =
           prod?.colorImages?.[0]?.images?.[0] ||
           prod?.ornate?.ornateImages?.[0] ||
           prod?.images?.[0];
-        const image = typeof firstImg === 'string' ? firstImg : firstImg?.url || item.image?.url || item.image || '';
+        const image = typeof firstImg === 'string' ? firstImg : firstImg?.url || '';
         const catFirst = prod?.categoryIds?.[0];
         let category = '';
         if (catFirst && typeof catFirst === 'object' && catFirst.name) {
           category = catFirst.name;
-        } else if (typeof item.category === 'string' && !/^[0-9a-fA-F]{24}$/.test(item.category.trim())) {
-          category = item.category;
         }
-        const originalPrice = prod?.pricing?.mrp || item.originalPrice || null;
+        const originalPrice = prod?.pricing?.mrp || null;
 
         const sa = item.selectedAttributes;
         const getAttrVal = (val) => {
@@ -107,7 +105,7 @@ class CartService {
         const sizeVal = getAttrVal(sa?.size) || (typeof sa?.sizeRange === 'string' ? sa.sizeRange : '');
         const caratWeight = sa?.caratWeight != null ? Number(sa.caratWeight) : null;
 
-        const selectedMetal = [metalPurity, metalColor].filter(Boolean).join(' ') || item.selectedMetal || '';
+        const selectedMetal = [metalPurity, metalColor].filter(Boolean).join(' ');
 
         const selectedAttributes = sa ? {
           metalPurity,
@@ -134,7 +132,7 @@ class CartService {
           category,
           quantity: item.quantity,
           selectedMetal,
-          selectedSize: sizeVal || item.selectedSize || '',
+          selectedSize: sizeVal || '',
           selectedAttributes,
           itemTotal: item.totalItemPrice || ((item.price || 0) * (item.quantity || 1)),
           addedAt: item.addedAt,
@@ -165,7 +163,7 @@ class CartService {
 
   // ------------------------------- add to cart ----------------------------
   async addToCart({ userId, productData, quantity = 1, options = {} } = {}) {
-    const rawProductId = productData?.productId || productData?.product || options?.productId;
+    const rawProductId = productData?.productId || options?.productId;
     if (!rawProductId) {
       throw new ApiError(400, 'Product ID is required');
     }
@@ -221,7 +219,7 @@ class CartService {
 
     // Check if this product & variant combination exists in cart
     const existingIndex = cart.items.findIndex((item) => {
-      const itemProdId = item.product?._id || item.product || item.productId;
+      const itemProdId = item.productId?._id || item.productId;
       const sameProduct = String(itemProdId) === String(productId);
       if (!sameProduct) return false;
       if (selectedAttributes?.metalColor && item.selectedAttributes?.metalColor) {
@@ -283,7 +281,7 @@ class CartService {
     }
 
     const index = cart.items.findIndex(
-      (item) => String(item.productId?._id || item.productId || item.product || item._id) === productIdStr
+      (item) => String(item.productId?._id || item.productId || item._id) === productIdStr
     );
 
     if (index === -1) {
@@ -317,7 +315,7 @@ class CartService {
     }
 
     cart.items = cart.items.filter(
-      (item) => String(item.productId?._id || item.productId || item.product || item._id) !== productIdStr
+      (item) => String(item.productId?._id || item.productId || item._id) !== productIdStr
     );
 
     await cart.save();

@@ -6,19 +6,12 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class UserService {
   formatUser(user) {
     if (!user) return null;
-    const doc = user.toObject ? user.toObject({ virtuals: true }) : { ...user };
-    return {
-      ...doc,
-      firstName: doc.profile?.firstName || '',
-      lastName: doc.profile?.lastName || '',
-      fullName: `${doc.profile?.firstName || ''} ${doc.profile?.lastName || ''}`.trim(),
-      email: doc.auth?.email || '',
-      phone: doc.profile?.phone || '',
-      location: doc.profile?.location || '',
-      bio: doc.profile?.bio || '',
-      avatar: doc.profile?.avatar || null,
-      themeColor: doc.profile?.themeColor || 'default',
-    };
+    const doc = user.toObject ? user.toObject() : { ...user };
+    if (doc.auth?.password) {
+      delete doc.auth.password;
+    }
+    delete doc.password;
+    return doc;
   }
 
   // ------------------------------- get all users ----------------------------
@@ -70,7 +63,7 @@ class UserService {
       const userAddresses = await addressService.getUserAddresses(id);
       formattedUser.addressesList = userAddresses || [];
     } catch (e) {
-      // Gracefully continue if address lookup fails
+      console.error('Error fetching user addresses:', e);
     }
 
     return formattedUser;

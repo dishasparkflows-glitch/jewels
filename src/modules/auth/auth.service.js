@@ -153,7 +153,7 @@ class AuthService {
 
     try {
       const resetUrlStr = resetUrl.toString();
-      const storeName = process.env.STORE_NAME || 'Jai Shree Krishna Fab';
+      const storeName = process.env.STORE_NAME || 'Neirah';
 
       await sendEmail({
         to: normalizedEmail,

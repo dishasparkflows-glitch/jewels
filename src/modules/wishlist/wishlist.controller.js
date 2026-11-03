@@ -30,13 +30,13 @@ class WishlistController {
     try {
       emitWishlistUpdate({
         userId: req.user._id,
-        wishlistCount: result.productIds?.length || 0,
+        wishlistCount: result.wishlistCount || 0,
         productId: req.body?.productId,
         isWishlisted: result.isWishlisted,
       });
     } catch {}
 
-    ApiResponse.success(res, result, msg);
+    ApiResponse.success(res, null, msg);
   });
 
   // ------------------------------- add item to wishlist ----------------------------

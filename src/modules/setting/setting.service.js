@@ -79,7 +79,9 @@ class SettingService {
         data.mobileNumber !== undefined ||
         data.storeAddress !== undefined ||
         data.gstCode !== undefined ||
-        data.panCode !== undefined
+        data.panCode !== undefined ||
+        data.playStoreUrl !== undefined ||
+        data.appStoreUrl !== undefined
       ) {
         settings.businessDetails = {
           ...(settings.businessDetails?.toObject ? settings.businessDetails.toObject() : (settings.businessDetails || {})),
@@ -89,7 +91,20 @@ class SettingService {
           ...(data.storeAddress !== undefined ? { storeAddress: data.storeAddress } : {}),
           ...(data.gstCode !== undefined ? { gstCode: data.gstCode } : {}),
           ...(data.panCode !== undefined ? { panCode: data.panCode } : {}),
+          ...(data.playStoreUrl !== undefined ? { playStoreUrl: data.playStoreUrl } : {}),
+          ...(data.appStoreUrl !== undefined ? { appStoreUrl: data.appStoreUrl } : {}),
         };
+        settings.markModified('businessDetails');
+      }
+
+      if (data.playStoreUrl !== undefined) {
+        if (!settings.businessDetails) settings.businessDetails = {};
+        settings.businessDetails.playStoreUrl = data.playStoreUrl;
+        settings.markModified('businessDetails');
+      }
+      if (data.appStoreUrl !== undefined) {
+        if (!settings.businessDetails) settings.businessDetails = {};
+        settings.businessDetails.appStoreUrl = data.appStoreUrl;
         settings.markModified('businessDetails');
       }
 

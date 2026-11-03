@@ -141,12 +141,10 @@ class WishlistService {
     }
 
     await wishlist.save();
-    await wishlist.populate(PRODUCT_POPULATE_CONFIG);
-    const formattedWishlist = this.formatWishlist(wishlist);
 
     return {
       isWishlisted,
-      ...formattedWishlist,
+      wishlistCount: wishlist.productIds.length,
     };
   }
 

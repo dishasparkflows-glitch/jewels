@@ -5,7 +5,7 @@ const ApiResponse = require('../../utils/ApiResponse');
 class StaticPageController {
   create = catchAsync(async (req, res) => {
     const page = await staticPageService.create(req.body);
-    ApiResponse.created(res, page, 'Static page created successfully');
+    ApiResponse.created(res, null, 'Static page created successfully');
   });
 
   getAll = catchAsync(async (req, res) => {
@@ -25,12 +25,12 @@ class StaticPageController {
 
   update = catchAsync(async (req, res) => {
     const page = await staticPageService.update(req.params.id, req.body);
-    ApiResponse.success(res, page, 'Static page updated successfully');
+    ApiResponse.success(res, null, 'Static page updated successfully');
   });
 
   delete = catchAsync(async (req, res) => {
     const result = await staticPageService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

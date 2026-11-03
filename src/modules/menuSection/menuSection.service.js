@@ -73,7 +73,7 @@ class MenuSectionService {
       { _id: id },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
-    ).populate('categoryId', 'name slug type');
+    );
 
     if (!item) {
       throw new ApiError(404, 'Menu section not found');

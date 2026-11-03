@@ -5,7 +5,7 @@ const ApiResponse = require('../../utils/ApiResponse');
 class BlogCategoryController {
   create = catchAsync(async (req, res) => {
     const item = await blogCategoryService.create(req.body);
-    ApiResponse.created(res, item, 'Blog category created successfully');
+    ApiResponse.created(res, null, 'Blog category created successfully');
   });
 
   getAll = catchAsync(async (req, res) => {
@@ -30,12 +30,12 @@ class BlogCategoryController {
 
   update = catchAsync(async (req, res) => {
     const item = await blogCategoryService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Blog category updated successfully');
+    ApiResponse.success(res, null, 'Blog category updated successfully');
   });
 
   delete = catchAsync(async (req, res) => {
     const result = await blogCategoryService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

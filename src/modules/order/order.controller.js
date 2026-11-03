@@ -29,8 +29,8 @@ class OrderController {
 
   // ------------------------------- Cancel Order ----------------------------
   cancelOrder = catchAsync(async (req, res) => {
-    const order = await orderService.cancelOrder(req.params.id, req.user, req.body?.reason);
-    ApiResponse.success(res, order, 'Order cancelled successfully');
+    await orderService.cancelOrder(req.params.id, req.user, req.body?.reason);
+    ApiResponse.success(res, null, 'Order cancelled successfully');
   });
 
   // ------------------------------- Admin: Get All Orders ----------------------------
@@ -41,8 +41,8 @@ class OrderController {
 
   // ------------------------------- Admin: Update Order Status ----------------------------
   updateOrderStatus = catchAsync(async (req, res) => {
-    const order = await orderService.updateOrderStatus(req.params.id, req.body);
-    ApiResponse.success(res, order, 'Order status updated successfully');
+    await orderService.updateOrderStatus(req.params.id, req.body);
+    ApiResponse.success(res, null, 'Order status updated successfully');
   });
 }
 

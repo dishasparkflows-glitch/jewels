@@ -61,7 +61,7 @@ class ThemeMediaMappingController {
       mappingId,
     });
 
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   deleteMappingByTarget = catchAsync(async (req, res) => {
@@ -89,7 +89,7 @@ class ThemeMediaMappingController {
       userId: req.user?._id,
     });
 
-    ApiResponse.success(res, result, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   getSummary = catchAsync(async (req, res) => {
@@ -103,7 +103,7 @@ class ThemeMediaMappingController {
     const { themeId } = req.params;
 
     const result = await themeMediaMappingService.activateTheme(themeId, req.user?._id);
-    ApiResponse.success(res, result, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

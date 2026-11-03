@@ -5,7 +5,7 @@ const ApiResponse = require('../../utils/ApiResponse');
 class BlogController {
   create = catchAsync(async (req, res) => {
     const item = await blogService.create(req.body);
-    ApiResponse.created(res, item, 'Blog post created successfully');
+    ApiResponse.created(res, null, 'Blog post created successfully');
   });
 
   getAll = catchAsync(async (req, res) => {
@@ -30,12 +30,12 @@ class BlogController {
 
   update = catchAsync(async (req, res) => {
     const item = await blogService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Blog post updated successfully');
+    ApiResponse.success(res, null, 'Blog post updated successfully');
   });
 
   delete = catchAsync(async (req, res) => {
     const result = await blogService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

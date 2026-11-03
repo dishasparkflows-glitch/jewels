@@ -153,9 +153,6 @@ class CenterDiamondPriceService {
       { returnDocument: 'after', runValidators: true }
     );
 
-    const populates = getSafePopulates();
-    if (populates.length > 0) updateQuery = updateQuery.populate(populates);
-
     const item = await updateQuery;
 
     if (!item) {

@@ -13,7 +13,7 @@ class WhatsAppController {
 
   getIntegrationStatus = catchAsync(async (req, res) => {
     const result = await whatsappService.getIntegrationStatus();
-    ApiResponse.success(res, result, 'Integration status retrieved');
+    ApiResponse.success(res, null, 'Integration status retrieved');
   });
 
   disconnectIntegration = catchAsync(async (req, res) => {
@@ -72,17 +72,17 @@ class WhatsAppController {
 
   createTemplate = catchAsync(async (req, res) => {
     const template = await whatsappTemplateService.createTemplate(req.body, req.user?._id);
-    ApiResponse.created(res, template, 'WhatsApp template created successfully');
+    ApiResponse.created(res, null, 'WhatsApp template created successfully');
   });
 
   updateTemplate = catchAsync(async (req, res) => {
     const template = await whatsappTemplateService.updateTemplate(req.params.id, req.body, req.user?._id);
-    ApiResponse.success(res, template, 'WhatsApp template updated successfully');
+    ApiResponse.success(res, null, 'WhatsApp template updated successfully');
   });
 
   updateTemplateStatus = catchAsync(async (req, res) => {
     const template = await whatsappTemplateService.updateTemplateStatus(req.params.id, req.body, req.user?._id);
-    ApiResponse.success(res, template, 'Template status updated successfully');
+    ApiResponse.success(res, null, 'Template status updated successfully');
   });
 
   previewTemplate = catchAsync(async (req, res) => {
@@ -102,7 +102,7 @@ class WhatsAppController {
 
   deleteTemplate = catchAsync(async (req, res) => {
     const result = await whatsappTemplateService.deleteTemplate(req.params.id);
-    ApiResponse.success(res, result, 'Template deleted successfully');
+    ApiResponse.success(res, null, 'Template deleted successfully');
   });
 
   // ─── Webhook ───────────────────────────────────────────────────────

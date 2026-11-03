@@ -6,7 +6,7 @@ class CouponController {
   // ------------------------------- create coupon ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await couponService.create(req.body);
-    ApiResponse.created(res, item, 'Coupon created successfully');
+    ApiResponse.created(res, null, 'Coupon created successfully');
   });
 
   // ------------------------------- get all coupons ----------------------------
@@ -49,14 +49,14 @@ class CouponController {
 
   update = catchAsync(async (req, res) => {
     const item = await couponService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Coupon updated successfully');
+    ApiResponse.success(res, null, 'Coupon updated successfully');
   });
 
   // ------------------------------- delete coupon ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await couponService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

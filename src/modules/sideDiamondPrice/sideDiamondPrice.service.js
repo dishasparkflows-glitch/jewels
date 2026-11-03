@@ -160,8 +160,7 @@ class SideDiamondPriceService {
       { returnDocument: 'after', runValidators: true }
     );
 
-    const populates = getSafePopulates();
-    if (populates.length > 0) updateQuery = updateQuery.populate(populates);
+    // No populate needed on update
 
     const item = await updateQuery;
 

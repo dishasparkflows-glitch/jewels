@@ -10,9 +10,7 @@ class SideDiamondPriceController {
       req.body.updatedBy = req.user._id;
     }
     const item = await sideDiamondPriceService.create(req.body);
-    ApiResponse.created(
-      res,
-      item,
+    ApiResponse.created(res, null,
       'Side diamond price entry created successfully'
     );
   });
@@ -54,10 +52,7 @@ class SideDiamondPriceController {
       req.body.updatedBy = req.user._id;
     }
     const item = await sideDiamondPriceService.update(req.params.id, req.body);
-    ApiResponse.success(
-      res,
-      item,
-      'Side diamond price entry updated successfully'
+    ApiResponse.success(res, null, 'Side diamond price entry updated successfully'
     );
   });
 
@@ -86,7 +81,7 @@ class SideDiamondPriceController {
 
   delete = catchAsync(async (req, res) => {
     const result = await sideDiamondPriceService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

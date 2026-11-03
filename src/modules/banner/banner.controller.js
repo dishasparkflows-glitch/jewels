@@ -6,7 +6,7 @@ class BannerController {
   // ------------------------------- create banner ----------------------------
   create = catchAsync(async (req, res) => {
     const banner = await bannerService.create(req.body);
-    ApiResponse.created(res, banner, 'Banner created successfully');
+    ApiResponse.created(res, null, 'Banner created successfully');
   });
 
   // ------------------------------- get all banners ----------------------------
@@ -48,13 +48,13 @@ class BannerController {
   // ------------------------------- update banner ----------------------------
   update = catchAsync(async (req, res) => {
     const banner = await bannerService.update(req.params.id, req.body);
-    ApiResponse.success(res, banner, 'Banner updated successfully');
+    ApiResponse.success(res, null, 'Banner updated successfully');
   });
 
   // ------------------------------- delete banner ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await bannerService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   // ------------------------------- get themes lookup for banners ----------------------------
@@ -83,10 +83,7 @@ class BannerController {
   // ----------------------- manual trigger offer cleanup ---------------------
   cleanupExpiredOffers = catchAsync(async (req, res) => {
     const result = await bannerService.autoDeleteExpiredOffers();
-    ApiResponse.success(
-      res,
-      result,
-      `Expired offers cleanup completed. ${result.deletedCount} offers deleted.`
+    ApiResponse.success(res, null, `Expired offers cleanup completed. ${result.deletedCount} offers deleted.`
     );
   });
 }

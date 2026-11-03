@@ -6,7 +6,7 @@ class VTOMasterController {
   // ------------------------------- create vto master ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await vtoMasterService.create(req.body);
-    ApiResponse.created(res, item, 'VTO configuration created successfully');
+    ApiResponse.created(res, null, 'VTO configuration created successfully');
   });
 
   // ------------------------------- get all vto masters ----------------------------
@@ -41,13 +41,13 @@ class VTOMasterController {
   // ------------------------------- update vto master ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await vtoMasterService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'VTO configuration updated successfully');
+    ApiResponse.success(res, null, 'VTO configuration updated successfully');
   });
 
   // ------------------------------- delete vto master ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await vtoMasterService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

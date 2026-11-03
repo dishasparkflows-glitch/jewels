@@ -6,7 +6,7 @@ class SizeController {
   // ------------------------------- create size ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await sizeService.create(req.body);
-    ApiResponse.created(res, item, 'Size created successfully');
+    ApiResponse.created(res, null, 'Size created successfully');
   });
 
   // ------------------------------- get all sizes ----------------------------
@@ -34,14 +34,14 @@ class SizeController {
 
   update = catchAsync(async (req, res) => {
     const item = await sizeService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Size updated successfully');
+    ApiResponse.success(res, null, 'Size updated successfully');
   });
 
   // ------------------------------- delete size ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await sizeService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

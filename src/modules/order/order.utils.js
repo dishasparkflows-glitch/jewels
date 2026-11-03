@@ -138,7 +138,24 @@ function calculateOrderPricing({ subtotal, discount = 0, paymentMethod = 'online
  * Extract shipping address snapshot from input payload or user profile
  */
 function buildShippingAddress(data, user = null) {
-  return data.shippingAddress || {
+  if (data.shippingAddress) {
+    const raw = data.shippingAddress.address || data.shippingAddress;
+    return {
+      firstName: data.shippingAddress.firstName || user?.profile?.firstName || '',
+      lastName: data.shippingAddress.lastName || user?.profile?.lastName || '',
+      fullName: [data.shippingAddress.firstName || user?.profile?.firstName, data.shippingAddress.lastName || user?.profile?.lastName].filter(Boolean).join(' '),
+      email: data.shippingAddress.email || user?.auth?.email || '',
+      phone: raw.phone || data.shippingAddress.phone || user?.profile?.phone || '',
+      countryCode: data.shippingAddress.countryCode || '+91',
+      addressLine: raw.addressLine || raw.street || '',
+      apartment: data.shippingAddress.apartment || raw.street || '',
+      city: raw.city || '',
+      state: raw.state || '',
+      postalCode: raw.pincode || raw.postalCode || '',
+      country: raw.country || 'India',
+    };
+  }
+  return {
     firstName: data.firstName || user?.profile?.firstName || '',
     lastName: data.lastName || user?.profile?.lastName || '',
     fullName: [data.firstName || user?.profile?.firstName, data.lastName || user?.profile?.lastName].filter(Boolean).join(' '),

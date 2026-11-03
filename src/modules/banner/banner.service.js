@@ -261,12 +261,7 @@ class BannerService {
       throw new ApiError(400, 'Collection banners must contain exactly four images if images are provided');
     }
     const cleanData = sanitizeBannerPayload(data);
-    const created = await Banner.create(cleanData);
-    const populated = await Banner.findById(created._id)
-      .populate('display.categoryId', 'name slug')
-      .populate('collectionImages.categoryId', 'name slug')
-      .populate('display.menuItemIds', 'title menuSectionId');
-    return this._formatBanner(populated);
+    return await Banner.create(cleanData);
   }
 
   // ------------------------------- get one banner ----------------------------
@@ -612,16 +607,13 @@ class BannerService {
       { _id: id },
       updateOps,
       { returnDocument: 'after', runValidators: true }
-    )
-      .populate('display.categoryId', 'name slug')
-      .populate('collectionImages.categoryId', 'name slug')
-      .populate('display.menuItemIds', 'title menuSectionId');
+    );
 
     if (!banner) {
       throw new ApiError(404, 'Banner not found');
     }
 
-    return this._formatBanner(banner);
+    return banner;
   }
 
   // ------------------------------- delete banner ----------------------------

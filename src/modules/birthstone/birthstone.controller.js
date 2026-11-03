@@ -6,7 +6,7 @@ class BirthstoneController {
   // ------------------------------- create birthstone ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await birthstoneService.create(req.body);
-    ApiResponse.created(res, item, 'Birthstone created successfully');
+    ApiResponse.created(res, null, 'Birthstone created successfully');
   });
 
   // ------------------------------- get all birthstones ----------------------------
@@ -46,14 +46,14 @@ class BirthstoneController {
 
   update = catchAsync(async (req, res) => {
     const item = await birthstoneService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Birthstone updated successfully');
+    ApiResponse.success(res, null, 'Birthstone updated successfully');
   });
 
   // ------------------------------- delete birthstone ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await birthstoneService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

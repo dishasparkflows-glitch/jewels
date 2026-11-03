@@ -6,7 +6,7 @@ class DiamondTypeController {
   // ------------------------------- create diamond type ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await diamondTypeService.create(req.body);
-    ApiResponse.created(res, item, 'Diamond type created successfully');
+    ApiResponse.created(res, null, 'Diamond type created successfully');
   });
 
   // ------------------------------- get all diamond types ----------------------------
@@ -35,13 +35,13 @@ class DiamondTypeController {
   // ------------------------------- update diamond type ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await diamondTypeService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Diamond type updated successfully');
+    ApiResponse.success(res, null, 'Diamond type updated successfully');
   });
 
   // ------------------------------- delete diamond type ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await diamondTypeService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

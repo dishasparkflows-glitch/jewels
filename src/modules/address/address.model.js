@@ -9,59 +9,37 @@ const addressSchema = new mongoose.Schema(
       required: [true, 'User ID is required'],
       index: true,
     },
-    addressType: {
-      type: String,
-      enum: ['home', 'office'],
-      default: 'home',
-      lowercase: true,
-      trim: true,
+    address: {
+      type: {
+        type: String,
+        enum: ['home', 'office', 'other'],
+        default: 'home',
+      },
+
+      phone: String,
+
+      addressLine: String,
+      street: String,
+
+      city: String,
+      state: String,
+      pincode: String,
+      country: String,
     },
-    phone: {
-      type: String,
-      required: [true, 'Phone number is required'],
-      trim: true,
-    },
-    addressLine: {
-      type: String,
-      required: [true, 'Address line is required'],
-      trim: true,
-    },
-    street: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-    city: {
-      type: String,
-      required: [true, 'City is required'],
-      trim: true,
-    },
-    state: {
-      type: String,
-      required: [true, 'State is required'],
-      trim: true,
-    },
-    pincode: {
-      type: String,
-      required: [true, 'Pincode is required'],
-      trim: true,
-    },
-    country: {
-      type: String,
-      default: 'India',
-      trim: true,
-    },
-    isDefault: {
-      type: Boolean,
-      default: false,
-    },
-    isBillingDefault: {
-      type: Boolean,
-      default: false,
-    },
-    isShippingDefault: {
-      type: Boolean,
-      default: false,
+
+    defaults: {
+      isDefault: {
+        type: Boolean,
+        default: false,
+      },
+      isBillingDefault: {
+        type: Boolean,
+        default: false,
+      },
+      isShippingDefault: {
+        type: Boolean,
+        default: false,
+      },
     },
   },
   {
@@ -72,10 +50,9 @@ const addressSchema = new mongoose.Schema(
 );
 
 // Indexes for fast lookup
-addressSchema.index({ userId: 1, isDefault: -1 });
-addressSchema.index({ userId: 1, addressType: 1 });
-addressSchema.index({ userId: 1, isShippingDefault: -1 });
-addressSchema.index({ userId: 1, isBillingDefault: -1 });
+addressSchema.index({ userId: 1, 'defaults.isDefault': -1 });
+addressSchema.index({ userId: 1, 'defaults.isShippingDefault': -1 });
+addressSchema.index({ userId: 1, 'defaults.isBillingDefault': -1 });
 
 addressSchema.plugin(metaPlugin);
 

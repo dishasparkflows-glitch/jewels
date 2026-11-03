@@ -28,25 +28,25 @@ class CurrencyController {
   // Create new currency
   create = catchAsync(async (req, res) => {
     const currency = await currencyService.create(req.body);
-    ApiResponse.created(res, currency, 'Currency created successfully');
+    ApiResponse.created(res, null, 'Currency created successfully');
   });
 
   // Update currency
   update = catchAsync(async (req, res) => {
     const currency = await currencyService.update(req.params.id, req.body);
-    ApiResponse.success(res, currency, 'Currency updated successfully');
+    ApiResponse.success(res, null, 'Currency updated successfully');
   });
 
   // Delete currency
   delete = catchAsync(async (req, res) => {
     const result = await currencyService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   // Synchronize live exchange rates
   syncLiveRates = catchAsync(async (req, res) => {
     const result = await currencyService.syncLiveRates();
-    ApiResponse.success(res, result, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   // Synchronize single currency rate

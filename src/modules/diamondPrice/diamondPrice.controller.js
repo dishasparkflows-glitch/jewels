@@ -9,7 +9,7 @@ class DiamondPriceController {
       req.body.updatedBy = req.user._id;
     }
     const item = await diamondPriceService.create(req.body);
-    ApiResponse.created(res, item, 'Diamond price entry created successfully');
+    ApiResponse.created(res, null, 'Diamond price entry created successfully');
   });
 
   // ------------------------------- get all diamond prices ----------------------------
@@ -45,14 +45,14 @@ class DiamondPriceController {
       req.body.updatedBy = req.user._id;
     }
     const item = await diamondPriceService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Diamond price entry updated successfully');
+    ApiResponse.success(res, null, 'Diamond price entry updated successfully');
   });
 
   // ------------------------------- delete diamond price ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await diamondPriceService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

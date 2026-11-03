@@ -6,7 +6,7 @@ class DiamondShapeController {
   // ------------------------------- create diamond shape ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await diamondShapeService.create(req.body);
-    ApiResponse.created(res, item, 'Diamond shape created successfully');
+    ApiResponse.created(res, null, 'Diamond shape created successfully');
   });
 
   // ------------------------------- get all diamond shapes ----------------------------
@@ -35,13 +35,13 @@ class DiamondShapeController {
   // ------------------------------- update diamond shape ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await diamondShapeService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Diamond shape updated successfully');
+    ApiResponse.success(res, null, 'Diamond shape updated successfully');
   });
 
   // ------------------------------- delete diamond shape ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await diamondShapeService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

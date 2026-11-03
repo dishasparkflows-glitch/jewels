@@ -5,8 +5,8 @@ const ApiResponse = require('../../utils/ApiResponse');
 class DiamondColorController {
   // ------------------------------- create diamond color ----------------------------
   create = catchAsync(async (req, res) => {
-    const item = await diamondColorService.create(req.body);
-    ApiResponse.created(res, item, 'Diamond color created successfully');
+    await diamondColorService.create(req.body);
+    ApiResponse.created(res, null, 'Diamond color created successfully');
   });
 
   // ------------------------------- get all diamond colors ----------------------------
@@ -34,14 +34,14 @@ class DiamondColorController {
 
   // ------------------------------- update diamond color ----------------------------
   update = catchAsync(async (req, res) => {
-    const item = await diamondColorService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Diamond color updated successfully');
+    await diamondColorService.update(req.params.id, req.body);
+    ApiResponse.success(res, null, 'Diamond color updated successfully');
   });
 
   // ------------------------------- delete diamond color ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await diamondColorService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

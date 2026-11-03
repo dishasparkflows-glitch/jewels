@@ -6,7 +6,7 @@ class InstagramPostController {
   // ------------------------------- create instagram post ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await instagramPostService.create(req.body);
-    ApiResponse.created(res, item, 'Instagram post created successfully');
+    ApiResponse.created(res, null, 'Instagram post created successfully');
   });
 
   // ------------------------------- get all instagram posts ----------------------------
@@ -35,26 +35,26 @@ class InstagramPostController {
   // ------------------------------- update instagram post ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await instagramPostService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Instagram post updated successfully');
+    ApiResponse.success(res, null, 'Instagram post updated successfully');
   });
 
   // ------------------------------- reorder instagram posts ----------------------------
   reorder = catchAsync(async (req, res) => {
     const result = await instagramPostService.reorder(req.body.items);
-    ApiResponse.success(res, result, 'Instagram posts reordered successfully');
+    ApiResponse.success(res, null, 'Instagram posts reordered successfully');
   });
 
   // ------------------------------- delete instagram post ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await instagramPostService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   // ------------------------------- bulk delete instagram posts ----------------------------
   bulkDelete = catchAsync(async (req, res) => {
     const { ids } = req.body;
     const result = await instagramPostService.bulkDelete(ids);
-    ApiResponse.success(res, result, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

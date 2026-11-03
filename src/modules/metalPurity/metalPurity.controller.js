@@ -6,7 +6,7 @@ class MetalPurityController {
   // ------------------------------- create metal purity ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await metalPurityService.create(req.body);
-    ApiResponse.created(res, item, 'Metal purity created successfully');
+    ApiResponse.created(res, null, 'Metal purity created successfully');
   });
 
   // ------------------------------- get all metal purities ----------------------------
@@ -35,13 +35,13 @@ class MetalPurityController {
   // ------------------------------- update metal purity ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await metalPurityService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Metal purity updated successfully');
+    ApiResponse.success(res, null, 'Metal purity updated successfully');
   });
 
   // ------------------------------- delete metal purity ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await metalPurityService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

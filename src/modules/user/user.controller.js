@@ -17,13 +17,13 @@ const getById = catchAsync(async (req, res) => {
 // ------------------------------- create user ----------------------------
 const create = catchAsync(async (req, res) => {
   const user = await userService.create({ ...req.body, createdBy: req.user._id });
-  return ApiResponse.created(res, user, 'User created successfully');
+  return ApiResponse.created(res, null, 'User created successfully');
 });
 
 // ------------------------------- update user ----------------------------
 const update = catchAsync(async (req, res) => {
   const user = await userService.update(req.params.id, req.body);
-  return ApiResponse.success(res, user, 'User updated successfully');
+  return ApiResponse.success(res, null, 'User updated successfully');
 });
 
 // ------------------------------- delete user ----------------------------
@@ -35,7 +35,7 @@ const remove = catchAsync(async (req, res) => {
 // ------------------------------- toggle user status ----------------------------
 const toggleStatus = catchAsync(async (req, res) => {
   const user = await userService.toggleStatus(req.params.id);
-  return ApiResponse.success(res, user, `User ${user.isActive ? 'activated' : 'deactivated'} successfully`);
+  return ApiResponse.success(res, null, `User ${user.isActive ? 'activated' : 'deactivated'} successfully`);
 });
 
 // ------------------------------- get current user ----------------------------

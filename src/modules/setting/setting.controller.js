@@ -18,13 +18,13 @@ class SettingController {
   // ------------------------------- update settings ----------------------------
   updateSettings = catchAsync(async (req, res) => {
     const settings = await settingService.updateSettings(req.body);
-    ApiResponse.success(res, settings, 'System settings updated successfully');
+    ApiResponse.success(res, null, 'System settings updated successfully');
   });
 
   // ------------------------------- create setting ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await settingService.create(req.body);
-    ApiResponse.created(res, item, 'Setting record created successfully');
+    ApiResponse.created(res, null, 'Setting record created successfully');
   });
 
   // ------------------------------- get all settings ----------------------------
@@ -53,13 +53,13 @@ class SettingController {
   // ------------------------------- update setting ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await settingService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Setting updated successfully');
+    ApiResponse.success(res, null, 'Setting updated successfully');
   });
 
   // ------------------------------- delete setting ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await settingService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

@@ -6,7 +6,7 @@ class DiamondCutController {
   // ------------------------------- create diamond cut ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await diamondCutService.create(req.body);
-    ApiResponse.created(res, item, 'Diamond cut created successfully');
+    ApiResponse.created(res, null, 'Diamond cut created successfully');
   });
 
   // ------------------------------- get all diamond cuts ----------------------------
@@ -39,14 +39,14 @@ class DiamondCutController {
 
   update = catchAsync(async (req, res) => {
     const item = await diamondCutService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Diamond cut updated successfully');
+    ApiResponse.success(res, null, 'Diamond cut updated successfully');
   });
 
   // ------------------------------- delete diamond cut ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await diamondCutService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

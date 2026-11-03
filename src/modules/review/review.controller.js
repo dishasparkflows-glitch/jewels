@@ -6,7 +6,7 @@ class ReviewController {
   // ------------------------------- create review ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await reviewService.create(req.body);
-    ApiResponse.created(res, item, 'Review created successfully');
+    ApiResponse.created(res, null, 'Review created successfully');
   });
 
   // ------------------------------- get all reviews ----------------------------
@@ -35,13 +35,13 @@ class ReviewController {
   // ------------------------------- update review ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await reviewService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Review updated successfully');
+    ApiResponse.success(res, null, 'Review updated successfully');
   });
 
   // ------------------------------- delete review ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await reviewService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

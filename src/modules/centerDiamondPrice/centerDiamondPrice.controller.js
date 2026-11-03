@@ -10,7 +10,7 @@ class CenterDiamondPriceController {
       req.body.updatedBy = req.user._id;
     }
     const item = await centerDiamondPriceService.create(req.body);
-    ApiResponse.created(res, item, 'Center diamond price created successfully');
+    ApiResponse.created(res, null, 'Center diamond price created successfully');
   });
 
   // ------------------------------- get all center diamond prices ----------------------------
@@ -46,7 +46,7 @@ class CenterDiamondPriceController {
       req.body.updatedBy = req.user._id;
     }
     const item = await centerDiamondPriceService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Center diamond price updated successfully');
+    ApiResponse.success(res, null, 'Center diamond price updated successfully');
   });
 
   // Import an Excel workbook and persist its rows through the existing upsert service.
@@ -74,7 +74,7 @@ class CenterDiamondPriceController {
 
   delete = catchAsync(async (req, res) => {
     const result = await centerDiamondPriceService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

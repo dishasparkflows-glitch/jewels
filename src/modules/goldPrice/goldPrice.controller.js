@@ -12,7 +12,7 @@ class GoldPriceController {
   // ------------------------------- update metal rates ----------------------------
   updateRates = catchAsync(async (req, res) => {
     const price = await goldPriceService.updateRates(req.body, req.user?._id);
-    ApiResponse.success(res, price, 'Real-time metal rates updated successfully');
+    ApiResponse.success(res, null, 'Real-time metal rates updated successfully');
   });
 }
 

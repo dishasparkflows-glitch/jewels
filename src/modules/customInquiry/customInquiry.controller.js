@@ -7,9 +7,7 @@ class CustomInquiryController {
   // ------------------------------- create custom inquiry ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await customInquiryService.create(req.body);
-    ApiResponse.created(
-      res,
-      item,
+    ApiResponse.created(res, null,
       'Your custom jewellery inquiry has been submitted successfully'
     );
   });
@@ -44,14 +42,14 @@ class CustomInquiryController {
 
   update = catchAsync(async (req, res) => {
     const item = await customInquiryService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Custom inquiry updated successfully');
+    ApiResponse.success(res, null, 'Custom inquiry updated successfully');
   });
 
   // ------------------------------- delete custom inquiry ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await customInquiryService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

@@ -6,7 +6,7 @@ class CategoryController {
   // ------------------------------- create category ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await categoryService.create(req.body);
-    ApiResponse.created(res, item, 'Category created successfully');
+    ApiResponse.created(res, null, 'Category created successfully');
   });
 
   // ------------------------------- get all categories ----------------------------
@@ -41,13 +41,13 @@ class CategoryController {
   // ------------------------------- update category ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await categoryService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Category updated successfully');
+    ApiResponse.success(res, null, 'Category updated successfully');
   });
 
   // ------------------------------- delete category ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await categoryService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

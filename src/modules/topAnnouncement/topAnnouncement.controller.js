@@ -11,7 +11,7 @@ class TopAnnouncementController {
 
   updateSettings = catchAsync(async (req, res) => {
     const settings = await topAnnouncementService.updateSettings(req.body);
-    ApiResponse.success(res, settings, 'Settings updated successfully');
+    ApiResponse.success(res, null, 'Settings updated successfully');
   });
 
   // Storefront Public endpoint
@@ -41,13 +41,13 @@ class TopAnnouncementController {
   // Create
   create = catchAsync(async (req, res) => {
     const item = await topAnnouncementService.create(req.body);
-    ApiResponse.created(res, item, 'Announcement created successfully');
+    ApiResponse.created(res, null, 'Announcement created successfully');
   });
 
   // Update
   update = catchAsync(async (req, res) => {
     const item = await topAnnouncementService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Announcement updated successfully');
+    ApiResponse.success(res, null, 'Announcement updated successfully');
   });
 
   // Toggle Status
@@ -59,21 +59,21 @@ class TopAnnouncementController {
   // Duplicate
   duplicate = catchAsync(async (req, res) => {
     const item = await topAnnouncementService.duplicate(req.params.id);
-    ApiResponse.created(res, item, 'Announcement duplicated successfully');
+    ApiResponse.created(res, null, 'Announcement duplicated successfully');
   });
 
   // Reorder
   reorder = catchAsync(async (req, res) => {
     const items = req.body.items || req.body;
     const result = await topAnnouncementService.reorder(items);
-    ApiResponse.success(res, result, 'Announcements reordered successfully');
+    ApiResponse.success(res, null, 'Announcements reordered successfully');
   });
 
 
   // Delete
   delete = catchAsync(async (req, res) => {
     const result = await topAnnouncementService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

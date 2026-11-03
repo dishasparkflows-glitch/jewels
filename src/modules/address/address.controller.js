@@ -17,26 +17,26 @@ const getAddressById = catchAsync(async (req, res) => {
 // ------------------------------- create address ----------------------------
 const createAddress = catchAsync(async (req, res) => {
   const address = await addressService.createAddress(req.user._id, req.body);
-  return ApiResponse.created(res, address, 'Address created successfully');
+  return ApiResponse.created(res, null, 'Address created successfully');
 });
 
 // ------------------------------- update address ----------------------------
 const updateAddress = catchAsync(async (req, res) => {
   const address = await addressService.updateAddress(req.user._id, req.params.id, req.body);
-  return ApiResponse.success(res, address, 'Address updated successfully');
+  return ApiResponse.success(res, null, 'Address updated successfully');
 });
 
 // ------------------------------- delete address ----------------------------
 const deleteAddress = catchAsync(async (req, res) => {
   const result = await addressService.deleteAddress(req.user._id, req.params.id);
-  return ApiResponse.success(res, result, 'Address deleted successfully');
+  return ApiResponse.success(res, null, 'Address deleted successfully');
 });
 
 // ------------------------------- set default address ----------------------------
 const setDefaultAddress = catchAsync(async (req, res) => {
   const { type = 'both' } = req.body;
   const address = await addressService.setDefault(req.user._id, req.params.id, type);
-  return ApiResponse.success(res, address, 'Default address updated successfully');
+  return ApiResponse.success(res, null, 'Default address updated successfully');
 });
 
 // ------------------------------- admin: get user addresses ----------------------------

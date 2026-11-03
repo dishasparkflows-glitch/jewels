@@ -6,7 +6,7 @@ class DiamondClarityController {
   // ------------------------------- create diamond clarity ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await diamondClarityService.create(req.body);
-    ApiResponse.created(res, item, 'Diamond clarity created successfully');
+    ApiResponse.created(res, null, 'Diamond clarity created successfully');
   });
 
   // ------------------------------- get all diamond clarities ----------------------------
@@ -35,13 +35,13 @@ class DiamondClarityController {
   // ------------------------------- update diamond clarity ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await diamondClarityService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Diamond clarity updated successfully');
+    ApiResponse.success(res, null, 'Diamond clarity updated successfully');
   });
 
   // ------------------------------- delete diamond clarity ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await diamondClarityService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

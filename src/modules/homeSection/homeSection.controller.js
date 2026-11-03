@@ -6,7 +6,7 @@ class HomeSectionController {
   // ------------------------------- Create Home Section ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await homeSectionService.create(req.body);
-    ApiResponse.created(res, item, 'Home section created successfully');
+    ApiResponse.created(res, null, 'Home section created successfully');
   });
 
   // ------------------------------- Get All Home Sections (Admin) ----------------------------
@@ -41,31 +41,31 @@ class HomeSectionController {
   // ------------------------------- Update Home Section ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await homeSectionService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Home section updated successfully');
+    ApiResponse.success(res, null, 'Home section updated successfully');
   });
 
   // ------------------------------- Toggle Status ----------------------------
   toggleStatus = catchAsync(async (req, res) => {
     const item = await homeSectionService.toggleStatus(req.params.id);
-    ApiResponse.success(res, item, `Home section marked as ${item.status}`);
+    ApiResponse.success(res, null, `Home section marked as ${item.status}`);
   });
 
   // ------------------------------- Reorder Home Sections ----------------------------
   reorder = catchAsync(async (req, res) => {
     const result = await homeSectionService.reorder(req.body.items);
-    ApiResponse.success(res, result, 'Home sections reordered successfully');
+    ApiResponse.success(res, null, 'Home sections reordered successfully');
   });
 
   // ------------------------------- Delete Home Section ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await homeSectionService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   // ------------------------------- Bulk Delete ----------------------------
   bulkDelete = catchAsync(async (req, res) => {
     const result = await homeSectionService.bulkDelete(req.body.ids);
-    ApiResponse.success(res, result, `${result.count} home sections deleted successfully`);
+    ApiResponse.success(res, null, `${result.count} home sections deleted successfully`);
   });
 
   // ------------------------------- Reset / Seed Defaults ----------------------------

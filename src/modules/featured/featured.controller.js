@@ -6,7 +6,7 @@ class FeaturedController {
   // ------------------------------- create featured item ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await featuredService.create(req.body);
-    ApiResponse.created(res, item, 'Featured item created successfully');
+    ApiResponse.created(res, null, 'Featured item created successfully');
   });
 
   // ------------------------------- get all featured items ----------------------------
@@ -39,20 +39,20 @@ class FeaturedController {
 
   update = catchAsync(async (req, res) => {
     const item = await featuredService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Featured item updated successfully');
+    ApiResponse.success(res, null, 'Featured item updated successfully');
   });
 
   // ------------------------------- reorder featured items ----------------------------
   reorder = catchAsync(async (req, res) => {
     const result = await featuredService.reorder(req.body.items);
-    ApiResponse.success(res, result, 'Featured items reordered successfully');
+    ApiResponse.success(res, null, 'Featured items reordered successfully');
   });
 
   // ------------------------------- delete featured item ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await featuredService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

@@ -6,7 +6,7 @@ class CaratWeightController {
   // ------------------------------- create carat weight ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await caratWeightService.create(req.body);
-    ApiResponse.created(res, item, 'Carat weight created successfully');
+    ApiResponse.created(res, null, 'Carat weight created successfully');
   });
 
   // ------------------------------- get all carat weights ----------------------------
@@ -39,14 +39,14 @@ class CaratWeightController {
 
   update = catchAsync(async (req, res) => {
     const item = await caratWeightService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Carat weight updated successfully');
+    ApiResponse.success(res, null, 'Carat weight updated successfully');
   });
 
   // ------------------------------- delete carat weight ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await caratWeightService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

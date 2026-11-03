@@ -2,53 +2,41 @@
  * Standard API response helper
  */
 class ApiResponse {
-  /**
-   * Determine whether the 'data' field should be included in the response.
-   * - GET requests include the 'data' field.
-   * - Non-GET requests (POST, PUT, PATCH, DELETE) return only 'success' and 'message'.
-   * - Essential data-returning endpoints (auth, upload, coupon validation) or explicit forceData retain 'data'.
-   */
-  static shouldIncludeData(res, forceData = false, data = null) {
-    if (forceData) return true;
-    if (data !== null && data !== undefined) return true;
+  static success(res, data = null, message = 'Success', statusCode = 200) {
+    let resData = data;
+    let resMessage = message;
+    if (typeof data === 'string' && message === 'Success') {
+      resMessage = data;
+      resData = null;
+    }
 
-    const method = (res?.req?.method || res?.request?.method || '').toUpperCase();
-    if (method === 'GET') return true;
-
-    const url = (res?.req?.originalUrl || res?.req?.url || '').toLowerCase();
-    const isEssentialDataRoute =
-      url.includes('/auth/login') ||
-      url.includes('/auth/register') ||
-      url.includes('/auth/google') ||
-      url.includes('/upload') ||
-      url.includes('/coupons/validate') ||
-      url.includes('/pricing-preview') ||
-      url.includes('/preview');
-
-    return isEssentialDataRoute;
-  }
-
-  static success(res, data = null, message = 'Success', statusCode = 200, forceData = false) {
     const payload = {
       success: true,
-      message,
+      message: resMessage,
     };
 
-    if (this.shouldIncludeData(res, forceData, data)) {
-      payload.data = data;
+    if (resData !== null && resData !== undefined) {
+      payload.data = resData;
     }
 
     return res.status(statusCode).json(payload);
   }
 
-  static created(res, data = null, message = 'Created successfully', forceData = false) {
+  static created(res, data = null, message = 'Created successfully') {
+    let resData = data;
+    let resMessage = message;
+    if (typeof data === 'string' && message === 'Created successfully') {
+      resMessage = data;
+      resData = null;
+    }
+
     const payload = {
       success: true,
-      message,
+      message: resMessage,
     };
 
-    if (this.shouldIncludeData(res, forceData, data)) {
-      payload.data = data;
+    if (resData !== null && resData !== undefined) {
+      payload.data = resData;
     }
 
     return res.status(201).json(payload);

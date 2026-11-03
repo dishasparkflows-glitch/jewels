@@ -6,7 +6,7 @@ class RingSizeController {
   // ------------------------------- create ring size ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await ringSizeService.create(req.body);
-    ApiResponse.created(res, item, 'Ring size created successfully');
+    ApiResponse.created(res, null, 'Ring size created successfully');
   });
 
   // ------------------------------- get all ring sizes ----------------------------
@@ -39,14 +39,14 @@ class RingSizeController {
 
   update = catchAsync(async (req, res) => {
     const item = await ringSizeService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Ring size updated successfully');
+    ApiResponse.success(res, null, 'Ring size updated successfully');
   });
 
   // ------------------------------- delete ring size ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await ringSizeService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

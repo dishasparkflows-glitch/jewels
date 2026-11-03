@@ -6,7 +6,7 @@ class DiamondSizeController {
   // ------------------------------- create diamond size ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await diamondSizeService.create(req.body);
-    ApiResponse.created(res, item, 'Diamond size created successfully');
+    ApiResponse.created(res, null, 'Diamond size created successfully');
   });
 
   // ------------------------------- get all diamond sizes ----------------------------
@@ -35,13 +35,13 @@ class DiamondSizeController {
   // ------------------------------- update diamond size ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await diamondSizeService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Diamond size updated successfully');
+    ApiResponse.success(res, null, 'Diamond size updated successfully');
   });
 
   // ------------------------------- delete diamond size ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await diamondSizeService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

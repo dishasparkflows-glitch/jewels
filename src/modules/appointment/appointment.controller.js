@@ -6,7 +6,7 @@ class AppointmentController {
   // ------------------------------- create appointment ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await appointmentService.create(req.body);
-    ApiResponse.created(res, item, 'Appointment booked successfully');
+    ApiResponse.created(res, null, 'Appointment booked successfully');
   });
 
   // ------------------------------- get all appointments ----------------------------
@@ -35,28 +35,28 @@ class AppointmentController {
   // ------------------------------- update appointment ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await appointmentService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Appointment updated successfully');
+    ApiResponse.success(res, null, 'Appointment updated successfully');
   });
 
   // ------------------------------- update status ----------------------------
   updateStatus = catchAsync(async (req, res) => {
     const { status } = req.body;
     const item = await appointmentService.updateStatus(req.params.id, status);
-    ApiResponse.success(res, item, `Appointment status updated to ${status}`);
+    ApiResponse.success(res, null, `Appointment status updated to ${status}`);
   });
 
 
   // ------------------------------- delete appointment ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await appointmentService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   // ------------------------------- bulk delete appointments ----------------------------
   bulkDelete = catchAsync(async (req, res) => {
     const { ids } = req.body;
     const result = await appointmentService.bulkDelete(ids);
-    ApiResponse.success(res, result, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

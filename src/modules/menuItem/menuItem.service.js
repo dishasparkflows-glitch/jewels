@@ -90,7 +90,7 @@ class MenuItemService {
       { _id: id },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
-    ).populate('menuSectionId', 'title categoryId');
+    );
 
     if (!item) {
       throw new ApiError(404, 'Menu item not found');

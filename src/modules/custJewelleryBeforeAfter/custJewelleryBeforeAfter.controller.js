@@ -6,9 +6,7 @@ class CustJewelleryBeforeAfterController {
   // ------------------------------- create cust jewellery before after ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await custJewelleryBeforeAfterService.create(req.body);
-    ApiResponse.created(
-      res,
-      item,
+    ApiResponse.created(res, null,
       'Before/After showcase entry created successfully'
     );
   });
@@ -51,17 +49,14 @@ class CustJewelleryBeforeAfterController {
       req.params.id,
       req.body
     );
-    ApiResponse.success(
-      res,
-      item,
-      'Before/After showcase entry updated successfully'
+    ApiResponse.success(res, null, 'Before/After showcase entry updated successfully'
     );
   });
 
   // ------------------------------- delete cust jewellery before after ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await custJewelleryBeforeAfterService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

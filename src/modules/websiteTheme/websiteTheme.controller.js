@@ -36,13 +36,13 @@ class WebsiteThemeController {
   // ------------------------------- create website theme ----------------------------
   create = catchAsync(async (req, res) => {
     const theme = await websiteThemeService.create(req.body, req.user?._id);
-    ApiResponse.created(res, theme, 'Website theme created successfully');
+    ApiResponse.created(res, null, 'Website theme created successfully');
   });
 
   // ------------------------------- update website theme ----------------------------
   update = catchAsync(async (req, res) => {
     const theme = await websiteThemeService.update(req.params.id, req.body, req.user?._id);
-    ApiResponse.success(res, theme, 'Website theme updated successfully');
+    ApiResponse.success(res, null, 'Website theme updated successfully');
   });
 
   // ------------------------------- save theme media ----------------------------
@@ -54,7 +54,7 @@ class WebsiteThemeController {
   // ------------------------------- duplicate website theme ----------------------------
   duplicate = catchAsync(async (req, res) => {
     const theme = await websiteThemeService.duplicate(req.params.id, req.user?._id);
-    ApiResponse.created(res, theme, 'Website theme duplicated successfully');
+    ApiResponse.created(res, null, 'Website theme duplicated successfully');
   });
 
   // ------------------------------- preview website theme ----------------------------
@@ -76,7 +76,7 @@ class WebsiteThemeController {
   // ------------------------------- archive website theme ----------------------------
   archive = catchAsync(async (req, res) => {
     const theme = await websiteThemeService.archive(req.params.id, req.user?._id);
-    ApiResponse.success(res, theme, 'Website theme archived successfully');
+    ApiResponse.success(res, null, 'Website theme archived successfully');
   });
 
   // ------------------------------- rollback website theme ----------------------------

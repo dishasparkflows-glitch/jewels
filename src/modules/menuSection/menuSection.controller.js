@@ -6,7 +6,7 @@ class MenuSectionController {
   // ------------------------------- create menu section ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await menuSectionService.create(req.body);
-    ApiResponse.created(res, item, 'Menu section created successfully');
+    ApiResponse.created(res, null, 'Menu section created successfully');
   });
 
   // ------------------------------- get all menu sections ----------------------------
@@ -35,20 +35,20 @@ class MenuSectionController {
   // ------------------------------- update menu section ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await menuSectionService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Menu section updated successfully');
+    ApiResponse.success(res, null, 'Menu section updated successfully');
   });
 
   // ------------------------------- reorder menu sections ----------------------------
   reorder = catchAsync(async (req, res) => {
     const items = req.body.items || req.body;
     const result = await menuSectionService.reorder(items);
-    ApiResponse.success(res, result, 'Menu sections reordered successfully');
+    ApiResponse.success(res, null, 'Menu sections reordered successfully');
   });
 
   // ------------------------------- delete menu section ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await menuSectionService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

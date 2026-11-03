@@ -25,12 +25,12 @@ class ProductGroupController {
 
   create = catchAsync(async (req, res) => {
     const group = await productGroupService.createGroup(req.body, req.user?._id);
-    ApiResponse.created(res, group, 'Product group created successfully');
+    ApiResponse.created(res, null, 'Product group created successfully');
   });
 
   update = catchAsync(async (req, res) => {
     const group = await productGroupService.updateGroup(req.params.id, req.body, req.user?._id);
-    ApiResponse.success(res, group, 'Product group updated successfully');
+    ApiResponse.success(res, null, 'Product group updated successfully');
   });
 
   delete = catchAsync(async (req, res) => {
@@ -65,7 +65,7 @@ class ProductGroupController {
       splitIndividual: Boolean(req.body.splitIndividual),
       userId: req.user?._id,
     });
-    ApiResponse.success(res, result, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   bulkSplitIndividual = catchAsync(async (req, res) => {
@@ -74,7 +74,7 @@ class ProductGroupController {
       productIds: req.body.productIds,
       userId: req.user?._id,
     });
-    ApiResponse.success(res, result, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   bulkApprove = catchAsync(async (req, res) => {
@@ -82,7 +82,7 @@ class ProductGroupController {
       req.body.groupIds,
       req.user?._id
     );
-    ApiResponse.success(res, result, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   approveGroup = catchAsync(async (req, res) => {
@@ -91,7 +91,7 @@ class ProductGroupController {
       req.body.productIds,
       req.user?._id
     );
-    ApiResponse.success(res, result, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 
   getUngrouped = catchAsync(async (req, res) => {
@@ -117,7 +117,7 @@ class ProductGroupController {
       fields: req.body.fields,
       userId: req.user?._id,
     });
-    ApiResponse.success(res, result, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

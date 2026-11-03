@@ -30,13 +30,13 @@ class GalleryController {
   // ------------------------------- update item ----------------------------
   update = catchAsync(async (req, res) => {
     const result = await galleryService.update(req.params.id, req.body, req.user?._id);
-    ApiResponse.success(res, result, 'Gallery item updated successfully');
+    ApiResponse.success(res, null, 'Gallery item updated successfully');
   });
 
   // ------------------------------- toggle status ----------------------------
   toggleStatus = catchAsync(async (req, res) => {
     const result = await galleryService.toggleStatus(req.params.id, req.user?._id);
-    ApiResponse.success(res, result, 'Gallery item status updated successfully');
+    ApiResponse.success(res, null, 'Gallery item status updated successfully');
   });
 
   // ------------------------------- themes lookup ----------------------------

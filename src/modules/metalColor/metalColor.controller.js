@@ -6,7 +6,7 @@ class MetalColorController {
   // ------------------------------- create metal color ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await metalColorService.create(req.body);
-    ApiResponse.created(res, item, 'Metal color created successfully');
+    ApiResponse.created(res, null, 'Metal color created successfully');
   });
 
   // ------------------------------- get all metal colors ----------------------------
@@ -35,13 +35,13 @@ class MetalColorController {
   // ------------------------------- update metal color ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await metalColorService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Metal color updated successfully');
+    ApiResponse.success(res, null, 'Metal color updated successfully');
   });
 
   // ------------------------------- delete metal color ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await metalColorService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

@@ -6,7 +6,7 @@ class CodSequenceController {
   // ------------------------------- create cod sequence ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await codSequenceService.create(req.body);
-    ApiResponse.created(res, item, 'COD sequence tier created successfully');
+    ApiResponse.created(res, null, 'COD sequence tier created successfully');
   });
 
   // ------------------------------- get all cod sequences ----------------------------
@@ -45,14 +45,14 @@ class CodSequenceController {
 
   update = catchAsync(async (req, res) => {
     const item = await codSequenceService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'COD sequence tier updated successfully');
+    ApiResponse.success(res, null, 'COD sequence tier updated successfully');
   });
 
   // ------------------------------- delete cod sequence ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await codSequenceService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

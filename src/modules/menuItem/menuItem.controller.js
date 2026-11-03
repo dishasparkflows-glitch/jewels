@@ -6,7 +6,7 @@ class MenuItemController {
   // ------------------------------- create menu item ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await menuItemService.create(req.body);
-    ApiResponse.created(res, item, 'Menu item created successfully');
+    ApiResponse.created(res, null, 'Menu item created successfully');
   });
 
   // ------------------------------- get all menu items ----------------------------
@@ -39,21 +39,21 @@ class MenuItemController {
 
   update = catchAsync(async (req, res) => {
     const item = await menuItemService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Menu item updated successfully');
+    ApiResponse.success(res, null, 'Menu item updated successfully');
   });
 
   // ------------------------------- reorder menu items ----------------------------
   reorder = catchAsync(async (req, res) => {
     const items = req.body.items || req.body;
     const result = await menuItemService.reorder(items);
-    ApiResponse.success(res, result, 'Menu items reordered successfully');
+    ApiResponse.success(res, null, 'Menu items reordered successfully');
   });
 
   // ------------------------------- delete menu item ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await menuItemService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

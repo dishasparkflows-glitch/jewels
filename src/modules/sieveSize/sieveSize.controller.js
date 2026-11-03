@@ -6,7 +6,7 @@ class SieveSizeController {
   // ------------------------------- create sieve size ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await sieveSizeService.create(req.body);
-    ApiResponse.created(res, item, 'Sieve size created successfully');
+    ApiResponse.created(res, null, 'Sieve size created successfully');
   });
 
   // ------------------------------- get all sieve sizes ----------------------------
@@ -39,14 +39,14 @@ class SieveSizeController {
 
   update = catchAsync(async (req, res) => {
     const item = await sieveSizeService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Sieve size updated successfully');
+    ApiResponse.success(res, null, 'Sieve size updated successfully');
   });
 
   // ------------------------------- delete sieve size ----------------------------
 
   delete = catchAsync(async (req, res) => {
     const result = await sieveSizeService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

@@ -12,13 +12,13 @@ class FooterSettingsController {
   // ------------------------------- update footer settings ----------------------------
   updateSettings = catchAsync(async (req, res) => {
     const settings = await footerSettingsService.updateSettings(req.body);
-    ApiResponse.success(res, settings, 'Footer settings updated successfully');
+    ApiResponse.success(res, null, 'Footer settings updated successfully');
   });
 
   // ------------------------------- create footer settings ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await footerSettingsService.create(req.body);
-    ApiResponse.created(res, item, 'Footer settings record created successfully');
+    ApiResponse.created(res, null, 'Footer settings record created successfully');
   });
 
   // ------------------------------- get all footer settings ----------------------------
@@ -47,13 +47,13 @@ class FooterSettingsController {
   // ------------------------------- update footer settings record ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await footerSettingsService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Footer settings record updated successfully');
+    ApiResponse.success(res, null, 'Footer settings record updated successfully');
   });
 
   // ------------------------------- delete footer settings ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await footerSettingsService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

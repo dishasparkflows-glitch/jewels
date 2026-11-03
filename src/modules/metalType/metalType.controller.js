@@ -6,7 +6,7 @@ class MetalTypeController {
   // ------------------------------- create metal type ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await metalTypeService.create(req.body);
-    ApiResponse.created(res, item, 'Metal type created successfully');
+    ApiResponse.created(res, null, 'Metal type created successfully');
   });
 
   // ------------------------------- get all metal types ----------------------------
@@ -35,13 +35,13 @@ class MetalTypeController {
   // ------------------------------- update metal type ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await metalTypeService.update(req.params.id, req.body);
-    ApiResponse.success(res, item, 'Metal type updated successfully');
+    ApiResponse.success(res, null, 'Metal type updated successfully');
   });
 
   // ------------------------------- delete metal type ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await metalTypeService.delete(req.params.id);
-    ApiResponse.success(res, { id: result.id }, result.message);
+    ApiResponse.success(res, null, result.message);
   });
 }
 

@@ -18,7 +18,8 @@ class FeaturedService {
       data.name = '';
     }
 
-    const productIds = data.productIds || data.products || [];
+    delete data.products;
+    const productIds = data.productIds || [];
     if (Array.isArray(productIds)) {
       data.productIds = productIds;
       data.productCount = productIds.length;
@@ -37,19 +38,20 @@ class FeaturedService {
     const item = await Featured.findOne({ _id: id, 'meta.deletedAt': null })
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
-      .populate('productIds', '_id basicInfo pricing images colorImages')
+      .populate('productIds', '_id basicInfo pricing images colorImages ornate')
       .lean();
     if (!item) {
       throw new ApiError(404, 'Featured item not found');
     }
     const products = item.productIds || [];
     const pIds = products.map((p) => (p._id ? p._id.toString() : p.toString()));
+    const populatedProducts = products.filter((p) => p && typeof p === 'object' && p._id);
 
     return {
       ...item,
       productCount: item.productCount || pIds.length,
-      products,
       productIds: pIds,
+      products: populatedProducts,
     };
   }
 
@@ -68,18 +70,13 @@ class FeaturedService {
       filter.name = new RegExp(queryParams.search, 'i');
     }
 
-    const populateProducts = queryParams.populateProducts === 'true';
-
     let query = Featured.find(filter)
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
+      .populate('productIds', '_id basicInfo pricing images colorImages ornate')
       .sort({ order: 1, 'meta.createdAt': -1 })
       .skip(skip)
       .limit(limit);
-
-    if (populateProducts) {
-      query = query.populate('productIds', '_id basicInfo pricing images colorImages');
-    }
 
     const [items, total] = await Promise.all([
       query.lean(),
@@ -87,13 +84,14 @@ class FeaturedService {
     ]);
 
     const formattedItems = items.map((item) => {
-      const pIds = Array.isArray(item.productIds)
-        ? item.productIds.map((p) => (p._id ? p._id.toString() : p.toString()))
-        : [];
+      const rawProducts = Array.isArray(item.productIds) ? item.productIds : [];
+      const pIds = rawProducts.map((p) => (p && p._id ? p._id.toString() : String(p)));
+      const populatedProducts = rawProducts.filter((p) => p && typeof p === 'object' && p._id);
       return {
         ...item,
         productCount: item.productCount !== undefined && item.productCount !== 0 ? item.productCount : pIds.length,
         productIds: pIds,
+        products: populatedProducts,
       };
     });
 
@@ -134,10 +132,9 @@ class FeaturedService {
       }
     }
 
-    const productIds = data.productIds !== undefined ? data.productIds : data.products;
-    if (Array.isArray(productIds)) {
-      data.productIds = productIds;
-      data.productCount = productIds.length;
+    delete data.products;
+    if (Array.isArray(data.productIds)) {
+      data.productCount = data.productIds.length;
     }
 
     if (data.categoryId === '') {
@@ -151,20 +148,21 @@ class FeaturedService {
     )
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
-      .populate('productIds', '_id basicInfo pricing images colorImages')
+      .populate('productIds', '_id basicInfo pricing images colorImages ornate')
       .lean();
 
     if (!item) {
       throw new ApiError(404, 'Featured item not found');
     }
 
-    const products = item.productIds || [];
-    const pIds = products.map((p) => (p._id ? p._id.toString() : p.toString()));
+    const rawProducts = Array.isArray(item.productIds) ? item.productIds : [];
+    const pIds = rawProducts.map((p) => (p && p._id ? p._id.toString() : String(p)));
+    const populatedProducts = rawProducts.filter((p) => p && typeof p === 'object' && p._id);
 
     return {
       ...item,
       productCount: item.productCount || pIds.length,
-      products,
+      products: populatedProducts,
       productIds: pIds,
     };
   }

@@ -44,6 +44,13 @@ router.put(
   productController.update
 );
 
+router.patch(
+  '/:id/status',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  productController.updateStatus
+);
+
 router.delete(
   '/:id',
   authenticate,

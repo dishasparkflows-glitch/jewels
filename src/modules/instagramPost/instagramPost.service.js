@@ -5,12 +5,26 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class InstagramPostService {
   // ------------------------------- create instagram post ----------------------------
   async create(data) {
+    if (!data.url || !data.url.trim()) {
+      throw new ApiError(400, 'Please provide Instagram post URL');
+    }
+    const cleanUrl = data.url.trim();
+    data.url = cleanUrl;
+
+    const existing = await InstagramPost.findOne({
+      url: cleanUrl,
+      'meta.deletedAt': null,
+    });
+    if (existing) {
+      throw new ApiError(409, 'An Instagram post with this URL already exists');
+    }
+
     return await InstagramPost.create(data);
   }
 
   // ------------------------------- get one instagram post ----------------------------
   async getOne(id) {
-    const item = await InstagramPost.findOne({ _id: id });
+    const item = await InstagramPost.findOne({ _id: id, 'meta.deletedAt': null });
     if (!item) {
       throw new ApiError(404, 'Instagram post not found');
     }
@@ -68,6 +82,23 @@ class InstagramPostService {
 
   // ------------------------------- update instagram post ----------------------------
   async update(id, data) {
+    if (data.url !== undefined) {
+      if (!data.url || !data.url.trim()) {
+        throw new ApiError(400, 'Please provide Instagram post URL');
+      }
+      const cleanUrl = data.url.trim();
+      data.url = cleanUrl;
+
+      const existing = await InstagramPost.findOne({
+        url: cleanUrl,
+        _id: { $ne: id },
+        'meta.deletedAt': null,
+      });
+      if (existing) {
+        throw new ApiError(409, 'An Instagram post with this URL already exists');
+      }
+    }
+
     const item = await InstagramPost.findOneAndUpdate(
       { _id: id },
       { $set: data },

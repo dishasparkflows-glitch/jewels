@@ -1150,11 +1150,31 @@ class ProductService {
 
   // ------------------------------- update product ----------------------------
   async update(id, data) {
-    if (data.status && data.status !== 'approved' && data.status !== 'draft') {
-      data.status = 'draft';
-    }
+    // Product update API does not change the status field
+    delete data.status;
+
     const existing = await Product.findById(id).lean();
     if (!existing) throw new ApiError(404, 'Product not found');
+
+    // Preserve existing demoMetrics when updating other product info
+    if (data.demoMetrics) {
+      const existingDemo = existing.demoMetrics || {};
+      const newSold = data.demoMetrics.soldCount;
+      const newReview = data.demoMetrics.reviewCount;
+      const parsedSold = Number(newSold);
+      const parsedReview = Number(newReview);
+
+      data.demoMetrics = {
+        soldCount: (!isNaN(parsedSold) && parsedSold > 0)
+          ? parsedSold
+          : (existingDemo.soldCount ?? (parsedSold || 0)),
+        reviewCount: (!isNaN(parsedReview) && parsedReview > 0)
+          ? parsedReview
+          : (existingDemo.reviewCount ?? (parsedReview || 0)),
+      };
+    } else if (existing.demoMetrics) {
+      data.demoMetrics = existing.demoMetrics;
+    }
     const isSilver = (data.productType ?? existing.productType) === 'silver' || Boolean(data.isOrnate ?? existing.isOrnate);
     if (!isSilver) {
       const combined = {
@@ -1240,6 +1260,28 @@ class ProductService {
       await productGroupService.refreshAffectedGroups(product._id);
     } catch (err) {
       console.error(`Error refreshing groups after product update (${id}):`, err);
+    }
+
+    return product;
+  }
+
+  // ------------------------------- update product status ----------------------------
+  async updateStatus(id, status) {
+    const validStatus = status === 'approved' || status === 'published' ? 'approved' : 'draft';
+    const product = await Product.findOneAndUpdate(
+      { _id: id },
+      { $set: { status: validStatus, 'meta.updatedAt': new Date() } },
+      { returnDocument: 'after' }
+    );
+
+    if (!product) {
+      throw new ApiError(404, 'Product not found');
+    }
+
+    try {
+      await productGroupService.refreshAffectedGroups(product._id);
+    } catch (err) {
+      console.error(`Error refreshing groups after status update (${id}):`, err);
     }
 
     return product;

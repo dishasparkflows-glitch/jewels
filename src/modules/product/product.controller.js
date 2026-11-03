@@ -266,6 +266,14 @@ class ProductController {
     ApiResponse.success(res, null, 'Product updated successfully');
   });
 
+  // ------------------------------- update product status ----------------------------
+  updateStatus = catchAsync(async (req, res) => {
+    const { status } = req.body;
+    const product = await productService.updateStatus(req.params.id, status);
+    const displayStatus = product.status === 'approved' ? 'published' : 'draft';
+    ApiResponse.success(res, { status: product.status }, `Product switched to ${displayStatus} successfully`);
+  });
+
   // ------------------------------- delete product ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await productService.delete(req.params.id);

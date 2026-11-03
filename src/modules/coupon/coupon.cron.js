@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const Coupon = require('./coupon.model');
+const { CRON_TIME } = require('../../config/constants');
 
 let expirationJob = null;
 let isUpdating = false;
@@ -30,25 +31,15 @@ async function expireCoupons(source = 'scheduled_cron') {
 }
 
 function startCouponExpirationCron() {
-  const enabled = process.env.COUPON_EXPIRATION_CRON_ENABLED !== 'false';
-  const schedule = process.env.COUPON_EXPIRATION_CRON || '0 0 * * *';
-  const timezone = process.env.COUPON_EXPIRATION_TIMEZONE || 'Asia/Kolkata';
-
-  if (!enabled) {
-    console.log('[Coupon Cron] Coupon expiration cron is disabled.');
-    return null;
-  }
-
-  if (!cron.validate(schedule)) {
-    console.error(`[Coupon Cron] Invalid cron expression: "${schedule}". Cron will not start.`);
-    return null;
-  }
-
   if (expirationJob) return expirationJob;
 
   setTimeout(() => { expireCoupons('startup'); }, 3000);
-  expirationJob = cron.schedule(schedule, () => { expireCoupons(); }, { timezone });
-  console.log(`[Coupon Cron] Scheduled coupon expiration at "${schedule}" (${timezone}).`);
+  expirationJob = cron.schedule(
+    CRON_TIME.COUPON_EXPIRATION,
+    () => { expireCoupons(); },
+    { timezone: 'Asia/Kolkata' }
+  );
+  console.log(`[Coupon Cron] Scheduled coupon expiration at "${CRON_TIME.COUPON_EXPIRATION}" (Asia/Kolkata).`);
   return expirationJob;
 }
 

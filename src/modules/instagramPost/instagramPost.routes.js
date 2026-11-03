@@ -39,13 +39,6 @@ router.post(
 );
 
 router.delete(
-  '/bulk-delete',
-  authenticate,
-  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
-  instagramPostController.bulkDelete
-);
-
-router.delete(
   '/:id',
   authenticate,
   authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),

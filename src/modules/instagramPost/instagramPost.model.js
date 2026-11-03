@@ -7,6 +7,8 @@ const instagramPostSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Please provide Instagram post URL'],
       trim: true,
+      unique: true,
+      index: true,
     },
     title: {
       type: String,

@@ -583,31 +583,69 @@ const formatStorefrontProductDetail = (p) => {
     return item;
   }).filter((c) => c.name);
 
-  // Return ONLY fields required by frontend PDP and customer checkout
+  // Lean variant projection: strip dead 0-value fields and flatten nested populated duplicates
+  const extractIdAndName = (item) => {
+    if (!item) return { id: null, name: '' };
+    if (typeof item === 'object') {
+      const id = item._id ? String(item._id) : (item.id ? String(item.id) : null);
+      return { id, name: item.name || '' };
+    }
+    const str = String(item).trim();
+    const isId = /^[a-f0-9]{24}$/i.test(str);
+    return { id: isId ? str : null, name: isId ? '' : str };
+  };
+
   const variants = Array.isArray(p.variants)
-    ? p.variants.map((v) => ({
-        _id: v._id,
-        sku: v.sku || '',
-        combination: v.combination || '',
-        price: Number(v.price || 0),
-        stock: v.stock !== undefined ? v.stock : 10,
-        metalPurityId: v.metalPurityId || null,
-        metalColorId: v.metalColorId || null,
-        diamondTypeId: v.diamondTypeId || null,
-        diamondShapeId: v.diamondShapeId || null,
-        diamondColorId: v.diamondColorId || null,
-        diamondClarityId: v.diamondClarityId || null,
-        caratWeight: Number(v.caratWeight || 0),
-        centerDiamondWeight: Number(v.centerDiamondWeight || v.caratWeight || 0),
-        metalWeight: Number(v.metalWeight || 0),
-        // Breakdown fields for customer price transparency table
-        certificateCharge: Number(v.certificateCharge || 0),
-        labourCharge: Number(v.labourCharge || v.computedMakingCharge || 0),
-        metalRate: Number(v.metalRate || 0),
-        metalCost: Number(v.metalCost || 0),
-        diamondCost: Number(v.diamondCost || v.centerDiamondCost || 0),
-        subtotal: Number(v.subtotal || 0),
-      }))
+    ? p.variants.map((v) => {
+        const purity = extractIdAndName(v.metalPurityId || v.metalPurity);
+        const color = extractIdAndName(v.diamondColorId || v.diamondColor);
+        const clarity = extractIdAndName(v.diamondClarityId || v.diamondClarity);
+        const dType = extractIdAndName(v.diamondTypeId || v.diamondType);
+        const shape = extractIdAndName(v.diamondShapeId || v.diamondShape);
+        const mColor = extractIdAndName(v.metalColorId || v.metalColor);
+
+        const item = {
+          _id: v._id,
+          sku: v.sku || '',
+          price: Number(v.price || 0),
+          stock: v.stock !== undefined ? v.stock : 10,
+          caratWeight: Number(v.caratWeight || v.centerDiamondWeight || 0),
+          centerDiamondWeight: Number(v.centerDiamondWeight || v.caratWeight || 0),
+          metalWeight: Number(v.metalWeight || 0),
+        };
+
+        if (purity.name) {
+          item.purity = purity.name;
+          item.metalPurity = purity.name;
+        }
+        if (purity.id) item.metalPurityId = purity.id;
+
+        if (color.name) {
+          item.color = color.name;
+          item.diamondColor = color.name;
+        }
+        if (color.id) item.diamondColorId = color.id;
+
+        if (clarity.name) {
+          item.clarity = clarity.name;
+          item.diamondClarity = clarity.name;
+        }
+        if (clarity.id) item.diamondClarityId = clarity.id;
+
+        if (dType.name) item.diamondType = dType.name;
+        if (dType.id) item.diamondTypeId = dType.id;
+
+        if (shape.name) item.diamondShape = shape.name;
+        if (shape.id) item.diamondShapeId = shape.id;
+
+        if (mColor.name) item.metalColor = mColor.name;
+        if (mColor.id) item.metalColorId = mColor.id;
+
+        if (v.labourCharge) item.labourCharge = Number(v.labourCharge);
+        if (v.certificateCharge) item.certificateCharge = Number(v.certificateCharge);
+
+        return item;
+      })
     : [];
 
   const centerDiamondRows = Array.isArray(p.centerDiamondRows) ? p.centerDiamondRows : [];

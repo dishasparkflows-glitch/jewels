@@ -80,8 +80,31 @@ class CouponService {
     const filter = { 'meta.deletedAt': null };
     filter.status = queryParams.status || 'active';
 
+    const now = new Date();
+    filter.$and = filter.$and || [];
+    filter.$and.push({
+      $or: [
+        { 'validity.endDate': null },
+        { 'validity.endDate': { $exists: false } },
+        { 'validity.endDate': { $gte: now } },
+      ],
+    });
+    filter.$and.push({
+      $or: [
+        { 'validity.startDate': null },
+        { 'validity.startDate': { $exists: false } },
+        { 'validity.startDate': { $lte: now } },
+      ],
+    });
+    
+
     if (queryParams.search) {
-      filter['coupon.code'] = new RegExp(queryParams.search.trim(), 'i');
+      const searchCond = { 'coupon.code': new RegExp(queryParams.search.trim(), 'i') };
+      if (filter.$and) {
+        filter.$and.push(searchCond);
+      } else {
+        filter['coupon.code'] = searchCond['coupon.code'];
+      }
     }
 
     return await Coupon.find(filter)

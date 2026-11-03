@@ -11,4 +11,7 @@ module.exports = {
     DEFAULT_LIMIT: 10,
     MAX_LIMIT: 100,
   },
+  CRON_TIME: {
+    COUPON_EXPIRATION: '0 0,12 * * *', // Every 12 AM and 12 PM
+  },
 };

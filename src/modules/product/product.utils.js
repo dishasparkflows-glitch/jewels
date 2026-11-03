@@ -68,7 +68,7 @@ const withColorStatuses = (product) => {
         status: item.status ?? 'active',
         metalColorId: resolved.name
           ? {
-              _id: resolved.id || undefined,
+              __id: resolved.id || undefined,
               name: resolved.name,
               colorCode: resolved.colorCode || resolved.hex,
               colorCodeEnd: resolved.colorCodeEnd,
@@ -353,7 +353,7 @@ const extractMetalColors = (p) => {
       '';
 
     colorMap.set(key, {
-      id: resolved.id || undefined,
+      _id: resolved.id || undefined,
       name: resolved.name || key,
       colorCode: resolved.colorCode,
       colorCodeEnd: resolved.colorCodeEnd,
@@ -376,7 +376,7 @@ const extractMetalColors = (p) => {
 
     if (colorMap.has(key)) {
       const existing = colorMap.get(key);
-      if (!existing.id && resolved.id) existing.id = resolved.id;
+      if (!existing._id && resolved.id) existing._id = resolved.id;
       if (!existing.name && resolved.name) existing.name = resolved.name;
       if (!existing.colorCode && resolved.colorCode) existing.colorCode = resolved.colorCode;
       if (!existing.colorCodeEnd && resolved.colorCodeEnd) existing.colorCodeEnd = resolved.colorCodeEnd;
@@ -405,7 +405,7 @@ const extractMetalColors = (p) => {
       }
 
       colorMap.set(key, {
-        id: resolved.id || undefined,
+        _id: resolved.id || undefined,
         name: resolved.name || key,
         colorCode: resolved.colorCode,
         colorCodeEnd: resolved.colorCodeEnd,
@@ -441,7 +441,7 @@ const formatColorImages = (colorImages, p = null) => {
       return {
         status: ci.status || 'active',
         metalColorId: {
-          _id: resolved.id || undefined,
+          __id: resolved.id || undefined,
           name: resolved.name || '',
           colorCode: resolved.colorCode || resolved.hex,
           colorCodeEnd: resolved.colorCodeEnd,
@@ -520,7 +520,6 @@ const formatStorefrontProduct = (p) => {
 
   return {
     _id: p._id,
-    id: p._id,
     images,
     image: images[0] || '',
     metalColors,
@@ -569,15 +568,25 @@ const formatStorefrontProductDetail = (p) => {
   const salePrice = Number(p.pricing?.salePrice || 0);
   const isGold = String(p.productType || '').toLowerCase() === 'gold';
   const mrp = isGold ? salePrice : Number(p.pricing?.mrp || salePrice || 0);
-  const images = extractProductImages(p);
-  const image = images[0] || '';
-  const metalColors = extractMetalColors(p);
+  const colorImages = Array.isArray(p.colorImages) ? p.colorImages : [];
+  const hasColorImages = colorImages.some((ci) => Array.isArray(ci?.images) && ci.images.length > 0);
+  const images = hasColorImages ? undefined : extractProductImages(p);
+  const image = hasColorImages ? undefined : (images?.[0] || '');
+  const rawMetalColors = extractMetalColors(p);
+  const metalColors = rawMetalColors.map((c) => {
+    const item = {
+      _id: c._id || c.id ? String(c._id || c.id) : undefined,
+      name: c.name || '',
+      colorCode: c.colorCode || c.hex || '',
+    };
+    if (c.colorCodeEnd) item.colorCodeEnd = c.colorCodeEnd;
+    return item;
+  }).filter((c) => c.name);
 
   // Return ONLY fields required by frontend PDP and customer checkout
   const variants = Array.isArray(p.variants)
     ? p.variants.map((v) => ({
         _id: v._id,
-        id: v._id,
         sku: v.sku || '',
         combination: v.combination || '',
         price: Number(v.price || 0),
@@ -605,9 +614,8 @@ const formatStorefrontProductDetail = (p) => {
 
   return {
     _id: p._id,
-    id: p._id,
-    images,
-    image,
+    ...(images ? { images } : {}),
+    ...(image ? { image } : {}),
     metalColors,
     basicInfo: {
       title,
@@ -619,9 +627,8 @@ const formatStorefrontProductDetail = (p) => {
     productType: p.productType || 'gold',
     isOrnate: Boolean(p.isOrnate),
     categoryIds: Array.isArray(p.categoryIds) ? p.categoryIds : [],
-    metalColorIds: Array.isArray(p.metalColorIds) ? p.metalColorIds : [],
     metalPurityIds: Array.isArray(p.metalPurityIds) ? p.metalPurityIds : [],
-    colorImages: Array.isArray(p.colorImages) ? p.colorImages : [],
+    colorImages,
     sizes: Array.isArray(p.sizes) ? p.sizes : (Array.isArray(p.sizeIds) ? p.sizeIds : []),
     pricing: {
       ...(p.pricing || {}),
@@ -742,7 +749,6 @@ const formatLookupProduct = (p) => {
 
   return {
     _id: p._id,
-    id: p._id,
     title,
     sku,
     price: effectivePrice,

@@ -52,8 +52,6 @@ const sideDiamondPriceSchema = new mongoose.Schema(
   {
     versionKey: false,
     strictPopulate: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
     collection: 'side_diamond_prices',
   }
 );

@@ -52,8 +52,6 @@ const productGroupSchema = new mongoose.Schema(
     collection: 'product_groups',
     versionKey: false,
     strictPopulate: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
   }
 );
 

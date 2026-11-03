@@ -76,8 +76,6 @@ const diamondSchema = new mongoose.Schema(
   {
     versionKey: false,
     strictPopulate: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
   }
 );
 

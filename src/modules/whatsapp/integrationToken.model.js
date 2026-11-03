@@ -51,8 +51,6 @@ const integrationTokenSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
     collection: 'integration_tokens',
   }
 );

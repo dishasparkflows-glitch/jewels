@@ -59,8 +59,6 @@ const diamondPriceNewSchema = new mongoose.Schema(
   {
     strictPopulate: false,
     versionKey: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
     collection: 'diamond_price_news',
   }
 );

@@ -29,8 +29,6 @@ const menuItemSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
     collection: 'menu_items',
   }
 );

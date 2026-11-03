@@ -52,8 +52,6 @@ const centerDiamondPriceSchema = new mongoose.Schema(
   {
     versionKey: false,
     strictPopulate: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
     collection: 'center_diamond_prices',
   }
 );

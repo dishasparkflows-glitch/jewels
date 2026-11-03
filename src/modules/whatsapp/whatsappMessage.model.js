@@ -88,8 +88,6 @@ const whatsAppMessageSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
     collection: 'whatsapp_messages',
   }
 );

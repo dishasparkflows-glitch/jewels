@@ -31,8 +31,6 @@ const caratWeightSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
     collection: 'carat_weights',
   }
 );

@@ -1060,7 +1060,7 @@ class ProductGroupService {
 
       return {
         message: 'Empty product group permanently deleted.',
-        id: group._id,
+        _id: group._id,
         hardDeleted: true,
       };
     }
@@ -1077,7 +1077,7 @@ class ProductGroupService {
 
     return {
       message: 'Product group deleted successfully. Member products were preserved.',
-      id: group._id,
+      _id: group._id,
       hardDeleted: false,
     };
   }
@@ -1706,7 +1706,7 @@ class ProductGroupService {
       });
 
       return {
-        id: target._id,
+        _id: target._id,
         title: target.basicInfo?.title || target.name || 'Unnamed Product',
         tag: target.ornate?.tagNo || '—',
         sku: target.basicInfo?.sku || '—',
@@ -1718,7 +1718,7 @@ class ProductGroupService {
       groupId: group._id,
       groupName: group.groupName,
       sourceProduct: {
-        id: source._id,
+        _id: source._id,
         title: source.basicInfo?.title,
         tag: source.ornate?.tagNo,
         sku: source.basicInfo?.sku,
@@ -1852,7 +1852,7 @@ class ProductGroupService {
 
       updateWrites.push({
         updateOne: {
-          filter: { _id: target._id },
+          filter: { __id: target._id },
           update: {
             $set: {
               ...updatePayload,

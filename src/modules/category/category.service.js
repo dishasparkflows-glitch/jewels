@@ -115,7 +115,7 @@ class CategoryService {
     }
 
     return await Category.find(filter)
-      .select('_id name status icon type slug')
+      .select('_id name status icon type slug sizingConfig')
       .collation({ locale: 'en', strength: 2 })
       .sort({ name: 1 })
       .lean();

@@ -109,8 +109,12 @@ const withColorStatuses = (product) => {
   }
 
   if (Array.isArray(product.variants)) {
+    const hasCenterConfig = Array.isArray(product.centerDiamondRows) && product.centerDiamondRows.length > 0;
     product.variants = product.variants.map((v) => {
       if (!v) return null;
+      const centerWt = v.centerDiamondWeight !== undefined && v.centerDiamondWeight !== null
+        ? v.centerDiamondWeight
+        : (hasCenterConfig ? (v.caratWeight ?? null) : 0);
       return {
         _id: v._id,
         sku: v.sku || '',
@@ -123,8 +127,13 @@ const withColorStatuses = (product) => {
         diamondShapeId: v.diamondShapeId || null,
         diamondColorId: v.diamondColorId || null,
         diamondClarityId: v.diamondClarityId || null,
-        caratWeight: v.caratWeight ?? v.centerDiamondWeight ?? null,
-        centerDiamondWeight: v.centerDiamondWeight ?? v.caratWeight ?? null,
+        caratWeight: v.caratWeight ?? centerWt ?? null,
+        centerDiamondWeight: centerWt,
+        sideDiamondWeight: v.sideDiamondWeight ?? null,
+        centerDiamondCost: v.centerDiamondCost ?? null,
+        sideDiamondCost: v.sideDiamondCost ?? null,
+        metalCost: v.metalCost ?? null,
+        metalRate: v.metalRate ?? null,
         metalWeight: v.metalWeight ?? null,
         labourCharge: v.labourCharge ?? null,
         certificateCharge: v.certificateCharge ?? null,
@@ -630,13 +639,23 @@ const formatStorefrontProductDetail = (p) => {
         const shape = extractIdAndName(v.diamondShapeId || v.diamondShape);
         const mColor = extractIdAndName(v.metalColorId || v.metalColor);
 
+        const hasCenterConfig = Array.isArray(p.centerDiamondRows) && p.centerDiamondRows.length > 0;
+        const centerWt = v.centerDiamondWeight !== undefined && v.centerDiamondWeight !== null
+          ? Number(v.centerDiamondWeight)
+          : (hasCenterConfig ? Number(v.caratWeight || 0) : 0);
+
         const item = {
           _id: v._id,
           sku: v.sku || '',
           price: Number(v.price || 0),
           stock: v.stock !== undefined ? v.stock : 10,
-          caratWeight: Number(v.caratWeight || v.centerDiamondWeight || 0),
-          centerDiamondWeight: Number(v.centerDiamondWeight || v.caratWeight || 0),
+          caratWeight: Number(v.caratWeight || centerWt || 0),
+          centerDiamondWeight: centerWt,
+          centerDiamondCost: Number(v.centerDiamondCost || 0),
+          sideDiamondWeight: Number(v.sideDiamondWeight || 0),
+          sideDiamondCost: Number(v.sideDiamondCost || 0),
+          metalCost: Number(v.metalCost || 0),
+          metalRate: Number(v.metalRate || 0),
           metalWeight: Number(v.metalWeight || 0),
         };
 
@@ -910,7 +929,7 @@ const buildPriceRangeConditions = (queryParams, effectivePrice) => {
 // ------------------------------- get product populate options ----------------------------
 const getProductPopulateOptions = () => {
   return [
-    { path: 'categoryIds', select: 'name slug sizeChart', strictPopulate: false },
+    { path: 'categoryIds', select: 'name slug sizeChart sizingConfig', strictPopulate: false },
     { path: 'sizeIds', select: 'name _id', strictPopulate: false },
     { path: 'metalColorIds', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
     { path: 'metalPurityIds', select: 'name karat metalType', strictPopulate: false },

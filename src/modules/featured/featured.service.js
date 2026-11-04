@@ -20,6 +20,7 @@ class FeaturedService {
 
     delete data.products;
     delete data.productCount;
+    delete data.position;
     const incomingPlacement = data.placement;
     const incomingOrder = data.order;
     delete data.placement;
@@ -157,6 +158,7 @@ class FeaturedService {
 
     delete data.products;
     delete data.productCount;
+    delete data.position;
     const incomingPlacement = data.placement;
     const incomingOrder = data.order;
     delete data.placement;

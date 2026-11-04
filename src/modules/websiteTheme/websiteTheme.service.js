@@ -488,7 +488,7 @@ class WebsiteThemeService {
     allFeatured.forEach((item) => {
       const featId = String(item._id);
       const isSelectedInTheme = selectedFeaturedIds.has(featId);
-      const placement = item.placement || 'Celebrate';
+      const placement = item.display?.type || 'Celebrate';
       const title = item.name || `${placement} Item`;
 
       if (item.image?.url) {

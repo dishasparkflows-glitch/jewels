@@ -40,10 +40,6 @@ const featuredSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    position: {
-      type: String,
-      default: 'none',
-    },
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',

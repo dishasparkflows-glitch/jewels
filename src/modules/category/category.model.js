@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 
-
 const promoBannerSchema = new mongoose.Schema(
   {
     title: {
@@ -18,6 +17,33 @@ const promoBannerSchema = new mongoose.Schema(
     },
   },
   { _id: true }
+);
+
+const sizingConfigSchema = new mongoose.Schema(
+  {
+    isScalable: {
+      type: Boolean,
+      default: false,
+    },
+    sizeLabel: {
+      type: String,
+      trim: true,
+      default: 'Size',
+    },
+    baseSize: {
+      type: Number,
+      default: 7.0,
+    },
+    stepSize: {
+      type: Number,
+      default: 1.0,
+    },
+    percentPerStep: {
+      type: Number,
+      default: 2.5,
+    },
+  },
+  { _id: false }
 );
 
 const categorySchema = new mongoose.Schema(
@@ -68,6 +94,16 @@ const categorySchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: 'category',
+    },
+    sizingConfig: {
+      type: sizingConfigSchema,
+      default: () => ({
+        isScalable: false,
+        sizeLabel: 'Size',
+        baseSize: 7.0,
+        stepSize: 1.0,
+        percentPerStep: 2.5,
+      }),
     },
     promoBanners: [promoBannerSchema],
   },

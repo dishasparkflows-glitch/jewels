@@ -2,9 +2,7 @@ const Address = require('./address.model');
 const ApiError = require('../../utils/ApiError');
 
 class AddressService {
-  /**
-   * Get all addresses for a user
-   */
+    // ------------------------------- get user addresses ----------------------------
   async getUserAddresses(userId) {
     const addresses = await Address.find({
       userId,
@@ -14,9 +12,7 @@ class AddressService {
     return addresses;
   }
 
-  /**
-   * Get a single address by ID
-   */
+    // ------------------------------- get address by id ----------------------------
   async getAddressById(userId, addressId, isAdmin = false) {
     const query = {
       _id: addressId,
@@ -33,9 +29,7 @@ class AddressService {
     return address;
   }
 
-  /**
-   * Create a new address for user
-   */
+    // ------------------------------- create address ----------------------------
   async createAddress(userId, data) {
     const existingCount = await Address.countDocuments({
       userId,
@@ -75,9 +69,7 @@ class AddressService {
     return address;
   }
 
-  /**
-   * Update address
-   */
+    // ------------------------------- update address ----------------------------
   async updateAddress(userId, addressId, data, isAdmin = false) {
     const query = {
       _id: addressId,
@@ -117,9 +109,7 @@ class AddressService {
     return addressDoc;
   }
 
-  /**
-   * Delete address (soft-delete)
-   */
+    // ------------------------------- delete address ----------------------------
   async deleteAddress(userId, addressId, isAdmin = false) {
     const query = {
       _id: addressId,
@@ -166,9 +156,7 @@ class AddressService {
     return { success: true, message: 'Address removed successfully' };
   }
 
-  /**
-   * Set address as default
-   */
+    // ------------------------------- set default address ----------------------------
   async setDefault(userId, addressId, type = 'both') {
     const addressDoc = await Address.findOne({
       _id: addressId,

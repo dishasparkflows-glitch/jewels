@@ -65,6 +65,11 @@ const categorySchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
+    type: {
+      type: String,
+      trim: true,
+      default: 'category',
+    },
     promoBanners: [promoBannerSchema],
   },
   {

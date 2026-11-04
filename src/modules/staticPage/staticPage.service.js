@@ -174,9 +174,6 @@ const DEFAULT_PAGES = [
 ];
 
 class StaticPageService {
-  /**
-   * Normalize page slug
-   */
   _normalizeSlug(slug, title) {
     const raw = slug || title || '';
     return raw
@@ -187,9 +184,7 @@ class StaticPageService {
       .replace(/^-+|-+$/g, '');
   }
 
-  /**
-   * Seed default pages if collection is empty
-   */
+    // ------------------------------- ensure default static pages ----------------------------
   async ensureSeedDefaults() {
     const count = await StaticPage.countDocuments();
     if (count === 0) {
@@ -197,9 +192,7 @@ class StaticPageService {
     }
   }
 
-  /**
-   * Get all static pages (with search & status filter)
-   */
+    // ------------------------------- get all static pages ----------------------------
   async getAll(query = {}) {
     await this.ensureSeedDefaults();
 
@@ -216,9 +209,7 @@ class StaticPageService {
     return pages;
   }
 
-  /**
-   * Get page by ID
-   */
+    // ------------------------------- get single static page ----------------------------
   async getOne(id) {
     const page = await StaticPage.findById(id);
     if (!page) {
@@ -227,9 +218,7 @@ class StaticPageService {
     return page;
   }
 
-  /**
-   * Get page by slug (public view)
-   */
+    // ------------------------------- get static page by slug ----------------------------
   async getBySlug(rawSlug) {
     await this.ensureSeedDefaults();
 
@@ -245,9 +234,7 @@ class StaticPageService {
     return page;
   }
 
-  /**
-   * Create a new static page
-   */
+    // ------------------------------- create static page ----------------------------
   async create(data) {
     const payload = { ...data };
     payload.slug = this._normalizeSlug(payload.slug, payload.title);
@@ -266,9 +253,7 @@ class StaticPageService {
     return page;
   }
 
-  /**
-   * Update an existing static page
-   */
+    // ------------------------------- update static page ----------------------------
   async update(id, data) {
     const page = await StaticPage.findById(id);
     if (!page) {
@@ -292,9 +277,7 @@ class StaticPageService {
     return page;
   }
 
-  /**
-   * Delete a static page
-   */
+    // ------------------------------- delete static page ----------------------------
   async delete(id) {
     const page = await StaticPage.findByIdAndDelete(id);
     if (!page) {

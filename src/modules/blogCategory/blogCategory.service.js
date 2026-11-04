@@ -3,9 +3,7 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class BlogCategoryService {
-  /**
-   * Create blog category
-   */
+    // ------------------------------- create blog category ----------------------------
   async create(data) {
     if (!data.slug && data.name) {
       data.slug = data.name
@@ -27,9 +25,7 @@ class BlogCategoryService {
     return await BlogCategory.create(data);
   }
 
-  /**
-   * Get single blog category by ID
-   */
+    // ------------------------------- get single blog category ----------------------------
   async getOne(id) {
     const item = await BlogCategory.findOne({ _id: id, 'meta.deletedAt': null });
     if (!item) {
@@ -38,9 +34,7 @@ class BlogCategoryService {
     return item;
   }
 
-  /**
-   * Get category by slug
-   */
+    // ------------------------------- get blog category by slug ----------------------------
   async getBySlug(slug) {
     const item = await BlogCategory.findOne({ slug, 'meta.deletedAt': null });
     if (!item) {
@@ -49,9 +43,7 @@ class BlogCategoryService {
     return item;
   }
 
-  /**
-   * Get all blog categories
-   */
+    // ------------------------------- get all blog categories ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -77,9 +69,7 @@ class BlogCategoryService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
-  /**
-   * Lookup list of active categories
-   */
+    // ------------------------------- get blog category lookup ----------------------------
   async getLookup() {
     return await BlogCategory.find({ 'meta.deletedAt': null, status: 'active' })
       .select('_id name slug')
@@ -87,9 +77,7 @@ class BlogCategoryService {
       .lean();
   }
 
-  /**
-   * Update blog category
-   */
+    // ------------------------------- update blog category ----------------------------
   async update(id, data) {
     if (data.name && !data.slug) {
       data.slug = data.name
@@ -127,9 +115,7 @@ class BlogCategoryService {
     return item;
   }
 
-  /**
-   * Soft delete blog category
-   */
+    // ------------------------------- delete blog category ----------------------------
   async delete(id) {
     const item = await BlogCategory.findOneAndUpdate(
       { _id: id, 'meta.deletedAt': null },

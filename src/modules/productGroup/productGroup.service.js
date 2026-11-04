@@ -42,9 +42,6 @@ class ProductGroupService {
     this._queues = new Map();
   }
 
-  /**
-   * Sequential promise queue per key to serialize concurrent updates safely
-   */
   _enqueue(key, fn) {
     const prev = this._queues.get(key) || Promise.resolve();
     const next = prev.catch(() => {}).then(fn);
@@ -56,9 +53,7 @@ class ProductGroupService {
     });
     return next;
   }
-  /**
-   * Generate next sequential group code (e.g. CG-000001)
-   */
+    // ------------------------------- generate group code ----------------------------
   async generateGroupCode() {
     const last = await ProductGroup.findOne({}, { groupCode: 1 })
       .sort({ groupCode: -1 })
@@ -79,14 +74,7 @@ class ProductGroupService {
     return `CG-${String(nextNum).padStart(6, '0')}`;
   }
 
-  /**
-   * Automatically assigns an Ornate product to a matching ProductGroup,
-   * or creates a new ProductGroup entry if no matching group exists.
-   *
-   * @param {Object} product - Upserted product document from MongoDB
-   * @param {Object} [label] - Raw Ornate label data from ERP
-   * @returns {Promise<Object|null>}
-   */
+    // ------------------------------- assign ornate product to group ----------------------------
   async assignOrnateProductToGroup(product, label = {}) {
     if (!product || !product._id) return null;
 
@@ -175,9 +163,6 @@ class ProductGroupService {
     return newGroup;
   }
 
-  /**
-   * Helper to evaluate eligibility of a product for public/group catalogue
-   */
   isProductEligible(product) {
     if (!product) return false;
     if (product.meta?.deletedAt) return false;
@@ -189,9 +174,6 @@ class ProductGroupService {
     return true;
   }
 
-  /**
-   * Check if product is in stock
-   */
   isProductInStock(product) {
     if (!product) return false;
     if (product.ornate?.isSold) return false;
@@ -201,22 +183,10 @@ class ProductGroupService {
     return true;
   }
 
-  /**
-   * Extract effective product price using canonical formula
-   */
   getProductPrice(product) {
     return Number(product?.pricing?.salePrice || product?.pricing?.mrp || product?.ornate?.goldAmt || 0);
   }
 
-  /**
-   * Select canonical representative product according to business rules:
-   * 1. Manual mode: preserve group.primaryProductId if still valid and eligible.
-   * 2. Auto mode:
-   *    - Highest-priced eligible product.
-   *    - In-stock products preferred.
-   *    - If all out of stock, fallback to eligible out-of-stock.
-   *    - Deterministic tie-breaker by _id.
-   */
   selectRepresentative(group, memberProducts = []) {
     const list = Array.isArray(memberProducts) ? memberProducts : [];
     const nonDeleted = list.filter((p) => p && !p.meta?.deletedAt);
@@ -257,10 +227,6 @@ class ProductGroupService {
     return sorted[0] || null;
   }
 
-  /**
-   * Recalculate primaryProductId for a group and save it directly in product_groups.
-   * Thread-safe sequential execution per groupId.
-   */
   async recalculateGroupRepresentative(groupId) {
     if (!groupId) return null;
     return this._enqueue(`group:${String(groupId)}`, async () => {
@@ -299,9 +265,6 @@ class ProductGroupService {
     });
   }
 
-  /**
-   * Refresh representatives of any active group containing a changed product.
-   */
   async refreshAffectedGroups(productId) {
     if (!productId) return;
     try {
@@ -319,9 +282,6 @@ class ProductGroupService {
     }
   }
 
-  /**
-   * Rebuild / validate primaryProductId across all active groups in product_groups.
-   */
   async recalculateAllRepresentatives() {
     const activeGroups = await ProductGroup.find({
       status: 'active',
@@ -337,9 +297,6 @@ class ProductGroupService {
     return { totalGroups: activeGroups.length, updatedRepresentatives: updated };
   }
 
-  /**
-   * Compute representative product, price range, and counts for a group
-   */
   computeGroupSummary(group, products = []) {
     const list = Array.isArray(products) ? products : [];
     const nonDeleted = list.filter((p) => p && !p.meta?.deletedAt);
@@ -371,9 +328,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Helper to extract valid image URL from a product document
-   */
   extractProductImage(product) {
     if (!product) return null;
     if (product.images && product.images[0]) {
@@ -398,9 +352,6 @@ class ProductGroupService {
     return null;
   }
 
-  /**
-   * Resolve 1st product image from a group's products
-   */
   getFirstProductImage(products = [], primaryId = null) {
     if (!Array.isArray(products) || !products.length) return null;
     if (primaryId) {
@@ -415,9 +366,6 @@ class ProductGroupService {
     return null;
   }
 
-  /**
-   * Build condition for filtering groups by their member product status
-   */
   async buildProductStatusConditions(statusParam) {
     if (!statusParam || statusParam === 'all') return null;
 
@@ -457,9 +405,6 @@ class ProductGroupService {
     return null;
   }
 
-  /**
-   * Get accurate counts for all admin Ornate Products tabs
-   */
   async getTabCounts() {
     const baseGroupFilter = { status: 'active', 'meta.deletedAt': null };
 
@@ -537,9 +482,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * List Product Groups with search, filters, pagination, and calculated summaries
-   */
   async getGroups(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -721,9 +663,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Lightweight listing — returns groupName, groupCode, productCount, status, and 1st product image
-   */
   async getGroupsSummary(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -856,9 +795,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Get single group details with fully populated products
-   */
   async getGroupById(id) {
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const filter = isObjectId
@@ -891,9 +827,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Create new product group with validated membership
-   */
   async createGroup(data, userId = null) {
     const groupName = data.groupName?.trim();
     if (!groupName) {
@@ -969,9 +902,6 @@ class ProductGroupService {
     return this.getGroupById(group._id);
   }
 
-  /**
-   * Update group properties (name, slug, description, status, representativeMode, primaryProductId)
-   */
   async updateGroup(id, data, userId = null) {
     const group = await ProductGroup.findOne({ _id: id, 'meta.deletedAt': null });
     if (!group) throw new ApiError(404, 'Product group not found');
@@ -1030,11 +960,6 @@ class ProductGroupService {
     return this.getGroupById(group._id);
   }
 
-  /**
-   * Delete product group:
-   * - If group is empty (0 products), hard delete (permanently remove document from DB)
-   * - Otherwise (has member products), soft delete (sets status: inactive and meta.deletedAt, preserving products)
-   */
   async deleteGroup(id, userId = null) {
     let group = await ProductGroup.findOne({ _id: id, 'meta.deletedAt': null });
     if (!group) {
@@ -1082,9 +1007,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Add products to group
-   */
   async addProducts(groupId, productIds = [], userId = null) {
     const group = await ProductGroup.findOne({ _id: groupId, 'meta.deletedAt': null });
     if (!group) throw new ApiError(404, 'Product group not found');
@@ -1120,9 +1042,6 @@ class ProductGroupService {
     return this.getGroupById(groupId);
   }
 
-  /**
-   * Remove a single product from group
-   */
   async removeProduct(groupId, productId, userId = null) {
     const group = await ProductGroup.findOne({ _id: groupId, 'meta.deletedAt': null });
     if (!group) throw new ApiError(404, 'Product group not found');
@@ -1144,9 +1063,6 @@ class ProductGroupService {
     return this.getGroupById(groupId);
   }
 
-  /**
-   * Explicitly move products from one group to another or split into individual groups
-   */
   async moveProducts({ sourceGroupId, targetGroupId, newGroupName, productIds, splitIndividual = false, userId = null }) {
     if (!sourceGroupId) {
       throw new ApiError(400, 'Source group ID is required');
@@ -1263,9 +1179,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Split products into individual groups (1 product per group) in one single click
-   */
   async splitProductsIntoIndividualGroups({ sourceGroupId = null, productIds = [], userId = null }) {
     const validIds = (productIds || []).filter((id) => mongoose.isValidObjectId(id));
     if (!validIds.length) {
@@ -1428,9 +1341,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Approve products in a group where stockStatus is In Stock
-   */
   async approveGroup(groupId, productIds = null, userId = null) {
     const group = await ProductGroup.findOne({ _id: groupId, 'meta.deletedAt': null });
     if (!group) throw new ApiError(404, 'Product group not found');
@@ -1481,11 +1391,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Bulk approve products across multiple groups
-   * @param {Array<string>} groupIds - List of ProductGroup IDs
-   * @param {string} userId - Admin user ID
-   */
   async bulkApproveGroups(groupIds = [], userId = null) {
     if (!Array.isArray(groupIds) || groupIds.length === 0) {
       throw new ApiError(400, 'Please select at least one group to approve');
@@ -1552,9 +1457,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Get eligible products not belonging to any active group
-   */
   async getUngroupedProducts(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
 
@@ -1614,9 +1516,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Preview synchronization of fields from source product to targets without mutation
-   */
   async previewSync({ groupId, sourceProductId, targetProductIds = [], fields = [] }) {
     const group = await ProductGroup.findOne({ _id: groupId, 'meta.deletedAt': null });
     if (!group) throw new ApiError(404, 'Product group not found');
@@ -1729,9 +1628,6 @@ class ProductGroupService {
     };
   }
 
-  /**
-   * Execute validated synchronization and commit first-sync / sync-log metadata
-   */
   async executeSync({ groupId, sourceProductId, targetProductIds = [], fields = [], userId = null }) {
     const operationId = new mongoose.Types.ObjectId().toString();
     const group = await ProductGroup.findOne({ _id: groupId, 'meta.deletedAt': null });

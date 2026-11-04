@@ -20,6 +20,7 @@ class RazorpayService extends BasePaymentProvider {
     }
   }
 
+    // ------------------------------- check if razorpay configured ----------------------------
   isConfigured() {
     return Boolean(this.keyId && this.keySecret);
   }
@@ -44,6 +45,7 @@ class RazorpayService extends BasePaymentProvider {
     return this.client;
   }
 
+    // ------------------------------- get razorpay public config ----------------------------
   getPublicConfig() {
     return {
       id: this.name,
@@ -55,9 +57,7 @@ class RazorpayService extends BasePaymentProvider {
     };
   }
 
-  /**
-   * Internal SDK order creation
-   */
+    // ------------------------------- create razorpay gateway order ----------------------------
   async createGatewayOrder({ amount, receipt, currency = 'INR', notes = {} }) {
     const client = this.getClient();
     const amountInPaise = Math.round(Number(amount) * 100);
@@ -86,9 +86,7 @@ class RazorpayService extends BasePaymentProvider {
     };
   }
 
-  /**
-   * Signature verification helper
-   */
+    // ------------------------------- verify razorpay payment signature ----------------------------
   verifyPaymentSignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature }) {
     if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       throw new ApiError(400, 'Missing required Razorpay signature parameters');
@@ -116,9 +114,6 @@ class RazorpayService extends BasePaymentProvider {
     return true;
   }
 
-  /**
-   * Webhook signature verification helper
-   */
   verifyWebhookSignature(rawBody, signature, webhookSecret = this.webhookSecret || process.env.RAZORPAY_WEBHOOK_SECRET) {
     if (!webhookSecret) {
       throw new ApiError(500, 'Razorpay webhook secret is not configured');
@@ -143,9 +138,6 @@ class RazorpayService extends BasePaymentProvider {
     return await client.payments.fetch(paymentId);
   }
 
-  /**
-   * Standard Initiate Payment method
-   */
   async initiatePayment({ order, amount }) {
     const razorpayData = await this.createGatewayOrder({
       amount,
@@ -175,9 +167,6 @@ class RazorpayService extends BasePaymentProvider {
     };
   }
 
-  /**
-   * Standard Verify Payment method (called after client checkout modal completes)
-   */
   async verifyPayment({ orderId, orderNumber, razorpayOrderId, razorpayPaymentId, razorpaySignature }) {
     this.verifyPaymentSignature({
       razorpayOrderId,
@@ -218,9 +207,6 @@ class RazorpayService extends BasePaymentProvider {
     });
   }
 
-  /**
-   * Standard Webhook Handler method
-   */
   async handleWebhook({ rawBody, signature, eventData }) {
     this.verifyWebhookSignature(rawBody, signature);
 

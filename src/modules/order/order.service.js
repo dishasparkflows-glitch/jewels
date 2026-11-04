@@ -21,16 +21,12 @@ const {
 } = require('./order.utils');
 
 class OrderService {
-  /**
-   * Helper: Generate a unique human-readable order number
-   */
+    // ------------------------------- generate order number ----------------------------
   generateOrderNumber() {
     return generateOrderNumber();
   }
 
-  /**
-   * Create a new order and initialize payment gateway session
-   */
+    // ------------------------------- create order ----------------------------
   async createOrder(data, user = null) {
     const effectiveUserId = user?._id || data.userId || null;
     let items = Array.isArray(data.items) && data.items.length > 0 ? data.items : [];
@@ -166,9 +162,6 @@ class OrderService {
     };
   }
 
-  /**
-   * Get single order by ID
-   */
   async getOrderById(orderId, user = null) {
     const order = await Order.findById(orderId);
     if (!order) {
@@ -179,9 +172,6 @@ class OrderService {
     return order;
   }
 
-  /**
-   * Get order by orderNumber
-   */
   async getOrderByNumber(orderNumber, user = null) {
     const order = await Order.findOne({ orderNumber });
     if (!order) {
@@ -192,9 +182,7 @@ class OrderService {
     return order;
   }
 
-  /**
-   * Get orders for the logged-in user
-   */
+    // ------------------------------- get my orders ----------------------------
   async getMyOrders(userId, queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = buildUserOrderFilters(userId, queryParams);
@@ -211,9 +199,7 @@ class OrderService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
-  /**
-   * Admin: Get all orders with filters
-   */
+    // ------------------------------- get all orders ----------------------------
   async getAllOrders(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = buildAdminOrderFilters(queryParams);
@@ -231,9 +217,6 @@ class OrderService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
-  /**
-   * Update order status
-   */
   async updateOrderStatus(orderId, { orderStatus, message }) {
     const order = await Order.findById(orderId);
     if (!order) {
@@ -251,9 +234,6 @@ class OrderService {
     return order;
   }
 
-  /**
-   * Cancel an order
-   */
   async cancelOrder(orderId, user = null, reason = '') {
     const order = await Order.findById(orderId);
     if (!order) {

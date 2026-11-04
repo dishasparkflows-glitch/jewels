@@ -22,10 +22,12 @@ class CCAvenueService extends BasePaymentProvider {
     ]);
   }
 
+    // ------------------------------- check if ccavenue configured ----------------------------
   isConfigured() {
     return Boolean(this.merchantId && this.accessCode && this.workingKey);
   }
 
+    // ------------------------------- get ccavenue public config ----------------------------
   getPublicConfig() {
     return {
       id: this.name,
@@ -38,9 +40,6 @@ class CCAvenueService extends BasePaymentProvider {
     };
   }
 
-  /**
-   * Derive 128-bit key from workingKey using MD5 hash
-   */
   getKey() {
     const workingKey = this.workingKey || process.env.CCAVENUE_WORKING_KEY;
     if (!workingKey) {
@@ -51,9 +50,7 @@ class CCAvenueService extends BasePaymentProvider {
     return hash.digest();
   }
 
-  /**
-   * Encrypt plaintext query string with AES-128-CBC
-   */
+    // ------------------------------- encrypt ccavenue data ----------------------------
   encrypt(plainText) {
     const key = this.getKey();
     const cipher = crypto.createCipheriv('aes-128-cbc', key, this.iv);
@@ -62,9 +59,7 @@ class CCAvenueService extends BasePaymentProvider {
     return encoded;
   }
 
-  /**
-   * Decrypt hex encoded response string with AES-128-CBC
-   */
+    // ------------------------------- decrypt ccavenue response ----------------------------
   decrypt(encResp) {
     if (!encResp) {
       throw new ApiError(400, 'Missing encrypted CCAvenue response');
@@ -76,9 +71,6 @@ class CCAvenueService extends BasePaymentProvider {
     return decoded;
   }
 
-  /**
-   * Parse decrypted query string into an object
-   */
   parseResponse(decryptedText) {
     const result = {};
     if (!decryptedText) return result;
@@ -104,9 +96,6 @@ class CCAvenueService extends BasePaymentProvider {
     return this.parseResponse(decryptedText);
   }
 
-  /**
-   * Build encrypted request form parameters
-   */
   buildPaymentRequest({
     orderNumber,
     amount,
@@ -183,9 +172,6 @@ class CCAvenueService extends BasePaymentProvider {
     };
   }
 
-  /**
-   * Standard Initiate Payment method
-   */
   async initiatePayment({ order, amount }) {
     const ccData = this.buildPaymentRequest({
       orderNumber: order.orderNumber,
@@ -234,9 +220,6 @@ class CCAvenueService extends BasePaymentProvider {
     };
   }
 
-  /**
-   * Standard Handler for CCAvenue POST Redirect Callback
-   */
   async handleResponse(encResp) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
 
@@ -296,9 +279,6 @@ class CCAvenueService extends BasePaymentProvider {
     }
   }
 
-  /**
-   * Standard Handler for CCAvenue S2S Webhook
-   */
   async handleWebhook({ encResp }) {
     return await this.handleResponse(encResp);
   }

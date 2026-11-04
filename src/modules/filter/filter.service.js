@@ -7,9 +7,6 @@ const CaratWeight = require('../caratWeight/caratWeight.model');
 const Featured = require('../featured/featured.model');
 const ApiError = require('../../utils/ApiError');
 
-/**
- * Fetch live dynamic options for all filter types from database
- */
 async function loadAllFilterOptions() {
   const activeFilter = { 'meta.deletedAt': null, status: 'active' };
 
@@ -91,7 +88,7 @@ async function loadAllFilterOptions() {
 }
 
 class FilterService {
-  // ── Get Filters (supports categoryId or category slug parameter) ──
+  // ------------------------------- get filters ----------------------------
   async getFilters(queryParams = {}) {
 
     const categoryParam = queryParams.categoryId || queryParams.category || queryParams.categorySlug;
@@ -183,8 +180,7 @@ class FilterService {
       filters: globalFilters,
     };
   }
-
-  // ── Storefront Filters (only clean, required, enabled filters) ──
+  // ------------------------------- get storefront filters ----------------------------
   async getStorefrontFilters(queryParams = {}) {
     const result = await this.getFilters(queryParams);
 
@@ -220,8 +216,7 @@ class FilterService {
       filters: cleanFilters,
     };
   }
-
-  // ── Update Category-Wise Filter Configuration in 'filters' Table ──
+  // ------------------------------- update category filters ----------------------------
   async updateCategoryFilters(categoryId, filterList) {
     const category = await Category.findOne({ _id: categoryId, 'meta.deletedAt': null }).lean();
     if (!category) {
@@ -263,8 +258,7 @@ class FilterService {
 
     return this.getFilters({ categoryId: category._id });
   }
-
-  // ── Get All Filters along with complete category assignments (for Admin Filters Sidebar View) ──
+  // ------------------------------- get all filters with categories ----------------------------
   async getAllFiltersWithCategories() {
     const allFilters = await Filter.find({ 'meta.deletedAt': null }).sort({ order: 1 }).lean();
     const allCategories = await Category.find({ 'meta.deletedAt': null })
@@ -301,8 +295,7 @@ class FilterService {
       };
     });
   }
-
-  // ── Update Categories assigned to a specific filter ──
+  // ------------------------------- update filter categories ----------------------------
   async updateFilterCategories(filterId, categoryAssignments) {
     const filter = await Filter.findOne({
       $or: [
@@ -335,8 +328,7 @@ class FilterService {
     await filter.save();
     return filter;
   }
-
-  // ── Reorder Master Filters ──
+  // ------------------------------- reorder filters ----------------------------
   async reorderFilters(orderedFilterIds) {
     const list = Array.isArray(orderedFilterIds) ? orderedFilterIds : (orderedFilterIds?.filterIds || []);
     if (!list || list.length === 0) return this.getAllFiltersWithCategories();
@@ -359,8 +351,7 @@ class FilterService {
     }
     return this.getAllFiltersWithCategories();
   }
-
-  // ── Update Master Filter ──
+  // ------------------------------- update filter ----------------------------
   async updateFilter(filterId, data) {
     const filter = await Filter.findOneAndUpdate(
       { filterId, 'meta.deletedAt': null },

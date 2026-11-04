@@ -8,6 +8,7 @@ class ThemeMediaMappingController {
     ApiResponse.success(res, modules, 'Supported modules retrieved successfully');
   });
 
+    // ------------------------------- get theme module records ----------------------------
   getModuleRecords = catchAsync(async (req, res) => {
     const { themeId } = req.params;
     const { module, page, limit, search } = req.query;
@@ -23,6 +24,7 @@ class ThemeMediaMappingController {
     ApiResponse.success(res, data, 'Module records retrieved successfully');
   });
 
+    // ------------------------------- get theme mappings ----------------------------
   getThemeMappings = catchAsync(async (req, res) => {
     const { themeId } = req.params;
     const { module } = req.query;
@@ -53,6 +55,7 @@ class ThemeMediaMappingController {
     ApiResponse.success(res, result.mapping, result.message);
   });
 
+    // ------------------------------- delete theme mapping ----------------------------
   deleteMapping = catchAsync(async (req, res) => {
     const { themeId, mappingId } = req.params;
 

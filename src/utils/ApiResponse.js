@@ -1,6 +1,3 @@
-/**
- * Standard API response helper
- */
 class ApiResponse {
   static success(res, data = null, message = 'Success', statusCode = 200) {
     let resData = data;

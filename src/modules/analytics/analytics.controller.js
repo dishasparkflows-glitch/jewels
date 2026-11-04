@@ -3,23 +3,27 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 
 class AnalyticsController {
+    // ------------------------------- get analytics status ----------------------------
   getStatus = catchAsync(async (req, res) => {
     const data = await analyticsService.getStatus();
     ApiResponse.success(res, data, 'Analytics status retrieved');
   });
 
+    // ------------------------------- get analytics overview ----------------------------
   getOverview = catchAsync(async (req, res) => {
     const { startDate, endDate } = req.query;
     const data = await analyticsService.getOverview({ startDate, endDate });
     ApiResponse.success(res, data, 'Analytics overview retrieved');
   });
 
+    // ------------------------------- get analytics timeline ----------------------------
   getTimeline = catchAsync(async (req, res) => {
     const { startDate, endDate } = req.query;
     const data = await analyticsService.getTimeline({ startDate, endDate });
     ApiResponse.success(res, data, 'Analytics timeline retrieved');
   });
 
+    // ------------------------------- get top products ----------------------------
   getTopProducts = catchAsync(async (req, res) => {
     const { startDate, endDate, limit } = req.query;
     const data = await analyticsService.getTopProducts({
@@ -30,17 +34,20 @@ class AnalyticsController {
     ApiResponse.success(res, data, 'Top products retrieved');
   });
 
+    // ------------------------------- get traffic sources ----------------------------
   getTrafficSources = catchAsync(async (req, res) => {
     const { startDate, endDate } = req.query;
     const data = await analyticsService.getTrafficSources({ startDate, endDate });
     ApiResponse.success(res, data, 'Traffic sources retrieved');
   });
 
+    // ------------------------------- get realtime analytics ----------------------------
   getRealtime = catchAsync(async (req, res) => {
     const data = await analyticsService.getRealtime();
     ApiResponse.success(res, data, 'Realtime analytics retrieved');
   });
 
+    // ------------------------------- get dashboard all analytics ----------------------------
   getDashboardAll = catchAsync(async (req, res) => {
     const { startDate = '30daysAgo', endDate = 'today' } = req.query;
 

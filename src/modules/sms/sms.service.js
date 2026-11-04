@@ -11,6 +11,7 @@ const applyVariables = (template, variables) =>
   });
 
 class SmsService {
+    // ------------------------------- get sms provider ----------------------------
   getProvider() {
     const providerName = (process.env.SMS_PROVIDER || 'netsms').trim().toLowerCase();
     const Provider = providers[providerName];
@@ -18,6 +19,7 @@ class SmsService {
     return new Provider();
   }
 
+    // ------------------------------- send sms ----------------------------
   async sendSms({ to, message, templateId, variables }) {
     if (!to || !message || !templateId) {
       return { skipped: true, reason: 'Recipient, approved template, and message are required' };
@@ -25,6 +27,7 @@ class SmsService {
     return this.getProvider().send({ to, message, templateId, variables });
   }
 
+    // ------------------------------- send signup confirmation sms ----------------------------
   async sendSignupConfirmation(user) {
     const variables = {
       name: user.profile?.firstName || '',
@@ -39,6 +42,7 @@ class SmsService {
     });
   }
 
+    // ------------------------------- send order confirmation sms ----------------------------
   async sendOrderConfirmation(order) {
     const variables = {
       orderId: order.orderNumber || order.orderId || String(order._id || ''),

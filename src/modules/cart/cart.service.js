@@ -146,6 +146,35 @@ class CartService {
     };
   }
 
+  // ------------------------------- consolidate cart items ----------------------------
+  consolidateCartItems(cart) {
+    if (!cart?.items?.length) return false;
+    const map = new Map();
+    let hasDuplicates = false;
+
+    for (const item of cart.items) {
+      const prodId = String(item.productId?._id || item.productId || '');
+      if (!prodId) continue;
+
+      if (map.has(prodId)) {
+        hasDuplicates = true;
+        const existing = map.get(prodId);
+        existing.quantity += (Number(item.quantity) || 1);
+        existing.price = item.price || existing.price;
+        existing.totalItemPrice = (Number(existing.price) || 0) * existing.quantity;
+        if (item.selectedAttributes) existing.selectedAttributes = item.selectedAttributes;
+      } else {
+        map.set(prodId, item);
+      }
+    }
+
+    if (hasDuplicates) {
+      cart.items = Array.from(map.values());
+      return true;
+    }
+    return false;
+  }
+
   // ------------------------------- get cart ----------------------------
   async getCart({ userId } = {}) {
     if (!userId) {
@@ -156,6 +185,9 @@ class CartService {
 
     if (!cart) {
       cart = await this.findOrCreateCart(userId);
+    } else if (this.consolidateCartItems(cart)) {
+      await cart.save();
+      await cart.populate(cartPopulateOptions);
     }
 
     return this.formatCart(cart);
@@ -205,36 +237,29 @@ class CartService {
       const toObjectId = (val) => (val && mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null);
 
       selectedAttributes = {
-        metalPurity: toObjectId(selectedAttributes?.metalPurity || firstVariant?.metalPurityId || found?.metalPurityIds?.[0]),
-        metalColor: toObjectId(selectedAttributes?.metalColor || firstVariant?.metalColorId || found?.metalColorIds?.[0]),
-        diamondType: toObjectId(selectedAttributes?.diamondType || firstVariant?.diamondTypeId || firstCenterRow?.diamondTypeId),
-        diamondShape: toObjectId(selectedAttributes?.diamondShape || firstVariant?.diamondShapeId || firstCenterRow?.diamondShapeId),
-        diamondClarity: toObjectId(selectedAttributes?.diamondClarity || firstVariant?.diamondClarityId || firstCenterRow?.diamondClarityId),
-        diamondColor: toObjectId(selectedAttributes?.diamondColor || firstVariant?.diamondColorId || firstCenterRow?.diamondColorId),
+        metalPurity: toObjectId(selectedAttributes?.metalPurityId || selectedAttributes?.metalPurity || firstVariant?.metalPurityId || found?.metalPurityIds?.[0]),
+        metalColor: toObjectId(selectedAttributes?.metalColorId || selectedAttributes?.metalColor || firstVariant?.metalColorId || found?.metalColorIds?.[0]),
+        diamondType: toObjectId(selectedAttributes?.diamondTypeId || selectedAttributes?.diamondType || firstVariant?.diamondTypeId || firstCenterRow?.diamondTypeId),
+        diamondShape: toObjectId(selectedAttributes?.diamondShapeId || selectedAttributes?.diamondShape || firstVariant?.diamondShapeId || firstCenterRow?.diamondShapeId),
+        diamondClarity: toObjectId(selectedAttributes?.diamondClarityId || selectedAttributes?.diamondClarity || firstVariant?.diamondClarityId || firstCenterRow?.diamondClarityId),
+        diamondColor: toObjectId(selectedAttributes?.diamondColorId || selectedAttributes?.diamondColor || firstVariant?.diamondColorId || firstCenterRow?.diamondColorId),
         caratWeight: selectedAttributes?.caratWeight != null ? Number(selectedAttributes.caratWeight) : (firstVariant?.caratWeight ?? firstCenterRow?.caratWeight ?? null),
         sizeRange: selectedAttributes?.sizeRange || (typeof selectedAttributes?.size === 'string' && !mongoose.isValidObjectId(selectedAttributes.size) ? selectedAttributes.size : null),
-        size: toObjectId(selectedAttributes?.size),
+        size: toObjectId(selectedAttributes?.sizeId || selectedAttributes?.size),
       };
     }
 
-    // Check if this product & variant combination exists in cart
+    // Check if this product exists in cart (same product always increments on the same item)
     const existingIndex = cart.items.findIndex((item) => {
       const itemProdId = item.productId?._id || item.productId;
-      const sameProduct = String(itemProdId) === String(productId);
-      if (!sameProduct) return false;
-      if (selectedAttributes?.metalColor && item.selectedAttributes?.metalColor) {
-        if (String(item.selectedAttributes.metalColor) !== String(selectedAttributes.metalColor)) return false;
-      }
-      if (selectedAttributes?.size && item.selectedAttributes?.size) {
-        if (String(item.selectedAttributes.size) !== String(selectedAttributes.size)) return false;
-      }
-      return true;
+      return String(itemProdId) === String(productId);
     });
 
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += parsedQty;
+      cart.items[existingIndex].price = price;
       cart.items[existingIndex].totalItemPrice =
-        (Number(cart.items[existingIndex].price) || price) * cart.items[existingIndex].quantity;
+        (Number(price) || Number(cart.items[existingIndex].price) || 0) * cart.items[existingIndex].quantity;
       if (selectedAttributes) {
         cart.items[existingIndex].selectedAttributes = selectedAttributes;
       }

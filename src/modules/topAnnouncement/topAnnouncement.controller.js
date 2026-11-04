@@ -4,23 +4,27 @@ const ApiResponse = require('../../utils/ApiResponse');
 
 class TopAnnouncementController {
   // Global settings
+    // ------------------------------- get announcement settings ----------------------------
   getSettings = catchAsync(async (req, res) => {
     const settings = await topAnnouncementService.getSettings();
     ApiResponse.success(res, settings, 'Settings retrieved successfully');
   });
 
+    // ------------------------------- update announcement settings ----------------------------
   updateSettings = catchAsync(async (req, res) => {
     const settings = await topAnnouncementService.updateSettings(req.body);
     ApiResponse.success(res, null, 'Settings updated successfully');
   });
 
   // Storefront Public endpoint
+    // ------------------------------- get public announcements ----------------------------
   getPublic = catchAsync(async (req, res) => {
     const data = await topAnnouncementService.getPublic();
     ApiResponse.success(res, data, 'Active top announcements retrieved successfully');
   });
 
   // Admin list
+    // ------------------------------- get all announcements ----------------------------
   getAll = catchAsync(async (req, res) => {
     const { items, pagination, settings } = await topAnnouncementService.getAll(req.query);
     return res.status(200).json({
@@ -33,18 +37,21 @@ class TopAnnouncementController {
   });
 
   // Get one
+    // ------------------------------- get single announcement ----------------------------
   getOne = catchAsync(async (req, res) => {
     const item = await topAnnouncementService.getOne(req.params.id);
     ApiResponse.success(res, item, 'Announcement retrieved successfully');
   });
 
   // Create
+    // ------------------------------- create announcement ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await topAnnouncementService.create(req.body);
     ApiResponse.created(res, null, 'Announcement created successfully');
   });
 
   // Update
+    // ------------------------------- update announcement ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await topAnnouncementService.update(req.params.id, req.body);
     ApiResponse.success(res, null, 'Announcement updated successfully');
@@ -71,6 +78,7 @@ class TopAnnouncementController {
 
 
   // Delete
+    // ------------------------------- delete announcement ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await topAnnouncementService.delete(req.params.id);
     ApiResponse.success(res, null, result.message);

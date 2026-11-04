@@ -8,6 +8,7 @@ class ProductGroupController {
     ApiResponse.success(res, counts, 'Tab counts retrieved successfully');
   });
 
+    // ------------------------------- get all product groups ----------------------------
   getAll = catchAsync(async (req, res) => {
     const { items, pagination } = await productGroupService.getGroups(req.query);
     ApiResponse.paginated(res, items, pagination, 'Product groups retrieved successfully');
@@ -18,21 +19,25 @@ class ProductGroupController {
     ApiResponse.paginated(res, items, pagination, 'Product groups summary retrieved successfully');
   });
 
+    // ------------------------------- get single product group ----------------------------
   getOne = catchAsync(async (req, res) => {
     const group = await productGroupService.getGroupById(req.params.id);
     ApiResponse.success(res, group, 'Product group retrieved successfully');
   });
 
+    // ------------------------------- create product group ----------------------------
   create = catchAsync(async (req, res) => {
     const group = await productGroupService.createGroup(req.body, req.user?._id);
     ApiResponse.created(res, null, 'Product group created successfully');
   });
 
+    // ------------------------------- update product group ----------------------------
   update = catchAsync(async (req, res) => {
     const group = await productGroupService.updateGroup(req.params.id, req.body, req.user?._id);
     ApiResponse.success(res, null, 'Product group updated successfully');
   });
 
+    // ------------------------------- delete product group ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await productGroupService.deleteGroup(req.params.id, req.user?._id);
     ApiResponse.success(res, { id: result.id, hardDeleted: result.hardDeleted }, result.message);

@@ -80,9 +80,7 @@ function normalizeModule(rawModule) {
 }
 
 class ThemeMediaMappingService {
-  /**
-   * Get list of module tabs with counts for the theme
-   */
+    // ------------------------------- get supported modules ----------------------------
   getSupportedModules() {
     return Object.values(MODULES_CONFIG).map((cfg) => ({
       key: cfg.key,
@@ -93,9 +91,7 @@ class ThemeMediaMappingService {
     }));
   }
 
-  /**
-   * 1. Get module records with their mapping status for a selected theme
-   */
+    // ------------------------------- get module records ----------------------------
   async getModuleRecords({ themeId, module = 'herobanner', page = 1, limit = 50, search = '' }) {
     if (!mongoose.isValidObjectId(themeId)) {
       throw new ApiError(400, 'Invalid Theme ID');
@@ -343,9 +339,7 @@ class ThemeMediaMappingService {
     };
   }
 
-  /**
-   * 2. Get all mappings for a theme
-   */
+    // ------------------------------- get theme mappings ----------------------------
   async getThemeMappings({ themeId, module = null }) {
     if (!mongoose.isValidObjectId(themeId)) {
       throw new ApiError(400, 'Invalid Theme ID');
@@ -383,9 +377,7 @@ class ThemeMediaMappingService {
     }));
   }
 
-  /**
-   * 3. Create or update (upsert) a single mapping
-   */
+    // ------------------------------- upsert theme mapping ----------------------------
   async upsertMapping({
     themeId,
     module,
@@ -461,9 +453,7 @@ class ThemeMediaMappingService {
     };
   }
 
-  /**
-   * 4. Delete a single mapping by ID
-   */
+    // ------------------------------- delete theme mapping ----------------------------
   async deleteMapping({ themeId, mappingId }) {
     if (!mongoose.isValidObjectId(themeId) || !mongoose.isValidObjectId(mappingId)) {
       throw new ApiError(400, 'Invalid Theme ID or Mapping ID');
@@ -484,9 +474,6 @@ class ThemeMediaMappingService {
     };
   }
 
-  /**
-   * 5. Delete mapping by compound target (module, recordId, device, placement)
-   */
   async deleteMappingByTarget({ themeId, module, recordId, device = 'common', placement = 'primary' }) {
     if (!mongoose.isValidObjectId(themeId) || !mongoose.isValidObjectId(recordId)) {
       throw new ApiError(400, 'Invalid Theme ID or Record ID');
@@ -508,9 +495,6 @@ class ThemeMediaMappingService {
     };
   }
 
-  /**
-   * 6. Bulk save mappings using bulkWrite
-   */
   async bulkSaveMappings({ themeId, mappings = [], userId = null }) {
     if (!mongoose.isValidObjectId(themeId)) throw new ApiError(400, 'Invalid Theme ID');
     if (!Array.isArray(mappings) || mappings.length === 0) {
@@ -592,9 +576,6 @@ class ThemeMediaMappingService {
     };
   }
 
-  /**
-   * 7. Comprehensive summary of theme mappings across all modules
-   */
   async getMappingSummary(themeId) {
     if (!mongoose.isValidObjectId(themeId)) {
       throw new ApiError(400, 'Invalid Theme ID');
@@ -656,9 +637,6 @@ class ThemeMediaMappingService {
     };
   }
 
-  /**
-   * 8. One-click theme activation with mapping validation
-   */
   async activateTheme(themeId, actorId = null) {
     if (!mongoose.isValidObjectId(themeId)) {
       throw new ApiError(400, 'Invalid Theme ID');
@@ -718,10 +696,6 @@ class ThemeMediaMappingService {
     };
   }
 
-  /**
-   * 9. Storefront dynamic media resolver:
-   * Merges active theme mappings onto module records seamlessly.
-   */
   async resolveRecordsForStorefront(module, records, activeThemeId = null) {
     if (!records || (Array.isArray(records) && records.length === 0)) {
       return records;

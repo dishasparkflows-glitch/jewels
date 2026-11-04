@@ -3,7 +3,7 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class TopAnnouncementService {
-  // ─── Global Settings ───────────────────────────────────────
+  // ------------------------------- get announcement settings ----------------------------
   async getSettings() {
     let settings = await TopAnnouncementSetting.findOne({ 'meta.deletedAt': null });
     if (!settings) {
@@ -16,26 +16,20 @@ class TopAnnouncementService {
     return settings;
   }
 
+  // ------------------------------- update announcement settings ----------------------------
   async updateSettings(data) {
     let settings = await TopAnnouncementSetting.findOne({ 'meta.deletedAt': null });
     if (!settings) {
-      settings = await TopAnnouncementSetting.create({
-        isEnabled: data.isEnabled !== undefined ? Boolean(data.isEnabled) : true,
-        autoplayInterval: data.autoplayInterval || 4000,
-        displayDirection: data.displayDirection || 'horizontal',
-      });
+      settings = await TopAnnouncementSetting.create(data);
     } else {
-      if (data.isEnabled !== undefined) settings.isEnabled = Boolean(data.isEnabled);
-      if (data.autoplayInterval !== undefined) settings.autoplayInterval = Number(data.autoplayInterval);
-      if (data.displayDirection !== undefined) settings.displayDirection = data.displayDirection;
+      Object.assign(settings, data);
       await settings.save();
     }
     return settings;
   }
 
-  // ─── Get All (Admin) ───────────────────────────────────────
+  // ------------------------------- get all announcements (Admin) ----------------------------
   async getAll(queryParams = {}) {
-
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
@@ -68,7 +62,7 @@ class TopAnnouncementService {
     };
   }
 
-  // ─── Get Public (Storefront Website) ───────────────────────
+  // ------------------------------- get public announcements (Storefront) ----------------------------
   async getPublic() {
     const settings = await this.getSettings();
     if (!settings.isEnabled) {
@@ -79,31 +73,30 @@ class TopAnnouncementService {
     }
 
     const now = new Date();
-    // Query active items where schedule conditions are met
     const filter = {
-      'meta.deletedAt': null, isActive: true,
+      'meta.deletedAt': null,
+      isActive: true,
       $and: [
         {
           $or: [
-            { startDate: null },
-            { startDate: { $lte: now } },
+            { 'date.start': null },
+            { 'date.start': { $lte: now } },
           ],
         },
         {
           $or: [
             { hasNoEndDate: true },
-            { endDate: null },
-            { endDate: { $gte: now } },
+            { 'date.end': null },
+            { 'date.end': { $gte: now } },
           ],
         },
       ],
     };
 
-    let items = await TopAnnouncement.find(filter)
+    const items = await TopAnnouncement.find(filter)
       .sort({ order: 1, 'meta.createdAt': 1 })
-      .select('_id message link order startDate endDate hasNoEndDate')
+      .select('_id message link order date hasNoEndDate')
       .lean();
-
 
     return {
       isEnabled: settings.isEnabled,
@@ -113,7 +106,7 @@ class TopAnnouncementService {
     };
   }
 
-  // ─── Get Single Announcement ──────────────────────────────
+  // ------------------------------- get single announcement ----------------------------
   async getOne(id) {
     const item = await TopAnnouncement.findOne({ _id: id });
     if (!item) {
@@ -122,49 +115,22 @@ class TopAnnouncementService {
     return item;
   }
 
-  // ─── Create Announcement ───────────────────────────────────
+  // ------------------------------- create announcement ----------------------------
   async create(data) {
-    let order = data.order;
-    if (order === undefined || order === null) {
+    if (data.order === undefined || data.order === null) {
       const highestItem = await TopAnnouncement.findOne({ 'meta.deletedAt': null }).sort({ order: -1 }).select('order');
-      order = (highestItem?.order || 0) + 1;
+      data.order = (highestItem?.order || 0) + 1;
     }
 
-    const announcement = await TopAnnouncement.create({
-      message: data.message,
-      link: data.link || '',
-      isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
-      order: Number(order),
-      startDate: data.startDate ? new Date(data.startDate) : new Date(),
-      endDate: data.hasNoEndDate ? null : (data.endDate ? new Date(data.endDate) : null),
-      hasNoEndDate: data.hasNoEndDate !== undefined ? Boolean(data.hasNoEndDate) : true,
-    });
-
+    const announcement = await TopAnnouncement.create(data);
     return announcement;
   }
 
-  // ─── Update Announcement ───────────────────────────────────
+  // ------------------------------- update announcement ----------------------------
   async update(id, data) {
-    const updatePayload = {};
-    if (data.message !== undefined) updatePayload.message = data.message;
-    if (data.link !== undefined) updatePayload.link = data.link;
-    if (data.isActive !== undefined) updatePayload.isActive = Boolean(data.isActive);
-    if (data.order !== undefined) updatePayload.order = Number(data.order);
-    if (data.startDate !== undefined) updatePayload.startDate = data.startDate ? new Date(data.startDate) : null;
-    if (data.hasNoEndDate !== undefined) {
-      updatePayload.hasNoEndDate = Boolean(data.hasNoEndDate);
-      if (updatePayload.hasNoEndDate) {
-        updatePayload.endDate = null;
-      } else if (data.endDate !== undefined) {
-        updatePayload.endDate = data.endDate ? new Date(data.endDate) : null;
-      }
-    } else if (data.endDate !== undefined) {
-      updatePayload.endDate = data.endDate ? new Date(data.endDate) : null;
-    }
-
     const item = await TopAnnouncement.findOneAndUpdate(
       { _id: id },
-      { $set: updatePayload },
+      { $set: data },
       { returnDocument: 'after', runValidators: true }
     );
 
@@ -175,7 +141,7 @@ class TopAnnouncementService {
     return item;
   }
 
-  // ─── Toggle Status ─────────────────────────────────────────
+  // ------------------------------- toggle announcement status ----------------------------
   async toggleStatus(id) {
     const item = await TopAnnouncement.findOne({ _id: id });
     if (!item) {
@@ -186,9 +152,9 @@ class TopAnnouncementService {
     return item;
   }
 
-  // ─── Duplicate Announcement ────────────────────────────────
+  // ------------------------------- duplicate announcement ----------------------------
   async duplicate(id) {
-    const source = await TopAnnouncement.findOne({ _id: id });
+    const source = await TopAnnouncement.findOne({ _id: id }).lean();
     if (!source) {
       throw new ApiError(404, 'Announcement not found');
     }
@@ -201,15 +167,14 @@ class TopAnnouncementService {
       link: source.link,
       isActive: source.isActive,
       order: newOrder,
-      startDate: source.startDate || new Date(),
-      endDate: source.endDate,
+      date: source.date,
       hasNoEndDate: source.hasNoEndDate,
     });
 
     return duplicated;
   }
 
-  // ─── Reorder Announcements (Drag and drop) ─────────────────
+  // ------------------------------- reorder announcements ----------------------------
   async reorder(items) {
     if (!Array.isArray(items)) {
       throw new ApiError(400, 'Items array is required for reordering');
@@ -233,7 +198,7 @@ class TopAnnouncementService {
     return { success: true };
   }
 
-  // ─── Delete Announcement (Soft delete) ─────────────────────
+  // ------------------------------- delete announcement (Soft delete) ----------------------------
   async delete(id) {
     const item = await TopAnnouncement.findOneAndUpdate(
       { _id: id },

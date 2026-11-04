@@ -9,9 +9,6 @@ let ioInstance = null;
 const MIN_VIEWERS = 25;
 const MAX_VIEWERS = 60;
 
-/**
- * Generate a deterministic yet realistic seed count for a product
- */
 function getInitialSeed(productId) {
   if (!productId) return 32;
   const str = String(productId);
@@ -24,10 +21,6 @@ function getInitialSeed(productId) {
   return MIN_VIEWERS + 3 + (Math.abs(hash) % 18);
 }
 
-/**
- * Calculate the next natural viewer count step
- * Mimics organic traffic with realistic ups and downs (e.g. 25 -> 32 -> 30 -> 40 -> 35 -> 50)
- */
 function calculateNextCount(current) {
   let delta = 0;
 
@@ -54,9 +47,6 @@ function calculateNextCount(current) {
   return next;
 }
 
-/**
- * Schedule next natural update tick for a specific product
- */
 function scheduleProductTick(productId) {
   const state = productStates.get(productId);
   if (!state || state.sockets.size === 0) return;
@@ -86,9 +76,6 @@ function scheduleProductTick(productId) {
   }, nextDelayMs);
 }
 
-/**
- * Ensure product state exists and return it
- */
 function getOrCreateProductState(productId) {
   const pid = String(productId).trim();
   if (!productStates.has(pid)) {
@@ -108,18 +95,12 @@ function getOrCreateProductState(productId) {
   return state;
 }
 
-/**
- * Get current live viewer count for API routes or initial SSR
- */
 function getProductViewerCount(productId) {
   if (!productId) return 32;
   const state = getOrCreateProductState(productId);
   return state.count;
 }
 
-/**
- * Initialize Socket.io on existing HTTP server
- */
 function initViewerSocket(server) {
   const allowedOrigins = [
     process.env.ADMIN_URL,
@@ -236,9 +217,6 @@ function initViewerSocket(server) {
   return io;
 }
 
-/**
- * Emit wishlist count update to a specific user's socket room
- */
 function emitWishlistUpdate({ userId, wishlistCount, productId, isWishlisted }) {
   if (!ioInstance) return;
   const payload = {
@@ -252,9 +230,6 @@ function emitWishlistUpdate({ userId, wishlistCount, productId, isWishlisted }) 
   }
 }
 
-/**
- * Emit cart count update to user and session socket rooms
- */
 function emitCartUpdate({ userId, sessionId, cartCount, totalItems }) {
   if (!ioInstance) return;
   const count = Number(totalItems ?? cartCount ?? 0);

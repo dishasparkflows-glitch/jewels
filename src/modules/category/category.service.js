@@ -85,9 +85,16 @@ class CategoryService {
       filter.name = new RegExp(queryParams.search, 'i');
     }
 
+    let sort = { name: 1 };
+    if (queryParams.sortBy) {
+      const order = queryParams.sortOrder === 'desc' || queryParams.sortOrder === '-1' ? -1 : 1;
+      sort = { [queryParams.sortBy]: order };
+    }
+
     const [items, total] = await Promise.all([
       Category.find(filter)
-        .sort({ 'meta.createdAt': -1 })
+        .collation({ locale: 'en', strength: 2 })
+        .sort(sort)
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -106,6 +113,7 @@ class CategoryService {
 
     return await Category.find(filter)
       .select('_id name status icon')
+      .collation({ locale: 'en', strength: 2 })
       .sort({ name: 1 })
       .lean();
   }

@@ -1,18 +1,6 @@
 const mongoose = require('mongoose');
 const { getRequestContext } = require('./context');
 
-/**
- * Meta Plugin
- * Adds a standardized `meta` subdocument to every schema for audit tracking.
- *
- * Fields:
- *   meta.createdBy  - User who created the document
- *   meta.updatedBy  - User who last updated the document
- *   meta.deletedBy  - User who soft-deleted the document
- *   meta.createdAt  - Timestamp of creation
- *   meta.updatedAt  - Timestamp of last update
- *   meta.deletedAt  - Timestamp of soft deletion
- */
 function metaPlugin(schema) {
   schema.plugin(require('./mediaPlugin'));
   // Prevent duplicate plugin registration

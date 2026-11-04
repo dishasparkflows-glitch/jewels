@@ -1,10 +1,5 @@
 const { PAGINATION } = require('../config/constants');
 
-/**
- * Build pagination query params from request
- * @param {Object} query - req.query object
- * @returns {{ page, limit, skip }}
- */
 const getPagination = (query) => {
   const page = Math.max(1, parseInt(query.page) || PAGINATION.DEFAULT_PAGE);
   const limit = Math.min(
@@ -16,9 +11,6 @@ const getPagination = (query) => {
   return { page, limit, skip };
 };
 
-/**
- * Build pagination meta for response
- */
 const getPaginationMeta = (totalDocsOrObj, pageArg, limitArg) => {
   let totalDocs = totalDocsOrObj;
   let page = pageArg;

@@ -9,9 +9,7 @@ class AnalyticsService {
     this.clientKeyPath = null;
   }
 
-  /**
-   * Resolve GA4 property ID and service account credentials configuration
-   */
+    // ------------------------------- get analytics config ----------------------------
   getAnalyticsConfig() {
     const propertyId = (process.env.GA4_PROPERTY_ID || '555775827').trim();
 
@@ -56,9 +54,7 @@ class AnalyticsService {
     };
   }
 
-  /**
-   * Lazily initialize Google Analytics Data API client
-   */
+    // ------------------------------- get analytics client ----------------------------
   getClient() {
     const config = this.getAnalyticsConfig();
 
@@ -84,9 +80,7 @@ class AnalyticsService {
     }
   }
 
-  /**
-   * Current connection status check
-   */
+    // ------------------------------- get status ----------------------------
   async getStatus() {
     const config = this.getAnalyticsConfig();
     return {
@@ -99,9 +93,7 @@ class AnalyticsService {
     };
   }
 
-  /**
-   * Overview Report: Total Users, Sessions, Page Views, Avg Duration, Engagement Rate
-   */
+    // ------------------------------- get overview ----------------------------
   async getOverview({ startDate = '30daysAgo', endDate = 'today' } = {}) {
     const config = this.getAnalyticsConfig();
     const client = this.getClient();
@@ -181,9 +173,7 @@ class AnalyticsService {
     }
   }
 
-  /**
-   * Timeline Report: Daily breakdown for charts
-   */
+    // ------------------------------- get timeline ----------------------------
   async getTimeline({ startDate = '30daysAgo', endDate = 'today' } = {}) {
     const config = this.getAnalyticsConfig();
     const client = this.getClient();
@@ -237,9 +227,7 @@ class AnalyticsService {
     }
   }
 
-  /**
-   * Top Products Report: Most viewed products enriched with catalog metadata
-   */
+    // ------------------------------- get top products ----------------------------
   async getTopProducts({ startDate = '30daysAgo', endDate = 'today', limit = 10 } = {}) {
     const config = this.getAnalyticsConfig();
     const client = this.getClient();
@@ -294,9 +282,7 @@ class AnalyticsService {
     }
   }
 
-  /**
-   * Traffic Sources Report: Channel groupings and sources
-   */
+    // ------------------------------- get traffic sources ----------------------------
   async getTrafficSources({ startDate = '30daysAgo', endDate = 'today' } = {}) {
     const config = this.getAnalyticsConfig();
     const client = this.getClient();
@@ -335,9 +321,7 @@ class AnalyticsService {
     }
   }
 
-  /**
-   * Realtime Report: Active users right now (last 30 minutes)
-   */
+    // ------------------------------- get realtime ----------------------------
   async getRealtime() {
     const config = this.getAnalyticsConfig();
     const client = this.getClient();

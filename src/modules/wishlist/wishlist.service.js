@@ -17,9 +17,20 @@ function formatWishlistProduct(p) {
   const formatted = formatStorefrontProduct(p);
   if (!formatted) return null;
 
+  const primaryImage = formatted.image || (Array.isArray(formatted.images) && formatted.images[0]) || '';
+
+  // Return clean metal colors needed for card swatches without redundant nested arrays
+  const metalColors = (formatted.metalColors || []).map((mc) => ({
+    _id: mc._id || mc.id,
+    name: mc.name || '',
+    colorCode: mc.colorCode || mc.hex || '',
+    colorCodeEnd: mc.colorCodeEnd || '',
+    hex: mc.hex || mc.colorCode || '',
+    firstPhoto: mc.firstPhoto || (Array.isArray(mc.images) ? mc.images[0] : '') || '',
+  }));
+
   return {
     _id: formatted._id,
-    id: formatted.id,
     basicInfo: {
       title: formatted.basicInfo?.title || formatted.title || '',
       slug: formatted.basicInfo?.slug || formatted.slug || '',
@@ -30,23 +41,16 @@ function formatWishlistProduct(p) {
       ...(formatted.pricing?.minPrice ? { minPrice: formatted.pricing.minPrice } : {}),
       ...(formatted.pricing?.maxPrice ? { maxPrice: formatted.pricing.maxPrice } : {}),
     },
-    images: formatted.images || [],
-    image: formatted.image || (formatted.images && formatted.images[0]) || '',
-    metalColors: formatted.metalColors || [],
-    colorImages: formatted.colorImages || [],
-    metalColorIds: formatted.metalColorIds || [],
+    image: primaryImage,
+    metalColors,
     productType: formatted.productType || 'gold',
     isOrnate: Boolean(formatted.isOrnate),
     stockStatus: formatted.stockStatus || 'in_stock',
-    ...(formatted.selectedAttributes ? { selectedAttributes: formatted.selectedAttributes } : {}),
-    ...(formatted.categoryIds ? { categoryIds: formatted.categoryIds } : {}),
   };
 }
 
 class WishlistService {
-  /**
-   * Format wishlist payload with only needed product fields
-   */
+  // ------------------------------- format wishlist ----------------------------
   formatWishlist(wishlistDoc) {
     if (!wishlistDoc) return null;
     const w = typeof wishlistDoc.toObject === 'function' ? wishlistDoc.toObject() : wishlistDoc;
@@ -63,9 +67,7 @@ class WishlistService {
     };
   }
 
-  /**
-   * Helper: Find or create wishlist by userId
-   */
+  // ------------------------------- find or create wishlist ----------------------------
   async findOrCreateWishlist(userId) {
     if (!userId) {
       throw new ApiError(400, 'User ID is required to manage wishlist');
@@ -83,9 +85,7 @@ class WishlistService {
     return wishlist;
   }
 
-  /**
-   * Fast count of wishlist items without populating
-   */
+  // ------------------------------- get count ----------------------------
   async getCount(userId) {
     if (!userId) return { count: 0, wishlistCount: 0 };
     const wishlist = await Wishlist.findOne({ userId }).select('productIds').lean();
@@ -93,9 +93,7 @@ class WishlistService {
     return { count, wishlistCount: count };
   }
 
-  /**
-   * Get wishlist for user
-   */
+  // ------------------------------- get wishlist ----------------------------
   async getWishlist(userId) {
     if (!userId) {
       return null;
@@ -110,9 +108,7 @@ class WishlistService {
     return this.formatWishlist(wishlist);
   }
 
-  /**
-   * Toggle item in wishlist (add if not present, remove if present)
-   */
+  // ------------------------------- toggle item in wishlist ----------------------------
   async toggleItem({ userId, productData }) {
     const productId = typeof productData === 'string' ? productData : productData?.productId;
     if (!productId) {
@@ -148,9 +144,7 @@ class WishlistService {
     };
   }
 
-  /**
-   * Add item specifically
-   */
+  // ------------------------------- add item to wishlist ----------------------------
   async addItem({ userId, productData }) {
     const productId = typeof productData === 'string' ? productData : productData?.productId;
     if (!productId) {
@@ -173,9 +167,7 @@ class WishlistService {
     return this.getWishlist(userId);
   }
 
-  /**
-   * Remove item specifically
-   */
+  // ------------------------------- remove item from wishlist ----------------------------
   async removeItem({ userId, productId }) {
     if (!productId) {
       throw new ApiError(400, 'Product ID is required');
@@ -195,9 +187,7 @@ class WishlistService {
     return this.getWishlist(userId);
   }
 
-  /**
-   * Clear all items from wishlist
-   */
+  // ------------------------------- clear wishlist ----------------------------
   async clearWishlist(userId) {
     const wishlist = await this.findOrCreateWishlist(userId);
     wishlist.productIds = [];

@@ -2,14 +2,8 @@ const Order = require('../order/order.model');
 const providersRegistry = require('./providers');
 const ApiError = require('../../utils/ApiError');
 
-/**
- * Payment Orchestrator Service
- * Delegates provider-specific logic to isolated provider services in `./providers/`
- */
 class PaymentService {
-  /**
-   * Return gateway configuration and active providers for client checkout
-   */
+    // ------------------------------- get payment config ----------------------------
   async getPaymentConfig() {
     let defaultGateway = 'razorpay';
     try {
@@ -32,12 +26,7 @@ class PaymentService {
     };
   }
 
-  /**
-   * Initiate payment for an existing order with the selected provider
-   * @param {Object} options
-   * @param {string|Order} options.order - Order document or Order ID
-   * @param {string} [options.provider] - 'razorpay' | 'ccavenue' | etc.
-   */
+    // ------------------------------- initiate order payment ----------------------------
   async initiateOrderPayment({ order, orderId, provider }) {
     const orderDoc = typeof order === 'object' && order?._id
       ? order
@@ -76,33 +65,25 @@ class PaymentService {
     });
   }
 
-  /**
-   * Razorpay payment signature verification
-   */
+    // ------------------------------- verify razorpay payment ----------------------------
   async verifyRazorpayPayment(params) {
     const razorpay = providersRegistry.getProvider('razorpay');
     return await razorpay.verifyPayment(params);
   }
 
-  /**
-   * CCAvenue POST redirect callback handling
-   */
+    // ------------------------------- handle ccavenue response ----------------------------
   async handleCCAvenueResponse(encResp) {
     const ccavenue = providersRegistry.getProvider('ccavenue');
     return await ccavenue.handleResponse(encResp);
   }
 
-  /**
-   * Razorpay Webhook notification handling
-   */
+    // ------------------------------- handle razorpay webhook ----------------------------
   async handleRazorpayWebhook(params) {
     const razorpay = providersRegistry.getProvider('razorpay');
     return await razorpay.handleWebhook(params);
   }
 
-  /**
-   * CCAvenue S2S Webhook notification handling
-   */
+    // ------------------------------- handle ccavenue webhook ----------------------------
   async handleCCAvenueWebhook(params) {
     const ccavenue = providersRegistry.getProvider('ccavenue');
     return await ccavenue.handleWebhook(params);

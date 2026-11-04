@@ -1,12 +1,3 @@
-/**
- * Password Reset Email Template
- *
- * @param {Object} options
- * @param {string} options.resetUrl - Full password reset URL with token
- * @param {string} [options.storeName='Neirah'] - Store name
- * @param {string} [options.expiresIn='1 hour'] - Expiry duration text
- * @returns {string} Compiled HTML string
- */
 function getPasswordResetHtml({ resetUrl, storeName = 'Neirah', expiresIn = '1 hour' }) {
   return `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">

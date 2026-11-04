@@ -78,11 +78,6 @@ const CANONICAL_MODULES = [
   'general',
 ];
 
-/**
- * Validates module and contentType, then generates a unique R2 object key.
- * Naming convention: module-timestamp-shortId.extension
- * Object key: folder/module-timestamp-shortId.extension (e.g. categories/category-1792148468272-a3f7.jpg)
- */
 function generateR2ObjectKey({ module: rawModule, contentType, productId, subfolder }) {
   if (!rawModule || typeof rawModule !== 'string' || !rawModule.trim()) {
     throw new ApiError(400, 'Module is required. Examples: "user", "category", "product", "navigation"');

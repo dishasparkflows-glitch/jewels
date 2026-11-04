@@ -23,13 +23,16 @@ const topAnnouncementSchema = new mongoose.Schema(
       default: 0,
       index: true,
     },
-    startDate: {
-      type: Date,
-      default: null,
-    },
-    endDate: {
-      type: Date,
-      default: null,
+    date: {
+      _id: false,
+      start: {
+        type: Date,
+        default: null,
+      },
+      end: {
+        type: Date,
+        default: null,
+      },
     },
     hasNoEndDate: {
       type: Boolean,

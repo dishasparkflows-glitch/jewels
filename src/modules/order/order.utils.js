@@ -1,9 +1,7 @@
 const Setting = require('../setting/setting.model');
 const ApiError = require('../../utils/ApiError');
 
-/**
- * Generate a unique human-readable order number: NJ-YYYYMMDD-XXXXXX
- */
+// ------------------------------- generate order number ----------------------------
 function generateOrderNumber() {
   const today = new Date();
   const datePart = today.toISOString().slice(0, 10).replace(/-/g, '');
@@ -11,9 +9,7 @@ function generateOrderNumber() {
   return `NJ-${datePart}-${randomPart}`;
 }
 
-/**
- * Resolve active payment provider from Setting or env
- */
+// ------------------------------- resolve payment provider ----------------------------
 async function resolvePaymentProvider(requestedProvider) {
   let configured = 'razorpay';
   try {
@@ -29,9 +25,7 @@ async function resolvePaymentProvider(requestedProvider) {
   return (requestedProvider || configured).toLowerCase();
 }
 
-/**
- * Format and validate order items directly using known schema fields without redundant conditions
- */
+// ------------------------------- format order items ----------------------------
 function formatOrderItems(items = []) {
   return items.map((item) => {
     const qty = Math.max(1, Number(item.quantity) || 1);
@@ -52,9 +46,7 @@ function formatOrderItems(items = []) {
   });
 }
 
-/**
- * Map cart items from saved Cart model directly to order items structure
- */
+// ------------------------------- map cart items to order items ----------------------------
 function mapCartItemsToOrderItems(cartItems = []) {
   return cartItems.map((cartItem) => {
     const qty = Math.max(1, Number(cartItem.quantity) || 1);
@@ -85,30 +77,22 @@ function mapCartItemsToOrderItems(cartItems = []) {
   });
 }
 
-/**
- * Calculate order subtotal from formatted items
- */
+// ------------------------------- calculate order subtotal ----------------------------
 function calculateOrderSubtotal(items = []) {
   return items.reduce((acc, curr) => acc + (Number(curr.totalItemPrice) || 0), 0);
 }
 
-/**
- * Calculate shipping charges (free over ₹5000)
- */
+// ------------------------------- calculate order shipping ----------------------------
 function calculateOrderShipping(subtotal) {
   return subtotal > 5000 || subtotal === 0 ? 0 : 250;
 }
 
-/**
- * Calculate GST (3% on fine jewellery)
- */
+// ------------------------------- calculate order tax ----------------------------
 function calculateOrderTax(subtotal) {
   return Math.round(subtotal * 0.03);
 }
 
-/**
- * Calculate complete pricing breakdown including shipping, tax, discounts, and COD amounts
- */
+// ------------------------------- calculate order pricing ----------------------------
 function calculateOrderPricing({ subtotal, discount = 0, paymentMethod = 'online', codFee = 0 }) {
   const shipping = calculateOrderShipping(subtotal);
   const tax = calculateOrderTax(subtotal);
@@ -134,9 +118,7 @@ function calculateOrderPricing({ subtotal, discount = 0, paymentMethod = 'online
   };
 }
 
-/**
- * Extract shipping address snapshot from input payload or user profile
- */
+// ------------------------------- build shipping address ----------------------------
 function buildShippingAddress(data, user = null) {
   if (data.shippingAddress) {
     const raw = data.shippingAddress.address || data.shippingAddress;
@@ -171,9 +153,7 @@ function buildShippingAddress(data, user = null) {
   };
 }
 
-/**
- * Validate required shipping address fields
- */
+// ------------------------------- validate shipping address ----------------------------
 function validateShippingAddress(shippingAddress) {
   if (!shippingAddress.addressLine || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postalCode) {
     throw new ApiError(400, 'Complete shipping address is required (addressLine, city, state, postalCode).');
@@ -183,9 +163,7 @@ function validateShippingAddress(shippingAddress) {
   }
 }
 
-/**
- * Extract customer information snapshot for the order
- */
+// ------------------------------- build customer info ----------------------------
 function buildCustomerInfo(shippingAddress, user = null) {
   return {
     firstName: shippingAddress.firstName || user?.profile?.firstName || '',
@@ -195,9 +173,7 @@ function buildCustomerInfo(shippingAddress, user = null) {
   };
 }
 
-/**
- * Authorization check: only order owner, admin, or super_admin can view/modify
- */
+// ------------------------------- check order access ----------------------------
 function checkOrderAccess(order, user = null) {
   if (user && user.role !== 'admin' && user.role !== 'super_admin') {
     const orderOwner = order.userId;
@@ -207,9 +183,7 @@ function checkOrderAccess(order, user = null) {
   }
 }
 
-/**
- * Build MongoDB query filter for user order history
- */
+// ------------------------------- build user order filters ----------------------------
 function buildUserOrderFilters(userId, queryParams = {}) {
   const filter = {
     'meta.deletedAt': null,
@@ -226,9 +200,7 @@ function buildUserOrderFilters(userId, queryParams = {}) {
   return filter;
 }
 
-/**
- * Build MongoDB query filter for admin order management
- */
+// ------------------------------- build admin order filters ----------------------------
 function buildAdminOrderFilters(queryParams = {}) {
   const filter = { 'meta.deletedAt': null };
 

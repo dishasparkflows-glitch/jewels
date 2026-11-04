@@ -3,9 +3,6 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class BirthstoneService {
-  /**
-   * Create new birthstone
-   */
   // ------------------------------- create birthstone ----------------------------
   async create(data) {
     const existing = await Birthstone.findOne({ month: data.month });
@@ -15,9 +12,6 @@ class BirthstoneService {
     return await Birthstone.create(data);
   }
 
-  /**
-   * Get single birthstone by ID
-   */
   // ------------------------------- get one birthstone ----------------------------
   async getOne(id) {
     const item = await Birthstone.findOne({ _id: id });
@@ -27,9 +21,6 @@ class BirthstoneService {
     return item;
   }
 
-  /**
-   * Get birthstone by Month name
-   */
   // ------------------------------- get birthstone by month ----------------------------
   async getByMonth(month) {
     const item = await Birthstone.findOne({
@@ -41,9 +32,6 @@ class BirthstoneService {
     return item;
   }
 
-  /**
-   * Get all birthstones with filtering and pagination
-   */
   // ------------------------------- get all birthstones ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
@@ -72,9 +60,6 @@ class BirthstoneService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
-  /**
-   * Dropdown lookup API for Birthstones
-   */
   // ------------------------------- get birthstone lookup ----------------------------
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null, status: 'active' };
@@ -84,9 +69,6 @@ class BirthstoneService {
       .lean();
   }
 
-  /**
-   * Update birthstone
-   */
   // ------------------------------- update birthstone ----------------------------
   async update(id, data) {
     if (data.month) {
@@ -112,9 +94,6 @@ class BirthstoneService {
     return item;
   }
 
-  /**
-   * Soft delete birthstone
-   */
   // ------------------------------- delete birthstone ----------------------------
   async delete(id) {
     const item = await Birthstone.findOneAndUpdate(

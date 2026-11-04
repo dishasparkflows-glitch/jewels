@@ -7,9 +7,7 @@ const ApiError = require('../../utils/ApiError');
 const { getPaginationMeta } = require('../../utils/pagination');
 
 class GalleryService {
-  /**
-   * Helper to format type names
-   */
+  // ------------------------------- get type label ----------------------------
   _getTypeLabel(type) {
     const map = {
       herobanner: 'Hero Banner',
@@ -26,9 +24,7 @@ class GalleryService {
     return map[type] || 'Storefront Media';
   }
 
-  /**
-   * One-time sync: Populates Gallery collection from existing theme banners and assets if empty.
-   */
+  // ------------------------------- sync legacy media ----------------------------
   async syncLegacyMedia() {
     try {
       const count = await Gallery.countDocuments({ 'meta.deletedAt': null });
@@ -92,8 +88,6 @@ class GalleryService {
         }
       }
 
-
-
       if (galleryDocs.length > 0) {
         await Gallery.insertMany(galleryDocs);
       }
@@ -102,9 +96,7 @@ class GalleryService {
     }
   }
 
-  /**
-   * Get all themes lookup with active theme status
-   */
+  // ------------------------------- get themes lookup ----------------------------
   async getThemesLookup() {
     const themes = await WebsiteTheme.find({ 'meta.deletedAt': null })
       .select('_id name code status config.bannerSelections schedule')
@@ -121,9 +113,7 @@ class GalleryService {
     }));
   }
 
-  /**
-   * Get existing banners lookup
-   */
+  // ------------------------------- get banners lookup ----------------------------
   async getBannersLookup(themeId = null, type = null) {
     const filter = { 'meta.deletedAt': null };
     if (type && type !== 'all') {
@@ -152,9 +142,7 @@ class GalleryService {
     }));
   }
 
-  /**
-   * List gallery media items
-   */
+  // ------------------------------- list gallery images ----------------------------
   async listImages(queryParams = {}) {
     await this.syncLegacyMedia();
 
@@ -290,9 +278,7 @@ class GalleryService {
     };
   }
 
-  /**
-   * Get single gallery item
-   */
+  // ------------------------------- get single gallery image ----------------------------
   async getOne(id) {
     if (!mongoose.isValidObjectId(id)) {
       throw new ApiError(400, 'Invalid gallery item ID');
@@ -307,9 +293,7 @@ class GalleryService {
     return item;
   }
 
-  /**
-   * Create gallery item: themeId, placement, platform, image, status
-   */
+  // ------------------------------- create gallery media ----------------------------
   async create(payload, actorId = null) {
     const {
       themeId,
@@ -376,16 +360,12 @@ class GalleryService {
     return galleryItems;
   }
 
-  /**
-   * Alias for create
-   */
+  // ------------------------------- upload and assign media ----------------------------
   async uploadAndAssign(payload, actorId = null) {
     return this.create(payload, actorId);
   }
 
-  /**
-   * Update gallery item: themeId, placement, platform, image, status
-   */
+  // ------------------------------- update gallery item ----------------------------
   async update(id, data, actorId = null) {
     if (!mongoose.isValidObjectId(id)) {
       throw new ApiError(400, 'Invalid gallery item ID');
@@ -416,18 +396,14 @@ class GalleryService {
     return item;
   }
 
-  /**
-   * Toggle status
-   */
+  // ------------------------------- toggle gallery status ----------------------------
   async toggleStatus(id, actorId = null) {
     const item = await this.getOne(id);
     const nextStatus = item.status === 'active' ? 'inactive' : 'active';
     return this.update(id, { status: nextStatus }, actorId);
   }
 
-  /**
-   * Delete gallery item
-   */
+  // ------------------------------- delete gallery item ----------------------------
   async deleteItem(id, queryParams = {}, actorId = null) {
     if (!mongoose.isValidObjectId(id)) {
       throw new ApiError(400, 'Invalid gallery item ID');

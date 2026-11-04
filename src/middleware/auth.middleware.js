@@ -3,9 +3,7 @@ const { JWT_SECRET } = require('../config/constants');
 const User = require('../modules/user/user.model');
 const { setRequestContext } = require('../utils/context');
 
-/**
- * Authenticate JWT token from Authorization header
- */
+// Authenticate JWT token from Authorization header
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -52,10 +50,7 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-/**
- * Authorize by role(s)
- * @param  {...string} roles - Allowed roles
- */
+// Authorize by role(s)
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -76,9 +71,7 @@ const authorize = (...roles) => {
   };
 };
 
-/**
- * Optional JWT token authentication - does not block guests
- */
+// Optional JWT token authentication - does not block guests
 const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;

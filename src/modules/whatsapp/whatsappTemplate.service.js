@@ -10,23 +10,16 @@ const PROVIDER = 'connectwhats';
 class WhatsAppTemplateService {
   // ─── Template Variable Engine ───────────────────────────────────────
 
-  /**
-   * Extracts {{1}}, {{2}} placeholders from template body
-   */
+    // ------------------------------- extract template variables ----------------------------
   extractTemplateVariables(bodyText) {
     return extractTemplateVariables(bodyText);
   }
 
-  /**
-   * Resolves a nested property path from an object safely
-   */
   getValueByPath(obj, path) {
     return getValueByPath(obj, path);
   }
 
-  /**
-   * Resolves template variables from context strictly based on template definitions
-   */
+    // ------------------------------- resolve template variables ----------------------------
   resolveTemplateVariables(template, context = {}) {
     if (!template || !template.variables || template.variables.length === 0) {
       return [];
@@ -123,9 +116,7 @@ class WhatsAppTemplateService {
     });
   }
 
-  /**
-   * Interpolate parameters into template body
-   */
+    // ------------------------------- render template preview ----------------------------
   renderTemplatePreview(template, parameters = []) {
     if (!template || !template.body) return '';
     let rendered = template.body;
@@ -136,9 +127,7 @@ class WhatsAppTemplateService {
     return rendered;
   }
 
-  /**
-   * Validates parameters against template definition
-   */
+    // ------------------------------- validate template parameters ----------------------------
   validateTemplateParameters(template, parameters = []) {
     if (!template) {
       throw new ApiError(404, 'WhatsApp template not found.');
@@ -160,9 +149,7 @@ class WhatsAppTemplateService {
     return true;
   }
 
-  /**
-   * Validates template schema before saving
-   */
+    // ------------------------------- validate template config ----------------------------
   validateTemplateConfig({ name, body, language, category, variables, header, buttons }) {
     if (!name || typeof name !== 'string' || !name.trim()) {
       throw new ApiError(400, 'Template name is required.');
@@ -222,9 +209,7 @@ class WhatsAppTemplateService {
 
   // ─── Template CRUD Operations ──────────────────────────────────────
 
-  /**
-   * Get all templates
-   */
+    // ------------------------------- get whatsapp templates ----------------------------
   async getTemplates(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -255,9 +240,7 @@ class WhatsAppTemplateService {
     };
   }
 
-  /**
-   * Get single template by ID or Name
-   */
+    // ------------------------------- get whatsapp template by id ----------------------------
   async getTemplateById(id) {
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
     const template = isObjectId
@@ -270,9 +253,7 @@ class WhatsAppTemplateService {
     return template;
   }
 
-  /**
-   * Create custom template
-   */
+    // ------------------------------- create whatsapp template ----------------------------
   async createTemplate(data, userId) {
     const { name, displayName, category = 'UTILITY', language = 'en_US', body, header, buttons, variables, provider } = data;
 
@@ -304,9 +285,7 @@ class WhatsAppTemplateService {
     });
   }
 
-  /**
-   * Update template
-   */
+    // ------------------------------- update whatsapp template ----------------------------
   async updateTemplate(id, data, userId) {
     const template = await WhatsAppTemplate.findOne({ _id: id });
     if (!template) {
@@ -340,9 +319,7 @@ class WhatsAppTemplateService {
     return await template.save();
   }
 
-  /**
-   * Update template status
-   */
+    // ------------------------------- update whatsapp template status ----------------------------
   async updateTemplateStatus(id, { isActive, status, providerStatus, providerTemplateId }, userId) {
     const template = await WhatsAppTemplate.findOne({ _id: id });
     if (!template) {
@@ -358,9 +335,7 @@ class WhatsAppTemplateService {
     return await template.save();
   }
 
-  /**
-   * Preview template with rendered parameters
-   */
+    // ------------------------------- preview whatsapp template ----------------------------
   async previewTemplate(id, customContext = null) {
     const template = await this.getTemplateById(id);
 
@@ -380,9 +355,7 @@ class WhatsAppTemplateService {
     };
   }
 
-  /**
-   * Delete template (System templates protected)
-   */
+    // ------------------------------- delete whatsapp template ----------------------------
   async deleteTemplate(id) {
     const template = await WhatsAppTemplate.findOne({ _id: id });
     if (!template) {
@@ -399,16 +372,12 @@ class WhatsAppTemplateService {
 
   // ─── Provider Sync ─────────────────────────────────────────────────
 
-  /**
-   * Fetch approved templates directly from ConnectWhats provider
-   */
+    // ------------------------------- get provider templates ----------------------------
   async getProviderTemplates() {
     return await connectWhatsClient.getProviderTemplates();
   }
 
-  /**
-   * Sync local templates status with ConnectWhats remote templates
-   */
+    // ------------------------------- sync provider templates ----------------------------
   async syncProviderTemplates() {
     const remoteResult = await connectWhatsClient.getProviderTemplates();
 

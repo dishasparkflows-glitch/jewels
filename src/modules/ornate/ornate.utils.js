@@ -11,22 +11,23 @@ let lastSessionId = '0';
 let cachedOrnateToken = null;
 let tokenExpiry = 0;
 
+// ------------------------------- get last session id ----------------------------
 function getLastSessionId() {
   return lastSessionId;
 }
 
+// ------------------------------- set last session id ----------------------------
 function setLastSessionId(id) {
   if (id) lastSessionId = String(id);
 }
 
+// ------------------------------- clear cached ornate token ----------------------------
 function clearCachedOrnateToken() {
   cachedOrnateToken = null;
   tokenExpiry = 0;
 }
 
-/**
- * Generates or returns cached Ornate ERP bearer token
- */
+// ------------------------------- get ornate token ----------------------------
 async function getOrnateToken(forceRefresh = false) {
   const now = Date.now();
 
@@ -65,9 +66,7 @@ async function getOrnateToken(forceRefresh = false) {
   }
 }
 
-/**
- * Generic helper for Ornate ERP POST APIs with automatic token handling and 401 retry.
- */
+// ------------------------------- call ornate api ----------------------------
 async function callOrnateApi(endpoint, wrapperKey, data = {}, timeout = ORNATE_TIMEOUT) {
   let token = await getOrnateToken();
 
@@ -103,9 +102,7 @@ async function callOrnateApi(endpoint, wrapperKey, data = {}, timeout = ORNATE_T
   }
 }
 
-/**
- * Reusable helper to fetch Ornate label data by sessionId (GetLabelData_API).
- */
+// ------------------------------- fetch ornate label data ----------------------------
 async function fetchOrnateLabelData(sessionId = '0') {
   return callOrnateApi(
     'GetLabelData_API',
@@ -115,16 +112,12 @@ async function fetchOrnateLabelData(sessionId = '0') {
   );
 }
 
-/**
- * Fetch active event list from Ornate ERP
- */
+// ------------------------------- get ornate events ----------------------------
 async function getOrnateEvents() {
   return callOrnateApi('GetEventData_API', 'EventList');
 }
 
-/**
- * Resolve existing category by GroupName (DO NOT auto-create)
- */
+// ------------------------------- resolve category ----------------------------
 async function resolveCategory(groupName, categoryCache) {
   if (!groupName || typeof groupName !== 'string') return null;
   const name = groupName.trim();
@@ -154,9 +147,7 @@ async function resolveCategory(groupName, categoryCache) {
   return resultId;
 }
 
-/**
- * Extracts SKU and standard identifier fields from an Ornate ERP label
- */
+// ------------------------------- extract label identifiers ----------------------------
 function extractLabelIdentifiers(label = {}) {
   const uniqueLabelID = label.UniqueLabelID ? String(label.UniqueLabelID).trim() : '';
   const barcodeNo = label.BarcodeNo ? String(label.BarcodeNo).trim() : '';
@@ -168,9 +159,7 @@ function extractLabelIdentifiers(label = {}) {
   return { uniqueLabelID, barcodeNo, labelNo, sku, tagNo, barcode };
 }
 
-/**
- * Computes salePrice and MRP from an Ornate ERP label
- */
+// ------------------------------- calculate label price ----------------------------
 function calculateLabelPrice(label = {}) {
   const salePrice =
     Number(label.TodaysSalesValue) ||
@@ -183,9 +172,7 @@ function calculateLabelPrice(label = {}) {
   return { salePrice, mrp };
 }
 
-/**
- * Maps studded detail records for a given label ID
- */
+// ------------------------------- map studded details ----------------------------
 function mapStuddedDetails(studdedDetails = [], uniqueLabelID = '', barcodeNo = '') {
   if (!Array.isArray(studdedDetails) || studdedDetails.length === 0) return [];
   const uId = String(uniqueLabelID).toLowerCase();
@@ -209,9 +196,7 @@ function mapStuddedDetails(studdedDetails = [], uniqueLabelID = '', barcodeNo = 
     }));
 }
 
-/**
- * Generates SEO slug from title and barcode (or SKU/identifier)
- */
+// ------------------------------- generate product slug ----------------------------
 function generateProductSlug(title = '', identifier = '') {
   const cleanTitle = String(title || '').trim();
   const cleanId = String(identifier || '').trim();
@@ -222,14 +207,7 @@ function generateProductSlug(title = '', identifier = '') {
     .replace(/^-+|-+$/g, '');
 }
 
-/**
- * Recursively cleans payloads by removing:
- * - undefined & null values
- * - empty strings or whitespace-only strings
- * - empty arrays []
- * - empty objects {}
- * Retains valid numeric and boolean data (e.g. 0, false).
- */
+// ------------------------------- clean payload ----------------------------
 function cleanPayload(obj) {
   if (obj === null || obj === undefined) return undefined;
   if (typeof obj !== 'object') {
@@ -259,10 +237,7 @@ function cleanPayload(obj) {
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-/**
- * Builds the complete MongoDB product payload strictly aligned with product.model.js,
- * storing ONLY fields that have available values (no empty arrays, strings, or objects).
- */
+// ------------------------------- build product payload from label ----------------------------
 function buildProductPayloadFromLabel(label, {
   existingProduct = null,
   categoryId = null,
@@ -361,9 +336,7 @@ function buildProductPayloadFromLabel(label, {
   };
 }
 
-/**
- * Normalizes an Ornate ERP label object into a standard UI/catalog summary format
- */
+// ------------------------------- normalize label summary ----------------------------
 function normalizeLabelSummary(label = {}, defaultName = '') {
   const { uniqueLabelID, barcodeNo, labelNo, sku, tagNo, barcode } = extractLabelIdentifiers(label);
   const { salePrice, mrp } = calculateLabelPrice(label);
@@ -388,10 +361,7 @@ function normalizeLabelSummary(label = {}, defaultName = '') {
   };
 }
 
-/**
- * Builds an $or query clause matching products across basicInfo.sku, ornate.barcode, and ornate.tagNo.
- * Accepts an array/Set of string IDs, a single ID string, or an object { sku, tagNo, barcode }.
- */
+// ------------------------------- build product identifier query ----------------------------
 function buildProductIdentifierQuery(identifiers) {
   if (identifiers instanceof Set || Array.isArray(identifiers)) {
     const list = Array.from(identifiers).map((id) => String(id).trim()).filter(Boolean);

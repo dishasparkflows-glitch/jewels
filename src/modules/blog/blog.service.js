@@ -3,9 +3,7 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class BlogService {
-  /**
-   * Create blog
-   */
+    // ------------------------------- create blog post ----------------------------
   async create(data) {
     if (data.basicInfo?.slug) {
       const existing = await Blog.findOne({
@@ -22,9 +20,7 @@ class BlogService {
     return await Blog.findById(item._id).populate('blogCategory', 'name slug').lean();
   }
 
-  /**
-   * Get single blog by ID
-   */
+    // ------------------------------- get single blog post ----------------------------
   async getOne(id) {
     const item = await Blog.findOne({ _id: id, 'meta.deletedAt': null })
       .populate('blogCategory', 'name slug')
@@ -35,9 +31,7 @@ class BlogService {
     return item;
   }
 
-  /**
-   * Get blog by Slug (public view)
-   */
+    // ------------------------------- get blog post by slug ----------------------------
   async getBySlug(slug) {
     const item = await Blog.findOneAndUpdate(
       { 'basicInfo.slug': slug, 'meta.deletedAt': null },
@@ -53,9 +47,7 @@ class BlogService {
     return item;
   }
 
-  /**
-   * Get all blogs with filtering and pagination
-   */
+    // ------------------------------- get all blog posts ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -91,9 +83,7 @@ class BlogService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
-  /**
-   * Get recent active blogs (for widgets / sidebar / footer)
-   */
+    // ------------------------------- get recent blog posts ----------------------------
   async getRecent(limit = 4) {
     const count = parseInt(limit, 10) || 4;
     return await Blog.find({ 'meta.deletedAt': null, status: 'active' })
@@ -103,9 +93,7 @@ class BlogService {
       .lean();
   }
 
-  /**
-   * Update blog
-   */
+    // ------------------------------- update blog post ----------------------------
   async update(id, data) {
     if (data.basicInfo?.slug) {
       const duplicate = await Blog.findOne({
@@ -133,9 +121,7 @@ class BlogService {
     return item;
   }
 
-  /**
-   * Soft delete blog
-   */
+    // ------------------------------- delete blog post ----------------------------
   async delete(id) {
     const item = await Blog.findOneAndUpdate(
       { _id: id, 'meta.deletedAt': null },

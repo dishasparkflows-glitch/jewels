@@ -10,18 +10,10 @@ class BasePaymentProvider {
     this.displayName = displayName || name;
   }
 
-  /**
-   * Check whether this provider has its required environment credentials configured
-   * @returns {boolean}
-   */
   isConfigured() {
     return false;
   }
 
-  /**
-   * Return client-safe configuration for frontend checkout
-   * @returns {Object}
-   */
   getPublicConfig() {
     return {
       id: this.name,
@@ -30,19 +22,11 @@ class BasePaymentProvider {
     };
   }
 
-  /**
-   * Initiate payment session with gateway for an order
-   * @param {Object} params
-   * @param {Object} params.order - The Mongoose Order document
-   * @param {number} params.amount - The payable amount in INR
-   */
+  // Initiate payment session with gateway for an order
   async initiatePayment({ order, amount }) {
     throw new ApiError(501, `initiatePayment not implemented for ${this.name}`);
   }
 
-  /**
-   * Mark an order as paid, append timeline, and clear user's cart
-   */
   async markOrderAsPaid(order, details = {}) {
     if (!order) return null;
 
@@ -92,9 +76,7 @@ class BasePaymentProvider {
     return order;
   }
 
-  /**
-   * Mark an order as failed with reason and timeline update
-   */
+  // Mark an order as failed with reason and timeline update
   async markOrderAsFailed(order, details = {}) {
     if (!order) return null;
 

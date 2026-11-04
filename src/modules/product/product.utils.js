@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const ApiError = require('../../utils/ApiError');
 
+// ------------------------------- resolve metal color info ----------------------------
 const resolveMetalColorInfo = (cObj, p = null) => {
   const isObj = typeof cObj === 'object' && cObj !== null;
   let id = isObj ? String(cObj._id || cObj.id || '') : (typeof cObj === 'string' && /^[a-f0-9]{24}$/i.test(cObj) ? cObj : '');
@@ -34,6 +35,7 @@ const resolveMetalColorInfo = (cObj, p = null) => {
 };
 
 // Lean and aggregate results do not apply schema defaults to existing records.
+// ------------------------------- with color statuses ----------------------------
 const withColorStatuses = (product) => {
   if (!product) return product;
   if (Array.isArray(product.colorImages)) {
@@ -137,6 +139,7 @@ const withColorStatuses = (product) => {
 };
 
 // Sanitize and validate colorImages entries for database persistence
+// ------------------------------- sanitize color images ----------------------------
 const sanitizeColorImages = (colorImages) => {
   if (!Array.isArray(colorImages)) return colorImages;
   return colorImages.map((ci) => {
@@ -239,9 +242,7 @@ const PRICING_COMPARISON_KEYS = [
   'otherAmount',
 ];
 
-/**
- * Checks whether the newly calculated pricing matches existing stored values.
- */
+// ------------------------------- is pricing unchanged ----------------------------
 const isPricingUnchanged = (product, result) => {
   if (!product || !result) return false;
   if (result.salePrice !== product.pricing?.salePrice) return false;
@@ -255,9 +256,7 @@ const isPricingUnchanged = (product, result) => {
   });
 };
 
-/**
- * Helper to format concise product card info for the home page storefront
- */
+// ------------------------------- extract product images ----------------------------
 const extractProductImages = (p) => {
   if (!p) return [];
   const images = [];
@@ -325,6 +324,7 @@ const extractProductImages = (p) => {
   return [...new Set(images)];
 };
 
+// ------------------------------- extract metal colors ----------------------------
 const extractMetalColors = (p) => {
   if (!p) return [];
   const colorMap = new Map();
@@ -419,6 +419,7 @@ const extractMetalColors = (p) => {
   return Array.from(colorMap.values());
 };
 
+// ------------------------------- format color images ----------------------------
 const formatColorImages = (colorImages, p = null) => {
   if (!Array.isArray(colorImages)) return [];
   return colorImages
@@ -458,9 +459,7 @@ const formatColorImages = (colorImages, p = null) => {
     .filter(Boolean);
 };
 
-/**
- * Format storefront products (returning images, metal colors, 1st photos, basicInfo, pricing, etc.)
- */
+// ------------------------------- format storefront product ----------------------------
 const formatStorefrontProduct = (p) => {
   if (!p) return null;
   const isGroup = Boolean(p.isGroup);
@@ -486,8 +485,22 @@ const formatStorefrontProduct = (p) => {
   const salePrice = Number(p.pricing?.salePrice || 0);
   const isGold = String(p.productType || '').toLowerCase() === 'gold';
   const mrp = isGold ? salePrice : Number(p.pricing?.mrp || salePrice || 0);
-  const minPrice = Number(p.pricing?.minPrice || salePrice || 0);
-  const maxPrice = Number(p.pricing?.maxPrice || (isGold ? salePrice : mrp) || salePrice || 0);
+
+  let minPrice = Number(p.pricing?.minPrice || 0);
+  let maxPrice = Number(p.pricing?.maxPrice || 0);
+
+  if ((!minPrice || !maxPrice || minPrice === maxPrice) && Array.isArray(p.variants) && p.variants.length > 0) {
+    const variantPrices = p.variants
+      .map((v) => Number(v.pricing?.calculatedPrice || v.pricing?.salePrice || v.salePrice || v.price || 0))
+      .filter((pr) => pr > 0);
+    if (variantPrices.length > 0) {
+      minPrice = Math.min(...variantPrices);
+      maxPrice = Math.max(...variantPrices);
+    }
+  }
+
+  if (!minPrice) minPrice = salePrice;
+  if (!maxPrice) maxPrice = isGold ? salePrice : mrp;
 
   const categoryIds = Array.isArray(p.categoryIds) ? p.categoryIds : (p.categoryIds ? [p.categoryIds] : []);
   const menuItemIds = Array.isArray(p.menuItemIds) ? p.menuItemIds : (p.menuItemIds ? [p.menuItemIds] : []);
@@ -547,15 +560,12 @@ const formatStorefrontProduct = (p) => {
   };
 };
 
+// ------------------------------- format home product ----------------------------
 const formatHomeProduct = (p) => {
   return formatStorefrontProduct(p);
 };
 
-/**
- * Format full product detail view for storefront PDP
- * Returns ONLY the fields needed by the customer/storefront
- * Strips internal cost prices, formulas, supplier margins, pricingKeys, etc.
- */
+// ------------------------------- format storefront product detail ----------------------------
 const formatStorefrontProductDetail = (p) => {
   if (!p) return null;
 
@@ -568,6 +578,22 @@ const formatStorefrontProductDetail = (p) => {
   const salePrice = Number(p.pricing?.salePrice || 0);
   const isGold = String(p.productType || '').toLowerCase() === 'gold';
   const mrp = isGold ? salePrice : Number(p.pricing?.mrp || salePrice || 0);
+
+  let minPrice = Number(p.pricing?.minPrice || 0);
+  let maxPrice = Number(p.pricing?.maxPrice || 0);
+
+  if ((!minPrice || !maxPrice || minPrice === maxPrice) && Array.isArray(p.variants) && p.variants.length > 0) {
+    const variantPrices = p.variants
+      .map((v) => Number(v.pricing?.calculatedPrice || v.pricing?.salePrice || v.salePrice || v.price || 0))
+      .filter((pr) => pr > 0);
+    if (variantPrices.length > 0) {
+      minPrice = Math.min(...variantPrices);
+      maxPrice = Math.max(...variantPrices);
+    }
+  }
+
+  if (!minPrice) minPrice = salePrice;
+  if (!maxPrice) maxPrice = mrp || salePrice;
   const colorImages = Array.isArray(p.colorImages) ? p.colorImages : [];
   const hasColorImages = colorImages.some((ci) => Array.isArray(ci?.images) && ci.images.length > 0);
   const images = hasColorImages ? undefined : extractProductImages(p);
@@ -676,8 +702,8 @@ const formatStorefrontProductDetail = (p) => {
       mrp,
       calculatedPrice: Number(p.pricing?.calculatedPrice || salePrice || 0),
       gstPercentage: Number(p.pricing?.gstPercentage ?? 3),
-      minPrice: Number(p.pricing?.minPrice || salePrice || 0),
-      maxPrice: Number(p.pricing?.maxPrice || mrp || salePrice || 0),
+      minPrice,
+      maxPrice,
     },
     specifications: {
       metalWeight: Number(p.specifications?.metalWeight || 0),
@@ -707,9 +733,7 @@ const formatStorefrontProductDetail = (p) => {
   };
 };
 
-/**
- * Helper to format product lookup results for dropdowns / admin selection
- */
+// ------------------------------- format lookup product ----------------------------
 const formatLookupProduct = (p) => {
   if (!p) return null;
   withColorStatuses(p);
@@ -807,9 +831,7 @@ const formatLookupProduct = (p) => {
   };
 };
 
-/**
- * Builds MongoDB search query filter for product listing/catalogue
- */
+// ------------------------------- build product search filter ----------------------------
 const buildProductSearchFilter = (search) => {
   if (!search || !String(search).trim()) return null;
   const searchRegex = new RegExp(String(search).trim(), 'i');
@@ -824,9 +846,7 @@ const buildProductSearchFilter = (search) => {
   ];
 };
 
-/**
- * Builds productType filter for catalogue
- */
+// ------------------------------- build product type filter ----------------------------
 const buildProductTypeFilter = (productType, isOrnateSpecified = false) => {
   if (!productType) return null;
   const pt = String(productType).toLowerCase();
@@ -841,9 +861,7 @@ const buildProductTypeFilter = (productType, isOrnateSpecified = false) => {
   return { productType: pt };
 };
 
-/**
- * Builds productType filter specifically for lookup modal
- */
+// ------------------------------- build lookup product type filter ----------------------------
 const buildLookupProductTypeFilter = (productType, isOrnateSpecified = false) => {
   if (!productType || productType === 'all') return null;
   const pt = String(productType).toLowerCase();
@@ -861,9 +879,7 @@ const buildLookupProductTypeFilter = (productType, isOrnateSpecified = false) =>
   return { productType: pt };
 };
 
-/**
- * Returns the MongoDB $cond expression for positive price precedence (salePrice fallback to mrp)
- */
+// ------------------------------- get effective price expression ----------------------------
 const getEffectivePriceExpression = () => {
   return ['pricing.salePrice', 'pricing.mrp'].reduceRight(
     (fallback, field) => ({ $cond: [{ $gt: [`$${field}`, 0] }, `$${field}`, fallback] }),
@@ -871,9 +887,7 @@ const getEffectivePriceExpression = () => {
   );
 };
 
-/**
- * Builds price range conditions against the effective price expression
- */
+// ------------------------------- build price range conditions ----------------------------
 const buildPriceRangeConditions = (queryParams, effectivePrice) => {
   const priceConditions = [];
   for (const [parameter, operator] of [['minPrice', '$gte'], ['maxPrice', '$lte']]) {
@@ -893,9 +907,7 @@ const buildPriceRangeConditions = (queryParams, effectivePrice) => {
   return priceConditions;
 };
 
-/**
- * Shared populate options for full product detail views
- */
+// ------------------------------- get product populate options ----------------------------
 const getProductPopulateOptions = () => {
   return [
     { path: 'categoryIds', select: 'name slug sizeChart', strictPopulate: false },
@@ -912,9 +924,7 @@ const getProductPopulateOptions = () => {
   ];
 };
 
-/**
- * Formats size chart payload with normalized URL, key, and PDF flag
- */
+// ------------------------------- format size chart ----------------------------
 const formatSizeChart = (chart, categoryName = '') => {
   if (!chart) return null;
   const rawUrl = typeof chart === 'object' ? chart.url : chart;
@@ -942,9 +952,7 @@ const formatSizeChart = (chart, categoryName = '') => {
   };
 };
 
-/**
- * Extract size chart from populated categoryIds or category model
- */
+// ------------------------------- extract size chart ----------------------------
 const extractSizeChart = async (product) => {
   if (!product) return null;
   const Category = require('../category/category.model');

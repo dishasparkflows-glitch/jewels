@@ -10,9 +10,6 @@ const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 1000;
 
 class ConnectWhatsClient {
-  /**
-   * Loads configuration from environment variables
-   */
   getEnvConfig() {
     const apiKey = (process.env.CONNECTWHATS_API_KEY || process.env.CONNECTWHATS_TOKEN || '').trim();
     const apiUrl = normalizeUrl(process.env.CONNECTWHATS_API_URL);
@@ -32,9 +29,6 @@ class ConnectWhatsClient {
     };
   }
 
-  /**
-   * Retrieves active credentials from DB (decrypted) or falls back to env
-   */
   async getActiveCredentials() {
     const envConfig = this.getEnvConfig();
 
@@ -77,9 +71,6 @@ class ConnectWhatsClient {
     };
   }
 
-  /**
-   * Low-level HTTP request helper for ConnectWhats API
-   */
   async makeRequest({ method = 'GET', endpoint, data, token, baseUrl }) {
     const url = `${normalizeUrl(baseUrl)}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     const cleanToken = (token || '').trim();
@@ -133,9 +124,6 @@ class ConnectWhatsClient {
     }
   }
 
-  /**
-   * Fetch approved templates directly from ConnectWhats provider
-   */
   async getProviderTemplates() {
     const creds = await this.getActiveCredentials();
     const phoneNoId = creds.phoneNumberId || creds.instanceId;

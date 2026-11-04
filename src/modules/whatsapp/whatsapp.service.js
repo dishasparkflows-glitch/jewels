@@ -15,9 +15,7 @@ const ACCOUNT_KEY = 'default';
 class WhatsAppService {
   // ─── Integration Management ────────────────────────────────────────
 
-  /**
-   * Connects / Re-validates ConnectWhats integration and stores encrypted token in DB
-   */
+    // ------------------------------- connect whatsapp integration ----------------------------
   async connectIntegration(customParams = {}) {
     const envConfig = connectWhatsClient.getEnvConfig();
     const apiKey = customParams.apiKey || envConfig.apiKey;
@@ -95,9 +93,7 @@ class WhatsAppService {
     };
   }
 
-  /**
-   * Retrieves safe integration status
-   */
+    // ------------------------------- get whatsapp integration status ----------------------------
   async getIntegrationStatus() {
     const envConfig = connectWhatsClient.getEnvConfig();
     const dbToken = await IntegrationToken.findOne({ provider: PROVIDER, accountKey: ACCOUNT_KEY });
@@ -116,9 +112,7 @@ class WhatsAppService {
     };
   }
 
-  /**
-   * Disconnects the ConnectWhats integration locally
-   */
+    // ------------------------------- disconnect whatsapp integration ----------------------------
   async disconnectIntegration() {
     await IntegrationToken.findOneAndUpdate(
       { provider: PROVIDER, accountKey: ACCOUNT_KEY },
@@ -129,9 +123,7 @@ class WhatsAppService {
 
   // ─── Messaging ─────────────────────────────────────────────────────
 
-  /**
-   * Sends a plain text WhatsApp message
-   */
+    // ------------------------------- send text message ----------------------------
   async sendTextMessage(to, message) {
     if (!to || !message) {
       throw new ApiError(400, 'Recipient phone number and message are required');
@@ -209,16 +201,12 @@ class WhatsAppService {
     }
   }
 
-  /**
-   * Sends a test message
-   */
+    // ------------------------------- send test message ----------------------------
   async sendTestMessage(to, message = 'Neirah Jewellery WhatsApp integration test message.') {
     return this.sendTextMessage(to, message);
   }
 
-  /**
-   * Sends a business template WhatsApp message
-   */
+    // ------------------------------- send template message ----------------------------
   async sendTemplateMessage({ to, templateName, language = 'en_US', variables = [], context = null }) {
     if (!to || !templateName) {
       throw new ApiError(400, 'Recipient phone number and templateName are required');
@@ -337,9 +325,7 @@ class WhatsAppService {
     }
   }
 
-  /**
-   * Retrieves message logs with pagination and filtering
-   */
+    // ------------------------------- get message history ----------------------------
   async getMessageHistory(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -377,9 +363,7 @@ class WhatsAppService {
     };
   }
 
-  /**
-   * Retrieves single message details
-   */
+    // ------------------------------- get message details ----------------------------
   async getMessageDetails(id) {
     const message = await WhatsAppMessage.findById(id).lean();
     if (!message) {
@@ -388,9 +372,7 @@ class WhatsAppService {
     return message;
   }
 
-  /**
-   * Handles delivery callbacks from ConnectWhats webhook
-   */
+    // ------------------------------- handle webhook ----------------------------
   async handleWebhook(payload) {
     if (!payload) return { handled: false };
 
@@ -425,9 +407,7 @@ class WhatsAppService {
 
   // ─── Business Notification Helpers ─────────────────────────────────
 
-  /**
-   * Dispatches WhatsApp appointment notification
-   */
+    // ------------------------------- send appointment notification ----------------------------
   async sendAppointmentNotification(appointment) {
     try {
       const fullName = appointment.customer?.name || appointment.fullName || 'Valued Client';
@@ -476,9 +456,7 @@ class WhatsAppService {
     }
   }
 
-  /**
-   * Dispatches WhatsApp custom inquiry notification
-   */
+    // ------------------------------- send custom inquiry notification ----------------------------
   async sendCustomInquiryNotification(inquiry) {
     try {
       const { name, phoneNumber, stoneType, metalType, budget, jewelryType, status } = inquiry;

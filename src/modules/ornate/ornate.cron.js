@@ -8,10 +8,6 @@ let lastSyncStatus = 'idle'; // 'idle', 'in_progress', 'success', 'error'
 let lastSyncResult = null;
 let lastSyncError = null;
 
-/**
- * Triggers the Ornate product synchronization process.
- * Guards against concurrent overlapping runs.
- */
 async function triggerOrnateSync(source = 'cron') {
   if (isSyncing) {
     return { skipped: true, reason: 'Sync already in progress' };
@@ -45,9 +41,6 @@ async function triggerOrnateSync(source = 'cron') {
   }
 }
 
-/**
- * Starts the 30-minute recurring Ornate synchronization cron job.
- */
 function startOrnateCron() {
   const isEnabled = process.env.ORNATE_SYNC_ENABLED !== 'false';
   const cronSchedule = process.env.ORNATE_SYNC_CRON || '*/30 * * * *';
@@ -61,9 +54,6 @@ function startOrnateCron() {
   });
 }
 
-/**
- * Stops the Ornate sync cron job if running.
- */
 function stopOrnateCron() {
   if (cronJob) {
     cronJob.stop();
@@ -71,9 +61,6 @@ function stopOrnateCron() {
   }
 }
 
-/**
- * Returns current status and last execution stats.
- */
 function getOrnateSyncStatus() {
   return {
     isCronScheduled: Boolean(cronJob),

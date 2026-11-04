@@ -6,10 +6,6 @@ let isCleaning = false;
 let lastCleanTime = null;
 let lastCleanResult = null;
 
-/**
- * Triggers the expired offer banner auto-deletion process.
- * Guards against concurrent overlapping runs.
- */
 async function triggerOfferCleanup(source = 'cron') {
   if (isCleaning) {
     console.warn(`[Banner Cron] ⏳ Offer cleanup already in progress (triggered by ${source}), skipping duplicate trigger.`);
@@ -41,10 +37,6 @@ async function triggerOfferCleanup(source = 'cron') {
   }
 }
 
-/**
- * Starts the recurring expired offer cleanup cron job.
- * Default runs every 5 minutes ('* /5 * * * *') or configurable via OFFER_EXPIRATION_CRON.
- */
 function startBannerCron() {
   const isEnabled = process.env.OFFER_EXPIRATION_CRON_ENABLED !== 'false';
   const cronSchedule = process.env.OFFER_EXPIRATION_CRON || '*/5 * * * *';

@@ -3,9 +3,6 @@ const Currency = require('./currency.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
-/**
- * Fetch external forex rates from ExchangeRate-API (base USD)
- */
 function fetchForexRates() {
   return new Promise((resolve) => {
     const url = 'https://api.exchangerate-api.com/v4/latest/USD';
@@ -31,10 +28,7 @@ function fetchForexRates() {
 }
 
 class CurrencyService {
-
-  /**
-   * Get all currencies with search, filter, and pagination
-   */
+    // ------------------------------- get all currencies ----------------------------
   async getAll(queryParams = {}) {
 
     const filter = {
@@ -87,9 +81,7 @@ class CurrencyService {
     };
   }
 
-  /**
-   * Get currency by ID
-   */
+    // ------------------------------- get single currency ----------------------------
   async getOne(id) {
     const currency = await Currency.findOne({
       _id: id,
@@ -102,9 +94,7 @@ class CurrencyService {
     return currency;
   }
 
-  /**
-   * Get currency by code (e.g. USD, EUR)
-   */
+    // ------------------------------- get currency by code ----------------------------
   async getByCode(code) {
     const currency = await Currency.findOne({
       'currencyInfo.code': code.toUpperCase(),
@@ -117,9 +107,7 @@ class CurrencyService {
     return currency;
   }
 
-  /**
-   * Create new currency
-   */
+    // ------------------------------- create currency ----------------------------
   async create(data) {
     const code = (data.currencyInfo?.code || '').trim().toUpperCase();
     if (!code) {
@@ -174,9 +162,7 @@ class CurrencyService {
     return await doc.save();
   }
 
-  /**
-   * Update currency
-   */
+    // ------------------------------- update currency ----------------------------
   async update(id, data) {
     const currency = await Currency.findOne({
       _id: id,
@@ -241,9 +227,7 @@ class CurrencyService {
     return await currency.save();
   }
 
-  /**
-   * Delete currency (soft delete)
-   */
+    // ------------------------------- delete currency ----------------------------
   async delete(id) {
     const currency = await Currency.findOne({
       _id: id,
@@ -267,9 +251,7 @@ class CurrencyService {
     return { id, message: `${currency.currencyInfo.code} deleted successfully` };
   }
 
-  /**
-   * Sync real-time live rates for all currencies where useLiveRate is true
-   */
+  // ------------------------------- sync live rates ----------------------------
   async syncLiveRates() {
     const liveRates = await fetchForexRates();
     if (!liveRates) {
@@ -326,9 +308,7 @@ class CurrencyService {
     };
   }
 
-  /**
-   * Sync single currency live rate
-   */
+  // ------------------------------- sync one rate ----------------------------
   async syncOneRate(id) {
     const currency = await Currency.findOne({
       _id: id,

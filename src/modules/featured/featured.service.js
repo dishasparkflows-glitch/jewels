@@ -19,10 +19,28 @@ class FeaturedService {
     }
 
     delete data.products;
+    delete data.productCount;
     const productIds = data.productIds || [];
     if (Array.isArray(productIds)) {
       data.productIds = productIds;
-      data.productCount = productIds.length;
+    }
+
+    if (!data.display && data.placement) {
+      data.display = {
+        type: data.placement,
+        platform: data.platform || 'web',
+        order: data.order || 0,
+      };
+    } else if (data.display) {
+      if (!data.display.type && data.placement) {
+        data.display.type = data.placement;
+      }
+      if (!data.placement && data.display.type) {
+        data.placement = data.display.type;
+      }
+      if (data.display.order !== undefined && data.order === undefined) {
+        data.order = data.display.order;
+      }
     }
 
     if (data.categoryId === '' || data.categoryId === undefined) {
@@ -49,7 +67,7 @@ class FeaturedService {
 
     return {
       ...item,
-      productCount: item.productCount || pIds.length,
+      productCount: pIds.length,
       productIds: pIds,
       products: populatedProducts,
     };
@@ -63,8 +81,15 @@ class FeaturedService {
     if (queryParams.status) {
       filter.status = queryParams.status;
     }
-    if (queryParams.placement) {
-      filter.placement = new RegExp(`^${queryParams.placement}$`, 'i');
+    if (queryParams.placement || queryParams.type) {
+      const p = queryParams.placement || queryParams.type;
+      filter.$or = [
+        { 'display.type': new RegExp(`^${p}$`, 'i') },
+        { placement: new RegExp(`^${p}$`, 'i') },
+      ];
+    }
+    if (queryParams.platform && queryParams.platform !== 'all') {
+      filter['display.platform'] = queryParams.platform;
     }
     if (queryParams.search) {
       filter.name = new RegExp(queryParams.search, 'i');
@@ -74,7 +99,7 @@ class FeaturedService {
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
       .populate('productIds', '_id basicInfo pricing images colorImages ornate')
-      .sort({ order: 1, 'meta.createdAt': -1 })
+      .sort({ 'display.order': 1, order: 1, 'meta.createdAt': -1 })
       .skip(skip)
       .limit(limit);
 
@@ -89,7 +114,7 @@ class FeaturedService {
       const populatedProducts = rawProducts.filter((p) => p && typeof p === 'object' && p._id);
       return {
         ...item,
-        productCount: item.productCount !== undefined && item.productCount !== 0 ? item.productCount : pIds.length,
+        productCount: pIds.length,
         productIds: pIds,
         products: populatedProducts,
       };
@@ -108,13 +133,17 @@ class FeaturedService {
       filter.status = 'active';
     }
 
-    if (queryParams.placement) {
-      filter.placement = new RegExp(`^${queryParams.placement}$`, 'i');
+    if (queryParams.placement || queryParams.type) {
+      const p = queryParams.placement || queryParams.type;
+      filter.$or = [
+        { 'display.type': new RegExp(`^${p}$`, 'i') },
+        { placement: new RegExp(`^${p}$`, 'i') },
+      ];
     }
 
     return await Featured.find(filter)
-      .sort({ order: 1, name: 1 })
-      .select('_id name placement image order status categoryId')
+      .sort({ 'display.order': 1, order: 1, name: 1 })
+      .select('_id name display placement image order status categoryId')
       .lean();
   }
 
@@ -133,8 +162,17 @@ class FeaturedService {
     }
 
     delete data.products;
-    if (Array.isArray(data.productIds)) {
-      data.productCount = data.productIds.length;
+    delete data.productCount;
+
+    if (data.display) {
+      if (data.display.type && !data.placement) data.placement = data.display.type;
+      if (data.display.order !== undefined) data.order = data.display.order;
+    } else if (data.placement) {
+      data.display = {
+        type: data.placement,
+        platform: data.platform || 'web',
+        order: data.order || 0,
+      };
     }
 
     if (data.categoryId === '') {
@@ -161,7 +199,7 @@ class FeaturedService {
 
     return {
       ...item,
-      productCount: item.productCount || pIds.length,
+      productCount: pIds.length,
       products: populatedProducts,
       productIds: pIds,
     };
@@ -170,12 +208,15 @@ class FeaturedService {
   // ------------------------------- reorder featured items ----------------------------
   async reorder(items) {
     if (Array.isArray(items)) {
-      const bulkOps = items.map((it, idx) => ({
-        updateOne: {
-          filter: { _id: it.id || it._id },
-          update: { $set: { order: typeof it.order === 'number' ? it.order : idx } },
-        },
-      }));
+      const bulkOps = items.map((it, idx) => {
+        const ord = typeof it.order === 'number' ? it.order : idx;
+        return {
+          updateOne: {
+            filter: { _id: it.id || it._id },
+            update: { $set: { order: ord, 'display.order': ord } },
+          },
+        };
+      });
       if (bulkOps.length > 0) {
         await Featured.bulkWrite(bulkOps);
       }

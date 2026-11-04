@@ -3,9 +3,6 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class HomeSectionService {
-  /**
-   * Helper to slugify string into a valid sectionKey
-   */
   slugify(text) {
     return text
       .toString()

@@ -32,10 +32,6 @@ const {
 } = ornateUtils;
 
 // ------------------------------- get ornate erp categories ----------------------------
-/**
- * Fetches all product categories (GroupName) from Ornate ERP without downloading images.
- * Returns distinct categories with product counts, metals, and sample item types.
- */
 async function getOrnateErpCategories() {
   const data = await fetchOrnateLabelData('0');
 
@@ -87,10 +83,6 @@ async function getOrnateErpCategories() {
 }
 
 // ------------------------------- sync ornate labels ----------------------------
-/**
- * Syncs Ornate ERP labels directly into the main Product table with `isOrnate: true`.
- * Downloads & uploads images to Cloudflare R2 only if product doesn't already have images.
- */
 async function syncOrnateLabels(sessionIdOverride, options = null) {
   const sessionIdToPass = sessionIdOverride !== undefined ? sessionIdOverride : getLastSessionId();
   const data = await fetchOrnateLabelData(sessionIdToPass);
@@ -285,9 +277,6 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
 }
 
 // ------------------------------- sync ornate sold labels ----------------------------
-/**
- * Marks physically sold items as unavailable/out of stock in the Product table.
- */
 async function syncOrnateSoldLabels() {
   const data = await callOrnateApi('GetSoldLabelData_API', 'SoldLabel', {
     RecordType: 'All',

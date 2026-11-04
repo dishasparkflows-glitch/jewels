@@ -2,9 +2,6 @@ const crypto = require('crypto');
 
 const ALGORITHM = 'aes-256-gcm';
 
-/**
- * Validates or derives a 32-byte encryption key for AES-256-GCM.
- */
 const getEncryptionKey = () => {
   const keyHex =
     process.env.INTEGRATION_TOKEN_ENCRYPTION_KEY ||
@@ -20,11 +17,6 @@ const getEncryptionKey = () => {
   return crypto.createHash('sha256').update(secret).digest();
 };
 
-/**
- * Encrypts a plain text string securely using AES-256-GCM.
- * @param {string} text - The token to encrypt.
- * @returns {string} - The IV, encrypted data, and auth tag concatenated with colons.
- */
 const encryptToken = (text) => {
   if (!text) return null;
   try {
@@ -43,11 +35,6 @@ const encryptToken = (text) => {
   }
 };
 
-/**
- * Decrypts a secure token payload using AES-256-GCM.
- * @param {string} encryptedPayload - The payload formatted as iv:encryptedData:authTag.
- * @returns {string} - The decrypted plain text token.
- */
 const decryptToken = (encryptedPayload) => {
   if (!encryptedPayload) return null;
   try {

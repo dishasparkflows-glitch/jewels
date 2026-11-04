@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 
 const promoBannerSchema = new mongoose.Schema(
@@ -90,6 +89,5 @@ categorySchema.pre('save', function (next) {
   next();
 });
 
-categorySchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Category', categorySchema);

@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const appointmentSchema = new mongoose.Schema(
   {
@@ -65,7 +64,6 @@ appointmentSchema.index({ 'customer.email': 1 });
 appointmentSchema.index({ 'customer.phone.number': 1 });
 appointmentSchema.index({ status: 1, 'meta.createdAt': -1 });
 
-appointmentSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Appointment', appointmentSchema);
 

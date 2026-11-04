@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const diamondSchema = new mongoose.Schema(
   {
@@ -94,6 +93,5 @@ diamondSchema.pre('validate', function (next) {
   next();
 });
 
-diamondSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Diamond', diamondSchema);

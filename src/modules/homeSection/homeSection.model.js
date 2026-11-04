@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const homeSectionItemSchema = new mongoose.Schema(
   {
@@ -181,6 +180,5 @@ const homeSectionSchema = new mongoose.Schema(
   }
 );
 
-homeSectionSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('HomeSection', homeSectionSchema, 'home_sections');

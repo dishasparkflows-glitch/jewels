@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const basicInfoSchema = new mongoose.Schema({
   title: { type: String, trim: true },
@@ -337,9 +336,6 @@ productSchema.pre('save', function (next) {
   if (isOrnate && this.productType !== 'silver') {
     this.productType = 'silver';
   }
-  if (isOrnate) {
-    this.isOrnate = true;
-  }
   const activeTitle = this.basicInfo?.title;
   if (this.basicInfo && activeTitle) {
     if (isOrnate) {
@@ -366,6 +362,5 @@ productSchema.pre('save', function (next) {
   next();
 });
 
-productSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Product', productSchema);

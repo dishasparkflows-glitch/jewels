@@ -110,9 +110,12 @@ class CategoryService {
     if (queryParams.status) {
       filter.status = queryParams.status;
     }
+    if (queryParams.type) {
+      filter.type = queryParams.type;
+    }
 
     return await Category.find(filter)
-      .select('_id name status icon')
+      .select('_id name status icon type slug')
       .collation({ locale: 'en', strength: 2 })
       .sort({ name: 1 })
       .lean();

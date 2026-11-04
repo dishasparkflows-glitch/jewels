@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const mediaSchema = new mongoose.Schema({
   url: { type: String, trim: true, default: '' },
@@ -138,7 +137,6 @@ const websiteThemeSchema = new mongoose.Schema({
   publishedAt: { type: Date, default: null },
 }, { versionKey: false });
 
-websiteThemeSchema.plugin(metaPlugin);
 websiteThemeSchema.index({ status: 1, 'schedule.startAt': 1, 'schedule.endAt': 1 });
 
 const websiteThemeSettingsSchema = new mongoose.Schema({

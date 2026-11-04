@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const couponSchema = new mongoose.Schema(
   {
@@ -87,6 +86,5 @@ const couponSchema = new mongoose.Schema(
 couponSchema.index({ 'validity.startDate': 1, 'validity.endDate': 1 });
 couponSchema.index({ status: 1, 'meta.createdAt': -1 });
 
-couponSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Coupon', couponSchema);

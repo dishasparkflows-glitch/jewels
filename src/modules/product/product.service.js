@@ -3,8 +3,15 @@ const Product = require('./product.model');
 const Setting = require('../setting/setting.model');
 const {
   calculateProductPricing,
+  calculateCustomPriceBreakdown,
   loadPricingMasters
 } = require('./product.pricing');
+const {
+  resolveProductByCodeOrId,
+  getWishlistSet,
+  populateMediaSizes,
+  buildAdminFilter,
+} = require('./product.query');
 const DiamondType = require('../diamondType/diamondType.model');
 const DiamondClarity = require('../diamondClarity/diamondClarity.model');
 const Featured = require('../featured/featured.model');
@@ -36,72 +43,11 @@ const {
 
 class ProductService {
   async _populateMediaSizes(product) {
-    if (!product) return;
-    let hasUpdates = false;
+    return populateMediaSizes(product);
+  }
 
-    if (Array.isArray(product.colorImages)) {
-      for (const colorGroup of product.colorImages) {
-        if (Array.isArray(colorGroup.images)) {
-          await Promise.all(
-            colorGroup.images.map(async (img) => {
-              if ((!img.fileSize || !img.size) && (img.key || img.url)) {
-                try {
-                  const meta = await cloudflareR2.getFileMetadata(img.key || img.url);
-                  if (meta && meta.fileSize) {
-                    img.fileSize = meta.fileSize;
-                    img.size = meta.size;
-                    img.allowCompression = meta.allowCompression;
-                    hasUpdates = true;
-                  }
-                } catch {
-                  // ignore
-                }
-              } else if (img.fileSize && !img.size) {
-                const isKb = img.fileSize < 1024 * 1024;
-                img.size = isKb ? `${Math.round(img.fileSize / 1024)} KB` : `${(img.fileSize / (1024 * 1024)).toFixed(1)} MB`;
-                img.allowCompression = !isKb;
-              }
-            })
-          );
-        }
-      }
-    }
-
-    if (Array.isArray(product.ornate?.ornateImages)) {
-      await Promise.all(
-        product.ornate.ornateImages.map(async (img) => {
-          if ((!img.fileSize || !img.size) && (img.key || img.url)) {
-            try {
-              const meta = await cloudflareR2.getFileMetadata(img.key || img.url);
-              if (meta && meta.fileSize) {
-                img.fileSize = meta.fileSize;
-                img.size = meta.size;
-                img.allowCompression = meta.allowCompression;
-                hasUpdates = true;
-              }
-            } catch {
-              // ignore
-            }
-          }
-        })
-      );
-    }
-
-    if (hasUpdates && product._id) {
-      try {
-        await Product.updateOne(
-          { _id: product._id },
-          {
-            $set: {
-              ...(product.colorImages ? { colorImages: product.colorImages } : {}),
-              ...(product.ornate?.ornateImages ? { 'ornate.ornateImages': product.ornate.ornateImages } : {}),
-            },
-          }
-        );
-      } catch (err) {
-        console.warn('[ProductService] Failed to persist media sizes:', err.message);
-      }
-    }
+  async calculateCustomPrice(data) {
+    return calculateCustomPriceBreakdown(data);
   }
   async previewPricing(data) {
     return calculateProductPricing(data, await loadPricingMasters());
@@ -209,60 +155,13 @@ class ProductService {
   }
 
   async _getWishlistSet(userId) {
-    if (!userId) return new Set();
-    try {
-      const wishlist = await Wishlist.findOne({ userId }).select('productIds').lean();
-      if (!wishlist?.productIds || !Array.isArray(wishlist.productIds)) return new Set();
-      return new Set(wishlist.productIds.map((id) => String(id)));
-    } catch {
-      return new Set();
-    }
+    return getWishlistSet(userId);
   }
 
   // ------------------------------- get one product ----------------------------
   async getOne(id, userId = null) {
     await this.refreshCalculatedPrices();
-    const isObjectId = mongoose.Types.ObjectId.isValid(id);
-    const filter = isObjectId
-      ? { $or: [{ _id: id }, { 'basicInfo.slug': id }, { 'basicInfo.sku': id }, { 'ornate.tagNo': id }] }
-      : { $or: [{ 'basicInfo.slug': id }, { 'basicInfo.sku': id }, { 'ornate.tagNo': id }] };
-
-    const populateOptions = this._getProductPopulateOptions();
-
-    let productQuery = Product.findOne(filter);
-    for (const pop of populateOptions) {
-      productQuery = productQuery.populate(pop);
-    }
-    let product = await productQuery.lean();
-
-    // Fallback 1: If not found and id ends with group sequence (e.g. -000030), try stripping the sequence
-    if (!product && typeof id === 'string' && /-\d{6}$/.test(id)) {
-      const strippedSlug = id.replace(/-\d{6}$/, '');
-      let fallbackQuery = Product.findOne({ 'basicInfo.slug': strippedSlug });
-      for (const pop of populateOptions) {
-        fallbackQuery = fallbackQuery.populate(pop);
-      }
-      product = await fallbackQuery.lean();
-    }
-
-    // Fallback 2: Check ProductGroup by slug, groupCode, or _id
-    if (!product) {
-      const groupFilter = isObjectId
-        ? { $or: [{ _id: id }, { slug: id }, { groupCode: id }], 'meta.deletedAt': null }
-        : { $or: [{ slug: id }, { groupCode: id }], 'meta.deletedAt': null };
-      const group = await ProductGroup.findOne(groupFilter).lean();
-      if (group) {
-        const targetProdId = group.primaryProductId || (Array.isArray(group.productIds) ? group.productIds[0] : null);
-        if (targetProdId) {
-          let groupProductQuery = Product.findOne({ _id: targetProdId });
-          for (const pop of populateOptions) {
-            groupProductQuery = groupProductQuery.populate(pop);
-          }
-          product = await groupProductQuery.lean();
-        }
-      }
-    }
-
+    const product = await resolveProductByCodeOrId(id, this._getProductPopulateOptions());
     if (!product) {
       throw new ApiError(404, 'Product not found');
     }
@@ -282,46 +181,7 @@ class ProductService {
   // ------------------------------- get product by sku or tag ----------------------------
   async getBySkuOrTag(code, userId = null) {
     await this.refreshCalculatedPrices();
-    const isObjectId = mongoose.Types.ObjectId.isValid(code);
-    const populateOptions = this._getProductPopulateOptions();
-    let productQuery = Product.findOne(
-      isObjectId
-        ? { $or: [{ _id: code }, { 'basicInfo.sku': code }, { 'ornate.tagNo': code }, { 'basicInfo.slug': code }] }
-        : { $or: [{ 'basicInfo.sku': code }, { 'ornate.tagNo': code }, { 'basicInfo.slug': code }] }
-    );
-    for (const pop of populateOptions) {
-      productQuery = productQuery.populate(pop);
-    }
-    let product = await productQuery.lean();
-
-    // Fallback 1: If not found and code ends with group sequence (e.g. -000030), try stripping the sequence
-    if (!product && typeof code === 'string' && /-\d{6}$/.test(code)) {
-      const strippedSlug = code.replace(/-\d{6}$/, '');
-      let fallbackQuery = Product.findOne({ 'basicInfo.slug': strippedSlug });
-      for (const pop of populateOptions) {
-        fallbackQuery = fallbackQuery.populate(pop);
-      }
-      product = await fallbackQuery.lean();
-    }
-
-    // Fallback 2: Check ProductGroup by slug, groupCode, or _id
-    if (!product) {
-      const groupFilter = isObjectId
-        ? { $or: [{ _id: code }, { slug: code }, { groupCode: code }], 'meta.deletedAt': null }
-        : { $or: [{ slug: code }, { groupCode: code }], 'meta.deletedAt': null };
-      const group = await ProductGroup.findOne(groupFilter).lean();
-      if (group) {
-        const targetProdId = group.primaryProductId || (Array.isArray(group.productIds) ? group.productIds[0] : null);
-        if (targetProdId) {
-          let groupProductQuery = Product.findOne({ _id: targetProdId });
-          for (const pop of populateOptions) {
-            groupProductQuery = groupProductQuery.populate(pop);
-          }
-          product = await groupProductQuery.lean();
-        }
-      }
-    }
-
+    const product = await resolveProductByCodeOrId(code, this._getProductPopulateOptions());
     if (!product) {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
     }

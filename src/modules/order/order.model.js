@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 const mediaField = require('../../utils/mediaField');
 
 const orderItemSchema = new mongoose.Schema(
@@ -169,7 +168,6 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
-orderSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Order', orderSchema);
 

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+require('./config/db');
 const routes = require('./routes');
 const { errorHandler } = require('./middleware/error.middleware');
 const { requestContextMiddleware } = require('./utils/context');

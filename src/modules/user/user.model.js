@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema(
@@ -111,6 +110,5 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, currentPassword);
 };
 
-userSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('User', userSchema);

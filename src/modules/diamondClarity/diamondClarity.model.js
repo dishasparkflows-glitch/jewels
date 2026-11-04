@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const diamondClaritySchema = new mongoose.Schema(
   {
@@ -27,7 +26,6 @@ const diamondClaritySchema = new mongoose.Schema(
   }
 );
 
-diamondClaritySchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('DiamondClarity', diamondClaritySchema, 'diamond_clarities');
 

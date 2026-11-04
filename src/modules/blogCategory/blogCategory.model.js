@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const blogCategorySchema = new mongoose.Schema(
   {
@@ -48,6 +47,5 @@ blogCategorySchema.pre('save', function (next) {
   next();
 });
 
-blogCategorySchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('BlogCategory', blogCategorySchema, 'blog_categories');

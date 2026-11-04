@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const metalPuritySchema = new mongoose.Schema(
   {
@@ -41,7 +40,6 @@ const metalPuritySchema = new mongoose.Schema(
 
 metalPuritySchema.index({ metalType: 1, status: 1 });
 
-metalPuritySchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('MetalPurity', metalPuritySchema, 'metal_purities');
 

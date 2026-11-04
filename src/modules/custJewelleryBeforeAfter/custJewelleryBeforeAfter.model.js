@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const custJewelleryBeforAfterSchema = new mongoose.Schema(
   {
@@ -46,6 +45,5 @@ const custJewelleryBeforAfterSchema = new mongoose.Schema(
   }
 );
 
-custJewelleryBeforAfterSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('CustJewelleryBeforAfter', custJewelleryBeforAfterSchema, 'cust_jewellery_before_afters');

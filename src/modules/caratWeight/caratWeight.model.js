@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const caratWeightSchema = new mongoose.Schema(
   {
@@ -35,6 +34,5 @@ const caratWeightSchema = new mongoose.Schema(
   }
 );
 
-caratWeightSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('CaratWeight', caratWeightSchema, 'carat_weights');

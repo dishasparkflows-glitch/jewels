@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const whatsAppMessageSchema = new mongoose.Schema(
   {
@@ -95,6 +94,5 @@ const whatsAppMessageSchema = new mongoose.Schema(
 whatsAppMessageSchema.index({ 'meta.createdAt': -1 });
 whatsAppMessageSchema.index({ provider: 1, to: 1, status: 1 });
 
-whatsAppMessageSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('WhatsAppMessage', whatsAppMessageSchema, 'whatsapp_messages');

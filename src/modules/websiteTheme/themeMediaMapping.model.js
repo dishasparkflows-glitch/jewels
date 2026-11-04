@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const themeMediaMappingSchema = new mongoose.Schema(
   {
@@ -51,7 +50,6 @@ const themeMediaMappingSchema = new mongoose.Schema(
   }
 );
 
-themeMediaMappingSchema.plugin(metaPlugin);
 
 // Unique compound index: one document per theme, module, record, placement, device
 themeMediaMappingSchema.index(

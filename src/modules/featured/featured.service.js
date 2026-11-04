@@ -20,27 +20,27 @@ class FeaturedService {
 
     delete data.products;
     delete data.productCount;
+    const incomingPlacement = data.placement;
+    const incomingOrder = data.order;
+    delete data.placement;
+    delete data.order;
+
     const productIds = data.productIds || [];
     if (Array.isArray(productIds)) {
       data.productIds = productIds;
     }
 
-    if (!data.display && data.placement) {
-      data.display = {
-        type: data.placement,
-        platform: data.platform || 'web',
-        order: data.order || 0,
-      };
-    } else if (data.display) {
-      if (!data.display.type && data.placement) {
-        data.display.type = data.placement;
-      }
-      if (!data.placement && data.display.type) {
-        data.placement = data.display.type;
-      }
-      if (data.display.order !== undefined && data.order === undefined) {
-        data.order = data.display.order;
-      }
+    if (!data.display) {
+      data.display = {};
+    }
+    if (!data.display.type && (data.type || incomingPlacement)) {
+      data.display.type = data.type || incomingPlacement;
+    }
+    if (!data.display.platform && data.platform) {
+      data.display.platform = data.platform;
+    }
+    if (data.display.order === undefined && typeof incomingOrder === 'number') {
+      data.display.order = incomingOrder;
     }
 
     if (data.categoryId === '' || data.categoryId === undefined) {
@@ -82,11 +82,8 @@ class FeaturedService {
       filter.status = queryParams.status;
     }
     if (queryParams.placement || queryParams.type) {
-      const p = queryParams.placement || queryParams.type;
-      filter.$or = [
-        { 'display.type': new RegExp(`^${p}$`, 'i') },
-        { placement: new RegExp(`^${p}$`, 'i') },
-      ];
+      const p = queryParams.type || queryParams.placement;
+      filter['display.type'] = new RegExp(`^${p}$`, 'i');
     }
     if (queryParams.platform && queryParams.platform !== 'all') {
       filter['display.platform'] = queryParams.platform;
@@ -99,7 +96,7 @@ class FeaturedService {
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
       .populate('productIds', '_id basicInfo pricing images colorImages ornate')
-      .sort({ 'display.order': 1, order: 1, 'meta.createdAt': -1 })
+      .sort({ 'display.order': 1, 'meta.createdAt': -1 })
       .skip(skip)
       .limit(limit);
 
@@ -134,16 +131,13 @@ class FeaturedService {
     }
 
     if (queryParams.placement || queryParams.type) {
-      const p = queryParams.placement || queryParams.type;
-      filter.$or = [
-        { 'display.type': new RegExp(`^${p}$`, 'i') },
-        { placement: new RegExp(`^${p}$`, 'i') },
-      ];
+      const p = queryParams.type || queryParams.placement;
+      filter['display.type'] = new RegExp(`^${p}$`, 'i');
     }
 
     return await Featured.find(filter)
-      .sort({ 'display.order': 1, order: 1, name: 1 })
-      .select('_id name display placement image order status categoryId')
+      .sort({ 'display.order': 1, name: 1 })
+      .select('_id name display image status categoryId')
       .lean();
   }
 
@@ -163,16 +157,22 @@ class FeaturedService {
 
     delete data.products;
     delete data.productCount;
+    const incomingPlacement = data.placement;
+    const incomingOrder = data.order;
+    delete data.placement;
+    delete data.order;
 
-    if (data.display) {
-      if (data.display.type && !data.placement) data.placement = data.display.type;
-      if (data.display.order !== undefined) data.order = data.display.order;
-    } else if (data.placement) {
-      data.display = {
-        type: data.placement,
-        platform: data.platform || 'web',
-        order: data.order || 0,
-      };
+    if (!data.display) {
+      data.display = {};
+    }
+    if (!data.display.type && (data.type || incomingPlacement)) {
+      data.display.type = data.type || incomingPlacement;
+    }
+    if (!data.display.platform && data.platform) {
+      data.display.platform = data.platform;
+    }
+    if (data.display.order === undefined && typeof incomingOrder === 'number') {
+      data.display.order = incomingOrder;
     }
 
     if (data.categoryId === '') {
@@ -180,7 +180,7 @@ class FeaturedService {
     }
 
     const item = await Featured.findOneAndUpdate(
-      { _id: id },
+      { _id: id, 'meta.deletedAt': null },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
     )
@@ -209,11 +209,11 @@ class FeaturedService {
   async reorder(items) {
     if (Array.isArray(items)) {
       const bulkOps = items.map((it, idx) => {
-        const ord = typeof it.order === 'number' ? it.order : idx;
+        const ord = typeof it.display?.order === 'number' ? it.display.order : (typeof it.order === 'number' ? it.order : idx);
         return {
           updateOne: {
-            filter: { _id: it.id || it._id },
-            update: { $set: { order: ord, 'display.order': ord } },
+            filter: { _id: it.id || it._id, 'meta.deletedAt': null },
+            update: { $set: { 'display.order': ord } },
           },
         };
       });
@@ -227,7 +227,7 @@ class FeaturedService {
   // ------------------------------- delete featured item ----------------------------
   async delete(id) {
     const item = await Featured.findOneAndUpdate(
-      { _id: id },
+      { _id: id, 'meta.deletedAt': null },
       { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
       { returnDocument: 'after' }
     );

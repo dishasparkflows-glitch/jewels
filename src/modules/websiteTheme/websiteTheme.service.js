@@ -79,7 +79,7 @@ class WebsiteThemeService {
     if (new Set(selectedFeaturedIds.map(String)).size !== selectedFeaturedIds.length) throw new ApiError(400, 'A showcase can only be selected once per theme.');
     if (selectedFeaturedIds.length) {
       const referencedFeatured = await Featured.find({ _id: { $in: selectedFeaturedIds }, 'meta.deletedAt': null })
-        .select('_id placement status')
+        .select('_id display.type status')
         .lean();
       const referencedById = new Map(referencedFeatured.map((item) => [String(item._id), item]));
       for (const selection of featuredSelections) {

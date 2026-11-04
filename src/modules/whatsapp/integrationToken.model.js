@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const integrationTokenSchema = new mongoose.Schema(
   {
@@ -56,6 +55,5 @@ const integrationTokenSchema = new mongoose.Schema(
 );
 
 integrationTokenSchema.index({ provider: 1, accountKey: 1 }, { unique: true });
-integrationTokenSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('IntegrationToken', integrationTokenSchema, 'integration_tokens');

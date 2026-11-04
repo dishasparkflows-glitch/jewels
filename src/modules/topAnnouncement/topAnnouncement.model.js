@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const topAnnouncementSchema = new mongoose.Schema(
   {
@@ -45,7 +44,6 @@ const topAnnouncementSchema = new mongoose.Schema(
   }
 );
 
-topAnnouncementSchema.plugin(metaPlugin);
 
 const topAnnouncementSettingSchema = new mongoose.Schema(
   {
@@ -69,7 +67,6 @@ const topAnnouncementSettingSchema = new mongoose.Schema(
   }
 );
 
-topAnnouncementSettingSchema.plugin(metaPlugin);
 
 const TopAnnouncement = mongoose.model('TopAnnouncement', topAnnouncementSchema, 'top_announcements');
 const TopAnnouncementSetting = mongoose.model('TopAnnouncementSetting', topAnnouncementSettingSchema, 'top_announcement_settings');

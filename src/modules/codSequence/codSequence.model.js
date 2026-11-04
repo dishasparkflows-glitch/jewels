@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const codSequenceSchema = new mongoose.Schema(
   {
@@ -38,6 +37,5 @@ const codSequenceSchema = new mongoose.Schema(
 // Helpful index for COD calculation: find active tier where orderAmount <= uptoAmount
 codSequenceSchema.index({ uptoAmount: 1, status: 1 });
 
-codSequenceSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('CodSequence', codSequenceSchema, 'cod_sequences');

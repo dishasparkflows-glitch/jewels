@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const categoryConfigSchema = new mongoose.Schema(
   {
@@ -72,7 +71,6 @@ const filterSchema = new mongoose.Schema(
   }
 );
 
-filterSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Filter', filterSchema, 'filters');
 

@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const addressSchema = new mongoose.Schema(
   {
@@ -53,6 +52,5 @@ addressSchema.index({ userId: 1, 'defaults.isDefault': -1 });
 addressSchema.index({ userId: 1, 'defaults.isShippingDefault': -1 });
 addressSchema.index({ userId: 1, 'defaults.isBillingDefault': -1 });
 
-addressSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Address', addressSchema);

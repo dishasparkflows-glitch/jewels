@@ -1,7 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
-const app = require('./app');
 const connectDB = require('./config/db');
+const app = require('./app');
 const { startBannerCron } = require('./modules/banner/banner.cron');
 const { startCouponExpirationCron } = require('./modules/coupon/coupon.cron');
 const { startWebsiteThemeCron } = require('./modules/websiteTheme/websiteTheme.cron');

@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const settingSchema = new mongoose.Schema(
   {
@@ -183,6 +182,5 @@ const settingSchema = new mongoose.Schema(
   }
 );
 
-settingSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Setting', settingSchema);

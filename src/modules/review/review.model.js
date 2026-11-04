@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const reviewSchema = new mongoose.Schema(
   {
@@ -69,6 +68,5 @@ reviewSchema.index({ status: 1, 'meta.createdAt': -1 });
 reviewSchema.index({ 'customer.email': 1 });
 reviewSchema.index({ 'review.reviewDate': -1 });
 
-reviewSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Review', reviewSchema);

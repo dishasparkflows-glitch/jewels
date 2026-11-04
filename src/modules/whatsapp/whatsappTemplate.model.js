@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const variableSchema = new mongoose.Schema(
   {
@@ -162,6 +161,5 @@ const whatsAppTemplateSchema = new mongoose.Schema(
 whatsAppTemplateSchema.index({ name: 1, isActive: 1, 'provider.status': 1 });
 whatsAppTemplateSchema.index({ 'meta.createdAt': -1 });
 
-whatsAppTemplateSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('WhatsAppTemplate', whatsAppTemplateSchema, 'whatsapp_templates');

@@ -108,7 +108,7 @@ class TopAnnouncementService {
 
   // ------------------------------- get single announcement ----------------------------
   async getOne(id) {
-    const item = await TopAnnouncement.findOne({ _id: id });
+    const item = await TopAnnouncement.findOne({ _id: id, 'meta.deletedAt': null });
     if (!item) {
       throw new ApiError(404, 'Announcement not found');
     }
@@ -129,7 +129,7 @@ class TopAnnouncementService {
   // ------------------------------- update announcement ----------------------------
   async update(id, data) {
     const item = await TopAnnouncement.findOneAndUpdate(
-      { _id: id },
+      { _id: id, 'meta.deletedAt': null },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
     );
@@ -143,7 +143,7 @@ class TopAnnouncementService {
 
   // ------------------------------- toggle announcement status ----------------------------
   async toggleStatus(id) {
-    const item = await TopAnnouncement.findOne({ _id: id });
+    const item = await TopAnnouncement.findOne({ _id: id, 'meta.deletedAt': null });
     if (!item) {
       throw new ApiError(404, 'Announcement not found');
     }
@@ -154,7 +154,7 @@ class TopAnnouncementService {
 
   // ------------------------------- duplicate announcement ----------------------------
   async duplicate(id) {
-    const source = await TopAnnouncement.findOne({ _id: id }).lean();
+    const source = await TopAnnouncement.findOne({ _id: id, 'meta.deletedAt': null }).lean();
     if (!source) {
       throw new ApiError(404, 'Announcement not found');
     }
@@ -182,7 +182,7 @@ class TopAnnouncementService {
 
     const bulkOps = items.map((item, index) => ({
       updateOne: {
-        filter: { _id: item.id || item._id },
+        filter: { _id: item.id || item._id, 'meta.deletedAt': null },
         update: {
           $set: {
             order: typeof item.order === 'number' ? item.order : index + 1,
@@ -201,7 +201,7 @@ class TopAnnouncementService {
   // ------------------------------- delete announcement (Soft delete) ----------------------------
   async delete(id) {
     const item = await TopAnnouncement.findOneAndUpdate(
-      { _id: id },
+      { _id: id, 'meta.deletedAt': null },
       { $set: { 'meta.deletedAt': new Date() } },
       { returnDocument: 'after' }
     );

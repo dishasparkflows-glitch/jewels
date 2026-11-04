@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const gallerySchema = new mongoose.Schema(
   {
@@ -49,6 +48,5 @@ const gallerySchema = new mongoose.Schema(
   }
 );
 
-gallerySchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Gallery', gallerySchema, 'galleries');

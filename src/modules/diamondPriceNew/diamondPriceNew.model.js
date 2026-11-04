@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const sideDiamondSchema = new mongoose.Schema(
   {
@@ -68,6 +67,5 @@ diamondPriceNewSchema.index(
   { unique: true }
 );
 
-diamondPriceNewSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('DiamondPriceNew', diamondPriceNewSchema, 'diamond_price_news');

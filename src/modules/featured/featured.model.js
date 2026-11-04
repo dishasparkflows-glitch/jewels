@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const featuredSchema = new mongoose.Schema(
   {
@@ -19,24 +18,17 @@ const featuredSchema = new mongoose.Schema(
       type: {
         type: String,
         enum: ['Celebrate', 'Gifts'],
-        required: [true, 'Please specify the banner type'],
+        required: [true, 'Please specify the showcase type (Celebrate or Gifts)'],
       },
       platform: {
         type: String,
         enum: ['web', 'mobile', 'common'],
         default: 'web',
-        index: true,
       },
       order: {
         type: Number,
         default: 0,
       },
-    },
-    placement: {
-      type: String,
-      enum: ['Celebrate', 'Gifts'],
-      default: 'Celebrate',
-      index: true,
     },
     image: {
       url: String,
@@ -51,11 +43,6 @@ const featuredSchema = new mongoose.Schema(
     position: {
       type: String,
       default: 'none',
-    },
-    order: {
-      type: Number,
-      default: 0,
-      index: true,
     },
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -81,21 +68,7 @@ const featuredSchema = new mongoose.Schema(
   }
 );
 
-featuredSchema.pre('validate', function () {
-  if (!this.display) {
-    this.display = {};
-  }
-  if (!this.display.type && this.placement) {
-    this.display.type = this.placement;
-  }
-  if (this.display?.type && !this.placement) {
-    this.placement = this.display.type;
-  }
-});
-
-featuredSchema.index({ placement: 1, status: 1 });
 featuredSchema.index({ 'display.type': 1, status: 1 });
-
-featuredSchema.plugin(metaPlugin);
+featuredSchema.index({ 'display.type': 1, 'display.order': 1 });
 
 module.exports = mongoose.model('Featured', featuredSchema);

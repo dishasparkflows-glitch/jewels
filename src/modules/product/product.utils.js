@@ -70,7 +70,7 @@ const withColorStatuses = (product) => {
         status: item.status ?? 'active',
         metalColorId: resolved.name
           ? {
-              __id: resolved.id || undefined,
+              _id: resolved.id || undefined,
               name: resolved.name,
               colorCode: resolved.colorCode || resolved.hex,
               colorCodeEnd: resolved.colorCodeEnd,
@@ -442,7 +442,7 @@ const formatColorImages = (colorImages, p = null) => {
       return {
         status: ci.status || 'active',
         metalColorId: {
-          __id: resolved.id || undefined,
+          _id: resolved.id || undefined,
           name: resolved.name || '',
           colorCode: resolved.colorCode || resolved.hex,
           colorCodeEnd: resolved.colorCodeEnd,

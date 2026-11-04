@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const basicInfoSchema = new mongoose.Schema(
   {
@@ -115,6 +114,5 @@ const blogSchema = new mongoose.Schema(
 
 blogSchema.index({ 'meta.createdAt': -1 });
 
-blogSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Blog', blogSchema);

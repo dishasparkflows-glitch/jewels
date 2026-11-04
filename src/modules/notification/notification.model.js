@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const notificationSchema = new mongoose.Schema(
   {
@@ -18,6 +17,5 @@ const notificationSchema = new mongoose.Schema(
   { versionKey: false }
 );
 
-notificationSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Notification', notificationSchema);

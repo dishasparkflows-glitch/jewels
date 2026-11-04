@@ -1748,7 +1748,7 @@ class ProductGroupService {
 
       updateWrites.push({
         updateOne: {
-          filter: { __id: target._id },
+          filter: { _id: target._id },
           update: {
             $set: {
               ...updatePayload,

@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../../utils/metaPlugin');
 
 const instagramPostSchema = new mongoose.Schema(
   {
@@ -31,6 +30,5 @@ const instagramPostSchema = new mongoose.Schema(
   }
 );
 
-instagramPostSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('InstagramPost', instagramPostSchema, 'instagram_posts');

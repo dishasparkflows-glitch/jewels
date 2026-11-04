@@ -25,11 +25,11 @@ const dimensions = [
   'diamondColorId',
   'diamondClarityId'
 ];
-// --- METAL WEIGHT CALCULATION (14KT BASE PURITY SCALING + CENTER DIAMOND PRONG ALLOWANCE) ---
+// --- METAL WEIGHT CALCULATION (14KT BASE PURITY SCALING + 5% CASTING BUFFER + CENTER DIAMOND PRONG ALLOWANCE) ---
 const calculateEffectiveWeight = (metalWeight, metalPurity, centerDiamondCarat = 0, baseCarat = 1) => {
   const baseWeight = parseFloat(metalWeight) || 0;
   if (!metalPurity) {
-    return Math.round((baseWeight + Number.EPSILON) * 1000) / 1000;
+    return Math.round(((baseWeight * 1.05) + Number.EPSILON) * 1000) / 1000;
   }
 
   const karat = typeof metalPurity === 'object' ? (metalPurity.karat || 0) : Number(metalPurity || 0);
@@ -50,10 +50,11 @@ const calculateEffectiveWeight = (metalWeight, metalPurity, centerDiamondCarat =
     const extraWeight = caratVal > 0 ? (caratVal - baseCaratVal) * (karatWeight * 0.08) : 0;
 
     const finalWeightWithCarat = karatWeight + extraWeight;
-    return Math.round((finalWeightWithCarat + Number.EPSILON) * 1000) / 1000;
+    const finalWeightWith5Percent = finalWeightWithCarat * 1.05;
+    return Math.round((finalWeightWith5Percent + Number.EPSILON) * 1000) / 1000;
   }
 
-  return Math.round((baseWeight + Number.EPSILON) * 1000) / 1000;
+  return Math.round(((baseWeight * 1.05) + Number.EPSILON) * 1000) / 1000;
 };
 
 const signature = (row) =>

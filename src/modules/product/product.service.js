@@ -21,6 +21,7 @@ const ProductGroup = require('../productGroup/productGroup.model');
 const productGroupService = require('../productGroup/productGroup.service');
 const { SHOP_FOR_OPTIONS, getShopForGenders } = require('./product.filters');
 const ApiError = require('../../utils/ApiError');
+const { getRequestContext } = require('../../utils/context');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const cloudflareR2 = require('../../utils/cloudflareR2');
 const {
@@ -55,27 +56,21 @@ class ProductService {
 
   async applyPricing(data) {
     if (data.productType === 'silver' || Boolean(data.isOrnate)) return data;
-    // For drafts, never fail product creation if specifications or purities are not yet configured
-    if (data.status === 'draft') {
-      const metalWeight = Number(data.specifications?.metalWeight);
-      if (!metalWeight || metalWeight <= 0) return data;
-      try {
-        const result = await this.previewPricing(data);
-        return {
-          ...data,
-          variants: result.variants,
-          pricing: { ...data.pricing, salePrice: result.salePrice }
-        };
-      } catch (err) {
-        return data;
-      }
+    const metalWeight = Number(data.specifications?.metalWeight);
+    if (!metalWeight || metalWeight <= 0) {
+      return data;
     }
-    const result = await this.previewPricing(data);
-    return {
-      ...data,
-      variants: result.variants,
-      pricing: { ...data.pricing, salePrice: result.salePrice }
-    };
+    try {
+      const result = await this.previewPricing(data);
+      return {
+        ...data,
+        variants: result.variants,
+        pricing: { ...data.pricing, salePrice: result.salePrice }
+      };
+    } catch (err) {
+      console.warn('Could not auto-calculate pricing on product save:', err.message);
+      return data;
+    }
   }
 
   // Refresh calculated prices before DB filtering/sorting so listing prices and
@@ -126,7 +121,13 @@ class ProductService {
   }
 
   // ------------------------------- create product ----------------------------
-  async create(data) {
+  async create(data, userId) {
+    const actorId = userId || getRequestContext('userId');
+    if (actorId) {
+      if (!data.meta) data.meta = {};
+      if (!data.meta.createdBy) data.meta.createdBy = actorId;
+      if (!data.meta.updatedBy) data.meta.updatedBy = actorId;
+    }
     if (data.status && data.status !== 'approved' && data.status !== 'draft') {
       data.status = 'draft';
     }
@@ -287,6 +288,59 @@ class ProductService {
       ];
     }
 
+    // Dynamic Filter: Featured showcase / campaign
+    let featuredHandpickedIds = [];
+    if (queryParams.featured) {
+      let featDoc = null;
+      if (mongoose.isValidObjectId(queryParams.featured)) {
+        featDoc = await Featured.findOne({ _id: queryParams.featured, 'meta.deletedAt': null }).lean();
+      }
+      if (!featDoc) {
+        featDoc = await Featured.findOne({
+          name: new RegExp(`^${queryParams.featured}$`, 'i'),
+          'meta.deletedAt': null,
+        }).lean();
+      }
+
+      if (featDoc) {
+        const featProductIds = (featDoc.productIds || []).map((id) => (id._id ? id._id.toString() : id.toString())).filter(Boolean);
+        if (featProductIds.length > 0) {
+          featuredHandpickedIds = featProductIds.filter((id) => mongoose.isValidObjectId(id)).map((id) => new mongoose.Types.ObjectId(id));
+          if (featuredHandpickedIds.length > 0) {
+            filter.$and = [
+              ...(filter.$and || []),
+              { _id: { $in: featuredHandpickedIds } },
+            ];
+          }
+        } else if (featDoc.categoryId) {
+          // If productIds is empty, display products of that category
+          const catId = featDoc.categoryId._id ? featDoc.categoryId._id.toString() : featDoc.categoryId.toString();
+          if (!queryParams.category) {
+            filter.$and = [
+              ...(filter.$and || []),
+              { categoryIds: mongoose.Types.ObjectId.isValid(catId) ? new mongoose.Types.ObjectId(catId) : catId },
+            ];
+          }
+        } else if (featDoc.menuItemIds?.length) {
+          filter.$and = [
+            ...(filter.$and || []),
+            { menuItemIds: { $in: featDoc.menuItemIds } },
+          ];
+        }
+      }
+    }
+
+    if (queryParams.productIds || queryParams.ids) {
+      const explicitIds = String(queryParams.productIds || queryParams.ids).split(',').map((s) => s.trim()).filter((id) => mongoose.isValidObjectId(id)).map((id) => new mongoose.Types.ObjectId(id));
+      if (explicitIds.length > 0) {
+        featuredHandpickedIds = [...featuredHandpickedIds, ...explicitIds];
+        filter.$and = [
+          ...(filter.$and || []),
+          { _id: { $in: explicitIds } },
+        ];
+      }
+    }
+
     // Grouping support using existing product_groups collection (zero $lookup, zero cache collection)
     let groupMetaByRepId = new Map();
     const shouldIncludeGroups = queryParams.includeGroups === 'true' || queryParams.includeGroups === true || queryParams.view === 'storefront';
@@ -343,6 +397,7 @@ class ProductService {
 
         filter.$or = [
           { _id: { $in: repProductIds } },
+          ...(featuredHandpickedIds.length ? [{ _id: { $in: featuredHandpickedIds } }] : []),
           standaloneFilter,
         ];
 
@@ -465,9 +520,10 @@ class ProductService {
             { _id: { $in: collectionVals.filter((v) => mongoose.isValidObjectId(v)) } },
             { name: { $in: collectionVals.map((v) => new RegExp(`^${v}$`, 'i')) } },
           ],
-        }).select('productIds name').lean();
+        }).select('productIds categoryId name').lean();
 
-        const pIds = featuredItems.flatMap((f) => (f.productIds || []).map((id) => (id._id || id)));
+        const pIds = featuredItems.flatMap((f) => (f.productIds || []).map((id) => (id._id || id))).filter(Boolean);
+        const catIds = featuredItems.map((f) => (f.categoryId?._id || f.categoryId)).filter(Boolean);
         const regexList = collectionVals.map((v) => new RegExp(v, 'i'));
 
         filter.$and = [
@@ -475,6 +531,7 @@ class ProductService {
           {
             $or: [
               ...(pIds.length ? [{ _id: { $in: pIds } }] : []),
+              ...(pIds.length === 0 && catIds.length ? [{ categoryIds: { $in: catIds } }] : []),
               { 'ornate.groupName': { $in: regexList } },
               { 'ornate.customGroupName': { $in: regexList } },
               { 'basicInfo.title': { $in: regexList } },
@@ -1009,9 +1066,15 @@ class ProductService {
   }
 
   // ------------------------------- update product ----------------------------
-  async update(id, data) {
+  async update(id, data, userId) {
+    const actorId = userId || getRequestContext('userId');
     // Product update API does not change the status field
     delete data.status;
+
+    if (actorId) {
+      data['meta.updatedBy'] = actorId;
+      data['meta.updatedAt'] = new Date();
+    }
 
     const existing = await Product.findById(id).lean();
     if (!existing) throw new ApiError(404, 'Product not found');
@@ -1046,8 +1109,8 @@ class ProductService {
       const calculated = await this.applyPricing(combined);
       data = {
         ...data,
-        variants: calculated.variants,
-        pricing: calculated.pricing
+        ...(calculated.variants ? { variants: calculated.variants } : {}),
+        ...(calculated.pricing ? { pricing: calculated.pricing } : {})
       };
     }
     if (data.colorImages) {
@@ -1126,11 +1189,16 @@ class ProductService {
   }
 
   // ------------------------------- update product status ----------------------------
-  async updateStatus(id, status) {
+  async updateStatus(id, status, userId) {
+    const actorId = userId || getRequestContext('userId');
     const validStatus = status === 'approved' || status === 'published' ? 'approved' : 'draft';
+    const updatePayload = { status: validStatus, 'meta.updatedAt': new Date() };
+    if (actorId) {
+      updatePayload['meta.updatedBy'] = actorId;
+    }
     const product = await Product.findOneAndUpdate(
       { _id: id },
-      { $set: { status: validStatus, 'meta.updatedAt': new Date() } },
+      { $set: updatePayload },
       { returnDocument: 'after' }
     );
 
@@ -1148,10 +1216,16 @@ class ProductService {
   }
 
   // ------------------------------- delete product ----------------------------
-  async delete(id) {
+  async delete(id, userId) {
+    const actorId = userId || getRequestContext('userId');
+    const updatePayload = { status: 'draft', 'meta.deletedAt': new Date(), 'meta.updatedAt': new Date() };
+    if (actorId) {
+      updatePayload['meta.deletedBy'] = actorId;
+      updatePayload['meta.updatedBy'] = actorId;
+    }
     const product = await Product.findOneAndUpdate(
       { _id: id },
-      { $set: { status: 'draft', 'meta.deletedAt': new Date() } },
+      { $set: updatePayload },
       { returnDocument: 'after' }
     );
 

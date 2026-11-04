@@ -19,27 +19,24 @@ const cartPopulateOptions = [
   { path: 'items.selectedAttributes.size', select: 'name' },
 ];
 
+const toObjectId = (val) => (val && mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null);
+
+const getAttrString = (val) => {
+  if (!val) return '';
+  if (typeof val === 'object' && val.name) return String(val.name).trim();
+  if (typeof val === 'string' && !/^[0-9a-fA-F]{24}$/.test(val.trim())) return val.trim();
+  return '';
+};
+
 class CartService {
   // ------------------------------- find or create cart ----------------------------
   async findOrCreateCart(userId) {
-    if (!userId) {
-      return null;
-    }
-
+    if (!userId) return null;
     let userCart = await Cart.findOne({ userId });
-
-    if (userCart) {
-      return userCart;
+    if (!userCart) {
+      userCart = await Cart.create({ userId, items: [] });
     }
-
-    // Create brand new cart
-    const newCart = new Cart({
-      userId,
-      items: [],
-    });
-
-    await newCart.save();
-    return newCart;
+    return userCart;
   }
 
   // ------------------------------- format cart ----------------------------
@@ -71,9 +68,7 @@ class CartService {
       cartId: cart._id,
       userId: cart.userId,
       items: items.map((item) => {
-        const prod = (item.productId && typeof item.productId === 'object' && item.productId._id)
-          ? item.productId
-          : null;
+        const prod = item.productId && typeof item.productId === 'object' ? item.productId : null;
         const prodId = prod?._id || item.productId;
         const title = prod?.basicInfo?.title || '';
         const firstImg =
@@ -81,31 +76,21 @@ class CartService {
           prod?.ornate?.ornateImages?.[0] ||
           prod?.images?.[0];
         const image = typeof firstImg === 'string' ? firstImg : firstImg?.url || '';
-        const catFirst = prod?.categoryIds?.[0];
-        let category = '';
-        if (catFirst && typeof catFirst === 'object' && catFirst.name) {
-          category = catFirst.name;
-        }
+        const category = prod?.categoryIds?.[0]?.name || '';
         const originalPrice = prod?.pricing?.mrp || null;
 
         const sa = item.selectedAttributes;
-        const getAttrVal = (val) => {
-          if (!val) return '';
-          if (typeof val === 'object' && val.name) return String(val.name).trim();
-          if (typeof val === 'string' && !/^[0-9a-fA-F]{24}$/.test(val.trim())) return val.trim();
-          return '';
-        };
-
-        const metalPurity = getAttrVal(sa?.metalPurity);
-        const metalColor = getAttrVal(sa?.metalColor);
-        const diamondType = getAttrVal(sa?.diamondType);
-        const diamondShape = getAttrVal(sa?.diamondShape);
-        const diamondClarity = getAttrVal(sa?.diamondClarity);
-        const diamondColor = getAttrVal(sa?.diamondColor);
-        const sizeVal = getAttrVal(sa?.size) || (typeof sa?.sizeRange === 'string' ? sa.sizeRange : '');
+        const metalPurity = getAttrString(sa?.metalPurity);
+        const metalColor = getAttrString(sa?.metalColor);
+        const diamondType = getAttrString(sa?.diamondType);
+        const diamondShape = getAttrString(sa?.diamondShape);
+        const diamondClarity = getAttrString(sa?.diamondClarity);
+        const diamondColor = getAttrString(sa?.diamondColor);
+        const sizeVal = getAttrString(sa?.size) || (typeof sa?.sizeRange === 'string' ? sa.sizeRange : '');
         const caratWeight = sa?.caratWeight != null ? Number(sa.caratWeight) : null;
 
         const selectedMetal = [metalPurity, metalColor].filter(Boolean).join(' ');
+        const itemTotal = Number(item.totalItemPrice) || ((Number(item.price) || 0) * (Number(item.quantity) || 1));
 
         const selectedAttributes = sa ? {
           metalPurity,
@@ -126,7 +111,7 @@ class CartService {
           title,
           slug: prod?.basicInfo?.slug || (title ? title.toLowerCase().trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') : ''),
           price: item.price,
-          totalItemPrice: item.totalItemPrice || ((item.price || 0) * (item.quantity || 1)),
+          totalItemPrice: itemTotal,
           originalPrice,
           image,
           category,
@@ -134,7 +119,7 @@ class CartService {
           selectedMetal,
           selectedSize: sizeVal || '',
           selectedAttributes,
-          itemTotal: item.totalItemPrice || ((item.price || 0) * (item.quantity || 1)),
+          itemTotal,
           addedAt: item.addedAt,
         };
       }),
@@ -177,9 +162,7 @@ class CartService {
 
   // ------------------------------- get cart ----------------------------
   async getCart({ userId } = {}) {
-    if (!userId) {
-      return this.formatCart(null);
-    }
+    if (!userId) return this.formatCart(null);
 
     let cart = await Cart.findOne({ userId }).populate(cartPopulateOptions);
 
@@ -194,20 +177,24 @@ class CartService {
   }
 
   // ------------------------------- add to cart ----------------------------
-  async addToCart({ userId, productData, quantity = 1, options = {} } = {}) {
-    const rawProductId = productData?.productId || options?.productId;
+  async addToCart({
+    userId,
+    productId,
+    quantity = 1,
+    price,
+    totalItemPrice,
+    selectedAttributes,
+    options = {},
+  } = {}) {
+    const rawProductId = productId || options?.productId;
     if (!rawProductId) {
       throw new ApiError(400, 'Product ID is required');
     }
-
     if (!userId) {
       throw new ApiError(401, 'Please log in to add items to your cart');
     }
 
-    const productId = rawProductId;
     const parsedQty = Math.max(1, parseInt(quantity, 10) || 1);
-    const addedAt = productData.addedAt ? new Date(productData.addedAt) : new Date();
-
     const cart = await this.findOrCreateCart(userId);
     if (!cart) {
       throw new ApiError(500, 'Failed to initialize cart');
@@ -216,71 +203,69 @@ class CartService {
     cart.userId = userId;
 
     let found = null;
-    if (mongoose.Types.ObjectId.isValid(productId)) {
-      found = await Product.findById(productId).lean();
-      if (found) {
-        if (!productData.price) productData.price = found.pricing?.salePrice || found.pricing?.mrp;
+    if (mongoose.Types.ObjectId.isValid(rawProductId)) {
+      found = await Product.findById(rawProductId).lean();
+    }
+
+    // Resolve price & item total using nullish coalescing
+    const resolvedPrice = Number(
+      price ?? options?.price ?? found?.pricing?.salePrice ?? found?.pricing?.mrp ?? 0
+    );
+    const resolvedTotal = Number(
+      totalItemPrice ?? options?.totalItemPrice ?? (resolvedPrice * parsedQty)
+    );
+
+    // Resolve & normalize selected attributes
+    const rawAttributes = selectedAttributes || options?.selectedAttributes || null;
+    let resolvedAttributes = null;
+
+    if (rawAttributes && typeof rawAttributes === 'object') {
+      const hasValues = Object.values(rawAttributes).some((v) => v !== null && v !== undefined && v !== '');
+      if (hasValues) {
+        resolvedAttributes = rawAttributes;
       }
     }
 
-    const price = Number(productData.price) || 0;
-    const totalItemPrice = Number(productData.totalItemPrice) || (price * parsedQty);
-
-    // Resolve selectedAttributes for gold products if needed
-    const isGold = (found?.productType === 'gold') || (productData.productType === 'gold');
-    let selectedAttributes = options.selectedAttributes || productData.selectedAttributes || null;
-
-    if (isGold || selectedAttributes) {
+    const isGold = found?.productType === 'gold';
+    if (isGold || resolvedAttributes) {
       const firstVariant = found?.variants?.[0] || null;
       const firstCenterRow = found?.centerDiamondRows?.[0] || null;
 
-      const toObjectId = (val) => (val && mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null);
-
-      selectedAttributes = {
-        metalPurity: toObjectId(selectedAttributes?.metalPurityId || selectedAttributes?.metalPurity || firstVariant?.metalPurityId || found?.metalPurityIds?.[0]),
-        metalColor: toObjectId(selectedAttributes?.metalColorId || selectedAttributes?.metalColor || firstVariant?.metalColorId || found?.metalColorIds?.[0]),
-        diamondType: toObjectId(selectedAttributes?.diamondTypeId || selectedAttributes?.diamondType || firstVariant?.diamondTypeId || firstCenterRow?.diamondTypeId),
-        diamondShape: toObjectId(selectedAttributes?.diamondShapeId || selectedAttributes?.diamondShape || firstVariant?.diamondShapeId || firstCenterRow?.diamondShapeId),
-        diamondClarity: toObjectId(selectedAttributes?.diamondClarityId || selectedAttributes?.diamondClarity || firstVariant?.diamondClarityId || firstCenterRow?.diamondClarityId),
-        diamondColor: toObjectId(selectedAttributes?.diamondColorId || selectedAttributes?.diamondColor || firstVariant?.diamondColorId || firstCenterRow?.diamondColorId),
-        caratWeight: selectedAttributes?.caratWeight != null ? Number(selectedAttributes.caratWeight) : (firstVariant?.caratWeight ?? firstCenterRow?.caratWeight ?? null),
-        sizeRange: selectedAttributes?.sizeRange || (typeof selectedAttributes?.size === 'string' && !mongoose.isValidObjectId(selectedAttributes.size) ? selectedAttributes.size : null),
-        size: toObjectId(selectedAttributes?.sizeId || selectedAttributes?.size),
+      resolvedAttributes = {
+        metalPurity: toObjectId(resolvedAttributes?.metalPurityId || resolvedAttributes?.metalPurity || firstVariant?.metalPurityId || found?.metalPurityIds?.[0]),
+        metalColor: toObjectId(resolvedAttributes?.metalColorId || resolvedAttributes?.metalColor || firstVariant?.metalColorId || found?.metalColorIds?.[0]),
+        diamondType: toObjectId(resolvedAttributes?.diamondTypeId || resolvedAttributes?.diamondType || firstVariant?.diamondTypeId || firstCenterRow?.diamondTypeId),
+        diamondShape: toObjectId(resolvedAttributes?.diamondShapeId || resolvedAttributes?.diamondShape || firstVariant?.diamondShapeId || firstCenterRow?.diamondShapeId),
+        diamondClarity: toObjectId(resolvedAttributes?.diamondClarityId || resolvedAttributes?.diamondClarity || firstVariant?.diamondClarityId || firstCenterRow?.diamondClarityId),
+        diamondColor: toObjectId(resolvedAttributes?.diamondColorId || resolvedAttributes?.diamondColor || firstVariant?.diamondColorId || firstCenterRow?.diamondColorId),
+        caratWeight: resolvedAttributes?.caratWeight != null ? Number(resolvedAttributes.caratWeight) : (firstVariant?.caratWeight ?? firstCenterRow?.caratWeight ?? null),
+        sizeRange: resolvedAttributes?.sizeRange || (typeof resolvedAttributes?.size === 'string' && !mongoose.isValidObjectId(resolvedAttributes.size) ? resolvedAttributes.size : null),
+        size: toObjectId(resolvedAttributes?.sizeId || resolvedAttributes?.size),
       };
     }
 
-    // Check if this product exists in cart (same product always increments on the same item)
+    // Merge if same product already exists in cart, else push new item
     const existingIndex = cart.items.findIndex((item) => {
       const itemProdId = item.productId?._id || item.productId;
-      return String(itemProdId) === String(productId);
+      return String(itemProdId) === String(rawProductId);
     });
 
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += parsedQty;
-      cart.items[existingIndex].price = price;
+      cart.items[existingIndex].price = resolvedPrice;
       cart.items[existingIndex].totalItemPrice =
-        (Number(price) || Number(cart.items[existingIndex].price) || 0) * cart.items[existingIndex].quantity;
-      if (selectedAttributes) {
-        cart.items[existingIndex].selectedAttributes = selectedAttributes;
+        (Number(resolvedPrice) || Number(cart.items[existingIndex].price) || 0) * cart.items[existingIndex].quantity;
+      if (resolvedAttributes) {
+        cart.items[existingIndex].selectedAttributes = resolvedAttributes;
       }
     } else {
       cart.items.push({
-        productId,
+        productId: rawProductId,
         quantity: parsedQty,
-        selectedAttributes: selectedAttributes ? {
-          metalPurity: selectedAttributes.metalPurity || null,
-          metalColor: selectedAttributes.metalColor || null,
-          diamondType: selectedAttributes.diamondType || null,
-          diamondShape: selectedAttributes.diamondShape || null,
-          diamondClarity: selectedAttributes.diamondClarity || null,
-          diamondColor: selectedAttributes.diamondColor || null,
-          caratWeight: selectedAttributes.caratWeight != null ? Number(selectedAttributes.caratWeight) : null,
-          sizeRange: selectedAttributes.sizeRange || null,
-          size: selectedAttributes.size || null,
-        } : undefined,
-        price,
-        totalItemPrice,
-        addedAt,
+        selectedAttributes: resolvedAttributes || undefined,
+        price: resolvedPrice,
+        totalItemPrice: resolvedTotal,
+        addedAt: new Date(),
       });
     }
 
@@ -290,20 +275,14 @@ class CartService {
   }
 
   // ------------------------------- update quantity ----------------------------
-  async updateQuantity({ userId, productId, quantity, options = {} } = {}) {
-    if (!productId) {
-      throw new ApiError(400, 'Product ID is required');
-    }
-    if (!userId) {
-      throw new ApiError(401, 'Please log in to update cart items');
-    }
+  async updateQuantity({ userId, productId, quantity } = {}) {
+    if (!productId) throw new ApiError(400, 'Product ID is required');
+    if (!userId) throw new ApiError(401, 'Please log in to update cart items');
 
     const productIdStr = String(productId).trim();
     const newQty = parseInt(quantity, 10);
     const cart = await this.findOrCreateCart(userId);
-    if (!cart) {
-      throw new ApiError(404, 'Cart not found');
-    }
+    if (!cart) throw new ApiError(404, 'Cart not found');
 
     const index = cart.items.findIndex(
       (item) => String(item.productId?._id || item.productId || item._id) === productIdStr
@@ -326,18 +305,12 @@ class CartService {
 
   // ------------------------------- remove item ----------------------------
   async removeItem({ userId, productId } = {}) {
-    if (!productId) {
-      throw new ApiError(400, 'Product ID is required');
-    }
-    if (!userId) {
-      throw new ApiError(401, 'Please log in to remove cart items');
-    }
+    if (!productId) throw new ApiError(400, 'Product ID is required');
+    if (!userId) throw new ApiError(401, 'Please log in to remove cart items');
 
     const productIdStr = String(productId).trim();
     const cart = await this.findOrCreateCart(userId);
-    if (!cart) {
-      return this.formatCart(null);
-    }
+    if (!cart) return this.formatCart(null);
 
     cart.items = cart.items.filter(
       (item) => String(item.productId?._id || item.productId || item._id) !== productIdStr
@@ -350,9 +323,7 @@ class CartService {
 
   // ------------------------------- clear cart ----------------------------
   async clearCart({ userId } = {}) {
-    if (!userId) {
-      return this.formatCart(null);
-    }
+    if (!userId) return this.formatCart(null);
     const cart = await this.findOrCreateCart(userId);
     if (cart) {
       cart.items = [];
@@ -368,20 +339,13 @@ class CartService {
     let wishlistCount = 0;
 
     if (userId) {
-      const cart = await Cart.findOne({
-        userId,
-      }).select('items.quantity').lean();
+      const [cart, wishlist] = await Promise.all([
+        Cart.findOne({ userId }).select('items.quantity').lean(),
+        Wishlist.findOne({ userId }).select('productIds').lean(),
+      ]);
 
-      if (cart?.items && Array.isArray(cart.items)) {
-        cartCount = cart.items.length;
-      }
-
-      const wishlist = await Wishlist.findOne({ userId })
-        .select('productIds')
-        .lean();
-      if (wishlist?.productIds && Array.isArray(wishlist.productIds)) {
-        wishlistCount = wishlist.productIds.length;
-      }
+      cartCount = cart?.items?.length || 0;
+      wishlistCount = wishlist?.productIds?.length || 0;
     }
 
     return {

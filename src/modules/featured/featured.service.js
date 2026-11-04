@@ -138,7 +138,8 @@ class FeaturedService {
 
     return await Featured.find(filter)
       .sort({ 'display.order': 1, name: 1 })
-      .select('_id name display image status categoryId')
+      .select('_id name display image status categoryId productIds menuItemIds')
+      .populate('categoryId', 'name type slug')
       .lean();
   }
 

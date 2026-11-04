@@ -4,15 +4,20 @@ const analyticsController = require('./analytics.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
-// Protect all analytics endpoints for Admin & Super Admin
+// Direct dev / Postman verification test endpoints
+router.get('/test', analyticsController.getOverview);
+router.route('/google-token').get(analyticsController.getGoogleAccessToken).post(analyticsController.getGoogleAccessToken);
+
+// All other analytics endpoints require Admin or Super Admin authentication
 router.use(authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN));
 
+router.get('/health', analyticsController.getAnalyticsHealth);
 router.get('/status', analyticsController.getStatus);
-router.get('/dashboard', analyticsController.getDashboardAll);
 router.get('/overview', analyticsController.getOverview);
-router.get('/timeline', analyticsController.getTimeline);
-router.get('/top-products', analyticsController.getTopProducts);
-router.get('/traffic-sources', analyticsController.getTrafficSources);
-router.get('/realtime', analyticsController.getRealtime);
+router.get('/dashboard', analyticsController.getDashboardAll);
+
+// GA4 Product Activity & Lead Reports
+router.get('/products/add-to-cart', analyticsController.getProductsAddToCartReport);
+router.get('/products/wishlist', analyticsController.getProductsWishlistReport);
 
 module.exports = router;

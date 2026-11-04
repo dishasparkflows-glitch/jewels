@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 const { getRequestContext } = require('./context');
 
 function metaPlugin(schema) {
+  // Allow schemas (such as embedded variant subdocuments) to opt out of metadata tracking
+  if (schema.options?.skipMeta) {
+    return;
+  }
   schema.plugin(require('./mediaPlugin'));
   // Prevent duplicate plugin registration
   if (schema.path('meta') || schema.paths?.['meta.createdAt']) {

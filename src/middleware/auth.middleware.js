@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../config/constants');
 const User = require('../modules/user/user.model');
-const { setRequestContext } = require('../utils/context');
+const { setRequestContext, getRequestContext, asyncLocalStorage } = require('../utils/context');
 
 // Authenticate JWT token from Authorization header
 const authenticate = async (req, res, next) => {
@@ -35,6 +35,10 @@ const authenticate = async (req, res, next) => {
 
     req.user = user;
     setRequestContext('userId', user._id);
+    if (!getRequestContext('userId')) {
+      const store = new Map([['userId', user._id]]);
+      return asyncLocalStorage.run(store, () => next());
+    }
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
@@ -82,6 +86,10 @@ const optionalAuth = async (req, res, next) => {
       if (user && user.isActive) {
         req.user = user;
         setRequestContext('userId', user._id);
+        if (!getRequestContext('userId')) {
+          const store = new Map([['userId', user._id]]);
+          return asyncLocalStorage.run(store, () => next());
+        }
       }
     }
   } catch (error) {

@@ -27,51 +27,11 @@ class CartController {
   // ------------------------------- add to cart ----------------------------
   addToCart = catchAsync(async (req, res) => {
     const { userId: authUserId } = this.getIdentity(req);
-    const {
-      productId,
-      quantity = 1,
-      price,
-      totalItemPrice,
-      selectedMetal,
-      selectedSize,
-      selectedAttributes,
-      userId,
-      options,
-    } = req.body;
-
-    const effectiveUserId = authUserId || userId || null;
-    const resolvedProductId = productId || options?.productId;
-    const resolvedPrice = price !== undefined ? Number(price) : (options?.price !== undefined ? Number(options.price) : 0);
-    const resolvedTotalItemPrice = totalItemPrice !== undefined ? Number(totalItemPrice) : (options?.totalItemPrice !== undefined ? Number(options.totalItemPrice) : resolvedPrice);
-    const resolvedMetal = selectedMetal || options?.selectedMetal || '';
-    const resolvedSize = selectedSize || options?.selectedSize || options?.size || '';
-    const rawAttributes = selectedAttributes || options?.selectedAttributes || null;
-
-    // Only keep selectedAttributes if it has non-null/non-empty values
-    let resolvedAttributes = null;
-    if (rawAttributes && typeof rawAttributes === 'object') {
-      const hasNonNull = Object.values(rawAttributes).some((v) => v !== null && v !== undefined && v !== '');
-      if (hasNonNull) {
-        resolvedAttributes = rawAttributes;
-      }
-    }
+    const effectiveUserId = authUserId || req.body?.userId || null;
 
     const data = await cartService.addToCart({
       userId: effectiveUserId,
-      productData: {
-        productId: resolvedProductId,
-        price: resolvedPrice,
-        totalItemPrice: resolvedTotalItemPrice,
-        selectedMetal: resolvedMetal,
-        selectedSize: resolvedSize,
-        selectedAttributes: resolvedAttributes,
-      },
-      quantity: Number(quantity) || 1,
-      options: {
-        selectedMetal: resolvedMetal,
-        selectedSize: resolvedSize,
-        selectedAttributes: resolvedAttributes,
-      },
+      ...req.body,
     });
 
     try {

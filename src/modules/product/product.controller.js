@@ -15,7 +15,7 @@ class ProductController {
 
   // ------------------------------- create product ----------------------------
   create = catchAsync(async (req, res) => {
-    const product = await productService.create(req.body);
+    const product = await productService.create(req.body, req.user?._id);
     ApiResponse.created(res, null, 'Product created successfully');
   });
 
@@ -86,21 +86,21 @@ class ProductController {
 
   // ------------------------------- update product ----------------------------
   update = catchAsync(async (req, res) => {
-    const product = await productService.update(req.params.id, req.body);
+    const product = await productService.update(req.params.id, req.body, req.user?._id);
     ApiResponse.success(res, null, 'Product updated successfully');
   });
 
   // ------------------------------- update product status ----------------------------
   updateStatus = catchAsync(async (req, res) => {
     const { status } = req.body;
-    const product = await productService.updateStatus(req.params.id, status);
+    const product = await productService.updateStatus(req.params.id, status, req.user?._id);
     const displayStatus = product.status === 'approved' ? 'published' : 'draft';
     ApiResponse.success(res, { status: product.status }, `Product switched to ${displayStatus} successfully`);
   });
 
   // ------------------------------- delete product ----------------------------
   delete = catchAsync(async (req, res) => {
-    const result = await productService.delete(req.params.id);
+    const result = await productService.delete(req.params.id, req.user?._id);
     ApiResponse.success(res, null, result.message);
   });
 }

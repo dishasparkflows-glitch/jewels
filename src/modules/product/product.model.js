@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const metaPlugin = require('../../utils/metaPlugin');
 
 const basicInfoSchema = new mongoose.Schema({
   title: { type: String, trim: true },
@@ -13,7 +14,7 @@ const basicInfoSchema = new mongoose.Schema({
     }],
     default: undefined,
   },
-}, { _id: false });
+}, { _id: false, skipMeta: true });
 
 const pricingSchema = new mongoose.Schema({
   baseCarat: { type: Number, min: 0, default: 1 },
@@ -28,11 +29,11 @@ const pricingSchema = new mongoose.Schema({
   baseLabourCharge: { type: Number, default: 0 },
   certificateCharge: { type: Number, default: 0 },
   otherAmountPercentage: { type: Number, default: 0 },
-}, { _id: false });
+}, { _id: false, skipMeta: true });
 
 const specificationsSchema = new mongoose.Schema({
   metalWeight: { type: Number },
-}, { _id: false });
+}, { _id: false, skipMeta: true });
 
 const ornateSchema = new mongoose.Schema({
   tagNo: { type: String },
@@ -57,7 +58,55 @@ const ornateSchema = new mongoose.Schema({
   diamondAmt: { type: Number },
   stockQty: { type: Number },
   isSold: { type: Boolean, default: false },
-}, { _id: false });
+}, { _id: false, skipMeta: true });
+
+const variantSchema = new mongoose.Schema({
+  pricingKey: String,
+  metalColorId: { type: mongoose.Schema.Types.ObjectId, ref: 'MetalColor' },
+  certificateCharge: Number,
+  subtotal: Number,
+  combination: String,
+  sku: String,
+  price: Number,
+  stock: Number,
+  metalPurityId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MetalPurity',
+  },
+  diamondTypeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DiamondType',
+  },
+  diamondShapeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DiamondShape',
+  },
+  metalWeight: { type: Number, default: 0 },
+  labourCharge: { type: Number, default: 0 },
+  isCalculated: { type: Boolean, default: false },
+  sideDiamondCost: Number,
+  sideDiamondWeight: Number,
+  centerDiamondCost: Number,
+  centerDiamondWeight: Number,
+  centerDiamondRate: Number,
+  metalCost: Number,
+  metalRate: Number,
+  diamondCost: Number,
+  computedMakingCharge: Number,
+  computedGst: Number,
+  diamondClarityId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DiamondClarity',
+  },
+  diamondColorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DiamondColor',
+  },
+  sizeFrom: Number,
+  sizeTo: Number,
+  caratWeight: { type: Number, default: 0 },
+  otherAmount: { type: Number, default: 0 },
+}, { _id: true, skipMeta: true });
 
 const seoSchema = new mongoose.Schema({
   metaTitle: { type: String, trim: true },
@@ -206,53 +255,7 @@ const productSchema = new mongoose.Schema(
 
     // ── Product Variants ──────────────────────────────────────
     variants: {
-      type: [{
-        pricingKey: String,
-        metalColorId: { type: mongoose.Schema.Types.ObjectId, ref: 'MetalColor' },
-        certificateCharge: Number,
-        subtotal: Number,
-        combination: String,
-        sku: String,
-        price: Number,
-        stock: Number,
-        metalPurityId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'MetalPurity',
-        },
-        diamondTypeId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'DiamondType',
-        },
-        diamondShapeId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'DiamondShape',
-        },
-        metalWeight: { type: Number, default: 0 },
-        labourCharge: { type: Number, default: 0 },
-        isCalculated: { type: Boolean, default: false },
-        sideDiamondCost: Number,
-        sideDiamondWeight: Number,
-        centerDiamondCost: Number,
-        centerDiamondWeight: Number,
-        centerDiamondRate: Number,
-        metalCost: Number,
-        metalRate: Number,
-        diamondCost: Number,
-        computedMakingCharge: Number,
-        computedGst: Number,
-        diamondClarityId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'DiamondClarity',
-        },
-        diamondColorId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'DiamondColor',
-        },
-        sizeFrom: Number,
-        sizeTo: Number,
-        caratWeight: { type: Number, default: 0 },
-        otherAmount: { type: Number, default: 0 },
-      }],
+      type: [variantSchema],
       default: undefined,
     },
 
@@ -359,8 +362,38 @@ productSchema.pre('save', function (next) {
       }
     });
   }
+  if (Array.isArray(this.variants)) {
+    this.variants.forEach((v) => {
+      if (v.meta !== undefined) {
+        v.meta = undefined;
+        if (v._doc) {
+          delete v._doc.meta;
+        }
+      }
+    });
+  }
   next();
 });
 
+productSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function (next) {
+  const update = this.getUpdate();
+  if (update) {
+    if (Array.isArray(update.variants)) {
+      update.variants.forEach((v) => {
+        if (v && typeof v === 'object') delete v.meta;
+      });
+    }
+    if (update.$set && Array.isArray(update.$set.variants)) {
+      update.$set.variants.forEach((v) => {
+        if (v && typeof v === 'object') delete v.meta;
+      });
+    }
+  }
+  next();
+});
+
+
+
+productSchema.plugin(metaPlugin);
 
 module.exports = mongoose.model('Product', productSchema);

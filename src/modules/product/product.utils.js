@@ -132,6 +132,9 @@ const withColorStatuses = (product) => {
         sideDiamondWeight: v.sideDiamondWeight ?? null,
         centerDiamondCost: v.centerDiamondCost ?? null,
         sideDiamondCost: v.sideDiamondCost ?? null,
+        diamondCost: v.diamondCost !== undefined && v.diamondCost !== null
+          ? v.diamondCost
+          : ((Number(v.centerDiamondCost || 0) + Number(v.sideDiamondCost || 0)) || null),
         metalCost: v.metalCost ?? null,
         metalRate: v.metalRate ?? null,
         metalWeight: v.metalWeight ?? null,
@@ -647,6 +650,7 @@ const formatStorefrontProductDetail = (p) => {
         const item = {
           _id: v._id,
           sku: v.sku || '',
+          combination: v.combination || '',
           price: Number(v.price || 0),
           stock: v.stock !== undefined ? v.stock : 10,
           caratWeight: Number(v.caratWeight || centerWt || 0),
@@ -654,6 +658,11 @@ const formatStorefrontProductDetail = (p) => {
           centerDiamondCost: Number(v.centerDiamondCost || 0),
           sideDiamondWeight: Number(v.sideDiamondWeight || 0),
           sideDiamondCost: Number(v.sideDiamondCost || 0),
+          diamondCost: Number(
+            v.diamondCost !== undefined && v.diamondCost !== null
+              ? v.diamondCost
+              : (Number(v.centerDiamondCost || 0) + Number(v.sideDiamondCost || 0))
+          ),
           metalCost: Number(v.metalCost || 0),
           metalRate: Number(v.metalRate || 0),
           metalWeight: Number(v.metalWeight || 0),

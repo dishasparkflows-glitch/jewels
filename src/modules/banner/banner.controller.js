@@ -1,11 +1,14 @@
 const bannerService = require('./banner.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
 
 class BannerController {
   // ------------------------------- create banner ----------------------------
   create = catchAsync(async (req, res) => {
     const banner = await bannerService.create(req.body);
+    await redisClient.deleteByPattern('banners:*');
     ApiResponse.created(res, null, 'Banner created successfully');
   });
 
@@ -28,7 +31,8 @@ class BannerController {
 
   // ------------------------------- get banner lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {
-    const items = await bannerService.getLookup(req.query);
+    const cacheKey = `banners:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => bannerService.getLookup(req.query));
     ApiResponse.success(res, items, 'Banner lookup list retrieved');
   });
 
@@ -48,12 +52,14 @@ class BannerController {
   // ------------------------------- update banner ----------------------------
   update = catchAsync(async (req, res) => {
     const banner = await bannerService.update(req.params.id, req.body);
+    await redisClient.deleteByPattern('banners:*');
     ApiResponse.success(res, null, 'Banner updated successfully');
   });
 
   // ------------------------------- delete banner ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await bannerService.delete(req.params.id);
+    await redisClient.deleteByPattern('banners:*');
     ApiResponse.success(res, null, result.message);
   });
 
@@ -83,6 +89,7 @@ class BannerController {
   // ----------------------- manual trigger offer cleanup ---------------------
   cleanupExpiredOffers = catchAsync(async (req, res) => {
     const result = await bannerService.autoDeleteExpiredOffers();
+    await redisClient.deleteByPattern('banners:*');
     ApiResponse.success(res, null, `Expired offers cleanup completed. ${result.deletedCount} offers deleted.`
     );
   });

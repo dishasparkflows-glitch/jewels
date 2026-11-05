@@ -1,11 +1,14 @@
 const diamondCutService = require('./diamondCut.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
 
 class DiamondCutController {
   // ------------------------------- create diamond cut ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await diamondCutService.create(req.body);
+    await redisClient.deleteByPattern('diamond-cuts:*');
     ApiResponse.created(res, null, 'Diamond cut created successfully');
   });
 
@@ -24,7 +27,8 @@ class DiamondCutController {
   // ------------------------------- get diamond cut lookup ----------------------------
 
   getLookup = catchAsync(async (req, res) => {
-    const items = await diamondCutService.getLookup(req.query);
+    const cacheKey = `diamond-cuts:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => diamondCutService.getLookup(req.query));
     ApiResponse.success(res, items, 'Diamond cut lookup list retrieved');
   });
 
@@ -39,6 +43,7 @@ class DiamondCutController {
 
   update = catchAsync(async (req, res) => {
     const item = await diamondCutService.update(req.params.id, req.body);
+    await redisClient.deleteByPattern('diamond-cuts:*');
     ApiResponse.success(res, null, 'Diamond cut updated successfully');
   });
 
@@ -46,6 +51,7 @@ class DiamondCutController {
 
   delete = catchAsync(async (req, res) => {
     const result = await diamondCutService.delete(req.params.id);
+    await redisClient.deleteByPattern('diamond-cuts:*');
     ApiResponse.success(res, null, result.message);
   });
 }

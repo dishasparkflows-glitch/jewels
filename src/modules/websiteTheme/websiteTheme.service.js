@@ -620,7 +620,7 @@ class WebsiteThemeService {
       const scheduled = await WebsiteTheme.findOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null });
       if (scheduled?.schedule?.startAt && scheduled.schedule.startAt <= now) {
         await this.setActive(scheduled, null, 'activated');
-        return;
+        return { activatedThemeId: scheduled._id };
       }
     }
     if (settings.activeThemeId) {
@@ -633,6 +633,7 @@ class WebsiteThemeService {
         if (fallback?.publishedSnapshot) {
           fallback.config = fallback.publishedSnapshot.config;
           await this.setActive(fallback, null, 'expired');
+          return { expiredThemeId: active._id, activatedThemeId: fallback._id };
         } else {
           const updated = await WebsiteThemeSettings.findOneAndUpdate(
             { key: 'storefront', activeThemeId: active._id },
@@ -640,9 +641,11 @@ class WebsiteThemeService {
             { new: true }
           );
           if (updated) await this.writeHistory(active, 'expired', null, 'Theme expired; no fallback theme was configured.', updated.revision);
+          return { expiredThemeId: active._id };
         }
       }
     }
+    return null;
   }
 }
 

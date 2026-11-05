@@ -2,8 +2,9 @@ const mongoose = require('mongoose');
 const { getRequestContext } = require('./context');
 
 function metaPlugin(schema) {
-  // Allow schemas (such as embedded variant subdocuments) to opt out of metadata tracking
-  if (schema.options?.skipMeta) {
+  // Only apply metadata tracking to top-level/root schemas.
+  // Embedded subdocuments (e.g. schemas with _id: false or explicit skipMeta: true) are excluded.
+  if (schema.options?.skipMeta || schema.options?._id === false) {
     return;
   }
   schema.plugin(require('./mediaPlugin'));
@@ -58,6 +59,12 @@ function metaPlugin(schema) {
 
   // Auto-set meta.createdAt & meta.createdBy on new docs, meta.updatedAt & meta.updatedBy on every save
   schema.pre('save', function (next) {
+    // Only apply to top-level/root documents, never to embedded subdocuments
+    if (this.$isSubdocument || (typeof this.ownerDocument === 'function' && this.ownerDocument() !== this)) {
+      if (typeof next === 'function') return next();
+      return;
+    }
+
     if (!this.meta) {
       this.meta = {};
     }

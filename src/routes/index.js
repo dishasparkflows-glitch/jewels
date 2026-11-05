@@ -56,6 +56,7 @@ const currencyRoutes = require('../modules/currency/currency.routes');
 const websiteThemeRoutes = require('../modules/websiteTheme/websiteTheme.routes');
 const analyticsRoutes = require('../modules/analytics/analytics.routes');
 const staticPageRoutes = require('../modules/staticPage/staticPage.routes');
+const commonRoutes = require('../modules/common/common.routes');
 const galleryRoutes = require('../modules/gallery/gallery.routes');
 const orderRoutes = require('../modules/order/order.routes');
 const paymentRoutes = require('../modules/payment/payment.routes');
@@ -121,5 +122,6 @@ router.use('/website', websiteThemeRoutes);
 router.use('/gallery', galleryRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/static-pages', staticPageRoutes);
+router.use('/common', commonRoutes);
 
 module.exports = router;

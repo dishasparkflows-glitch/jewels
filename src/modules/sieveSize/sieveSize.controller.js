@@ -1,11 +1,14 @@
 const sieveSizeService = require('./sieveSize.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
 
 class SieveSizeController {
   // ------------------------------- create sieve size ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await sieveSizeService.create(req.body);
+    await redisClient.deleteByPattern('sieve-sizes:*');
     ApiResponse.created(res, null, 'Sieve size created successfully');
   });
 
@@ -24,7 +27,8 @@ class SieveSizeController {
   // ------------------------------- get sieve size lookup ----------------------------
 
   getLookup = catchAsync(async (req, res) => {
-    const items = await sieveSizeService.getLookup(req.query);
+    const cacheKey = `sieve-sizes:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => sieveSizeService.getLookup(req.query));
     ApiResponse.success(res, items, 'Sieve size lookup list retrieved');
   });
 
@@ -39,6 +43,7 @@ class SieveSizeController {
 
   update = catchAsync(async (req, res) => {
     const item = await sieveSizeService.update(req.params.id, req.body);
+    await redisClient.deleteByPattern('sieve-sizes:*');
     ApiResponse.success(res, null, 'Sieve size updated successfully');
   });
 
@@ -46,6 +51,7 @@ class SieveSizeController {
 
   delete = catchAsync(async (req, res) => {
     const result = await sieveSizeService.delete(req.params.id);
+    await redisClient.deleteByPattern('sieve-sizes:*');
     ApiResponse.success(res, null, result.message);
   });
 }

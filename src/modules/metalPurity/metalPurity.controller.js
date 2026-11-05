@@ -1,11 +1,14 @@
 const metalPurityService = require('./metalPurity.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
 
 class MetalPurityController {
   // ------------------------------- create metal purity ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await metalPurityService.create(req.body);
+    await redisClient.deleteByPattern('metal-purities:*');
     ApiResponse.created(res, null, 'Metal purity created successfully');
   });
 
@@ -22,7 +25,8 @@ class MetalPurityController {
 
   // ------------------------------- get metal purity lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {
-    const items = await metalPurityService.getLookup(req.query);
+    const cacheKey = `metal-purities:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => metalPurityService.getLookup(req.query));
     ApiResponse.success(res, items, 'Metal purity lookup list retrieved');
   });
 
@@ -35,12 +39,14 @@ class MetalPurityController {
   // ------------------------------- update metal purity ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await metalPurityService.update(req.params.id, req.body);
+    await redisClient.deleteByPattern('metal-purities:*');
     ApiResponse.success(res, null, 'Metal purity updated successfully');
   });
 
   // ------------------------------- delete metal purity ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await metalPurityService.delete(req.params.id);
+    await redisClient.deleteByPattern('metal-purities:*');
     ApiResponse.success(res, null, result.message);
   });
 }

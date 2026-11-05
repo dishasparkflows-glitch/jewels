@@ -1,6 +1,7 @@
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
+require('dotenv').config();
 const connectDB = require('./config/db');
+const { connectRedis } = require('./config/redis');
 const app = require('./app');
 const { startBannerCron } = require('./modules/banner/banner.cron');
 const { startCouponExpirationCron } = require('./modules/coupon/coupon.cron');
@@ -12,7 +13,10 @@ const { initViewerSocket } = require('./socket/viewers.socket');
 const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB and start server
-connectDB().then(() => {
+connectDB().then(async () => {
+  // Initialize and verify Redis connection
+  await connectRedis();
+
   // Start recurring banner offer auto-cleanup cron
   startBannerCron();
 
@@ -28,8 +32,6 @@ connectDB().then(() => {
   server.listen(PORT, () => {
     console.log(`\n🚀 Jewels API Server running on port ${PORT}`);
     console.log(`📋 Environment: ${process.env.NODE_ENV}`);
-    console.log(`🔗 Health: http://localhost:${PORT}/health`);
-    console.log(`📡 API Base: http://localhost:${PORT}/api\n`);
   });
 });
 

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Banner = require('./banner.model');
 const Category = require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
@@ -454,6 +455,24 @@ class BannerService {
   // ----------------------- get category display banner -----------------------
   async getCategoryDisplayBanner(categoryId = null, platform = 'web') {
     const now = new Date();
+    let resolvedCatId = categoryId;
+    let categoryDoc = null;
+    if (categoryId) {
+      if (mongoose.isValidObjectId(categoryId)) {
+        categoryDoc = await Category.findOne({ _id: categoryId }).lean();
+      } else {
+        categoryDoc = await Category.findOne({
+          $or: [
+            { slug: String(categoryId).trim().toLowerCase() },
+                        { name: new RegExp('^' + categoryId + '$', 'i') },
+          ],
+          'meta.deletedAt': null,
+        }).lean();
+        if (categoryDoc) {
+          resolvedCatId = categoryDoc._id;
+        }
+      }
+    }
     const selectedPlatform = ['web', 'mobile'].includes(platform) ? platform : 'web';
     const platformCondition = selectedPlatform === 'web'
       ? { $or: [{ 'display.platform': 'web' }, { 'display.platform': { $exists: false } }] }
@@ -467,11 +486,11 @@ class BannerService {
       { $or: [{ startDate: null }, { startDate: { $exists: false } }, { startDate: { $lte: now } }] },
     ];
 
-    if (categoryId) {
+    if (resolvedCatId) {
       const categorySpecificOffer = await Banner.findOne({
         $and: [
           ...baseOfferConds,
-          { 'display.categoryId': categoryId },
+          { 'display.categoryId': resolvedCatId },
         ],
       })
         .select('-meta')
@@ -508,13 +527,13 @@ class BannerService {
       };
     }
 
-    if (categoryId) {
+    if (resolvedCatId) {
       const categoryBanner = await Banner.findOne({
         $and: [
           { status: 'active' },
           { 'display.type': 'categorybanner' },
           platformCondition,
-          { 'display.categoryId': categoryId },
+          { 'display.categoryId': resolvedCatId },
         ],
       })
         .select('-meta')
@@ -533,9 +552,9 @@ class BannerService {
       }
 
       try {
-        const categoryDoc = await Category.findOne({
-          _id: categoryId,
-        }).lean();
+        if (!categoryDoc && resolvedCatId && mongoose.isValidObjectId(resolvedCatId)) {
+          categoryDoc = await Category.findOne({ _id: resolvedCatId }).lean();
+        }
 
         if (categoryDoc) {
           const bannerUrl =
@@ -666,4 +685,3 @@ class BannerService {
 }
 
 module.exports = new BannerService();
-

@@ -1,5 +1,8 @@
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
+const { WebsiteTheme } = require('./websiteTheme.model');
 const websiteThemeService = require('./websiteTheme.service');
 
 class WebsiteThemeController {
@@ -19,11 +22,13 @@ class WebsiteThemeController {
 
   // ------------------------------- get theme lookup ----------------------------
   getLookup = catchAsync(async (_req, res) => {
-    const { WebsiteTheme } = require('./websiteTheme.model');
-    const items = await WebsiteTheme.find({ 'meta.deletedAt': null })
-      .select('_id name code status description publishedAt schedule')
-      .sort({ status: 1, name: 1 })
-      .lean();
+    const cacheKey = 'website-themes:lookup:all';
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, async () => {
+      return await WebsiteTheme.find({ 'meta.deletedAt': null })
+        .select('_id name code status description publishedAt schedule')
+        .sort({ status: 1, name: 1 })
+        .lean();
+    });
     ApiResponse.success(res, items, 'Theme lookup list retrieved successfully');
   });
 
@@ -36,6 +41,7 @@ class WebsiteThemeController {
   // ------------------------------- create website theme ----------------------------
   create = catchAsync(async (req, res) => {
     const theme = await websiteThemeService.create(req.body, req.user?._id);
+    await redisClient.deleteByPattern('website-themes:*');
     ApiResponse.created(res, null, 'Website theme created successfully');
   });
 

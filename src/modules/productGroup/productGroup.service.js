@@ -623,6 +623,19 @@ class ProductGroupService {
       const imageUrl = this.getFirstProductImage(products, g.primaryProductId) || this.extractProductImage(summary.representative);
       const firstProduct = products.length > 0 ? products[0] : null;
 
+      const salePrice = Number(
+        summary.representative?.pricing?.salePrice ||
+        firstProduct?.pricing?.salePrice ||
+        summary.representativePrice ||
+        summary.minPrice ||
+        0
+      );
+      const mrp = Number(
+        summary.representative?.pricing?.mrp ||
+        firstProduct?.pricing?.mrp ||
+        0
+      );
+
       return {
         _id: g._id,
         groupCode: g.groupCode,
@@ -637,12 +650,14 @@ class ProductGroupService {
         productCount: summary.totalProducts,
         eligibleCount: summary.eligibleCount,
         representative: summary.representative,
-        firstProduct: firstProduct ? { _id: firstProduct._id, basicInfo: firstProduct.basicInfo } : null,
+        firstProduct: firstProduct ? { _id: firstProduct._id, basicInfo: firstProduct.basicInfo, pricing: firstProduct.pricing } : null,
         imageUrl,
         firstProductImage: imageUrl,
         representativePrice: summary.representativePrice,
         minPrice: summary.minPrice,
         maxPrice: summary.maxPrice,
+        salePrice,
+        mrp,
       };
     });
 

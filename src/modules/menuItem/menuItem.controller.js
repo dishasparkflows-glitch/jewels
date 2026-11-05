@@ -1,11 +1,14 @@
 const menuItemService = require('./menuItem.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
 
 class MenuItemController {
   // ------------------------------- create menu item ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await menuItemService.create(req.body);
+    await redisClient.deleteByPattern('menu-items:*');
     ApiResponse.created(res, null, 'Menu item created successfully');
   });
 
@@ -24,7 +27,8 @@ class MenuItemController {
   // ------------------------------- get menu item lookup ----------------------------
 
   getLookup = catchAsync(async (req, res) => {
-    const items = await menuItemService.getLookup(req.query);
+    const cacheKey = `menu-items:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => menuItemService.getLookup(req.query));
     ApiResponse.success(res, items, 'Menu item lookup list retrieved');
   });
 
@@ -39,6 +43,7 @@ class MenuItemController {
 
   update = catchAsync(async (req, res) => {
     const item = await menuItemService.update(req.params.id, req.body);
+    await redisClient.deleteByPattern('menu-items:*');
     ApiResponse.success(res, null, 'Menu item updated successfully');
   });
 
@@ -46,6 +51,7 @@ class MenuItemController {
   reorder = catchAsync(async (req, res) => {
     const items = req.body.items || req.body;
     const result = await menuItemService.reorder(items);
+    await redisClient.deleteByPattern('menu-items:*');
     ApiResponse.success(res, null, 'Menu items reordered successfully');
   });
 
@@ -53,6 +59,7 @@ class MenuItemController {
 
   delete = catchAsync(async (req, res) => {
     const result = await menuItemService.delete(req.params.id);
+    await redisClient.deleteByPattern('menu-items:*');
     ApiResponse.success(res, null, result.message);
   });
 }

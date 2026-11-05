@@ -1,6 +1,8 @@
 const footerSettingsService = require('./footerSettings.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
 
 class FooterSettingsController {
   // ------------------------------- get footer settings ----------------------------
@@ -12,12 +14,14 @@ class FooterSettingsController {
   // ------------------------------- update footer settings ----------------------------
   updateSettings = catchAsync(async (req, res) => {
     const settings = await footerSettingsService.updateSettings(req.body);
+    await redisClient.deleteByPattern('footer-settings:*');
     ApiResponse.success(res, null, 'Footer settings updated successfully');
   });
 
   // ------------------------------- create footer settings ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await footerSettingsService.create(req.body);
+    await redisClient.deleteByPattern('footer-settings:*');
     ApiResponse.created(res, null, 'Footer settings record created successfully');
   });
 
@@ -34,7 +38,8 @@ class FooterSettingsController {
 
   // ------------------------------- get footer settings lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {
-    const items = await footerSettingsService.getLookup(req.query);
+    const cacheKey = `footer-settings:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => footerSettingsService.getLookup(req.query));
     ApiResponse.success(res, items, 'Footer settings lookup list retrieved');
   });
 
@@ -47,12 +52,14 @@ class FooterSettingsController {
   // ------------------------------- update footer settings record ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await footerSettingsService.update(req.params.id, req.body);
+    await redisClient.deleteByPattern('footer-settings:*');
     ApiResponse.success(res, null, 'Footer settings record updated successfully');
   });
 
   // ------------------------------- delete footer settings ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await footerSettingsService.delete(req.params.id);
+    await redisClient.deleteByPattern('footer-settings:*');
     ApiResponse.success(res, null, result.message);
   });
 }

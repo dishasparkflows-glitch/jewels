@@ -1,11 +1,14 @@
 const birthstoneService = require('./birthstone.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
 
 class BirthstoneController {
   // ------------------------------- create birthstone ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await birthstoneService.create(req.body);
+    await redisClient.deleteByPattern('birthstones:*');
     ApiResponse.created(res, null, 'Birthstone created successfully');
   });
 
@@ -24,7 +27,8 @@ class BirthstoneController {
   // ------------------------------- get birthstone lookup ----------------------------
 
   getLookup = catchAsync(async (req, res) => {
-    const items = await birthstoneService.getLookup(req.query);
+    const cacheKey = `birthstones:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => birthstoneService.getLookup(req.query));
     ApiResponse.success(res, items, 'Birthstone lookup list retrieved');
   });
 
@@ -46,6 +50,7 @@ class BirthstoneController {
 
   update = catchAsync(async (req, res) => {
     const item = await birthstoneService.update(req.params.id, req.body);
+    await redisClient.deleteByPattern('birthstones:*');
     ApiResponse.success(res, null, 'Birthstone updated successfully');
   });
 
@@ -53,6 +58,7 @@ class BirthstoneController {
 
   delete = catchAsync(async (req, res) => {
     const result = await birthstoneService.delete(req.params.id);
+    await redisClient.deleteByPattern('birthstones:*');
     ApiResponse.success(res, null, result.message);
   });
 }

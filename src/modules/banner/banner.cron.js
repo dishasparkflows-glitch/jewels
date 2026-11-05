@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const bannerService = require('./banner.service');
+const redisClient = require('../../utils/redisClient');
 
 let cronJob = null;
 let isCleaning = false;
@@ -25,6 +26,12 @@ async function triggerOfferCleanup(source = 'cron') {
     };
 
     if (result.deletedCount > 0) {
+      if (Array.isArray(result.expiredIds) && result.expiredIds.length > 0) {
+        for (const id of result.expiredIds) {
+          await redisClient.deleteByPattern(`banners:*${id}*`);
+        }
+      }
+      await redisClient.deleteByPattern('banners:*');
       console.log(`[Banner Cron] ✅ Completed expired offer cleanup: auto-deleted ${result.deletedCount} offers in ${Date.now() - startTime}ms [Source: ${source}]`);
     }
 

@@ -14,4 +14,5 @@ module.exports = {
   CRON_TIME: {
     COUPON_EXPIRATION: '0 0,12 * * *', // Every 12 AM and 12 PM
   },
+  CACHE_TTL: 86400, // 24 hours in seconds
 };

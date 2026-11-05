@@ -1,11 +1,14 @@
 const blogCategoryService = require('./blogCategory.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
 
 class BlogCategoryController {
   // ------------------------------- create blog category ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await blogCategoryService.create(req.body);
+    await redisClient.deleteByPattern('blog-categories:*');
     ApiResponse.created(res, null, 'Blog category created successfully');
   });
 
@@ -17,7 +20,8 @@ class BlogCategoryController {
 
   // ------------------------------- get blog category lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {
-    const items = await blogCategoryService.getLookup();
+    const cacheKey = `blog-categories:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => blogCategoryService.getLookup());
     ApiResponse.success(res, items, 'Blog categories lookup list retrieved');
   });
 
@@ -36,12 +40,14 @@ class BlogCategoryController {
   // ------------------------------- update blog category ----------------------------
   update = catchAsync(async (req, res) => {
     const item = await blogCategoryService.update(req.params.id, req.body);
+    await redisClient.deleteByPattern('blog-categories:*');
     ApiResponse.success(res, null, 'Blog category updated successfully');
   });
 
   // ------------------------------- delete blog category ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await blogCategoryService.delete(req.params.id);
+    await redisClient.deleteByPattern('blog-categories:*');
     ApiResponse.success(res, null, result.message);
   });
 }

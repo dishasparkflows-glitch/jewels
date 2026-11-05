@@ -1,11 +1,14 @@
 const couponService = require('./coupon.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
 
 class CouponController {
   // ------------------------------- create coupon ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await couponService.create(req.body);
+    await redisClient.deleteByPattern('coupons:*');
     ApiResponse.created(res, null, 'Coupon created successfully');
   });
 
@@ -19,7 +22,8 @@ class CouponController {
   // ------------------------------- get coupon lookup ----------------------------
 
   getLookup = catchAsync(async (req, res) => {
-    const items = await couponService.getLookup(req.query);
+    const cacheKey = `coupons:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => couponService.getLookup(req.query));
     ApiResponse.success(res, items, 'Coupon lookup list retrieved');
   });
 
@@ -49,6 +53,7 @@ class CouponController {
 
   update = catchAsync(async (req, res) => {
     const item = await couponService.update(req.params.id, req.body);
+    await redisClient.deleteByPattern('coupons:*');
     ApiResponse.success(res, null, 'Coupon updated successfully');
   });
 
@@ -56,6 +61,7 @@ class CouponController {
 
   delete = catchAsync(async (req, res) => {
     const result = await couponService.delete(req.params.id);
+    await redisClient.deleteByPattern('coupons:*');
     ApiResponse.success(res, null, result.message);
   });
 }

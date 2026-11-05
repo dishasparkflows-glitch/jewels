@@ -1,11 +1,14 @@
 const codSequenceService = require('./codSequence.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const redisClient = require('../../utils/redisClient');
+const { CACHE_TTL } = require('../../config/constants');
 
 class CodSequenceController {
   // ------------------------------- create cod sequence ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await codSequenceService.create(req.body);
+    await redisClient.deleteByPattern('cod-sequences:*');
     ApiResponse.created(res, null, 'COD sequence tier created successfully');
   });
 
@@ -24,7 +27,8 @@ class CodSequenceController {
   // ------------------------------- get cod sequence lookup ----------------------------
 
   getLookup = catchAsync(async (req, res) => {
-    const items = await codSequenceService.getLookup(req.query);
+    const cacheKey = `cod-sequences:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
+    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => codSequenceService.getLookup(req.query));
     ApiResponse.success(res, items, 'COD sequence lookup list retrieved');
   });
 
@@ -45,6 +49,7 @@ class CodSequenceController {
 
   update = catchAsync(async (req, res) => {
     const item = await codSequenceService.update(req.params.id, req.body);
+    await redisClient.deleteByPattern('cod-sequences:*');
     ApiResponse.success(res, null, 'COD sequence tier updated successfully');
   });
 
@@ -52,6 +57,7 @@ class CodSequenceController {
 
   delete = catchAsync(async (req, res) => {
     const result = await codSequenceService.delete(req.params.id);
+    await redisClient.deleteByPattern('cod-sequences:*');
     ApiResponse.success(res, null, result.message);
   });
 }

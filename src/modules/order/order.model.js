@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const mediaField = require('../../utils/mediaField');
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -28,15 +27,6 @@ const orderItemSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    originalPrice: {
-      type: Number,
-      default: null,
-    },
-    image: mediaField,
-    category: {
-      type: String,
-      default: '',
-    },
     selectedMetal: {
       type: String,
       default: '',
@@ -50,7 +40,7 @@ const orderItemSchema = new mongoose.Schema(
       default: null,
     },
   },
-  { _id: true }
+  { _id: true, skipMeta: true }
 );
 
 const addressSnapshotSchema = new mongoose.Schema(
@@ -150,13 +140,6 @@ const orderSchema = new mongoose.Schema(
       default: 'placed',
       index: true,
     },
-    timeline: [
-      {
-        status: { type: String, required: true },
-        message: { type: String, default: '' },
-        timestamp: { type: Date, default: Date.now },
-      },
-    ],
     notes: {
       type: String,
       default: '',
@@ -168,6 +151,48 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
+/**
+ * Generate formatted sequential order numbers: RJ/ORD-0001, RJ/ORD-0002, etc.
+ */
+orderSchema.statics.generateOrderNumber = async function () {
+  const lastOrder = await this.findOne({
+    orderNumber: { $regex: /^RJ\/ORD-(\d+)/i },
+  })
+    .sort({ _id: -1 })
+    .select('orderNumber')
+    .lean();
+
+  let nextSeq = 1;
+  if (lastOrder && lastOrder.orderNumber) {
+    const match = lastOrder.orderNumber.match(/^RJ\/ORD-(\d+)/i);
+    if (match) {
+      nextSeq = parseInt(match[1], 10) + 1;
+    }
+  } else {
+    // If no RJ/ORD- format exists yet, use existing orders count to continue sequence
+    const count = await this.countDocuments();
+    nextSeq = count + 1;
+  }
+
+  let candidate = `RJ/ORD-${String(nextSeq).padStart(4, '0')}`;
+  while (await this.exists({ orderNumber: candidate })) {
+    nextSeq += 1;
+    candidate = `RJ/ORD-${String(nextSeq).padStart(4, '0')}`;
+  }
+
+  return candidate;
+};
+
+orderSchema.pre('validate', async function (next) {
+  if (!this.orderNumber) {
+    try {
+      this.orderNumber = await this.constructor.generateOrderNumber();
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
 
 module.exports = mongoose.model('Order', orderSchema);
 

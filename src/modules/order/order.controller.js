@@ -11,7 +11,8 @@ class OrderController {
 
   // ------------------------------- Get User Orders ----------------------------
   getMyOrders = catchAsync(async (req, res) => {
-    const result = await orderService.getMyOrders(req.user._id, req.query);
+    const userEmail = req.user.auth?.email || req.user.email;
+    const result = await orderService.getMyOrders(req.user._id, req.query, userEmail);
     ApiResponse.success(res, result, 'Orders retrieved successfully');
   });
 

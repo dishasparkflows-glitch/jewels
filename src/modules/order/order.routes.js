@@ -10,8 +10,8 @@ router.post('/', optionalAuth, orderController.createOrder);
 // User orders list (protected)
 router.get('/my-orders', authenticate, orderController.getMyOrders);
 
-// Order lookup by order number (e.g. tracking page / order confirmation)
-router.get('/lookup/:orderNumber', optionalAuth, orderController.getOrderByNumber);
+// Order lookup by order number (e.g. tracking page / order confirmation, supports numbers with slashes like RJ/ORD-0002)
+router.get('/lookup/:orderNumber(*)', optionalAuth, orderController.getOrderByNumber);
 
 // Get single order by ID
 router.get('/:id', optionalAuth, orderController.getOrderById);

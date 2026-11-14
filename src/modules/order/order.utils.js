@@ -2,11 +2,39 @@ const Setting = require('../setting/setting.model');
 const ApiError = require('../../utils/ApiError');
 
 // ------------------------------- generate order number ----------------------------
-function generateOrderNumber() {
-  const today = new Date();
-  const datePart = today.toISOString().slice(0, 10).replace(/-/g, '');
-  const randomPart = Math.floor(100000 + Math.random() * 900000);
-  return `NJ-${datePart}-${randomPart}`;
+async function generateOrderNumber() {
+  const mongoose = require('mongoose');
+  const Order = mongoose.models.Order || mongoose.model('Order');
+
+  if (typeof Order.generateOrderNumber === 'function') {
+    return await Order.generateOrderNumber();
+  }
+
+  const lastOrder = await Order.findOne({
+    orderNumber: { $regex: /^RJ\/ORD-(\d+)/i },
+  })
+    .sort({ _id: -1 })
+    .select('orderNumber')
+    .lean();
+
+  let nextSeq = 1;
+  if (lastOrder && lastOrder.orderNumber) {
+    const match = lastOrder.orderNumber.match(/^RJ\/ORD-(\d+)/i);
+    if (match) {
+      nextSeq = parseInt(match[1], 10) + 1;
+    }
+  } else {
+    const count = await Order.countDocuments();
+    nextSeq = count + 1;
+  }
+
+  let candidate = `RJ/ORD-${String(nextSeq).padStart(4, '0')}`;
+  while (await Order.exists({ orderNumber: candidate })) {
+    nextSeq += 1;
+    candidate = `RJ/ORD-${String(nextSeq).padStart(4, '0')}`;
+  }
+
+  return candidate;
 }
 
 // ------------------------------- resolve payment provider ----------------------------
@@ -36,9 +64,6 @@ function formatOrderItems(items = []) {
       price,
       quantity: qty,
       totalItemPrice: item.totalItemPrice !== undefined ? Number(item.totalItemPrice) : price * qty,
-      originalPrice: item.originalPrice !== undefined ? item.originalPrice : null,
-      image: item.image || null,
-      category: item.category || '',
       selectedMetal: item.selectedMetal || '',
       selectedSize: item.selectedSize || '',
       selectedAttributes: item.selectedAttributes || null,
@@ -54,12 +79,6 @@ function mapCartItemsToOrderItems(cartItems = []) {
     const prod = cartItem.productId && typeof cartItem.productId === 'object' ? cartItem.productId : null;
     const prodId = prod?._id || cartItem.productId;
     const title = prod?.basicInfo?.title || cartItem.title || '';
-    const firstImg =
-      prod?.colorImages?.[0]?.images?.[0] ||
-      prod?.ornate?.ornateImages?.[0] ||
-      prod?.images?.[0];
-    const image = typeof firstImg === 'string' ? firstImg : firstImg?.url || cartItem.image?.url || cartItem.image || null;
-    const category = prod?.categoryIds?.[0] ? String(prod.categoryIds[0]) : cartItem.category || '';
 
     return {
       productId: prodId,
@@ -67,9 +86,6 @@ function mapCartItemsToOrderItems(cartItems = []) {
       price,
       quantity: qty,
       totalItemPrice: Number(cartItem.totalItemPrice) || (price * qty),
-      originalPrice: prod?.pricing?.mrp || cartItem.originalPrice || null,
-      image,
-      category,
       selectedMetal: cartItem.selectedMetal || '',
       selectedSize: cartItem.selectedSize || '',
       selectedAttributes: cartItem.selectedAttributes || null,
@@ -184,14 +200,41 @@ function checkOrderAccess(order, user = null) {
 }
 
 // ------------------------------- build user order filters ----------------------------
-function buildUserOrderFilters(userId, queryParams = {}) {
+function buildUserOrderFilters(userId, queryParams = {}, userEmail = null) {
   const filter = {
     'meta.deletedAt': null,
-    userId,
   };
 
-  if (queryParams.orderStatus) {
-    filter.orderStatus = queryParams.orderStatus;
+  if (userId && userEmail) {
+    const escapedEmail = String(userEmail).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const emailRegex = new RegExp(`^${escapedEmail}$`, 'i');
+    filter.$or = [
+      { userId },
+      { 'customer.email': emailRegex },
+      { 'shippingAddress.email': emailRegex },
+    ];
+  } else if (userId) {
+    filter.userId = userId;
+  } else if (userEmail) {
+    const escapedEmail = String(userEmail).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const emailRegex = new RegExp(`^${escapedEmail}$`, 'i');
+    filter.$or = [
+      { 'customer.email': emailRegex },
+      { 'shippingAddress.email': emailRegex },
+    ];
+  }
+
+  if (queryParams.orderStatus && queryParams.orderStatus !== 'all') {
+    const statusVal = String(queryParams.orderStatus).toLowerCase();
+    if (statusVal === 'pending') {
+      filter.orderStatus = { $in: ['placed', 'confirmed', 'pending'] };
+    } else if (statusVal === 'processing') {
+      filter.orderStatus = { $in: ['processing', 'shipped', 'out_for_delivery'] };
+    } else if (statusVal.includes(',')) {
+      filter.orderStatus = { $in: statusVal.split(',').map((s) => s.trim()) };
+    } else {
+      filter.orderStatus = queryParams.orderStatus;
+    }
   }
   if (queryParams.paymentStatus) {
     filter['payment.status'] = queryParams.paymentStatus;
@@ -204,8 +247,17 @@ function buildUserOrderFilters(userId, queryParams = {}) {
 function buildAdminOrderFilters(queryParams = {}) {
   const filter = { 'meta.deletedAt': null };
 
-  if (queryParams.orderStatus) {
-    filter.orderStatus = queryParams.orderStatus;
+  if (queryParams.orderStatus && queryParams.orderStatus !== 'all') {
+    const statusVal = String(queryParams.orderStatus).toLowerCase();
+    if (statusVal === 'pending') {
+      filter.orderStatus = { $in: ['placed', 'confirmed', 'pending'] };
+    } else if (statusVal === 'processing') {
+      filter.orderStatus = { $in: ['processing', 'shipped', 'out_for_delivery'] };
+    } else if (statusVal.includes(',')) {
+      filter.orderStatus = { $in: statusVal.split(',').map((s) => s.trim()) };
+    } else {
+      filter.orderStatus = queryParams.orderStatus;
+    }
   }
   if (queryParams.paymentStatus) {
     filter['payment.status'] = queryParams.paymentStatus;

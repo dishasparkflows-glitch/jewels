@@ -21,12 +21,12 @@ const {
 } = require('./order.utils');
 
 class OrderService {
-    // ------------------------------- generate order number ----------------------------
+  // ------------------------------- generate order number ----------------------------
   generateOrderNumber() {
     return generateOrderNumber();
   }
 
-    // ------------------------------- create order ----------------------------
+  // ------------------------------- create order ----------------------------
   async createOrder(data, user = null) {
     const effectiveUserId = user?._id || data.userId || null;
     let items = Array.isArray(data.items) && data.items.length > 0 ? data.items : [];
@@ -98,7 +98,7 @@ class OrderService {
     validateShippingAddress(shippingAddress);
     const customer = buildCustomerInfo(shippingAddress, user);
 
-    const orderNumber = generateOrderNumber();
+    const orderNumber = await generateOrderNumber();
     const chosenProvider = await resolvePaymentProvider(data.paymentProvider);
 
     // Create the order document
@@ -117,21 +117,16 @@ class OrderService {
         status: 'pending',
       },
       orderStatus: 'placed',
-      timeline: [
-        {
-          status: 'placed',
-          message: `Order ${orderNumber} created`,
-          timestamp: new Date(),
-        },
-      ],
       notes: data.notes || '',
     });
 
     await order.save();
 
     // Payment initialization
+    // Payment initialization - Online payment integration temporarily commented out for testing
     let paymentResponse = null;
 
+    /*
     if (paymentMethod === 'online' || (paymentMethod === 'cod' && pricing.codDueNow > 0)) {
       paymentResponse = await paymentService.initiateOrderPayment({
         order,
@@ -140,11 +135,6 @@ class OrderService {
     } else {
       // Pure COD with no advance charge required
       order.orderStatus = 'confirmed';
-      order.timeline.push({
-        status: 'confirmed',
-        message: 'Order confirmed with Cash on Delivery',
-        timestamp: new Date(),
-      });
       await order.save();
 
       // Clear user's cart
@@ -154,6 +144,23 @@ class OrderService {
           { $set: { items: [] } }
         );
       }
+    }
+    */
+
+    // Directly confirm order without online gateway integration
+    order.orderStatus = 'confirmed';
+    if (paymentMethod === 'online') {
+      order.payment.status = 'paid';
+      order.payment.paidAt = new Date();
+    }
+    await order.save();
+
+    // Clear user's cart
+    if (effectiveUserId) {
+      await Cart.updateOne(
+        { userId: effectiveUserId },
+        { $set: { items: [] } }
+      );
     }
 
     return {
@@ -182,14 +189,14 @@ class OrderService {
     return order;
   }
 
-    // ------------------------------- get my orders ----------------------------
-  async getMyOrders(userId, queryParams = {}) {
+  // ------------------------------- get my orders ----------------------------
+  async getMyOrders(userId, queryParams = {}, userEmail = null) {
     const { page, limit, skip } = getPagination(queryParams);
-    const filter = buildUserOrderFilters(userId, queryParams);
+    const filter = buildUserOrderFilters(userId, queryParams, userEmail);
 
     const [items, total] = await Promise.all([
       Order.find(filter)
-        .sort({ 'meta.createdAt': -1 })
+        .sort({ 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -199,14 +206,14 @@ class OrderService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
-    // ------------------------------- get all orders ----------------------------
+  // ------------------------------- get all orders ----------------------------
   async getAllOrders(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = buildAdminOrderFilters(queryParams);
 
     const [items, total] = await Promise.all([
       Order.find(filter)
-        .sort({ 'meta.createdAt': -1 })
+        .sort({ 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
         .limit(limit)
         .populate('userId', 'profile.firstName profile.lastName auth.email')
@@ -217,24 +224,18 @@ class OrderService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
-  async updateOrderStatus(orderId, { orderStatus, message }) {
+  async updateOrderStatus(orderId, { orderStatus }) {
     const order = await Order.findById(orderId);
     if (!order) {
       throw new ApiError(404, 'Order not found');
     }
 
     order.orderStatus = orderStatus;
-    order.timeline.push({
-      status: orderStatus,
-      message: message || `Status updated to ${orderStatus}`,
-      timestamp: new Date(),
-    });
-
     await order.save();
     return order;
   }
 
-  async cancelOrder(orderId, user = null, reason = '') {
+  async cancelOrder(orderId, user = null) {
     const order = await Order.findById(orderId);
     if (!order) {
       throw new ApiError(404, 'Order not found');
@@ -247,12 +248,6 @@ class OrderService {
     }
 
     order.orderStatus = 'cancelled';
-    order.timeline.push({
-      status: 'cancelled',
-      message: reason ? `Order cancelled: ${reason}` : 'Order cancelled by customer',
-      timestamp: new Date(),
-    });
-
     await order.save();
     return order;
   }

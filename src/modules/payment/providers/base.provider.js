@@ -37,8 +37,8 @@ class BasePaymentProvider {
     const payableAmount = details.paidAmount !== undefined
       ? details.paidAmount
       : (order.payment?.method === 'cod' && (order.pricing?.codDueNow || 0) > 0
-          ? order.pricing.codDueNow
-          : order.pricing?.total || 0);
+        ? order.pricing.codDueNow
+        : order.pricing?.total || 0);
 
     order.payment.status = 'paid';
     order.payment.provider = this.name;
@@ -51,12 +51,6 @@ class BasePaymentProvider {
     order.payment.paidAmount = payableAmount;
 
     order.orderStatus = 'confirmed';
-
-    order.timeline.push({
-      status: 'paid',
-      message: details.timelineMessage || `Payment of ₹${payableAmount} completed successfully via ${this.displayName}`,
-      timestamp: new Date(),
-    });
 
     await order.save();
 
@@ -88,12 +82,6 @@ class BasePaymentProvider {
     order.payment.provider = this.name;
     order.payment.failureReason = details.reason || 'Payment failed';
     if (details.paymentDetails) order.payment.paymentDetails = details.paymentDetails;
-
-    order.timeline.push({
-      status: 'payment_failed',
-      message: details.timelineMessage || `Payment failed via ${this.displayName}: ${order.payment.failureReason}`,
-      timestamp: new Date(),
-    });
 
     await order.save();
     return order;

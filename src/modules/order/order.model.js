@@ -109,6 +109,8 @@ const orderSchema = new mongoose.Schema(
     coupon: {
       code: { type: String, default: null },
       discountAmount: { type: Number, default: 0 },
+      discountType: { type: String, enum: ['Percentage', 'Fixed', null], default: null },
+      discountValue: { type: Number, default: 0 },
       couponId: { type: mongoose.Schema.Types.ObjectId, ref: 'Coupon', default: null },
     },
     payment: {
@@ -142,6 +144,31 @@ const orderSchema = new mongoose.Schema(
       default: 'pending',
       index: true,
     },
+    logisticsProvider: {
+      type: String,
+      enum: ['Shiprocket', 'Sequel', null],
+      default: null,
+    },
+    shiprocketInfo: {
+      status: {
+        type: String,
+        enum: ['not_started', 'creating', 'success', 'failed', 'cancelled'],
+        default: 'not_started',
+      },
+      creatingSince: { type: Date, default: null },
+      shiprocketOrderId: { type: String, default: null },
+      shiprocketShipmentId: { type: String, default: null },
+      awbCode: { type: String, default: null, index: true },
+      courierName: { type: String, default: null },
+      courierId: { type: Number, default: null },
+      labelUrl: { type: String, default: null },
+      manifestUrl: { type: String, default: null },
+      pickupScheduledDate: { type: Date, default: null },
+      lastError: { type: String, default: null },
+    },
+    shippedAt: { type: Date, default: null },
+    deliveredAt: { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
     notes: {
       type: String,
       default: '',

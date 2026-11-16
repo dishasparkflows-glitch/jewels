@@ -64,6 +64,8 @@ const orderRoutes = require('../modules/order/order.routes');
 const paymentRoutes = require('../modules/payment/payment.routes');
 const filterRoutes = require('../modules/filter/filter.routes');
 const otpRoutes = require('../modules/otp/otp.routes');
+const { shiprocketRouter, adminLogisticsRouter } = require('../modules/shiprocket/shiprocket.routes');
+const returnRoutes = require('../modules/return/return.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -78,6 +80,9 @@ router.use('/wishlist', wishlistRoutes);
 router.use('/cart', cartRoutes);
 router.use('/orders', orderRoutes);
 router.use('/payments', paymentRoutes);
+router.use('/shiprocket', shiprocketRouter);
+router.use('/admin/logistics', adminLogisticsRouter);
+router.use('/returns', returnRoutes);
 router.use('/whatsapp', whatsappRoutes);
 router.use('/banners', bannerRoutes);
 router.use('/top-announcements', topAnnouncementRoutes);

@@ -62,9 +62,13 @@ class OrderService {
         const couponValidation = await couponService.validateCoupon(couponCode, subtotal);
         if (couponValidation?.isValid) {
           discount = Number(couponValidation.discountAmount) || 0;
+          const discType = couponValidation.discount?.type || 'Percentage';
+          const discVal = Number(couponValidation.discount?.value) || 0;
           appliedCoupon = {
             code: couponValidation.coupon?.code || couponCode.toUpperCase(),
             discountAmount: discount,
+            discountType: discType,
+            discountValue: discVal,
             couponId: couponValidation.couponId,
           };
         }
@@ -109,7 +113,7 @@ class OrderService {
       shippingAddress,
       items: formattedItems,
       pricing,
-      coupon: appliedCoupon || { code: null, discountAmount: 0, couponId: null },
+      coupon: appliedCoupon || { code: null, discountAmount: 0, discountType: null, discountValue: 0, couponId: null },
       payment: {
         method: paymentMethod,
         provider: paymentMethod === 'cod' && pricing.codDueNow === 0 ? 'cod' : chosenProvider,

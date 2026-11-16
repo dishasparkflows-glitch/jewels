@@ -460,11 +460,14 @@ class BannerService {
     if (categoryId) {
       if (mongoose.isValidObjectId(categoryId)) {
         categoryDoc = await Category.findOne({ _id: categoryId }).lean();
+        if (categoryDoc) {
+          resolvedCatId = categoryDoc._id;
+        }
       } else {
         categoryDoc = await Category.findOne({
           $or: [
             { slug: String(categoryId).trim().toLowerCase() },
-                        { name: new RegExp('^' + categoryId + '$', 'i') },
+            { name: new RegExp('^' + categoryId + '$', 'i') },
           ],
           'meta.deletedAt': null,
         }).lean();
@@ -475,8 +478,8 @@ class BannerService {
     }
     const selectedPlatform = ['web', 'mobile'].includes(platform) ? platform : 'web';
     const platformCondition = selectedPlatform === 'web'
-      ? { $or: [{ 'display.platform': 'web' }, { 'display.platform': { $exists: false } }] }
-      : { 'display.platform': selectedPlatform };
+      ? { $or: [{ 'display.platform': 'web' }, { 'display.platform': 'common' }, { 'display.platform': 'all' }, { 'display.platform': { $exists: false } }, { 'display.platform': null }] }
+      : { $or: [{ 'display.platform': selectedPlatform }, { 'display.platform': 'common' }, { 'display.platform': 'all' }, { 'display.platform': { $exists: false } }, { 'display.platform': null }] };
 
     const baseOfferConds = [
       { status: 'active' },
@@ -486,6 +489,7 @@ class BannerService {
       { $or: [{ startDate: null }, { startDate: { $exists: false } }, { startDate: { $lte: now } }] },
     ];
 
+    // 1. Check for category-specific offer banner
     if (resolvedCatId) {
       const categorySpecificOffer = await Banner.findOne({
         $and: [
@@ -509,24 +513,7 @@ class BannerService {
       }
     }
 
-    const generalOffer = await Banner.findOne({
-      $and: [...baseOfferConds, platformCondition],
-    })
-      .select('-meta')
-      .populate('display.categoryId', 'name slug')
-      .populate('collectionImages.categoryId', 'name slug')
-      .sort({ 'display.order': 1, _id: -1 })
-      .lean();
-
-    if (generalOffer) {
-      return {
-        banner: this._formatBanner(generalOffer),
-        source: 'offerbanner',
-        isOffer: true,
-        type: 'offerbanner',
-      };
-    }
-
+    // 2. Check for category-specific categorybanner in Banner collection
     if (resolvedCatId) {
       const categoryBanner = await Banner.findOne({
         $and: [
@@ -550,53 +537,169 @@ class BannerService {
           type: 'categorybanner',
         };
       }
+    }
 
-      try {
-        if (!categoryDoc && resolvedCatId && mongoose.isValidObjectId(resolvedCatId)) {
-          categoryDoc = await Category.findOne({ _id: resolvedCatId }).lean();
-        }
-
-        if (categoryDoc) {
-          const bannerUrl =
-            categoryDoc.banner?.url ||
-            (typeof categoryDoc.banner === 'string' ? categoryDoc.banner : null) ||
-            (Array.isArray(categoryDoc.images) && categoryDoc.images[0]?.url);
-
-          if (bannerUrl) {
-            return {
-              banner: {
-                _id: `category-banner-${categoryDoc._id}`,
-                content: {
-                  title: categoryDoc.name || 'Category Banner',
-                  subtitle: '',
-                  description: '',
-                },
-                image: {
-                  url: bannerUrl,
-                  key: categoryDoc.banner?.key || '',
-                },
-                mediaType: 'image',
-                display: {
-                  type: 'categorybanner',
-                  platform: selectedPlatform,
-                  categoryId: {
-                    _id: categoryDoc._id,
-                    name: categoryDoc.name,
-                    slug: categoryDoc.slug,
-                  },
-                  order: 0,
-                  position: 'none',
-                },
-              },
-              source: 'category_model',
-              isOffer: false,
-              type: 'categorybanner',
-            };
-          }
-        }
-      } catch (catErr) {
-        console.warn('Failed to fetch category model banner fallback:', catErr.message);
+    // 3. Fallback to category model's own banner image (if configured)
+    try {
+      if (!categoryDoc && resolvedCatId && mongoose.isValidObjectId(resolvedCatId)) {
+        categoryDoc = await Category.findOne({ _id: resolvedCatId }).lean();
       }
+
+      if (categoryDoc) {
+        const bannerUrl =
+          categoryDoc.banner?.url ||
+          (typeof categoryDoc.banner === 'string' ? categoryDoc.banner : null) ||
+          (Array.isArray(categoryDoc.images) && categoryDoc.images[0]?.url);
+
+        if (bannerUrl) {
+          return {
+            banner: {
+              _id: `category-banner-${categoryDoc._id}`,
+              content: {
+                title: categoryDoc.name || 'Category Banner',
+                subtitle: '',
+                description: '',
+              },
+              image: {
+                url: bannerUrl,
+                key: categoryDoc.banner?.key || '',
+                mediaType: 'image',
+              },
+              media: {
+                url: bannerUrl,
+                key: categoryDoc.banner?.key || '',
+                mediaType: 'image',
+              },
+              mediaType: 'image',
+              display: {
+                type: 'categorybanner',
+                platform: selectedPlatform,
+                categoryId: {
+                  _id: categoryDoc._id,
+                  name: categoryDoc.name,
+                  slug: categoryDoc.slug,
+                },
+                order: 0,
+                position: 'none',
+              },
+            },
+            source: 'category_model',
+            isOffer: false,
+            type: 'categorybanner',
+          };
+        }
+      }
+    } catch (catErr) {
+      console.warn('Failed to fetch category model banner fallback:', catErr.message);
+    }
+
+    // 4. Fallback to active theme or default category banner
+    try {
+      const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');
+      const activeTheme = await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id name').lean();
+
+      let themeBanner = null;
+      if (activeTheme) {
+        themeBanner = await Banner.findOne({
+          $and: [
+            { status: 'active' },
+            { 'display.type': 'categorybanner' },
+            { themeId: activeTheme._id },
+            platformCondition,
+          ],
+        })
+          .select('-meta')
+          .populate('display.categoryId', 'name slug')
+          .sort({ 'display.order': 1, _id: -1 })
+          .lean();
+      }
+
+      if (!themeBanner) {
+        themeBanner = await Banner.findOne({
+          $and: [
+            { status: 'active' },
+            { 'display.type': 'categorybanner' },
+            platformCondition,
+          ],
+        })
+          .select('-meta')
+          .populate('display.categoryId', 'name slug')
+          .sort({ 'display.order': 1, _id: -1 })
+          .lean();
+      }
+
+      if (themeBanner) {
+        return {
+          banner: this._formatBanner(themeBanner),
+          source: 'theme_categorybanner',
+          isOffer: false,
+          type: 'categorybanner',
+        };
+      }
+
+      if (activeTheme) {
+        const Gallery = require('../gallery/gallery.model');
+        const galleryItem = await Gallery.findOne({
+          placement: 'categorybanner',
+          themeId: activeTheme._id,
+          status: { $ne: 'inactive' },
+        }).lean();
+
+        if (galleryItem && galleryItem.image?.url) {
+          return {
+            banner: {
+              _id: `gallery-category-${galleryItem._id}`,
+              content: {
+                title: categoryDoc?.name || activeTheme.name || 'Category Banner',
+                subtitle: '',
+                description: '',
+              },
+              image: galleryItem.image,
+              media: galleryItem.image,
+              mediaType: 'image',
+              display: {
+                type: 'categorybanner',
+                platform: selectedPlatform,
+                categoryId: categoryDoc ? {
+                  _id: categoryDoc._id,
+                  name: categoryDoc.name,
+                  slug: categoryDoc.slug,
+                } : null,
+                order: 0,
+                position: 'none',
+              },
+            },
+            source: 'gallery_categorybanner',
+            isOffer: false,
+            type: 'categorybanner',
+          };
+        }
+      }
+    } catch (themeErr) {
+      console.warn('Failed to fetch theme category banner fallback:', themeErr.message);
+    }
+
+    // 5. Fallback to general offer banner (if any active offer banner exists without specific category)
+    const generalOffer = await Banner.findOne({
+      $and: [
+        ...baseOfferConds,
+        platformCondition,
+        { $or: [{ 'display.categoryId': null }, { 'display.categoryId': { $exists: false } }] },
+      ],
+    })
+      .select('-meta')
+      .populate('display.categoryId', 'name slug')
+      .populate('collectionImages.categoryId', 'name slug')
+      .sort({ 'display.order': 1, _id: -1 })
+      .lean();
+
+    if (generalOffer) {
+      return {
+        banner: this._formatBanner(generalOffer),
+        source: 'offerbanner',
+        isOffer: true,
+        type: 'offerbanner',
+      };
     }
 
     return {

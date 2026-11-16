@@ -47,6 +47,14 @@ const integrationTokenSchema = new mongoose.Schema(
       message: String,
       occurredAt: Date,
     },
+    refreshLockUntil: {
+      type: Date,
+      default: null,
+    },
+    refreshLockOwner: {
+      type: String,
+      default: null,
+    },
   },
   {
     versionKey: false,

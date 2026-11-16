@@ -216,7 +216,6 @@ class WebsiteThemeService {
   // ------------------------------- update website theme ----------------------------
   async update(id, data, actorId) {
     const theme = await this.getById(id);
-    if (theme.status === 'active') throw new ApiError(409, 'Edit the active theme by duplicating it first.');
     if (theme.status === 'archived') throw new ApiError(409, 'Archived themes cannot be edited.');
     if (data.status) throw new ApiError(400, 'Theme status can only be changed through publish, schedule, or archive actions.');
     if (data.config) {
@@ -237,10 +236,14 @@ class WebsiteThemeService {
       if (!code || duplicate) throw new ApiError(409, 'Theme code is empty or already in use.');
       theme.code = code;
     }
+    theme.meta = theme.meta || {};
     theme.meta.updatedBy = actorId;
+    theme.meta.updatedAt = new Date();
     await theme.save();
-    if (theme.status === 'scheduled') theme.publishedSnapshot = snapshotOf(theme);
-    if (theme.status === 'scheduled') await theme.save();
+    if (theme.status === 'scheduled' || theme.status === 'active') {
+      theme.publishedSnapshot = snapshotOf(theme);
+      await theme.save();
+    }
     await this.writeHistory(theme, 'updated', actorId, 'Theme configuration updated.');
     return theme;
   }
@@ -296,6 +299,7 @@ class WebsiteThemeService {
     theme.status = 'active';
     theme.publishedAt = new Date();
     theme.schedule.startAt = null;
+    theme.meta = theme.meta || {};
     theme.meta.updatedBy = actorId || theme.meta.updatedBy;
     await theme.save();
     await this.writeHistory(theme, action, actorId, '', updatedSettings.revision);
@@ -341,6 +345,7 @@ class WebsiteThemeService {
 
   async remove(id, actorId) {
     const theme = await this.getById(id);
+    theme.meta = theme.meta || {};
     theme.meta.deletedAt = new Date();
     theme.meta.deletedBy = actorId || null;
     theme.meta.updatedBy = actorId || null;

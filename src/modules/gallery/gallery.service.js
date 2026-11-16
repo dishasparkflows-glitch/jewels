@@ -155,6 +155,7 @@ class GalleryService {
       platform = 'all',
       status,
       sortBy = 'newest',
+      search,
     } = queryParams;
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -164,47 +165,66 @@ class GalleryService {
     const activeTheme = await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null }).lean();
     const activeThemeId = activeTheme ? String(activeTheme._id) : null;
 
-    const filter = { 'meta.deletedAt': null };
+    const andConditions = [{ 'meta.deletedAt': null }];
 
-    // Theme filter
+    // Theme filter (themeId-wise filtering as defined in gallery.model.js)
     if (themeId && themeId !== 'all') {
       if (themeId === 'active') {
-        filter.$or = [{ themeId: activeThemeId }, { themeId: null }];
+        andConditions.push({
+          $or: [
+            { themeId: activeThemeId ? new mongoose.Types.ObjectId(activeThemeId) : null },
+            { themeId: null },
+          ],
+        });
       } else if (mongoose.isValidObjectId(themeId)) {
-        filter.themeId = themeId;
+        andConditions.push({ themeId: new mongoose.Types.ObjectId(themeId) });
       } else if (themeId === 'null' || themeId === 'unassigned') {
-        filter.themeId = null;
+        andConditions.push({ themeId: null });
       }
     }
 
     // Placement filter
     const targetType = type !== 'all' ? type : (placement && placement !== 'all' ? placement : null);
     if (targetType) {
-      filter.placement = targetType;
+      andConditions.push({ placement: targetType });
     }
 
     // Platform filter
     if (platform && platform !== 'all') {
       if (platform === 'common') {
-        filter.platform = 'common';
+        andConditions.push({ platform: 'common' });
       } else if (platform === 'web' || platform === 'desktop') {
-        filter.platform = { $in: ['web', 'desktop', 'common'] };
+        andConditions.push({ platform: { $in: ['web', 'desktop', 'common'] } });
       } else if (platform === 'app' || platform === 'mobile') {
-        filter.platform = { $in: ['app', 'mobile', 'common'] };
+        andConditions.push({ platform: { $in: ['app', 'mobile', 'common'] } });
       }
     }
 
     // Status filter
     if (status && status !== 'all') {
-      filter.status = status;
+      andConditions.push({ status });
     }
+
+    // Search filter (searches URL, key, placement)
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      andConditions.push({
+        $or: [
+          { 'image.url': searchRegex },
+          { 'image.key': searchRegex },
+          { placement: searchRegex },
+        ],
+      });
+    }
+
+    const filter = andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
 
     let sort = { 'meta.createdAt': -1 };
     if (sortBy === 'oldest') sort = { 'meta.createdAt': 1 };
 
     const [docs, total] = await Promise.all([
       Gallery.find(filter)
-        .populate('themeId', 'name status code isLive')
+        .populate('themeId', 'name status code description')
         .sort(sort)
         .skip(skip)
         .limit(limitNum)
@@ -212,14 +232,22 @@ class GalleryService {
       Gallery.countDocuments(filter),
     ]);
 
-    const countFilter = { 'meta.deletedAt': null };
+    const countConditions = [{ 'meta.deletedAt': null }];
     if (themeId && themeId !== 'all') {
       if (themeId === 'active') {
-        countFilter.$or = [{ themeId: activeThemeId }, { themeId: null }];
+        countConditions.push({
+          $or: [
+            { themeId: activeThemeId ? new mongoose.Types.ObjectId(activeThemeId) : null },
+            { themeId: null },
+          ],
+        });
       } else if (mongoose.isValidObjectId(themeId)) {
-        countFilter.themeId = themeId;
+        countConditions.push({ themeId: new mongoose.Types.ObjectId(themeId) });
+      } else if (themeId === 'null' || themeId === 'unassigned') {
+        countConditions.push({ themeId: null });
       }
     }
+    const countFilter = countConditions.length > 1 ? { $and: countConditions } : countConditions[0];
 
     const allDocsForCounts = await Gallery.find(countFilter).select('placement').lean();
     const counts = {
@@ -242,30 +270,18 @@ class GalleryService {
       }
     });
 
-    const items = docs.map((doc) => {
-      const themeObj = doc.themeId;
-      const isLive = themeObj?.status === 'active' || String(themeObj?._id) === activeThemeId;
-      const url = doc.image?.url || '';
-      const key = doc.image?.key || '';
-
-      return {
-        id: String(doc._id),
-        _id: doc._id,
-        url,
-        key,
-        placement: doc.placement,
-        type: doc.placement,
-        typeLabel: this._getTypeLabel(doc.placement),
-        platform: doc.platform,
-        themeId: themeObj?._id ? String(themeObj._id) : null,
-        themeName: themeObj?.name || 'Global / Unassigned',
-        themeStatus: themeObj?.status || null,
-        isThemeLive: isLive,
-        status: doc.status || 'active',
-        createdAt: doc.meta?.createdAt || doc.createdAt,
-        updatedAt: doc.meta?.updatedAt || doc.updatedAt,
-      };
-    });
+    const items = docs.map((doc) => ({
+      _id: doc._id,
+      themeId: doc.themeId || null,
+      placement: doc.placement,
+      platform: doc.platform,
+      image: {
+        url: doc.image?.url || '',
+        key: doc.image?.key || '',
+      },
+      status: doc.status || 'active',
+      meta: doc.meta,
+    }));
 
     const themesLookup = await this.getThemesLookup();
 
@@ -274,7 +290,11 @@ class GalleryService {
       counts,
       themes: themesLookup,
       total,
-      pagination: getPaginationMeta(total, pageNum, limitNum),
+      pagination: {
+        ...getPaginationMeta(total, pageNum, limitNum),
+        page: pageNum,
+        totalItems: total,
+      },
     };
   }
 
@@ -284,13 +304,25 @@ class GalleryService {
       throw new ApiError(400, 'Invalid gallery item ID');
     }
     const item = await Gallery.findOne({ _id: id, 'meta.deletedAt': null })
-      .populate('themeId', 'name status code')
+      .populate('themeId', 'name status code description')
       .lean();
 
     if (!item) {
       throw new ApiError(404, 'Gallery media item not found');
     }
-    return item;
+
+    return {
+      _id: item._id,
+      themeId: item.themeId || null,
+      placement: item.placement,
+      platform: item.platform,
+      image: {
+        url: item.image?.url || '',
+        key: item.image?.key || '',
+      },
+      status: item.status || 'active',
+      meta: item.meta,
+    };
   }
 
   // ------------------------------- create gallery media ----------------------------
@@ -393,7 +425,7 @@ class GalleryService {
     };
 
     await item.save();
-    return item;
+    return this.getOne(item._id);
   }
 
   // ------------------------------- toggle gallery status ----------------------------

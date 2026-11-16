@@ -33,6 +33,14 @@ const gemstoneShapeSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
+    meta: {
+      deletedAt: { type: Date, default: null, index: true },
+      deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now },
+      createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    },
   },
   {
     versionKey: false,

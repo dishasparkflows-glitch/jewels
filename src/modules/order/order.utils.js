@@ -196,8 +196,26 @@ function buildCustomerInfo(shippingAddress, user = null) {
 // ------------------------------- check order access ----------------------------
 function checkOrderAccess(order, user = null) {
   if (user && user.role !== 'admin' && user.role !== 'super_admin') {
-    const orderOwner = order.userId;
-    if (orderOwner && orderOwner.toString() !== user._id.toString()) {
+    const rawOwner = order.userId;
+    const ownerId = rawOwner?._id
+      ? rawOwner._id.toString()
+      : (rawOwner ? rawOwner.toString() : null);
+
+    const currentUserId = user._id ? user._id.toString() : null;
+
+    // Direct owner ID match
+    if (ownerId && currentUserId && ownerId === currentUserId) {
+      return;
+    }
+
+    // Email match fallback (e.g. order placed with account email)
+    const userEmail = (user.auth?.email || user.email || '').toLowerCase().trim();
+    const customerEmail = (order.customer?.email || order.shippingAddress?.email || '').toLowerCase().trim();
+    if (userEmail && customerEmail && userEmail === customerEmail) {
+      return;
+    }
+
+    if (ownerId && currentUserId && ownerId !== currentUserId) {
       throw new ApiError(403, 'You do not have permission to access this order');
     }
   }

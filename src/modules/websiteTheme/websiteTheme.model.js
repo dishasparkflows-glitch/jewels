@@ -135,7 +135,11 @@ const websiteThemeSchema = new mongoose.Schema({
     fallbackThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'WebsiteTheme', default: null },
   },
   publishedAt: { type: Date, default: null },
-}, { versionKey: false });
+  meta: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => ({ createdAt: new Date(), updatedAt: new Date(), deletedAt: null }),
+  },
+}, { versionKey: false, timestamps: true });
 
 websiteThemeSchema.index({ status: 1, 'schedule.startAt': 1, 'schedule.endAt': 1 });
 

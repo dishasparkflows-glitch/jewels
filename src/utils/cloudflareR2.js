@@ -76,10 +76,8 @@ class CloudflareR2Service {
   // ------------------------------- delete file from R2 ----------------------------
   async deleteFile(key) {
     if (!key) return;
-    let cleanKey = String(key).replace(/^\/+/, '').split(/[?#]/)[0];
-    if (this.bucketName && cleanKey.startsWith(`${this.bucketName}/`)) {
-      cleanKey = cleanKey.slice(this.bucketName.length + 1);
-    }
+    const cleanKey = this.extractKey(key);
+    if (!cleanKey) return;
 
     try {
       await this.client.send(
@@ -97,7 +95,13 @@ class CloudflareR2Service {
 
   // ------------------------------- extract clean R2 key from string or URL ----------------------------
   extractKey(input) {
-    if (!input || typeof input !== 'string') return '';
+    if (!input) return '';
+    if (typeof input === 'object' && input !== null) {
+      if (typeof input.key === 'string' && input.key) return this.extractKey(input.key);
+      if (typeof input.url === 'string' && input.url) return this.extractKey(input.url);
+      return '';
+    }
+    if (typeof input !== 'string') return '';
     let clean = input.trim();
     if (/^https?:\/\//i.test(clean)) {
       try {

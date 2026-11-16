@@ -30,7 +30,7 @@ class GalleryController {
   // ------------------------------- update item ----------------------------
   update = catchAsync(async (req, res) => {
     const result = await galleryService.update(req.params.id, req.body, req.user?._id);
-    ApiResponse.success(res, null, 'Gallery item updated successfully');
+    ApiResponse.success(res, result, 'Gallery item updated successfully');
   });
 
   // ------------------------------- toggle status ----------------------------

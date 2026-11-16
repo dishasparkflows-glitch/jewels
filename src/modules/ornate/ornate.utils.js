@@ -152,8 +152,8 @@ function extractLabelIdentifiers(label = {}) {
   const uniqueLabelID = label.UniqueLabelID ? String(label.UniqueLabelID).trim() : '';
   const barcodeNo = label.BarcodeNo ? String(label.BarcodeNo).trim() : '';
   const labelNo = label.LabelNo ? String(label.LabelNo).trim() : '';
-  const sku = uniqueLabelID || barcodeNo || labelNo;
   const tagNo = labelNo || uniqueLabelID;
+  const sku = tagNo || uniqueLabelID || barcodeNo;
   const barcode = barcodeNo;
 
   return { uniqueLabelID, barcodeNo, labelNo, sku, tagNo, barcode };
@@ -278,7 +278,7 @@ function buildProductPayloadFromLabel(label, {
     // Structured Product Blocks (matching product.model.js)
     basicInfo: {
       title,
-      sku,
+      sku: tagNo || sku,
       slug: activeSlug,
       description: description?.trim() || undefined,
       remark: label.Remark?.trim() || undefined,

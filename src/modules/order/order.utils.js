@@ -1,9 +1,9 @@
+const mongoose = require('mongoose');
 const Setting = require('../setting/setting.model');
 const ApiError = require('../../utils/ApiError');
 
 // ------------------------------- generate order number ----------------------------
 async function generateOrderNumber() {
-  const mongoose = require('mongoose');
   const Order = mongoose.models.Order || mongoose.model('Order');
 
   if (typeof Order.generateOrderNumber === 'function') {
@@ -61,6 +61,7 @@ function formatOrderItems(items = []) {
     return {
       productId: item.productId,
       title: item.title,
+      sku: item.sku || item.productId?.basicInfo?.sku || '',
       price,
       quantity: qty,
       totalItemPrice: item.totalItemPrice !== undefined ? Number(item.totalItemPrice) : price * qty,
@@ -79,10 +80,12 @@ function mapCartItemsToOrderItems(cartItems = []) {
     const prod = cartItem.productId && typeof cartItem.productId === 'object' ? cartItem.productId : null;
     const prodId = prod?._id || cartItem.productId;
     const title = prod?.basicInfo?.title || cartItem.title || '';
+    const sku = prod?.basicInfo?.sku || cartItem.sku || '';
 
     return {
       productId: prodId,
       title,
+      sku,
       price,
       quantity: qty,
       totalItemPrice: Number(cartItem.totalItemPrice) || (price * qty),
@@ -186,6 +189,7 @@ function buildCustomerInfo(shippingAddress, user = null) {
     lastName: shippingAddress.lastName || user?.profile?.lastName || '',
     email: shippingAddress.email || user?.auth?.email || '',
     phone: shippingAddress.phone || user?.profile?.phone || '',
+    countryCode: shippingAddress.countryCode || user?.profile?.countryCode || '+91',
   };
 }
 
@@ -227,7 +231,7 @@ function buildUserOrderFilters(userId, queryParams = {}, userEmail = null) {
   if (queryParams.orderStatus && queryParams.orderStatus !== 'all') {
     const statusVal = String(queryParams.orderStatus).toLowerCase();
     if (statusVal === 'pending') {
-      filter.orderStatus = { $in: ['placed', 'confirmed', 'pending'] };
+      filter.orderStatus = 'pending';
     } else if (statusVal === 'processing') {
       filter.orderStatus = { $in: ['processing', 'shipped', 'out_for_delivery'] };
     } else if (statusVal.includes(',')) {
@@ -250,7 +254,7 @@ function buildAdminOrderFilters(queryParams = {}) {
   if (queryParams.orderStatus && queryParams.orderStatus !== 'all') {
     const statusVal = String(queryParams.orderStatus).toLowerCase();
     if (statusVal === 'pending') {
-      filter.orderStatus = { $in: ['placed', 'confirmed', 'pending'] };
+      filter.orderStatus = 'pending';
     } else if (statusVal === 'processing') {
       filter.orderStatus = { $in: ['processing', 'shipped', 'out_for_delivery'] };
     } else if (statusVal.includes(',')) {

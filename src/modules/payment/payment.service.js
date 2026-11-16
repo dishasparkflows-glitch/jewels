@@ -49,7 +49,6 @@ class PaymentService {
     if (payableAmount <= 0) {
       orderDoc.payment.status = 'paid';
       orderDoc.payment.paidAt = new Date();
-      orderDoc.orderStatus = 'confirmed';
       await orderDoc.save();
       return { provider: 'none', status: 'paid', order: orderDoc };
     }

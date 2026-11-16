@@ -12,6 +12,11 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    sku: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     price: {
       type: Number,
       required: true,
@@ -81,14 +86,11 @@ const orderSchema = new mongoose.Schema(
       lastName: { type: String, default: '' },
       email: { type: String, default: '', index: true },
       phone: { type: String, default: '', index: true },
+      countryCode: { type: String, default: '+91' },
     },
     shippingAddress: {
       type: addressSnapshotSchema,
       required: true,
-    },
-    billingAddress: {
-      type: addressSnapshotSchema,
-      default: null,
     },
     items: {
       type: [orderItemSchema],
@@ -136,8 +138,8 @@ const orderSchema = new mongoose.Schema(
     },
     orderStatus: {
       type: String,
-      enum: ['placed', 'confirmed', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled'],
-      default: 'placed',
+      enum: ['pending', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled'],
+      default: 'pending',
       index: true,
     },
     notes: {

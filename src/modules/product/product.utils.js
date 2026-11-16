@@ -675,7 +675,6 @@ const formatStorefrontProductDetail = (p) => {
         if (purity.id) item.metalPurityId = purity.id;
 
         if (color.name) {
-          item.color = color.name;
           item.diamondColor = color.name;
         }
         if (color.id) item.diamondColorId = color.id;
@@ -692,7 +691,10 @@ const formatStorefrontProductDetail = (p) => {
         if (shape.name) item.diamondShape = shape.name;
         if (shape.id) item.diamondShapeId = shape.id;
 
-        if (mColor.name) item.metalColor = mColor.name;
+        if (mColor.name) {
+          item.color = mColor.name;
+          item.metalColor = mColor.name;
+        }
         if (mColor.id) item.metalColorId = mColor.id;
 
         if (v.labourCharge) item.labourCharge = Number(v.labourCharge);

@@ -332,7 +332,7 @@ productSchema.index({ 'meta.createdAt': -1 });
 productSchema.pre('save', function (next) {
   const isOrnate = Boolean(this.isOrnate);
   const tagNo = this.ornate?.tagNo;
-  if (isOrnate && tagNo && !this.basicInfo?.sku) {
+  if (isOrnate && tagNo) {
     if (!this.basicInfo) this.basicInfo = {};
     this.basicInfo.sku = tagNo;
   }

@@ -107,7 +107,6 @@ class OrderService {
       userId: effectiveUserId,
       customer,
       shippingAddress,
-      billingAddress: data.billingAddress || shippingAddress,
       items: formattedItems,
       pricing,
       coupon: appliedCoupon || { code: null, discountAmount: 0, couponId: null },
@@ -116,7 +115,7 @@ class OrderService {
         provider: paymentMethod === 'cod' && pricing.codDueNow === 0 ? 'cod' : chosenProvider,
         status: 'pending',
       },
-      orderStatus: 'placed',
+      orderStatus: 'pending',
       notes: data.notes || '',
     });
 
@@ -134,7 +133,7 @@ class OrderService {
       });
     } else {
       // Pure COD with no advance charge required
-      order.orderStatus = 'confirmed';
+      order.orderStatus = 'pending';
       await order.save();
 
       // Clear user's cart
@@ -147,8 +146,8 @@ class OrderService {
     }
     */
 
-    // Directly confirm order without online gateway integration
-    order.orderStatus = 'confirmed';
+    // Keep order status as pending; mark payment paid if online
+    order.orderStatus = 'pending';
     if (paymentMethod === 'online') {
       order.payment.status = 'paid';
       order.payment.paidAt = new Date();
@@ -170,7 +169,10 @@ class OrderService {
   }
 
   async getOrderById(orderId, user = null) {
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderId)
+      .populate('userId', 'profile.firstName profile.lastName auth.email')
+      .populate('items.productId', 'basicInfo media assets ornate colorImages')
+      .lean();
     if (!order) {
       throw new ApiError(404, 'Order not found');
     }
@@ -180,7 +182,9 @@ class OrderService {
   }
 
   async getOrderByNumber(orderNumber, user = null) {
-    const order = await Order.findOne({ orderNumber });
+    const order = await Order.findOne({ orderNumber })
+      .populate('items.productId', 'basicInfo media assets ornate colorImages')
+      .lean();
     if (!order) {
       throw new ApiError(404, 'Order not found');
     }
@@ -199,6 +203,7 @@ class OrderService {
         .sort({ 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
         .limit(limit)
+        .populate('items.productId', 'basicInfo media assets ornate colorImages')
         .lean(),
       Order.countDocuments(filter),
     ]);
@@ -217,6 +222,7 @@ class OrderService {
         .skip(skip)
         .limit(limit)
         .populate('userId', 'profile.firstName profile.lastName auth.email')
+        .populate('items.productId', 'basicInfo media assets ornate colorImages')
         .lean(),
       Order.countDocuments(filter),
     ]);

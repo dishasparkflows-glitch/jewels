@@ -5,17 +5,21 @@ const DiamondType = require('../diamondType/diamondType.model');
 const DiamondClarity = require('../diamondClarity/diamondClarity.model');
 const CaratWeight = require('../caratWeight/caratWeight.model');
 const Featured = require('../featured/featured.model');
+const GemstoneType = require('../gemstoneType/gemstoneType.model');
+const GemstoneShape = require('../gemstoneShape/gemstoneShape.model');
 const ApiError = require('../../utils/ApiError');
 
 async function loadAllFilterOptions() {
   const activeFilter = { 'meta.deletedAt': null, status: 'active' };
 
-  const [diamondTypes, diamondClarities, caratWeights, collections, categories] = await Promise.all([
+  const [diamondTypes, diamondClarities, caratWeights, collections, categories, gemstoneTypes, gemstoneShapes] = await Promise.all([
     DiamondType.find(activeFilter).sort({ name: 1 }).select('_id name').lean(),
     DiamondClarity.find(activeFilter).sort({ name: 1 }).select('_id name').lean(),
     CaratWeight.find(activeFilter).sort({ order: 1, weight: 1, name: 1 }).select('_id name weight').lean(),
     Featured.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name').lean(),
     Category.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name slug').lean(),
+    GemstoneType.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name slug colorCode colorCodeEnd swatchImage image').lean(),
+    GemstoneShape.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name code iconSvg image').lean(),
   ]);
 
   const formattedDiamondTypes = diamondTypes.map((item) => ({
@@ -66,12 +70,31 @@ async function loadAllFilterOptions() {
     { _id: 'Platinum', name: 'Platinum', value: 'Platinum' },
   ];
 
+  const formattedGemstoneTypes = gemstoneTypes.map((item) => ({
+    _id: String(item._id),
+    name: item.name,
+    value: item.slug || item.name,
+    colorCode: item.colorCode || '#9966CC',
+    colorCodeEnd: item.colorCodeEnd || item.colorCode || '#9966CC',
+    swatchImage: item.swatchImage?.url || null,
+  }));
+
+  const formattedGemstoneShapes = gemstoneShapes.map((item) => ({
+    _id: String(item._id),
+    name: item.name,
+    value: item.code || item.name.toLowerCase(),
+    code: item.code,
+    iconSvg: item.iconSvg || null,
+  }));
+
   return {
     'jewellery-types': formattedCategories,
     'price-range': [],
     'carat-weights': formattedCaratWeights,
     'diamond-types': formattedDiamondTypes,
     'diamond-clarities': formattedDiamondClarities,
+    'gemstone-types': formattedGemstoneTypes,
+    'gemstone-shapes': formattedGemstoneShapes,
     collections: formattedCollections,
     gender: genders,
     metal: metals,
@@ -79,6 +102,8 @@ async function loadAllFilterOptions() {
       diamondTypes: formattedDiamondTypes,
       diamondClarities: formattedDiamondClarities,
       caratWeights: formattedCaratWeights,
+      gemstoneTypes: formattedGemstoneTypes,
+      gemstoneShapes: formattedGemstoneShapes,
       collections: formattedCollections,
       categories: formattedCategories,
       genders,
@@ -146,7 +171,7 @@ class FilterService {
           type: f.type,
           order,
           enabled: isEnabled,
-          options: loadedOptions[f.filterId] || [],
+          options: loadedOptions[f.filterId] || loadedOptions[f.key] || [],
         };
       }).sort((a, b) => a.order - b.order);
 
@@ -169,7 +194,7 @@ class FilterService {
         type: f.type,
         order: f.order,
         enabled: f.enabled !== false,
-        options: loadedOptions[f.filterId] || [],
+        options: loadedOptions[f.filterId] || loadedOptions[f.key] || [],
       }))
       .sort((a, b) => a.order - b.order);
 

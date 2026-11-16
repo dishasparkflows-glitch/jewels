@@ -14,9 +14,12 @@ const {
 } = require('./product.query');
 const DiamondType = require('../diamondType/diamondType.model');
 const DiamondClarity = require('../diamondClarity/diamondClarity.model');
+const GemstoneType = require('../gemstoneType/gemstoneType.model');
+const GemstoneShape = require('../gemstoneShape/gemstoneShape.model');
 const Featured = require('../featured/featured.model');
 const Wishlist = require('../wishlist/wishlist.model');
 const Category = require('../category/category.model');
+const MenuItem = require('../menuItem/menuItem.model');
 const ProductGroup = require('../productGroup/productGroup.model');
 const productGroupService = require('../productGroup/productGroup.service');
 const { SHOP_FOR_OPTIONS, getShopForGenders } = require('./product.filters');
@@ -477,6 +480,77 @@ class ProductService {
                 { 'sideDiamondRows.diamondClarityId': { $in: clarityIds } },
                 { 'variants.diamondClarityId': { $in: clarityIds } },
               ] : []),
+              { 'basicInfo.title': { $in: regexList } },
+              { 'basicInfo.description': { $in: regexList } },
+            ],
+          },
+        ];
+      }
+    }
+
+    // Dynamic Filter: Gemstone (also supports Angara alias stone_names)
+    const gemstoneParam = queryParams.gemstone || queryParams.stone_names;
+    if (gemstoneParam) {
+      const gemstones = String(gemstoneParam).split(',').map((s) => s.trim()).filter(Boolean);
+      if (gemstones.length) {
+        const gtDocs = await GemstoneType.find({
+          $or: [
+            { _id: { $in: gemstones.filter((g) => mongoose.isValidObjectId(g)) } },
+            { slug: { $in: gemstones.map((g) => g.toLowerCase()) } },
+            { name: { $in: gemstones.map((g) => new RegExp(`^${g}$`, 'i')) } },
+          ],
+        }).lean();
+        const stoneIds = gtDocs.map((d) => d._id);
+        const stoneNames = gtDocs.length ? gtDocs.map((d) => d.name) : gemstones;
+        const regexList = stoneNames.map((n) => new RegExp(n, 'i'));
+
+        filter.$and = [
+          ...(filter.$and || []),
+          {
+            $or: [
+              ...(stoneIds.length ? [
+                { gemstoneTypeId: { $in: stoneIds } },
+                { 'centerDiamondRows.gemstoneTypeId': { $in: stoneIds } },
+                { 'variants.gemstoneTypeId': { $in: stoneIds } },
+              ] : []),
+              { gemstone: { $in: stoneNames } },
+              { 'specifications.gemstone': { $in: stoneNames } },
+              { 'basicInfo.title': { $in: regexList } },
+              { 'basicInfo.description': { $in: regexList } },
+            ],
+          },
+        ];
+      }
+    }
+
+    // Dynamic Filter: Gemstone Shape (also supports Angara alias stone_shapes)
+    const gemstoneShapeParam = queryParams.gemstoneShape || queryParams.stone_shapes;
+    if (gemstoneShapeParam) {
+      const shapes = String(gemstoneShapeParam).split(',').map((s) => s.trim()).filter(Boolean);
+      if (shapes.length) {
+        const gsDocs = await GemstoneShape.find({
+          $or: [
+            { _id: { $in: shapes.filter((sh) => mongoose.isValidObjectId(sh)) } },
+            { code: { $in: shapes.map((sh) => sh.toLowerCase()) } },
+            { name: { $in: shapes.map((sh) => new RegExp(`^${sh}$`, 'i')) } },
+          ],
+        }).lean();
+        const shapeIds = gsDocs.map((d) => d._id);
+        const shapeNames = gsDocs.length ? gsDocs.map((d) => d.name) : shapes;
+        const regexList = shapeNames.map((sh) => new RegExp(sh, 'i'));
+
+        filter.$and = [
+          ...(filter.$and || []),
+          {
+            $or: [
+              ...(shapeIds.length ? [
+                { gemstoneShapeId: { $in: shapeIds } },
+                { 'centerDiamondRows.gemstoneShapeId': { $in: shapeIds } },
+                { 'centerDiamondRows.diamondShapeId': { $in: shapeIds } },
+                { 'variants.gemstoneShapeId': { $in: shapeIds } },
+              ] : []),
+              { gemstoneShape: { $in: shapeNames } },
+              { 'specifications.gemstoneShape': { $in: shapeNames } },
               { 'basicInfo.title': { $in: regexList } },
               { 'basicInfo.description': { $in: regexList } },
             ],
@@ -995,6 +1069,186 @@ class ProductService {
       silver: silverList,
       trending: trendingList,
       total: formatted.length
+    };
+  }
+
+  // ------------------------------- get similar products ----------------------------
+  async getSimilarProducts(idOrCode, queryParams = {}, userId = null) {
+    await this.refreshCalculatedPrices();
+    const product = await resolveProductByCodeOrId(idOrCode, [
+      ...this._getProductPopulateOptions(),
+      { path: 'menuItemIds', select: 'title slug', strictPopulate: false },
+    ]);
+    if (!product) {
+      throw new ApiError(404, 'Product not found');
+    }
+
+    const productId = product._id;
+    const categoryIds = (product.categoryIds || [])
+      .map((c) => (c?._id ? c._id : c))
+      .filter(Boolean);
+    const menuItemIds = (product.menuItemIds || [])
+      .map((m) => (m?._id ? m._id : m))
+      .filter(Boolean);
+    const productType = (product.productType || 'gold').toLowerCase();
+
+    // Target price (salePrice or calculatedPrice or mrp)
+    const targetPrice = Number(
+      product.pricing?.calculatedPrice ||
+      product.pricing?.salePrice ||
+      product.pricing?.mrp ||
+      0
+    );
+
+    // Build dynamic tabs matching the product
+    const tabs = [
+      { id: 'recommended', label: 'Recommended' },
+    ];
+
+    // Primary category tab
+    const primaryCat = Array.isArray(product.categoryIds) && product.categoryIds[0];
+    const catName = primaryCat?.name || primaryCat?.title;
+    if (catName) {
+      tabs.push({
+        id: 'category',
+        label: catName,
+        filterType: 'category',
+      });
+    }
+
+    // Subcategory / Menu item style tab (e.g. "Tennis Bracelets")
+    const primaryMenu = Array.isArray(product.menuItemIds) && product.menuItemIds[0];
+    const menuTitle = primaryMenu?.title || primaryMenu?.name;
+    if (menuTitle && menuTitle !== catName) {
+      tabs.push({
+        id: 'style',
+        label: menuTitle,
+        filterType: 'menuItem',
+      });
+    }
+
+    // Metal / Product type tab (e.g. "Gold Jewellery" or "Silver Collection")
+    const typeLabel = productType === 'silver' ? 'Silver Collection' : 'Gold Jewellery';
+    tabs.push({
+      id: 'metal',
+      label: typeLabel,
+      filterType: 'productType',
+    });
+
+    // Budget tab if price > 0
+    if (targetPrice > 0) {
+      const budgetLower = Math.max(0, Math.round(targetPrice * 0.7));
+      const budgetUpper = Math.round(targetPrice * 1.3);
+      const formatK = (val) => {
+        if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
+        if (val >= 1000) return `₹${Math.round(val / 1000)}K`;
+        return `₹${val}`;
+      };
+      tabs.push({
+        id: 'budget',
+        label: `${formatK(budgetLower)} - ${formatK(budgetUpper)}`,
+        filterType: 'budget',
+      });
+    }
+
+    const selectedTab = (queryParams.tab || 'recommended').toLowerCase();
+    const limit = Math.min(Number(queryParams.limit) || 16, 50);
+
+    // If target product has no categories, do not return other products
+    if (categoryIds.length === 0) {
+      return {
+        targetProduct: {
+          id: String(product._id),
+          title: product.basicInfo?.title || product.name || '',
+          slug: product.basicInfo?.slug || '',
+          productType,
+          price: targetPrice,
+        },
+        tabs,
+        activeTab: selectedTab,
+        items: [],
+        total: 0,
+      };
+    }
+
+    // STRICT: Only query products with the exact same categoryIds
+    const baseFilter = {
+      _id: { $ne: productId },
+      'meta.deletedAt': null,
+      status: 'approved',
+      categoryIds: { $in: categoryIds },
+    };
+
+    let queryConditions = { ...baseFilter };
+
+    if (selectedTab === 'category') {
+      // Handled by baseFilter.categoryIds
+    } else if (selectedTab === 'style' && menuItemIds.length > 0) {
+      queryConditions.menuItemIds = { $in: menuItemIds };
+    } else if (selectedTab === 'metal') {
+      queryConditions.productType = productType;
+    } else if (selectedTab === 'budget' && targetPrice > 0) {
+      const minP = Math.max(0, targetPrice * 0.7);
+      const maxP = targetPrice * 1.3;
+      queryConditions.$or = [
+        { 'pricing.salePrice': { $gte: minP, $lte: maxP } },
+        { 'pricing.mrp': { $gte: minP, $lte: maxP } },
+        { 'pricing.calculatedPrice': { $gte: minP, $lte: maxP } },
+      ];
+    } else {
+      // Recommended:
+      // Match within the same category, prioritizing same productType or same menu items
+      const orClauses = [];
+      if (menuItemIds.length > 0) {
+        orClauses.push({ menuItemIds: { $in: menuItemIds } });
+      }
+      orClauses.push({ productType });
+      queryConditions.$or = orClauses;
+    }
+
+    let rawItems = await Product.find(queryConditions)
+      .populate(this._getProductPopulateOptions())
+      .limit(limit)
+      .lean();
+
+    // If recommended filter with specific sub-criteria yields fewer than limit,
+    // backfill ONLY from other products with the SAME categoryIds (never outside categoryIds!)
+    if (selectedTab === 'recommended' && rawItems.length < limit) {
+      const existingIds = new Set(rawItems.map((r) => String(r._id)));
+      existingIds.add(String(productId));
+
+      const sameCategoryMore = await Product.find({
+        ...baseFilter,
+        _id: { $nin: Array.from(existingIds) },
+      })
+        .populate(this._getProductPopulateOptions())
+        .limit(limit - rawItems.length)
+        .lean();
+
+      rawItems = [...rawItems, ...sameCategoryMore];
+    }
+
+    const wishlistedSet = await this._getWishlistSet(userId);
+    const formattedItems = rawItems
+      .map(formatStorefrontProduct)
+      .filter((item) => item && (item.images?.length > 0 || item.image))
+      .map((item) => ({
+        ...item,
+        inWishlist: wishlistedSet.has(String(item.id || item._id)),
+      }));
+
+    return {
+      targetProduct: {
+        id: String(product._id),
+        title: product.basicInfo?.title || product.name || '',
+        slug: product.basicInfo?.slug || '',
+        productType,
+        price: targetPrice,
+      },
+      tabs,
+      activeTab: selectedTab,
+      items: formattedItems,
+      total: formattedItems.length,
     };
   }
 

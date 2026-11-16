@@ -20,71 +20,57 @@ const MIME_EXTENSION_MAP = {
 
 // Logical module names mapped to canonical R2 folders and filename prefixes
 const MODULE_CONFIG = {
-  user: { folder: 'users', prefix: 'user' },
   users: { folder: 'users', prefix: 'user' },
-  category: { folder: 'categories', prefix: 'category' },
   categories: { folder: 'categories', prefix: 'category' },
-  product: { folder: 'products', prefix: 'product' },
   products: { folder: 'products', prefix: 'product' },
-  navigation: { folder: 'navigation', prefix: 'navigation' },
-  'navigation-icons': { folder: 'navigation', prefix: 'navigation' },
-  banner: { folder: 'banners', prefix: 'banner' },
   banners: { folder: 'banners', prefix: 'banner' },
-  'promo-banners': { folder: 'banners', prefix: 'banner' },
-  diamond: { folder: 'diamonds', prefix: 'diamond' },
   diamonds: { folder: 'diamonds', prefix: 'diamond' },
-  'diamond/shapes': { folder: 'diamonds', prefix: 'diamond' },
-  'diamond/types': { folder: 'diamonds', prefix: 'diamond' },
-  'diamond/clarity': { folder: 'diamonds', prefix: 'diamond' },
-  'diamond/color': { folder: 'diamonds', prefix: 'diamond' },
-  review: { folder: 'reviews', prefix: 'review' },
   reviews: { folder: 'reviews', prefix: 'review' },
   vto: { folder: 'vto', prefix: 'vto' },
-  birthstone: { folder: 'birthstones', prefix: 'birthstone' },
   birthstones: { folder: 'birthstones', prefix: 'birthstone' },
-  'celebrate-gift': { folder: 'celebrate-gifts', prefix: 'celebrate-gift' },
   'celebrate-gifts': { folder: 'celebrate-gifts', prefix: 'celebrate-gift' },
   featured: { folder: 'featured', prefix: 'featured' },
-  setting: { folder: 'settings', prefix: 'setting' },
   settings: { folder: 'settings', prefix: 'setting' },
   'brand-logos': { folder: 'brand-logos', prefix: 'brand-logo' },
-  'trust-badge': { folder: 'settings/trust-badges', prefix: 'trust-badge' },
   'trust-badges': { folder: 'settings/trust-badges', prefix: 'trust-badge' },
-  'trust-strip': { folder: 'settings/trust-badges', prefix: 'trust-badge' },
   certificates: { folder: 'certificates', prefix: 'certificate' },
-  'home-section': { folder: 'home-sections', prefix: 'home-section' },
   'home-sections': { folder: 'home-sections', prefix: 'home-section' },
-  'website-theme': { folder: 'website-themes', prefix: 'website-theme' },
   'website-themes': { folder: 'website-themes', prefix: 'website-theme' },
   'before-after': { folder: 'before-after', prefix: 'before-after' },
+  'custom-inquiries': { folder: 'custom-inquiries', prefix: 'custom-inquiry' },
+  blogs: { folder: 'blogs', prefix: 'blog' },
+  navigation: { folder: 'navigation', prefix: 'navigation' },
+  'gemstone-types': { folder: 'gemstones/types', prefix: 'gemstone-type' },
+  'gemstone-shapes': { folder: 'gemstones/shapes', prefix: 'gemstone-shape' },
+  gemstones: { folder: 'gemstones', prefix: 'gemstone' },
   general: { folder: 'general', prefix: 'general' },
 };
 
-const CANONICAL_MODULES = [
-  'user',
-  'category',
-  'product',
-  'navigation',
-  'banner',
-  'diamond',
-  'review',
-  'vto',
-  'birthstone',
-  'celebrate-gift',
-  'setting',
-  'trust-badges',
-  'home-section',
-  'website-theme',
-  'general',
-];
+const CANONICAL_MODULES = Object.keys(MODULE_CONFIG);
 
 function generateR2ObjectKey({ module: rawModule, contentType, productId, subfolder }) {
   if (!rawModule || typeof rawModule !== 'string' || !rawModule.trim()) {
-    throw new ApiError(400, 'Module is required. Examples: "user", "category", "product", "navigation"');
+    throw new ApiError(400, 'Module is required. Examples: "users", "categories", "products"');
   }
 
   const moduleName = rawModule.trim().toLowerCase();
-  const config = MODULE_CONFIG[moduleName];
+  const normalizedKey = moduleName.startsWith('diamond/')
+    ? 'diamonds'
+    : moduleName.startsWith('gemstone/')
+    ? (moduleName.includes('shape') ? 'gemstone-shapes' : 'gemstone-types')
+    : moduleName.startsWith('navigation')
+    ? 'navigation'
+    : moduleName.includes('banner')
+    ? 'banners'
+    : moduleName;
+
+  const config =
+    MODULE_CONFIG[normalizedKey] ||
+    MODULE_CONFIG[normalizedKey + 's'] ||
+    MODULE_CONFIG[normalizedKey.replace(/s$/, '')] ||
+    MODULE_CONFIG[normalizedKey.replace(/y$/, 'ies')] ||
+    MODULE_CONFIG[normalizedKey.replace(/ies$/, 'y')];
+
   if (!config) {
     throw new ApiError(
       400,
@@ -143,3 +129,4 @@ module.exports = {
   CANONICAL_MODULES,
   generateR2ObjectKey,
 };
+

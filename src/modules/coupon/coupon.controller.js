@@ -1,4 +1,6 @@
 const couponService = require('./coupon.service');
+const { expireCoupons } = require('./coupon.cron');
+const bannerService = require('../banner/banner.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const redisClient = require('../../utils/redisClient');
@@ -63,6 +65,37 @@ class CouponController {
     const result = await couponService.delete(req.params.id);
     await redisClient.deleteByPattern('coupons:*');
     ApiResponse.success(res, null, result.message);
+  });
+
+  // ------------------------------- manual trigger cron / expiration ----------------------------
+
+  runCron = catchAsync(async (req, res) => {
+    const couponResult = await expireCoupons('manual_admin_trigger');
+
+    let bannerResult = { deletedCount: 0 };
+    try {
+      bannerResult = await bannerService.autoDeleteExpiredOffers();
+      await redisClient.deleteByPattern('banners:*');
+    } catch (bErr) {
+      console.warn('[Coupon Run Cron] Banner cleanup warning:', bErr.message);
+    }
+
+    const expiredCoupons = couponResult.modifiedCount || 0;
+    const expiredOffers = bannerResult.deletedCount || 0;
+
+    const message =
+      expiredCoupons > 0 || expiredOffers > 0
+        ? `Expiry cron executed successfully! ${expiredCoupons} coupon(s) marked expired and ${expiredOffers} expired offer banner(s) cleaned up.`
+        : 'Expiry cron executed successfully! All coupons and offers are active and up to date.';
+
+    ApiResponse.success(
+      res,
+      {
+        expiredCoupons,
+        expiredOffers,
+      },
+      message
+    );
   });
 }
 

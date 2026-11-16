@@ -28,6 +28,8 @@ const diamondPriceNewRoutes = require('../modules/diamondPriceNew/diamondPriceNe
 const diamondShapeRoutes = require('../modules/diamondShape/diamondShape.routes');
 const diamondSizeRoutes = require('../modules/diamondSize/diamondSize.routes');
 const diamondTypeRoutes = require('../modules/diamondType/diamondType.routes');
+const gemstoneTypeRoutes = require('../modules/gemstoneType/gemstoneType.routes');
+const gemstoneShapeRoutes = require('../modules/gemstoneShape/gemstoneShape.routes');
 const featuredRoutes = require('../modules/featured/featured.routes');
 const footerSettingsRoutes = require('../modules/footerSettings/footerSettings.routes');
 const homeSectionRoutes = require('../modules/homeSection/homeSection.routes');
@@ -61,9 +63,11 @@ const galleryRoutes = require('../modules/gallery/gallery.routes');
 const orderRoutes = require('../modules/order/order.routes');
 const paymentRoutes = require('../modules/payment/payment.routes');
 const filterRoutes = require('../modules/filter/filter.routes');
+const otpRoutes = require('../modules/otp/otp.routes');
 
 // Mount routes
 router.use('/auth', authRoutes);
+router.use('/otp', otpRoutes);
 router.use('/users', userRoutes);
 router.use('/addresses', addressRoutes);
 router.use('/products', productRoutes);
@@ -98,6 +102,8 @@ router.use('/diamond-prices-new', diamondPriceNewRoutes);
 router.use('/diamond-shapes', diamondShapeRoutes);
 router.use('/diamond-sizes', diamondSizeRoutes);
 router.use('/diamond-types', diamondTypeRoutes);
+router.use('/gemstone-types', gemstoneTypeRoutes);
+router.use('/gemstone-shapes', gemstoneShapeRoutes);
 router.use('/featured', featuredRoutes);
 router.use('/footer-settings', footerSettingsRoutes);
 router.use('/home-sections', homeSectionRoutes);

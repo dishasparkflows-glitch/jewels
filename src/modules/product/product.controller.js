@@ -78,6 +78,12 @@ class ProductController {
     ApiResponse.success(res, product, 'Product retrieved successfully');
   });
 
+  // ------------------------------- get similar products ----------------------------
+  getSimilarProducts = catchAsync(async (req, res) => {
+    const data = await productService.getSimilarProducts(req.params.id, req.query, req.user?._id);
+    ApiResponse.success(res, data, 'Similar products retrieved successfully');
+  });
+
   // ------------------------------- get product by sku or tag ----------------------------
   getBySkuOrTag = catchAsync(async (req, res) => {
     const product = await productService.getBySkuOrTag(req.params.code, req.user?._id);

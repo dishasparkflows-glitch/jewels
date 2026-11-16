@@ -54,10 +54,6 @@ const customInquirySchema = new mongoose.Schema(
         type: mongoose.Schema.Types.Mixed,
         default: '',
       },
-      estimatedBudget: {
-        type: mongoose.Schema.Types.Mixed,
-        default: '',
-      },
     },
 
     referenceImages: [

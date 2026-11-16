@@ -50,8 +50,6 @@ class BasePaymentProvider {
     order.payment.paidAt = new Date();
     order.payment.paidAmount = payableAmount;
 
-    order.orderStatus = 'confirmed';
-
     await order.save();
 
     // Clear cart if this order belongs to a registered user

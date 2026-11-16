@@ -459,17 +459,13 @@ class WhatsAppService {
     // ------------------------------- send custom inquiry notification ----------------------------
   async sendCustomInquiryNotification(inquiry) {
     try {
-      const { name, phoneNumber, stoneType, metalType, budget, jewelryType, status } = inquiry;
-      if (!phoneNumber) return;
+      const { name, phone } = inquiry.customer;
+      const normalizedPhone = normalizePhoneNumber(`${phone.countryCode}${phone.number}`);
+      const { stoneType, metalType, budget } = inquiry.requirements;
 
-      const normalizedPhone = normalizePhoneNumber(phoneNumber);
-      let msg = '';
-
-      if (status === 'confirmed') {
-        msg = `💍 *NEIRAH: CUSTOM DESIGN CONFIRMED* ✨\n\nHello ${name},\nYour custom jewelry consultation is *CONFIRMED*. Our jewelry designers will contact you shortly to review CAD drafts. 💍`;
-      } else {
-        msg = `💍 *NEIRAH: CUSTOM INQUIRY RECEIVED* ✨\n\nHello ${name},\nThank you for reaching out for a bespoke jewelry design!\n\n💎 Stone: ${stoneType || 'Custom'}\n👑 Metal: ${metalType || 'Gold'}\n💰 Budget: ₹${budget || 'Custom'}\n\nOur styling team will contact you shortly. ✨`;
-      }
+      const msg = inquiry.status === 'confirmed'
+        ? `💍 *NEIRAH: CUSTOM DESIGN CONFIRMED* ✨\n\nHello ${name},\nYour custom jewelry consultation is *CONFIRMED*. Our jewelry designers will contact you shortly to review CAD drafts. 💍`
+        : `💍 *NEIRAH: CUSTOM INQUIRY RECEIVED* ✨\n\nHello ${name},\nThank you for reaching out for a bespoke jewelry design!\n\n💎 Stone: ${stoneType}\n👑 Metal: ${metalType}\n💰 Budget: ₹${budget}\n\nOur styling team will contact you shortly. ✨`;
 
       await this.sendTextMessage(normalizedPhone, msg);
     } catch (err) {

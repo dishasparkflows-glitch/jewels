@@ -36,7 +36,7 @@ class WishlistController {
       });
     } catch {}
 
-    ApiResponse.success(res, null, msg);
+    ApiResponse.success(res, result, msg);
   });
 
   // ------------------------------- add item to wishlist ----------------------------

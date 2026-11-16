@@ -16,6 +16,11 @@ const addressSchema = new mongoose.Schema(
       },
 
       phone: String,
+      countryCode: {
+        type: String,
+        default: '+91',
+        trim: true,
+      },
 
       addressLine: String,
       street: String,

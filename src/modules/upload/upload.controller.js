@@ -95,16 +95,16 @@ const getFile = catchAsync(async (req, res) => {
 
 // ------------------------------- delete file ----------------------------
 const deleteFile = catchAsync(async (req, res) => {
-  const { filepath, key, keys } = req.body;
-  const candidates = Array.isArray(keys) && keys.length ? keys : [key || filepath];
+  const { key, keys } = req.body || {};
+  const allKeys = Array.isArray(keys) ? keys : [];
 
-  if (Array.isArray(keys) && keys.length > 0) {
-    await Promise.all(keys.map((k) => cloudflareR2.deleteFile(k)));
-    return ApiResponse.success(res, null, `${keys.length} files deleted from Cloudflare R2 successfully`);
+  if (allKeys.length > 0) {
+    await Promise.all(allKeys.map((k) => cloudflareR2.deleteFile(k)));
+    return ApiResponse.success(res, null, `${allKeys.length} files deleted from Cloudflare R2 successfully`);
   }
 
-  const target = key || filepath;
-  if (!target) throw new ApiError(400, 'File path or key is required');
+  const target = key || req.query?.key;
+  if (!target) throw new ApiError(400, 'File key is required');
 
   await cloudflareR2.deleteFile(target);
 
@@ -113,14 +113,14 @@ const deleteFile = catchAsync(async (req, res) => {
 
 // ------------------------------- get file info / size from R2 ----------------------------
 const getFileInfo = catchAsync(async (req, res) => {
-  const { key, url, keys, urls } = req.method === 'POST' ? req.body : req.query;
-  const targetList = Array.isArray(keys) ? keys : Array.isArray(urls) ? urls : [key || url].filter(Boolean);
+  const { key, keys } = req.method === 'POST' ? req.body : req.query;
+  const targetList = Array.isArray(keys) ? keys : [key].filter(Boolean);
 
   if (targetList.length === 0) {
-    throw new ApiError(400, 'File key or url is required');
+    throw new ApiError(400, 'File key is required');
   }
 
-  if (targetList.length === 1 && !Array.isArray(keys) && !Array.isArray(urls)) {
+  if (targetList.length === 1 && !Array.isArray(keys)) {
     const meta = await cloudflareR2.getFileMetadata(targetList[0]);
     if (!meta) {
       throw new ApiError(404, 'File metadata could not be retrieved from Cloudflare R2');

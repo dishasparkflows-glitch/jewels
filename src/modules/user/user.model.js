@@ -27,6 +27,11 @@ const userSchema = new mongoose.Schema(
         default: '',
         trim: true,
       },
+      countryCode: {
+        type: String,
+        default: '+91',
+        trim: true,
+      },
       location: {
         type: String,
         default: '',

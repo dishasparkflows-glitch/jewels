@@ -11,7 +11,7 @@ const applyVariables = (template, variables) =>
   });
 
 class SmsService {
-    // ------------------------------- get sms provider ----------------------------
+  // ------------------------------- get sms provider ----------------------------
   getProvider() {
     const providerName = (process.env.SMS_PROVIDER || 'netsms').trim().toLowerCase();
     const Provider = providers[providerName];
@@ -19,7 +19,7 @@ class SmsService {
     return new Provider();
   }
 
-    // ------------------------------- send sms ----------------------------
+  // ------------------------------- send sms ----------------------------
   async sendSms({ to, message, templateId, variables }) {
     if (!to || !message || !templateId) {
       return { skipped: true, reason: 'Recipient, approved template, and message are required' };
@@ -27,7 +27,7 @@ class SmsService {
     return this.getProvider().send({ to, message, templateId, variables });
   }
 
-    // ------------------------------- send signup confirmation sms ----------------------------
+  // ------------------------------- send signup confirmation sms ----------------------------
   async sendSignupConfirmation(user) {
     const variables = {
       name: user.profile?.firstName || '',
@@ -42,7 +42,7 @@ class SmsService {
     });
   }
 
-    // ------------------------------- send order confirmation sms ----------------------------
+  // ------------------------------- send order confirmation sms ----------------------------
   async sendOrderConfirmation(order) {
     const variables = {
       orderId: order.orderNumber || order.orderId || String(order._id || ''),
@@ -55,6 +55,38 @@ class SmsService {
       templateId: process.env.NETSMS_ORDER_TEMPLATE_ID,
       variables,
     });
+  }
+
+  // ------------------------------- send OTP sms ----------------------------
+  async sendOtp({ to, otp }) {
+    const rawTemplate = process.env.NETSMS_ORDER_OTP_TEMPLATE;
+    const message = rawTemplate.replace('{#var#}', String(otp));
+    const templateId = process.env.NETSMS_ORDER_OTP_TEMPLATE_ID;
+    const apiKey = process.env.NETSMS_API_KEY;
+    if (!apiKey) {
+      console.log(`[SMS OTP Dev Mode] To: ${to} | OTP: ${otp} | Msg: ${message}`);
+      return { success: true, simulated: true, otp };
+    }
+
+    try {
+      const axios = require('axios');
+      const response = await axios.get(process.env.NETSMS_API_URL, {
+        params: {
+          APIKey: apiKey,
+          SenderID: process.env.NETSMS_SENDER_ID,
+          SMSType: process.env.NETSMS_SMS_TYPE,
+          Mobile: to,
+          MsgText: message,
+          EntityID: process.env.NETSMS_ENTITY_ID,
+          TemplateID: templateId,
+        },
+        timeout: 10000,
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('[SMS OTP Error]:', error.message);
+      return { success: false, error: error.message };
+    }
   }
 }
 

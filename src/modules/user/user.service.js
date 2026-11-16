@@ -90,7 +90,7 @@ class UserService {
     const updateFields = {};
 
     // Map top-level profile fields into profile.<key> so MongoDB saves them into document
-    const profileKeys = ['firstName', 'lastName', 'phone', 'location', 'bio', 'avatar', 'themeColor'];
+    const profileKeys = ['firstName', 'lastName', 'phone', 'countryCode', 'location', 'bio', 'avatar', 'themeColor'];
     for (const key of profileKeys) {
       if (data[key] !== undefined) {
         updateFields[`profile.${key}`] = data[key];

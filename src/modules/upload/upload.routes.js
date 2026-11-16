@@ -14,6 +14,6 @@ router.post('/file-info', optionalAuth, uploadController.getFileInfo);
 router.get('/file', optionalAuth, uploadController.getFile);
 
 // File deletion endpoint
-router.delete('/', authenticate, uploadController.deleteFile);
+router.delete('/', optionalAuth, uploadController.deleteFile);
 
 module.exports = router;

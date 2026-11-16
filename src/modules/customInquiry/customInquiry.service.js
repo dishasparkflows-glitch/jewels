@@ -1,11 +1,20 @@
 const CustomInquiry = require('./customInquiry.model');
+const whatsappService = require('../whatsapp/whatsapp.service');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class CustomInquiryService {
   // ------------------------------- create custom inquiry ----------------------------
   async create(data) {
-    return await CustomInquiry.create(data);
+    const created = await CustomInquiry.create(data);
+
+    try {
+      await whatsappService.sendCustomInquiryNotification(created);
+    } catch (waErr) {
+      console.warn('[CustomInquiryService] WhatsApp notification notice:', waErr.message);
+    }
+
+    return created;
   }
 
   // ------------------------------- get one custom inquiry ----------------------------
@@ -39,6 +48,7 @@ class CustomInquiryService {
         { 'customer.name': reg },
         { 'customer.email': reg },
         { 'customer.phone.number': reg },
+        { 'customer.phone.countryCode': reg },
         { 'requirements.comments': reg },
         { 'requirements.stoneType': reg },
         { 'requirements.metalType': reg },

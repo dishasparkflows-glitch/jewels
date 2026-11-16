@@ -298,13 +298,14 @@ async function syncOrnateSoldLabels() {
     const uniqueLabelID = label.UniqueLabelID || label.BarcodeNo || label.LabelNo;
     if (!uniqueLabelID) continue;
 
-    const sku = String(uniqueLabelID).trim();
+    const tagNo = String(label.LabelNo || uniqueLabelID).trim();
+    const sku = tagNo || String(uniqueLabelID).trim();
     const { salePrice } = calculateLabelPrice(label);
 
     const soldProduct = await Product.findOneAndUpdate(
       buildProductIdentifierQuery({
         sku,
-        tagNo: label.LabelNo || uniqueLabelID,
+        tagNo,
         barcode: label.BarcodeNo || uniqueLabelID,
       }),
       {
@@ -318,13 +319,13 @@ async function syncOrnateSoldLabels() {
         }) || {},
         $setOnInsert: cleanPayload({
           'basicInfo.title': label.ItemName || `Ornate Item ${sku}`,
-          'basicInfo.sku': sku,
+          'basicInfo.sku': tagNo || sku,
           'basicInfo.slug': generateProductSlug(
             label.ItemName || `Ornate Item ${sku}`,
             (label.BarcodeNo ? String(label.BarcodeNo).trim() : '') || sku
           ),
           status: 'draft',
-          'ornate.tagNo': String(label.LabelNo || uniqueLabelID),
+          'ornate.tagNo': tagNo,
           'ornate.barcode': String(label.BarcodeNo || uniqueLabelID),
         }) || {},
       },

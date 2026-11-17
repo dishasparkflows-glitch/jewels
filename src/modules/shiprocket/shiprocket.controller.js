@@ -17,20 +17,20 @@ class ShiprocketController {
       cod: cod === '1' || cod === 'true',
       declaredValue: declared_value,
     });
-    return ApiResponse.success(res, 'Pincode serviceability checked successfully', result);
+    return ApiResponse.success(res, result, 'Pincode serviceability checked successfully');
   });
 
   trackByAwb = catchAsync(async (req, res) => {
     const awbCode = req.query.awb || req.params.awbCode;
     if (!awbCode) throw new ApiError(400, 'AWB code is required');
     const tracking = await shiprocketService.trackShipmentByAwb(awbCode);
-    return ApiResponse.success(res, 'Shipment tracking details retrieved', tracking);
+    return ApiResponse.success(res, tracking, 'Shipment tracking details retrieved');
   });
 
   trackByOrderId = catchAsync(async (req, res) => {
     const { orderId } = req.params;
     const tracking = await shiprocketService.trackShipmentByOrderId(orderId);
-    return ApiResponse.success(res, 'Order shipment tracking retrieved', tracking);
+    return ApiResponse.success(res, tracking, 'Order shipment tracking retrieved');
   });
 
   // ─── Webhook Receiver ────────────────────────────────────────────────────
@@ -135,39 +135,39 @@ class ShiprocketController {
   getCourierRates = catchAsync(async (req, res) => {
     const { orderId } = req.params;
     const rates = await shiprocketService.getCourierRatesForOrder(orderId);
-    return ApiResponse.success(res, 'Live courier rates retrieved', rates);
+    return ApiResponse.success(res, rates, 'Live courier rates retrieved');
   });
 
   createShipment = catchAsync(async (req, res) => {
     const { orderId } = req.params;
     const options = req.body || {};
     const result = await shiprocketService.createShipmentForOrder(orderId, options);
-    return ApiResponse.success(res, result.message, result);
+    return ApiResponse.success(res, result, result.message || 'Shipment created successfully');
   });
 
   assignAwb = catchAsync(async (req, res) => {
     const { orderId } = req.params;
     const { courierId } = req.body;
     const result = await shiprocketService.assignAwbToOrder(orderId, { courierId });
-    return ApiResponse.success(res, 'AWB assigned successfully', result);
+    return ApiResponse.success(res, result, 'AWB assigned successfully');
   });
 
   getLabel = catchAsync(async (req, res) => {
     const { orderId } = req.params;
     const result = await shiprocketService.generateShippingLabel(orderId);
-    return ApiResponse.success(res, 'Shipping label generated', result);
+    return ApiResponse.success(res, result, 'Shipping label generated');
   });
 
   getManifest = catchAsync(async (req, res) => {
     const { orderId } = req.params;
     const result = await shiprocketService.generateManifest(orderId);
-    return ApiResponse.success(res, 'Carrier handover manifest generated', result);
+    return ApiResponse.success(res, result, 'Carrier handover manifest generated');
   });
 
   trackAdminOrder = catchAsync(async (req, res) => {
     const { orderId } = req.params;
     const result = await shiprocketService.trackShipmentByOrderId(orderId);
-    return ApiResponse.success(res, 'Shipment tracking retrieved', result);
+    return ApiResponse.success(res, result, 'Shipment tracking retrieved');
   });
 
   cancelShipment = catchAsync(async (req, res) => {
@@ -175,26 +175,26 @@ class ShiprocketController {
     const targetOrderId = orderId || req.params.orderId;
     if (!targetOrderId) throw new ApiError(400, 'Order ID is required to cancel shipment');
     const result = await shiprocketService.cancelShipment(targetOrderId);
-    return ApiResponse.success(res, result.message, result);
+    return ApiResponse.success(res, result, result.message || 'Shipment cancelled');
   });
 
   createReturnShipment = catchAsync(async (req, res) => {
     const { returnId } = req.params;
     const options = req.body || {};
     const result = await shiprocketService.createReturnShipment(returnId, options);
-    return ApiResponse.success(res, 'Reverse return shipment scheduled', result);
+    return ApiResponse.success(res, result, 'Reverse return shipment scheduled');
   });
 
   getReturnLabel = catchAsync(async (req, res) => {
     const { returnId } = req.params;
     const result = await shiprocketService.generateReturnLabel(returnId);
-    return ApiResponse.success(res, 'Return label generated', result);
+    return ApiResponse.success(res, result, 'Return label generated');
   });
 
   trackReturn = catchAsync(async (req, res) => {
     const { returnId } = req.params;
     const result = await shiprocketService.trackReturnShipment(returnId);
-    return ApiResponse.success(res, 'Return shipment tracking retrieved', result);
+    return ApiResponse.success(res, result, 'Return shipment tracking retrieved');
   });
 }
 

@@ -1,10 +1,7 @@
 const Order = require('../order/order.model');
 const Return = require('../return/return.model');
 const ApiError = require('../../utils/ApiError');
-const {
-  shiprocketRequest,
-  isMockMode,
-} = require('./integrationToken.service');
+const { shiprocketRequest } = require('./integrationToken.service');
 
 const WAREHOUSE_PINCODE = process.env.SHIPROCKET_PICKUP_PINCODE || '382006'; // Gandhinagar
 const PICKUP_LOCATION = process.env.SHIPROCKET_PICKUP_LOCATION || 'work';
@@ -29,43 +26,6 @@ class ShiprocketService {
       throw new ApiError(400, 'Destination delivery pincode is required');
     }
 
-    if (isMockMode()) {
-      return {
-        isMock: true,
-        pickupPincode: finalPickup,
-        deliveryPincode: finalDelivery,
-        availableCouriers: [
-          {
-            courierId: 1,
-            courierName: 'Blue Dart Air',
-            rating: 4.8,
-            etd: '2-3 Days',
-            rate: cod ? 180 : 120,
-            codAvailable: true,
-            isAir: true,
-          },
-          {
-            courierId: 2,
-            courierName: 'Delhivery Surface',
-            rating: 4.5,
-            etd: '3-5 Days',
-            rate: cod ? 130 : 90,
-            codAvailable: true,
-            isAir: false,
-          },
-          {
-            courierId: 3,
-            courierName: 'DTDC Premium Express',
-            rating: 4.3,
-            etd: '3-4 Days',
-            rate: cod ? 150 : 110,
-            codAvailable: true,
-            isAir: true,
-          },
-        ],
-      };
-    }
-
     try {
       const params = {
         pickup_postcode: finalPickup,
@@ -88,6 +48,9 @@ class ShiprocketService {
         isAir: Boolean(c.is_air),
       }));
 
+      // Sort couriers by price (rate) ascending: lowest to highest
+      availableCouriers.sort((a, b) => Number(a.rate || 0) - Number(b.rate || 0));
+
       return {
         pickupPincode,
         deliveryPincode,
@@ -95,9 +58,6 @@ class ShiprocketService {
       };
     } catch (error) {
       console.error('[Shiprocket Serviceability Error]:', error.response?.data || error.message);
-      if (isMockMode()) {
-        return this.checkServiceability({ pickupPincode, deliveryPincode, weight, cod, declaredValue });
-      }
       throw new ApiError(500, `Shiprocket Serviceability check failed: ${error.response?.data?.message || error.message}`);
     }
   }
@@ -197,42 +157,7 @@ class ShiprocketService {
       const customerEmail =
         order.shippingAddress?.email || order.customer?.email || 'customer@example.com';
 
-      // 3. Mock Mode branch for local testing without wallet debit
-      if (isMockMode()) {
-        const mockOrderId = `SR_ORD_${Date.now()}`;
-        const mockShipmentId = `SR_SHP_${Date.now()}`;
-        const mockAwb = `AWB-SR-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-        const mockCourier = options.courierName || 'Blue Dart Air';
-
-        order.logisticsProvider = 'Shiprocket';
-        order.shiprocketInfo = {
-          status: 'success',
-          creatingSince: null,
-          shiprocketOrderId: mockOrderId,
-          shiprocketShipmentId: mockShipmentId,
-          awbCode: mockAwb,
-          courierName: mockCourier,
-          courierId: options.courierId || 1,
-          labelUrl: `https://apiv2.shiprocket.in/mock-labels/${mockShipmentId}.pdf`,
-          manifestUrl: `https://apiv2.shiprocket.in/mock-manifests/${mockShipmentId}.pdf`,
-          pickupScheduledDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          lastError: null,
-        };
-
-        if (order.orderStatus === 'pending') {
-          order.orderStatus = 'processing';
-        }
-        await order.save();
-
-        return {
-          success: true,
-          isMock: true,
-          message: 'Shipment & AWB allocated successfully (Mock Mode)',
-          shiprocketInfo: order.shiprocketInfo,
-        };
-      }
-
-      // 4. Live Shiprocket adhoc order creation payload
+      // Live Shiprocket adhoc order creation payload
       const shiprocketOrderData = {
         order_id: `${order.orderNumber || 'ORD'}_${order._id.toString()}_${Date.now()}`,
         order_date: new Date(order.createdAt || Date.now()).toISOString().split('T')[0],
@@ -343,15 +268,6 @@ class ShiprocketService {
     const shipmentId = order.shiprocketInfo?.shiprocketShipmentId;
     if (!shipmentId) throw new ApiError(400, 'Order does not have a registered Shiprocket Shipment ID');
 
-    if (isMockMode()) {
-      order.shiprocketInfo.awbCode = `AWB-SR-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-      order.shiprocketInfo.courierId = courierId;
-      order.shiprocketInfo.courierName = courierId === 1 ? 'Blue Dart Air' : 'Delhivery Surface';
-      order.shiprocketInfo.status = 'success';
-      await order.save();
-      return { success: true, isMock: true, shiprocketInfo: order.shiprocketInfo };
-    }
-
     const payload = { shipment_id: shipmentId };
     if (courierId) payload.courier_id = courierId;
 
@@ -378,11 +294,6 @@ class ShiprocketService {
     const shipmentId = order.shiprocketInfo?.shiprocketShipmentId;
     if (!shipmentId) throw new ApiError(400, 'Order does not have a Shiprocket shipment');
 
-    if (isMockMode()) {
-      const mockUrl = order.shiprocketInfo?.labelUrl || `https://apiv2.shiprocket.in/mock-labels/${shipmentId}.pdf`;
-      return { labelUrl: mockUrl, isMock: true };
-    }
-
     const response = await shiprocketRequest('POST', '/courier/generate/label', {
       shipment_id: [shipmentId],
     });
@@ -406,11 +317,6 @@ class ShiprocketService {
     const shipmentId = order.shiprocketInfo?.shiprocketShipmentId;
     if (!shipmentId) throw new ApiError(400, 'Order does not have a Shiprocket shipment');
 
-    if (isMockMode()) {
-      const mockUrl = order.shiprocketInfo?.manifestUrl || `https://apiv2.shiprocket.in/mock-manifests/${shipmentId}.pdf`;
-      return { manifestUrl: mockUrl, isMock: true };
-    }
-
     const response = await shiprocketRequest('POST', '/manifests/generate', {
       shipment_id: [shipmentId],
     });
@@ -429,39 +335,6 @@ class ShiprocketService {
    */
   async trackShipmentByAwb(awbCode) {
     if (!awbCode) throw new ApiError(400, 'AWB code is required');
-
-    if (isMockMode()) {
-      return {
-        isMock: true,
-        awb: awbCode,
-        currentStatus: 'IN TRANSIT',
-        currentStatusId: 17,
-        courierName: 'Blue Dart Air',
-        origin: 'Gandhinagar Hub',
-        destination: 'Surat Central',
-        etd: 'Tomorrow by 6:00 PM',
-        scans: [
-          {
-            date: new Date().toISOString(),
-            activity: 'Package out for delivery',
-            location: 'Destination Hub',
-            status: 'OUT FOR DELIVERY',
-          },
-          {
-            date: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-            activity: 'Arrived at Transit Hub',
-            location: 'Ahmedabad Airport Air Hub',
-            status: 'IN TRANSIT',
-          },
-          {
-            date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-            activity: 'Shipment picked up from Neirah Luxury Warehouse',
-            location: 'Gandhinagar',
-            status: 'SHIPPED',
-          },
-        ],
-      };
-    }
 
     try {
       const response = await shiprocketRequest('GET', `/courier/track/awb/${awbCode}`);
@@ -487,7 +360,6 @@ class ShiprocketService {
       };
     } catch (error) {
       console.error('[Shiprocket Track AWB Error]:', error.message);
-      if (isMockMode()) return this.trackShipmentByAwb(awbCode);
       throw new ApiError(500, `Shipment tracking failed: ${error.response?.data?.message || error.message}`);
     }
   }
@@ -528,13 +400,11 @@ class ShiprocketService {
     const awb = order.shiprocketInfo?.awbCode;
     if (!awb) throw new ApiError(400, 'Order does not have an active AWB');
 
-    if (!isMockMode()) {
-      await shiprocketRequest('POST', '/orders/cancel/shipment/awbs', {
-        awbs: [awb],
-      }).catch((e) => {
-        console.warn('[Shiprocket] Cancel API warning:', e.message);
-      });
-    }
+    await shiprocketRequest('POST', '/orders/cancel/shipment/awbs', {
+      awbs: [awb],
+    }).catch((e) => {
+      console.warn('[Shiprocket] Cancel API warning:', e.message);
+    });
 
     order.shiprocketInfo.status = 'cancelled';
     await order.save();
@@ -556,32 +426,6 @@ class ShiprocketService {
 
     if (returnDoc.shiprocketReturnInfo?.status === 'success' && returnDoc.shiprocketReturnInfo?.awbCode) {
       throw new ApiError(400, `Return shipment already active with AWB: ${returnDoc.shiprocketReturnInfo.awbCode}`);
-    }
-
-    if (isMockMode()) {
-      const mockReturnOrderId = `SR_RET_${Date.now()}`;
-      const mockShipmentId = `SR_RET_SHP_${Date.now()}`;
-      const mockAwb = `AWB-RET-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-
-      returnDoc.shiprocketReturnInfo = {
-        shiprocketOrderId: mockReturnOrderId,
-        shiprocketShipmentId: mockShipmentId,
-        awbCode: mockAwb,
-        courierName: 'Delhivery Reverse Air',
-        labelUrl: `https://apiv2.shiprocket.in/mock-labels/${mockShipmentId}.pdf`,
-        status: 'scheduled',
-        pickupScheduledDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        lastError: null,
-      };
-      returnDoc.status = 'pickup_scheduled';
-      await returnDoc.save();
-
-      return {
-        success: true,
-        isMock: true,
-        message: 'Reverse return shipment scheduled successfully (Mock Mode)',
-        shiprocketReturnInfo: returnDoc.shiprocketReturnInfo,
-      };
     }
 
     try {
@@ -687,13 +531,6 @@ class ShiprocketService {
 
     const shipmentId = returnDoc.shiprocketReturnInfo?.shiprocketShipmentId;
     if (!shipmentId) throw new ApiError(400, 'Return does not have a shipment ID');
-
-    if (isMockMode()) {
-      return {
-        labelUrl: `https://apiv2.shiprocket.in/mock-labels/${shipmentId}.pdf`,
-        isMock: true,
-      };
-    }
 
     const response = await shiprocketRequest('POST', '/courier/generate/label', {
       shipment_id: [shipmentId],

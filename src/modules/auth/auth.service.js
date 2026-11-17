@@ -77,9 +77,6 @@ class AuthService {
 
   // ------------------------------- Google sign-in ----------------------------
   async googleLogin(credential) {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    if (!clientId) throw new ApiError(503, 'Google sign-in is not configured');
-
     let payload;
     try {
       const ticket = await new OAuth2Client(clientId).verifyIdToken({
@@ -97,7 +94,6 @@ class AuthService {
 
     const email = payload.email.trim().toLowerCase();
     let user = await User.findOne({ 'auth.email': email });
-    if (user && user.role !== 'user') throw new ApiError(403, 'Google sign-in is for customer accounts only');
     if (user && !user.isActive) throw new ApiError(403, 'Account is deactivated. Contact admin.');
 
     if (!user) {
@@ -153,7 +149,12 @@ class AuthService {
 
     try {
       const resetUrlStr = resetUrl.toString();
-      const storeName = process.env.STORE_NAME || 'Neirah';
+      const Setting = require('../setting/setting.model');
+      const setting =
+        (await Setting.findOne({ 'meta.deletedAt': null }).lean()) ||
+        (await Setting.findOne().lean()) ||
+        {};
+      const storeName = setting?.businessDetails?.companyName || process.env.STORE_NAME || 'Neirah';
 
       await sendEmail({
         to: normalizedEmail,
@@ -161,6 +162,7 @@ class AuthService {
         text: `Use this link to reset your password: ${resetUrlStr}\nThis link expires in one hour.`,
         html: getPasswordResetHtml({
           resetUrl: resetUrlStr,
+          setting,
           storeName,
           expiresIn: '1 hour',
         }),

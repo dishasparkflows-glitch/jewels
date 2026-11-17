@@ -13,6 +13,17 @@ router.get('/my-orders', authenticate, orderController.getMyOrders);
 // Order lookup by order number (e.g. tracking page / order confirmation, supports numbers with slashes like RJ/ORD-0002)
 router.get('/lookup/:orderNumber(*)', optionalAuth, orderController.getOrderByNumber);
 
+// Send Invoice (Admin / Super Admin)
+router.post(
+  '/send-invoice',
+  authenticate,
+  authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  orderController.sendInvoice
+);
+
+// Download PDF Invoice (Supports customer or admin)
+router.get('/:id/invoice', optionalAuth, orderController.downloadInvoice);
+
 // Get single order by ID
 router.get('/:id', optionalAuth, orderController.getOrderById);
 
@@ -32,6 +43,22 @@ router.patch(
   authenticate,
   authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN),
   orderController.updateOrderStatus
+);
+
+// Bulk delete orders (Admin / Super Admin)
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  orderController.bulkDeleteOrders
+);
+
+// Delete single order (Admin / Super Admin)
+router.delete(
+  '/:id',
+  authenticate,
+  authorize(ROLES.ADMIN, ROLES.SUPER_ADMIN),
+  orderController.deleteOrder
 );
 
 module.exports = router;

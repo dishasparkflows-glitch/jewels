@@ -45,6 +45,64 @@ class OrderController {
     const updated = await orderService.updateOrderStatus(req.params.id, req.body, req.user);
     ApiResponse.success(res, updated, 'Order status updated successfully');
   });
+
+  // ------------------------------- Download Invoice PDF ----------------------------
+  downloadInvoice = catchAsync(async (req, res) => {
+    const orderId = req.params.id;
+    const { order, pdfBuffer } = await orderService.generateOrderInvoice(orderId, req.user);
+    const safeOrderNum = (order.orderNumber || 'ORD').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `NEIRAH_INVOICE_${safeOrderNum}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.end(pdfBuffer);
+  });
+
+  // ------------------------------- Send Invoice (Email & WhatsApp) ----------------------------
+  sendInvoice = catchAsync(async (req, res) => {
+    const orderId = req.params.id || req.body.id || req.body.orderId;
+    if (!orderId) {
+      throw new ApiError(400, 'Order ID is required');
+    }
+    const methods = Array.isArray(req.body.methods) && req.body.methods.length > 0
+      ? req.body.methods
+      : ['email', 'whatsapp'];
+
+    // Support direct PDF download via sendInvoice if methods includes 'download'
+    if (methods.includes('download') && methods.length === 1) {
+      const { order, pdfBuffer } = await orderService.generateOrderInvoice(orderId, req.user);
+      const safeOrderNum = (order.orderNumber || 'ORD').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `NEIRAH_INVOICE_${safeOrderNum}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      return res.end(pdfBuffer);
+    }
+
+    const result = await orderService.dispatchInvoice(orderId, methods);
+    ApiResponse.success(
+      res,
+      result,
+      result.dispatched.length > 0
+        ? `Invoice dispatched successfully via ${result.dispatched.join(' & ')}`
+        : 'Invoice dispatch processed'
+    );
+  });
+
+  // ------------------------------- Admin: Delete Order ----------------------------
+  deleteOrder = catchAsync(async (req, res) => {
+    const result = await orderService.deleteOrder(req.params.id, req.user);
+    ApiResponse.success(res, null, result.message);
+  });
+
+  // ------------------------------- Admin: Bulk Delete Orders ----------------------------
+  bulkDeleteOrders = catchAsync(async (req, res) => {
+    const ids = req.body.ids || req.body.orderIds;
+    const result = await orderService.bulkDeleteOrders(ids, req.user);
+    ApiResponse.success(res, null, result.message);
+  });
 }
 
 module.exports = new OrderController();

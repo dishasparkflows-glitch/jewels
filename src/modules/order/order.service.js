@@ -1,8 +1,13 @@
 const Order = require('./order.model');
 const Cart = require('../cart/cart.model');
+const Setting = require('../setting/setting.model');
 const couponService = require('../coupon/coupon.service');
 const codSequenceService = require('../codSequence/codSequence.service');
 const paymentService = require('../payment/payment.service');
+const whatsappService = require('../whatsapp/whatsapp.service');
+const { sendEmail } = require('../../utils/emailService');
+const { generateInvoicePDF } = require('../../utils/invoiceGenerator');
+const { getInvoiceEmailHtml } = require('../../template');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const {
@@ -177,12 +182,124 @@ class OrderService {
       );
     }
 
+    // Automated Dispatch: Generate PDF invoice and deliver to customer email in background
+    this.dispatchInvoice(order._id, ['email']).catch((err) => {
+      console.warn('[AutoInvoice] Background order invoice dispatch failed:', err.message);
+    });
+
     return {
       order,
       payment: paymentResponse,
     };
   }
 
+  // ------------------------------- Invoice Generation & Dispatch ----------------------------
+  async getOrderForInvoice(orderId) {
+    const order = await Order.findById(orderId)
+      .populate('userId', 'profile.firstName profile.lastName auth.email')
+      .populate('items.productId', 'basicInfo media assets ornate colorImages')
+      .lean();
+    if (!order) {
+      throw new ApiError(404, 'Order not found');
+    }
+    return order;
+  }
+
+  async getStoreSetting() {
+    try {
+      return (await Setting.findOne({ 'meta.deletedAt': null }).lean()) || (await Setting.findOne().lean()) || {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  async generateOrderInvoice(orderId, user = null) {
+    const order = await this.getOrderForInvoice(orderId);
+    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
+      checkOrderAccess(order, user);
+    }
+    const setting = await this.getStoreSetting();
+    const pdfBuffer = await generateInvoicePDF(order, { setting });
+    return { order, pdfBuffer };
+  }
+
+  async dispatchInvoice(orderId, methods = ['email', 'whatsapp']) {
+    const order = await this.getOrderForInvoice(orderId);
+    const setting = await this.getStoreSetting();
+    const pdfBuffer = await generateInvoicePDF(order, { setting });
+
+    const brandName = setting?.businessDetails?.companyName || 'NEIRAH';
+    const brandPrefix = brandName.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const safeOrderNum = (order.orderNumber || 'ORD').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `${brandPrefix || 'NEIRAH'}_INVOICE_${safeOrderNum}.pdf`;
+    const dispatched = [];
+    const errors = [];
+
+    // 1. Email Dispatch
+    if (methods.includes('email')) {
+      const recipientEmail =
+        order.customer?.email ||
+        order.shippingAddress?.email ||
+        order.userId?.auth?.email;
+
+      if (recipientEmail) {
+        try {
+          await sendEmail({
+            to: recipientEmail,
+            subject: `${brandName}: Invoice for Order #${order.orderNumber}`,
+            text: `Dear Customer,\n\nPlease find attached your tax invoice for Order #${order.orderNumber}.\n\nThank you for choosing ${brandName}.\n\nWarm regards,\n${brandName} Team`,
+            html: getInvoiceEmailHtml({ order, setting }),
+            attachments: [
+              {
+                filename,
+                content: pdfBuffer,
+              },
+            ],
+          });
+          dispatched.push('email');
+        } catch (err) {
+          console.error('[OrderService] Invoice email dispatch failed:', err.message);
+          errors.push(`Email error: ${err.message}`);
+        }
+      } else {
+        errors.push('No recipient email found for this order.');
+      }
+    }
+
+    // 2. WhatsApp Dispatch
+    if (methods.includes('whatsapp')) {
+      const recipientPhone =
+        order.customer?.phone ||
+        order.shippingAddress?.phone;
+
+      if (recipientPhone) {
+        try {
+          const waResult = await whatsappService.sendWhatsAppInvoice(recipientPhone, pdfBuffer, order.orderNumber);
+          if (waResult?.success) {
+            dispatched.push('whatsapp');
+          } else {
+            errors.push(`WhatsApp error: ${waResult?.error || 'Failed to dispatch WhatsApp message'}`);
+          }
+        } catch (err) {
+          console.error('[OrderService] Invoice WhatsApp dispatch failed:', err.message);
+          errors.push(`WhatsApp error: ${err.message}`);
+        }
+      } else {
+        errors.push('No recipient phone number found for this order.');
+      }
+    }
+
+    return {
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      dispatched,
+      errors: errors.length > 0 ? errors : null,
+      pdfBuffer,
+    };
+  }
+
+
+  // ------------------------------- get order by id ----------------------------
   async getOrderById(orderId, user = null) {
     const order = await Order.findById(orderId)
       .populate('userId', 'profile.firstName profile.lastName auth.email')
@@ -201,6 +318,7 @@ class OrderService {
     return order;
   }
 
+  // ------------------------------- get order by number ----------------------------
   async getOrderByNumber(orderNumber, user = null) {
     const order = await Order.findOne({ orderNumber })
       .populate('items.productId', 'basicInfo media assets ornate colorImages')
@@ -260,7 +378,8 @@ class OrderService {
 
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
-
+  
+  // ------------------------------- update order status ----------------------------
   async updateOrderStatus(orderId, { orderStatus }, adminUser = null) {
     const order = await Order.findById(orderId);
     if (!order) {
@@ -308,6 +427,7 @@ class OrderService {
     return order;
   }
 
+  // ------------------------------- cancel order ----------------------------
   async cancelOrder(orderId, user = null) {
     const order = await Order.findById(orderId);
     if (!order) {
@@ -337,6 +457,49 @@ class OrderService {
 
     await order.save();
     return order;
+  }
+
+  // ------------------------------- delete order ----------------------------
+  async deleteOrder(id, adminUser = null) {
+    const item = await Order.findOneAndUpdate(
+      { _id: id },
+      {
+        $set: {
+          'meta.deletedAt': new Date(),
+          'meta.deletedBy': adminUser?._id || adminUser?.id || null,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!item) {
+      throw new ApiError(404, 'Order not found');
+    }
+
+    return { message: 'Order deleted successfully', id };
+  }
+
+  // ------------------------------- bulk delete orders ----------------------------
+  async bulkDeleteOrders(ids, adminUser = null) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of order IDs to delete');
+    }
+
+    const result = await Order.updateMany(
+      { _id: { $in: ids } },
+      {
+        $set: {
+          'meta.deletedAt': new Date(),
+          'meta.deletedBy': adminUser?._id || adminUser?.id || null,
+        },
+      }
+    );
+
+    return {
+      message: `${result.modifiedCount} order(s) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
   }
 }
 

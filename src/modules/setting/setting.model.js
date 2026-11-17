@@ -160,16 +160,8 @@ const settingSchema = new mongoose.Schema(
 
     // Social Media Links
     socialMedia: {
-      instagram: {
-        type: String,
-        default: 'https://www.instagram.com/neirah.officials?igsh=MWRrcDE3YnlhaTd6eg%3D%3D&utm_source=qr',
-        trim: true,
-      },
-      facebook: {
-        type: String,
-        default: 'https://www.facebook.com/share/1Cosh9cg8h/?mibextid=wwXIfr',
-        trim: true,
-      },
+      instagram: { type: String, default: '', trim: true },
+      facebook: { type: String, default: '', trim: true },
       youtube: { type: String, default: '', trim: true },
       pinterest: { type: String, default: '', trim: true },
       twitter: { type: String, default: '', trim: true },

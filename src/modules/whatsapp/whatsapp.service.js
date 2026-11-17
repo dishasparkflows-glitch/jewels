@@ -473,6 +473,21 @@ class WhatsAppService {
     }
   }
 
+  // ------------------------------- send invoice notification ----------------------------
+  async sendWhatsAppInvoice(to, pdfBuffer, orderNumber) {
+    try {
+      const normalizedPhone = normalizePhoneNumber(to);
+      const cleanOrderNum = orderNumber ? String(orderNumber).replace(/^#/, '') : 'N/A';
+      const msg = `💍 *NEIRAH: YOUR INVOICE* 💍\n\nYour invoice for order *#${cleanOrderNum}* is ready. Please view or download it from your Neirah account order history.\n\n_Thank you for choosing NEIRAH._`;
+
+      await this.sendTextMessage(normalizedPhone, msg);
+      return { success: true };
+    } catch (err) {
+      console.error('[WhatsAppService] Failed to send WhatsApp invoice notification:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
   // ─── Forwarded Template Operations (Backward Compatibility) ────────
   getTemplates(queryParams) {
     return whatsappTemplateService.getTemplates(queryParams);

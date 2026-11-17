@@ -35,8 +35,13 @@ connectDB().then(async () => {
   });
 });
 
-// Handle unhandled promise rejections
+// Handle unhandled promise rejections gracefully without crashing the server
 process.on('unhandledRejection', (err) => {
-  console.error('❌ Unhandled Rejection:', err.message);
-  process.exit(1);
+  console.error('❌ Unhandled Rejection:', err?.stack || err?.message || err);
+  // Avoid process.exit(1) to prevent transient external network/webhook blips from crashing the API
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('💥 Uncaught Exception:', err?.stack || err?.message || err);
 });

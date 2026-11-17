@@ -4,9 +4,7 @@ const DiamondColor = require('../diamondColor/diamondColor.model');
 const DiamondClarity = require('../diamondClarity/diamondClarity.model');
 const DiamondShape = require('../diamondShape/diamondShape.model');
 const DiamondType = require('../diamondType/diamondType.model');
-const DiamondCut = require('../diamondCut/diamondCut.model');
 const DiamondSize = require('../diamondSize/diamondSize.model');
-const SieveSize = require('../sieveSize/sieveSize.model');
 const MetalColor = require('../metalColor/metalColor.model');
 const MetalPurity = require('../metalPurity/metalPurity.model');
 const ApiError = require('../../utils/ApiError');
@@ -309,21 +307,17 @@ class DiamondService {
     const [
       colors,
       clarities,
-      cuts,
       shapes,
       types,
       sizes,
-      sieveSizes,
       metalColors,
       metalPurities,
     ] = await Promise.all([
       DiamondColor.find(filter).sort({ name: 1 }).select('_id name image status').lean(),
       DiamondClarity.find(filter).sort({ name: 1 }).select('_id name image status').lean(),
-      DiamondCut.find(filter).sort({ name: 1 }).select('_id name image status').lean(),
       DiamondShape.find(filter).sort({ name: 1 }).select('_id name image icon status').lean(),
       DiamondType.find(filter).sort({ name: 1 }).select('_id name status').lean(),
       DiamondSize.find(filter).sort({ name: 1 }).select('_id name sizeFrom sizeTo status').lean(),
-      SieveSize.find(filter).sort({ name: 1 }).select('_id name status').lean(),
       MetalColor.find(filter).sort({ name: 1 }).select('_id name colorCode colorCodeEnd status').lean(),
       MetalPurity.find(filter).sort({ order: 1, karat: 1, name: 1 }).select('_id name metalType karat order purityPercent status').lean(),
     ]);
@@ -333,15 +327,15 @@ class DiamondService {
       diamondColors: colors,
       clarities,
       diamondClarities: clarities,
-      cuts,
-      diamondCuts: cuts,
+      cuts: [],
+      diamondCuts: [],
       shapes,
       diamondShapes: shapes,
       types,
       diamondTypes: types,
       sizes,
       diamondSizes: sizes,
-      sieveSizes,
+      sieveSizes: [],
       metalColors,
       metalPurities,
     };

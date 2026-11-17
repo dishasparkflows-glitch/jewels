@@ -3,7 +3,6 @@ const Filter = require('./filter.model');
 const Category = require('../category/category.model');
 const DiamondType = require('../diamondType/diamondType.model');
 const DiamondClarity = require('../diamondClarity/diamondClarity.model');
-const CaratWeight = require('../caratWeight/caratWeight.model');
 const Featured = require('../featured/featured.model');
 const GemstoneType = require('../gemstoneType/gemstoneType.model');
 const GemstoneShape = require('../gemstoneShape/gemstoneShape.model');
@@ -12,15 +11,16 @@ const ApiError = require('../../utils/ApiError');
 async function loadAllFilterOptions() {
   const activeFilter = { 'meta.deletedAt': null, status: 'active' };
 
-  const [diamondTypes, diamondClarities, caratWeights, collections, categories, gemstoneTypes, gemstoneShapes] = await Promise.all([
+  const [diamondTypes, diamondClarities, collections, categories, gemstoneTypes, gemstoneShapes] = await Promise.all([
     DiamondType.find(activeFilter).sort({ name: 1 }).select('_id name').lean(),
     DiamondClarity.find(activeFilter).sort({ name: 1 }).select('_id name').lean(),
-    CaratWeight.find(activeFilter).sort({ order: 1, weight: 1, name: 1 }).select('_id name weight').lean(),
     Featured.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name').lean(),
     Category.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name slug').lean(),
     GemstoneType.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name slug colorCode colorCodeEnd swatchImage image').lean(),
     GemstoneShape.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name code iconSvg image').lean(),
   ]);
+
+  const caratWeights = [];
 
   const formattedDiamondTypes = diamondTypes.map((item) => ({
     _id: String(item._id),

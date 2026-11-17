@@ -96,8 +96,6 @@ class CouponService {
         { 'validity.startDate': { $lte: now } },
       ],
     });
-    
-
     if (queryParams.search) {
       const searchCond = { 'coupon.code': new RegExp(queryParams.search.trim(), 'i') };
       if (filter.$and) {
@@ -107,10 +105,12 @@ class CouponService {
       }
     }
 
-    return await Coupon.find(filter)
-      .select('_id coupon discount validity usage status meta')
-      .sort({ 'coupon.code': 1 })
+    const items = await Coupon.find(filter)
+      .select('_id categoryId coupon discount validity usage status meta')
+      .sort({ 'discount.value': -1, 'coupon.code': 1 })
       .lean();
+
+    return items;
   }
 
   // ------------------------------- validate coupon ----------------------------

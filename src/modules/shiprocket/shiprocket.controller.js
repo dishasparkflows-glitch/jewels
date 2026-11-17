@@ -69,11 +69,23 @@ class ShiprocketController {
       return res.status(200).json({ message: 'Order not found, acknowledged' });
     }
 
+    if (!order.orderTimeline) {
+      order.orderTimeline = {
+        placed: { at: order.meta?.createdAt || new Date(), by: order.userId || null },
+        accepted: { at: null, by: null },
+        cancelled: { at: null, by: null },
+        packed: { at: null },
+        shipped: { at: null, by: null },
+        delivered: { at: null, by: null },
+      };
+    }
+
     // Status Evaluation
     if (['SHIPPED', 'IN TRANSIT'].includes(rawStatus)) {
       if (order.orderStatus !== 'shipped' && order.orderStatus !== 'delivered') {
         order.orderStatus = 'shipped';
-        order.shippedAt = order.shippedAt || new Date();
+        if (!order.orderTimeline.shipped) order.orderTimeline.shipped = {};
+        order.orderTimeline.shipped.at = order.orderTimeline.shipped.at || new Date();
       }
     } else if (['OUT FOR DELIVERY'].includes(rawStatus)) {
       if (order.orderStatus !== 'delivered') {
@@ -81,7 +93,8 @@ class ShiprocketController {
       }
     } else if (['DELIVERED'].includes(rawStatus)) {
       order.orderStatus = 'delivered';
-      order.deliveredAt = new Date();
+      if (!order.orderTimeline.delivered) order.orderTimeline.delivered = {};
+      order.orderTimeline.delivered.at = order.orderTimeline.delivered.at || new Date();
 
       // Financial Reconciliation for COD orders
       if (order.payment?.method === 'cod') {
@@ -109,7 +122,8 @@ class ShiprocketController {
       }
     } else if (['CANCELED', 'CANCELLED', 'RTO', 'RTO INITIATED', 'RTO DELIVERED'].includes(rawStatus)) {
       order.orderStatus = 'cancelled';
-      order.cancelledAt = new Date();
+      if (!order.orderTimeline.cancelled) order.orderTimeline.cancelled = {};
+      order.orderTimeline.cancelled.at = order.orderTimeline.cancelled.at || new Date();
     }
 
     await order.save();

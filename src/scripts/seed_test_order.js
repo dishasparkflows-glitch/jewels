@@ -128,9 +128,14 @@ async function seedTestOrder() {
       pickupScheduledDate: new Date(Date.now() + 86400 * 1000),
       lastError: null,
     },
-    shippedAt: new Date(Date.now() - 3600 * 1000 * 2),
-    deliveredAt: null,
-    cancelledAt: null,
+    orderTimeline: {
+      placed: { at: new Date(Date.now() - 3600 * 1000 * 24), by: user._id },
+      accepted: { at: new Date(Date.now() - 3600 * 1000 * 20), by: null },
+      packed: { at: new Date(Date.now() - 3600 * 1000 * 10) },
+      shipped: { at: new Date(Date.now() - 3600 * 1000 * 2), by: null },
+      delivered: { at: null, by: null },
+      cancelled: { at: null, by: null },
+    },
     notes: 'Test order record created with all fields populated for end-to-end verification',
   };
 

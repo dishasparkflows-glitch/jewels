@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const reviewController = require('./review.controller');
-const { authenticate } = require('../../middleware/auth.middleware');
+const { authenticate, optionalAuth } = require('../../middleware/auth.middleware');
 
 router.get('/lookup', reviewController.getLookup);
 router.get('/', reviewController.getAll);
 router.get('/:id', reviewController.getOne);
 
-// Protected routes (Admin operations)
-router.post('/', authenticate, reviewController.create);
+// Allow customers / users / admin to submit a review
+router.post('/', optionalAuth, reviewController.create);
 router.put('/:id', authenticate, reviewController.update);
 router.delete('/:id', authenticate, reviewController.delete);
 

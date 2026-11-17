@@ -299,8 +299,13 @@ class ProductService {
         featDoc = await Featured.findOne({ _id: queryParams.featured, 'meta.deletedAt': null }).lean();
       }
       if (!featDoc) {
+        const clean = String(queryParams.featured).toLowerCase().trim();
         featDoc = await Featured.findOne({
-          name: new RegExp(`^${queryParams.featured}$`, 'i'),
+          $or: [
+            { slug: clean },
+            { name: new RegExp(`^${clean}$`, 'i') },
+            { name: new RegExp(`^${clean.replace(/-/g, ' ')}$`, 'i') },
+          ],
           'meta.deletedAt': null,
         }).lean();
       }
@@ -1152,7 +1157,7 @@ class ProductService {
     }
 
     const selectedTab = (queryParams.tab || 'recommended').toLowerCase();
-    const limit = Math.min(Number(queryParams.limit) || 16, 50);
+    const limit = Math.min(Math.max(1, Number(queryParams.limit) || 12), 12);
 
     // If target product has no categories, do not return other products
     if (categoryIds.length === 0) {
@@ -1232,6 +1237,7 @@ class ProductService {
     const formattedItems = rawItems
       .map(formatStorefrontProduct)
       .filter((item) => item && (item.images?.length > 0 || item.image))
+      .slice(0, limit)
       .map((item) => ({
         ...item,
         inWishlist: wishlistedSet.has(String(item.id || item._id)),
@@ -1250,6 +1256,107 @@ class ProductService {
       items: formattedItems,
       total: formattedItems.length,
     };
+  }
+
+  // ------------------------------- get most liked products ----------------------------
+  async getMostLiked(queryParams = {}, userId = null) {
+    await this.refreshCalculatedPrices();
+    const limit = Math.min(Number(queryParams.limit) || 6, 24);
+
+    // Resolve current product ID to exclude from recommendations
+    let currentId = queryParams.productId || queryParams.excludeId;
+    let excludeObjId = null;
+
+    if (currentId) {
+      if (mongoose.isValidObjectId(currentId)) {
+        excludeObjId = new mongoose.Types.ObjectId(currentId);
+      } else {
+        const found = await Product.findOne({
+          $or: [{ 'basicInfo.slug': currentId }, { sku: currentId }],
+        })
+          .select('_id')
+          .lean();
+        if (found) {
+          excludeObjId = found._id;
+          currentId = String(found._id);
+        }
+      }
+    }
+
+    // 1. Query Wishlist table to aggregate the most wishlisted/liked product IDs
+    const aggregationPipeline = [
+      { $unwind: '$productIds' },
+      ...(excludeObjId ? [{ $match: { productIds: { $ne: excludeObjId } } }] : []),
+      {
+        $group: {
+          _id: '$productIds',
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+      { $limit: limit },
+    ];
+
+    const mostLikedWishlistDocs = await Wishlist.aggregate(aggregationPipeline);
+    const mostLikedProductIds = mostLikedWishlistDocs
+      .map((row) => row._id)
+      .filter((id) => mongoose.isValidObjectId(id));
+
+    let rawItems = [];
+
+    if (mostLikedProductIds.length > 0) {
+      const wishlistProducts = await Product.find({
+        _id: { $in: mostLikedProductIds },
+        'meta.deletedAt': null,
+        status: 'approved',
+      })
+        .populate(this._getProductPopulateOptions())
+        .lean();
+
+      // Preserve popularity order from aggregation
+      const productMap = new Map(wishlistProducts.map((p) => [String(p._id), p]));
+      rawItems = mostLikedProductIds
+        .map((id) => productMap.get(String(id)))
+        .filter(Boolean);
+    }
+
+    // 2. If fewer than limit (e.g. wishlist table has fewer than 6 products),
+    // backfill with approved storefront products
+    if (rawItems.length < limit) {
+      const existingIds = new Set(rawItems.map((r) => String(r._id)));
+      if (excludeObjId) existingIds.add(String(excludeObjId));
+
+      const fallbackFilter = {
+        'meta.deletedAt': null,
+        status: 'approved',
+        _id: { $nin: Array.from(existingIds) },
+      };
+
+      const backfill = await Product.find(fallbackFilter)
+        .populate(this._getProductPopulateOptions())
+        .sort({
+          'metrics.likes': -1,
+          'metrics.views': -1,
+          'demoMetrics.soldCount': -1,
+          'meta.createdAt': -1,
+        })
+        .limit(limit - rawItems.length)
+        .lean();
+
+      rawItems = [...rawItems, ...backfill];
+    }
+
+    const wishlistedSet = await this._getWishlistSet(userId);
+    const items = rawItems
+      .map(formatStorefrontProduct)
+      .filter((item) => item && (item.images?.length > 0 || item.image))
+      .slice(0, limit)
+      .map((item) => ({
+        ...item,
+        inWishlist: wishlistedSet.has(String(item.id || item._id)),
+      }));
+
+    return items;
   }
 
   // ------------------------------- get product lookup ----------------------------

@@ -66,6 +66,35 @@ const addressSnapshotSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const orderTimelineSchema = new mongoose.Schema(
+  {
+    placed: {
+      at: { type: Date, default: Date.now },
+      by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    },
+    accepted: {
+      at: { type: Date, default: null },
+      by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    },
+    cancelled: {
+      at: { type: Date, default: null },
+      by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    },
+    packed: {
+      at: { type: Date, default: null },
+    },
+    shipped: {
+      at: { type: Date, default: null },
+      by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    },
+    delivered: {
+      at: { type: Date, default: null },
+      by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    },
+  },
+  { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
   {
     orderNumber: {
@@ -140,7 +169,7 @@ const orderSchema = new mongoose.Schema(
     },
     orderStatus: {
       type: String,
-      enum: ['pending', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled'],
+      enum: ['pending', 'processing', 'accepted', 'shipped', 'out_for_delivery', 'delivered', 'cancelled'],
       default: 'pending',
       index: true,
     },
@@ -166,9 +195,17 @@ const orderSchema = new mongoose.Schema(
       pickupScheduledDate: { type: Date, default: null },
       lastError: { type: String, default: null },
     },
-    shippedAt: { type: Date, default: null },
-    deliveredAt: { type: Date, default: null },
-    cancelledAt: { type: Date, default: null },
+    orderTimeline: {
+      type: orderTimelineSchema,
+      default: () => ({
+        placed: { at: new Date(), by: null },
+        accepted: { at: null, by: null },
+        cancelled: { at: null, by: null },
+        packed: { at: null },
+        shipped: { at: null, by: null },
+        delivered: { at: null, by: null },
+      }),
+    },
     notes: {
       type: String,
       default: '',
@@ -220,6 +257,22 @@ orderSchema.pre('validate', async function (next) {
       return next(err);
     }
   }
+
+  // Ensure orderTimeline placed object contains order creation timestamp and userId
+  if (!this.orderTimeline) {
+    this.orderTimeline = {};
+  }
+  if (!this.orderTimeline.placed) {
+    this.orderTimeline.placed = { at: new Date(), by: this.userId || null };
+  } else {
+    if (!this.orderTimeline.placed.at) {
+      this.orderTimeline.placed.at = new Date();
+    }
+    if (!this.orderTimeline.placed.by && this.userId) {
+      this.orderTimeline.placed.by = this.userId;
+    }
+  }
+
   next();
 });
 

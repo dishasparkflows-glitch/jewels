@@ -84,6 +84,12 @@ class ProductController {
     ApiResponse.success(res, data, 'Similar products retrieved successfully');
   });
 
+  // ------------------------------- get most liked products ----------------------------
+  getMostLiked = catchAsync(async (req, res) => {
+    const data = await productService.getMostLiked(req.query, req.user?._id);
+    ApiResponse.success(res, data, 'Most liked products retrieved successfully');
+  });
+
   // ------------------------------- get product by sku or tag ----------------------------
   getBySkuOrTag = catchAsync(async (req, res) => {
     const product = await productService.getBySkuOrTag(req.params.code, req.user?._id);

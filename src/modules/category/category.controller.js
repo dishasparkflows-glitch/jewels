@@ -3,12 +3,24 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const redisClient = require('../../utils/redisClient');
 const { CACHE_TTL } = require('../../config/constants');
+const { WebsiteThemeSettings } = require('../websiteTheme/websiteTheme.model');
+
+async function bumpStorefrontRevision() {
+  try {
+    await WebsiteThemeSettings.findOneAndUpdate(
+      { key: 'storefront' },
+      { $inc: { revision: 1 } },
+      { upsert: true }
+    );
+  } catch (_) {}
+}
 
 class CategoryController {
   // ------------------------------- create category ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await categoryService.create(req.body);
     await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.created(res, null, 'Category created successfully');
   });
 
@@ -46,6 +58,7 @@ class CategoryController {
   update = catchAsync(async (req, res) => {
     const item = await categoryService.update(req.params.id, req.body);
     await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.success(res, null, 'Category updated successfully');
   });
 
@@ -53,6 +66,7 @@ class CategoryController {
   delete = catchAsync(async (req, res) => {
     const result = await categoryService.delete(req.params.id);
     await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.success(res, null, result.message);
   });
 }

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Featured = require('./featured.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -54,7 +55,19 @@ class FeaturedService {
 
   // ------------------------------- get one featured item ----------------------------
   async getOne(id) {
-    const item = await Featured.findOne({ _id: id, 'meta.deletedAt': null })
+    let filter = { 'meta.deletedAt': null };
+    if (mongoose.isValidObjectId(id)) {
+      filter._id = id;
+    } else {
+      const clean = String(id).toLowerCase().trim();
+      filter.$or = [
+        { slug: clean },
+        { name: new RegExp(`^${clean}$`, 'i') },
+        { name: new RegExp(`^${clean.replace(/-/g, ' ')}$`, 'i') },
+      ];
+    }
+
+    const item = await Featured.findOne(filter)
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
       .populate('productIds', '_id basicInfo pricing images colorImages ornate')

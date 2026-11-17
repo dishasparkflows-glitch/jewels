@@ -511,8 +511,14 @@ const formatStorefrontProduct = (p) => {
     }
   }
 
-  if (!minPrice) minPrice = salePrice;
-  if (!maxPrice) maxPrice = isGold ? salePrice : mrp;
+  const isSilver = String(p.productType || '').toLowerCase() === 'silver' || Boolean(p.isOrnate);
+  if (isSilver) {
+    minPrice = salePrice;
+    maxPrice = salePrice;
+  } else {
+    if (!minPrice) minPrice = salePrice;
+    if (!maxPrice) maxPrice = minPrice;
+  }
 
   const categoryIds = Array.isArray(p.categoryIds) ? p.categoryIds : (p.categoryIds ? [p.categoryIds] : []);
   const menuItemIds = Array.isArray(p.menuItemIds) ? p.menuItemIds : (p.menuItemIds ? [p.menuItemIds] : []);
@@ -604,8 +610,14 @@ const formatStorefrontProductDetail = (p) => {
     }
   }
 
-  if (!minPrice) minPrice = salePrice;
-  if (!maxPrice) maxPrice = mrp || salePrice;
+  const isSilver = String(p.productType || '').toLowerCase() === 'silver' || Boolean(p.isOrnate);
+  if (isSilver) {
+    minPrice = salePrice;
+    maxPrice = salePrice;
+  } else {
+    if (!minPrice) minPrice = salePrice;
+    if (!maxPrice) maxPrice = minPrice;
+  }
   const colorImages = Array.isArray(p.colorImages) ? p.colorImages : [];
   const hasColorImages = colorImages.some((ci) => Array.isArray(ci?.images) && ci.images.length > 0);
   const images = hasColorImages ? undefined : extractProductImages(p);

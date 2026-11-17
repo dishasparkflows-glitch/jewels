@@ -105,6 +105,11 @@ const categorySchema = new mongoose.Schema(
         percentPerStep: 2.5,
       }),
     },
+    order: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
     promoBanners: [promoBannerSchema],
   },
   {
@@ -112,6 +117,7 @@ const categorySchema = new mongoose.Schema(
   }
 );
 
+categorySchema.index({ order: 1, name: 1 });
 categorySchema.index({ 'meta.createdAt': -1 });
 
 categorySchema.pre('save', function (next) {

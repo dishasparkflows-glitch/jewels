@@ -5,12 +5,16 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 class ReviewService {
   // ------------------------------- create review ----------------------------
   async create(data) {
+    if (!data.productId || data.productId === 'null' || data.productId === '') {
+      data.productId = null;
+    }
     return await Review.create(data);
   }
 
   // ------------------------------- get one review ----------------------------
   async getOne(id) {
-    const item = await Review.findOne({ _id: id });
+    const item = await Review.findOne({ _id: id })
+      .populate('productId', 'basicInfo.title basicInfo.slug basicInfo.sku media.images ornate.ornateImages');
     if (!item) {
       throw new ApiError(404, 'Review not found');
     }
@@ -25,6 +29,11 @@ class ReviewService {
     if (queryParams.status) {
       filter.status = queryParams.status;
     }
+
+    if (queryParams.productId) {
+      filter.productId = queryParams.productId;
+    }
+
     if (queryParams.search) {
       const reg = new RegExp(queryParams.search, 'i');
       filter.$or = [
@@ -38,6 +47,7 @@ class ReviewService {
     const selectFields = queryParams.status === 'approved' ? '-meta' : '';
 
     const query = Review.find(filter)
+      .populate('productId', 'basicInfo.title basicInfo.slug basicInfo.sku media.images ornate.ornateImages')
       .sort({ 'review.reviewDate': -1, 'meta.createdAt': -1 })
       .skip(skip)
       .limit(limit);
@@ -55,7 +65,11 @@ class ReviewService {
   // ------------------------------- get review lookup ----------------------------
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null, status: 'approved' };
+    if (queryParams.productId) {
+      filter.productId = queryParams.productId;
+    }
     return await Review.find(filter)
+      .populate('productId', 'basicInfo.title basicInfo.slug basicInfo.sku media.images ornate.ornateImages')
       .sort({ 'review.reviewDate': -1 })
       .select('-meta')
       .lean();
@@ -63,11 +77,17 @@ class ReviewService {
 
   // ------------------------------- update review ----------------------------
   async update(id, data) {
+    if (data.productId !== undefined) {
+      if (!data.productId || data.productId === 'null' || data.productId === '') {
+        data.productId = null;
+      }
+    }
+
     const item = await Review.findOneAndUpdate(
       { _id: id },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
-    );
+    ).populate('productId', 'basicInfo.title basicInfo.slug basicInfo.sku media.images ornate.ornateImages');
 
     if (!item) {
       throw new ApiError(404, 'Review not found');

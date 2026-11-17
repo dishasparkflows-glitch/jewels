@@ -2,6 +2,14 @@ const mongoose = require('mongoose');
 
 const reviewSchema = new mongoose.Schema(
   {
+    // Product Association
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      default: null,
+      index: true,
+    },
+
     // 1. Customer Details
     customer: {
       name: {
@@ -65,8 +73,8 @@ const reviewSchema = new mongoose.Schema(
 );
 
 reviewSchema.index({ status: 1, 'meta.createdAt': -1 });
+reviewSchema.index({ productId: 1, status: 1, 'review.reviewDate': -1 });
 reviewSchema.index({ 'customer.email': 1 });
 reviewSchema.index({ 'review.reviewDate': -1 });
-
 
 module.exports = mongoose.model('Review', reviewSchema);

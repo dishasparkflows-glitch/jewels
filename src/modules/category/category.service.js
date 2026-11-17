@@ -6,13 +6,19 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 const id = (value) => String(value?._id || value);
 const active = (row) => row.status === 'active' && !row.meta?.deletedAt;
-const ordered = (rows) => [...rows].sort((a, b) => (a.order || 0) - (b.order || 0));
+const ordered = (rows) =>
+  [...rows].sort((a, b) => {
+    const diff = (Number(a.order) || 0) - (Number(b.order) || 0);
+    if (diff !== 0) return diff;
+    return String(a.name || a.title || '').localeCompare(String(b.name || b.title || ''));
+  });
 
 function buildNavigation(categories, sections, items) {
   return ordered(categories.filter(active)).map((category) => ({
     _id: category._id,
     name: category.name,
     slug: category.slug,
+    order: Number(category.order) || 0,
     promoBanners: ordered(category.promoBanners || []).map((banner) => ({
       _id: banner._id,
       title: banner.title || '',
@@ -60,6 +66,7 @@ class CategoryService {
   // ------------------------------- create category ----------------------------
   async create(data) {
     normalizeSizeChart(data);
+    if (data.order !== undefined) data.order = Number(data.order) || 0;
     return await Category.create(data);
   }
 
@@ -85,7 +92,7 @@ class CategoryService {
       filter.name = new RegExp(queryParams.search, 'i');
     }
 
-    let sort = { name: 1 };
+    let sort = { order: 1, name: 1 };
     if (queryParams.sortBy) {
       const order = queryParams.sortOrder === 'desc' || queryParams.sortOrder === '-1' ? -1 : 1;
       sort = { [queryParams.sortBy]: order };
@@ -115,15 +122,16 @@ class CategoryService {
     }
 
     return await Category.find(filter)
-      .select('_id name status icon type slug sizingConfig')
+      .select('_id name status icon type slug sizingConfig order')
       .collation({ locale: 'en', strength: 2 })
-      .sort({ name: 1 })
+      .sort({ order: 1, name: 1 })
       .lean();
   }
 
   // ------------------------------- update category ----------------------------
   async update(id, data) {
     normalizeSizeChart(data);
+    if (data.order !== undefined) data.order = Number(data.order) || 0;
     const item = await Category.findOneAndUpdate(
       { _id: id },
       { $set: data },
@@ -155,8 +163,8 @@ class CategoryService {
   // ------------------------------- get storefront navigation ----------------------------
   async getNavigation() {
     const categories = await Category.find({ status: 'active', 'meta.deletedAt': null })
-      .select('_id name slug promoBanners status meta.deletedAt')
-      .sort({ order: 1, _id: 1 })
+      .select('_id name slug promoBanners status meta.deletedAt order')
+      .sort({ order: 1, name: 1, _id: 1 })
       .lean();
 
     const sections = await MenuSection.find({

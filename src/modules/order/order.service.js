@@ -120,6 +120,17 @@ class OrderService {
         status: 'pending',
       },
       orderStatus: 'pending',
+      orderTimeline: {
+        placed: {
+          at: new Date(),
+          by: effectiveUserId || null,
+        },
+        accepted: { at: null, by: null },
+        cancelled: { at: null, by: null },
+        packed: { at: null },
+        shipped: { at: null, by: null },
+        delivered: { at: null, by: null },
+      },
       notes: data.notes || '',
     });
 
@@ -176,6 +187,11 @@ class OrderService {
     const order = await Order.findById(orderId)
       .populate('userId', 'profile.firstName profile.lastName auth.email')
       .populate('items.productId', 'basicInfo media assets ornate colorImages')
+      .populate('orderTimeline.placed.by', 'profile.firstName profile.lastName auth.email role')
+      .populate('orderTimeline.accepted.by', 'profile.firstName profile.lastName auth.email role')
+      .populate('orderTimeline.cancelled.by', 'profile.firstName profile.lastName auth.email role')
+      .populate('orderTimeline.shipped.by', 'profile.firstName profile.lastName auth.email role')
+      .populate('orderTimeline.delivered.by', 'profile.firstName profile.lastName auth.email role')
       .lean();
     if (!order) {
       throw new ApiError(404, 'Order not found');
@@ -188,6 +204,11 @@ class OrderService {
   async getOrderByNumber(orderNumber, user = null) {
     const order = await Order.findOne({ orderNumber })
       .populate('items.productId', 'basicInfo media assets ornate colorImages')
+      .populate('orderTimeline.placed.by', 'profile.firstName profile.lastName auth.email role')
+      .populate('orderTimeline.accepted.by', 'profile.firstName profile.lastName auth.email role')
+      .populate('orderTimeline.cancelled.by', 'profile.firstName profile.lastName auth.email role')
+      .populate('orderTimeline.shipped.by', 'profile.firstName profile.lastName auth.email role')
+      .populate('orderTimeline.delivered.by', 'profile.firstName profile.lastName auth.email role')
       .lean();
     if (!order) {
       throw new ApiError(404, 'Order not found');
@@ -208,6 +229,9 @@ class OrderService {
         .skip(skip)
         .limit(limit)
         .populate('items.productId', 'basicInfo media assets ornate colorImages')
+        .populate('orderTimeline.placed.by', 'profile.firstName profile.lastName auth.email role')
+        .populate('orderTimeline.accepted.by', 'profile.firstName profile.lastName auth.email role')
+        .populate('orderTimeline.cancelled.by', 'profile.firstName profile.lastName auth.email role')
         .lean(),
       Order.countDocuments(filter),
     ]);
@@ -227,6 +251,9 @@ class OrderService {
         .limit(limit)
         .populate('userId', 'profile.firstName profile.lastName auth.email')
         .populate('items.productId', 'basicInfo media assets ornate colorImages')
+        .populate('orderTimeline.placed.by', 'profile.firstName profile.lastName auth.email role')
+        .populate('orderTimeline.accepted.by', 'profile.firstName profile.lastName auth.email role')
+        .populate('orderTimeline.cancelled.by', 'profile.firstName profile.lastName auth.email role')
         .lean(),
       Order.countDocuments(filter),
     ]);
@@ -234,13 +261,49 @@ class OrderService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
-  async updateOrderStatus(orderId, { orderStatus }) {
+  async updateOrderStatus(orderId, { orderStatus }, adminUser = null) {
     const order = await Order.findById(orderId);
     if (!order) {
       throw new ApiError(404, 'Order not found');
     }
 
     order.orderStatus = orderStatus;
+    if (!order.orderTimeline) {
+      order.orderTimeline = {
+        placed: { at: order.meta?.createdAt || new Date(), by: order.userId || null },
+        accepted: { at: null, by: null },
+        cancelled: { at: null, by: null },
+        packed: { at: null },
+        shipped: { at: null, by: null },
+        delivered: { at: null, by: null },
+      };
+    }
+
+    const now = new Date();
+    const adminId = adminUser?._id || adminUser?.id || null;
+    const normalizedStatus = String(orderStatus).toLowerCase();
+
+    if (normalizedStatus === 'processing' || normalizedStatus === 'accepted') {
+      if (!order.orderTimeline.accepted) order.orderTimeline.accepted = {};
+      order.orderTimeline.accepted.at = order.orderTimeline.accepted.at || now;
+      if (adminId) order.orderTimeline.accepted.by = adminId;
+    } else if (normalizedStatus === 'packed') {
+      if (!order.orderTimeline.packed) order.orderTimeline.packed = {};
+      order.orderTimeline.packed.at = order.orderTimeline.packed.at || now;
+    } else if (normalizedStatus === 'shipped') {
+      if (!order.orderTimeline.shipped) order.orderTimeline.shipped = {};
+      order.orderTimeline.shipped.at = order.orderTimeline.shipped.at || now;
+      if (adminId) order.orderTimeline.shipped.by = adminId;
+    } else if (normalizedStatus === 'delivered') {
+      if (!order.orderTimeline.delivered) order.orderTimeline.delivered = {};
+      order.orderTimeline.delivered.at = order.orderTimeline.delivered.at || now;
+      if (adminId) order.orderTimeline.delivered.by = adminId;
+    } else if (normalizedStatus === 'cancelled') {
+      if (!order.orderTimeline.cancelled) order.orderTimeline.cancelled = {};
+      order.orderTimeline.cancelled.at = order.orderTimeline.cancelled.at || now;
+      if (adminId) order.orderTimeline.cancelled.by = adminId;
+    }
+
     await order.save();
     return order;
   }
@@ -258,6 +321,20 @@ class OrderService {
     }
 
     order.orderStatus = 'cancelled';
+    if (!order.orderTimeline) {
+      order.orderTimeline = {
+        placed: { at: order.meta?.createdAt || new Date(), by: order.userId || null },
+        accepted: { at: null, by: null },
+        cancelled: { at: null, by: null },
+        packed: { at: null },
+        shipped: { at: null, by: null },
+        delivered: { at: null, by: null },
+      };
+    }
+    if (!order.orderTimeline.cancelled) order.orderTimeline.cancelled = {};
+    order.orderTimeline.cancelled.at = new Date();
+    order.orderTimeline.cancelled.by = user?._id || user?.id || null;
+
     await order.save();
     return order;
   }

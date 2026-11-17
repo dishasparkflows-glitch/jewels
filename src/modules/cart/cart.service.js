@@ -10,13 +10,13 @@ const cartPopulateOptions = [
     select: 'basicInfo pricing colorImages ornate images categoryIds productType variants centerDiamondRows',
     populate: { path: 'categoryIds', select: 'name' },
   },
-  { path: 'items.selectedAttributes.metalPurity', select: 'name' },
-  { path: 'items.selectedAttributes.metalColor', select: 'name' },
-  { path: 'items.selectedAttributes.diamondType', select: 'name' },
-  { path: 'items.selectedAttributes.diamondShape', select: 'name' },
-  { path: 'items.selectedAttributes.diamondClarity', select: 'name' },
-  { path: 'items.selectedAttributes.diamondColor', select: 'name' },
-  { path: 'items.selectedAttributes.size', select: 'name' },
+  { path: 'items.selectedAttributes.metalPurity', select: 'name', strictPopulate: false },
+  { path: 'items.selectedAttributes.metalColor', select: 'name', strictPopulate: false },
+  { path: 'items.selectedAttributes.diamondType', select: 'name', strictPopulate: false },
+  { path: 'items.selectedAttributes.diamondShape', select: 'name', strictPopulate: false },
+  { path: 'items.selectedAttributes.diamondClarity', select: 'name', strictPopulate: false },
+  { path: 'items.selectedAttributes.diamondColor', select: 'name', strictPopulate: false },
+  { path: 'items.selectedAttributes.size', select: 'name', strictPopulate: false },
 ];
 
 const toObjectId = (val) => (val && mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null);
@@ -89,7 +89,8 @@ class CartService {
         const sizeVal = getAttrString(sa?.size) || (typeof sa?.sizeRange === 'string' ? sa.sizeRange : '');
         const caratWeight = sa?.caratWeight != null ? Number(sa.caratWeight) : null;
 
-        const selectedMetal = [metalPurity, metalColor].filter(Boolean).join(' ');
+        const pPurity = (metalPurity || '').replace(/\s*gold$/i, '').trim();
+        const selectedMetal = item.selectedMetal || (pPurity && metalColor ? `${pPurity} ${metalColor}` : [metalPurity, metalColor].filter(Boolean).join(' '));
         const itemTotal = Number(item.totalItemPrice) || ((Number(item.price) || 0) * (Number(item.quantity) || 1));
 
         const selectedAttributes = sa ? {
@@ -183,12 +184,21 @@ class CartService {
     quantity = 1,
     price,
     totalItemPrice,
+    selectedMetal,
+    selectedSize,
     selectedAttributes,
     options = {},
   } = {}) {
-    const rawProductId = productId || options?.productId;
-    if (!rawProductId) {
-      throw new ApiError(400, 'Product ID is required');
+    let cleanProductId = productId || options?.productId;
+    if (typeof cleanProductId === 'object' && cleanProductId !== null) {
+      cleanProductId = cleanProductId._id || cleanProductId.id;
+    }
+    const rawProductId = typeof cleanProductId === 'string' ? cleanProductId.trim() : String(cleanProductId || '').trim();
+    if (!rawProductId || rawProductId === '[object Object]') {
+      throw new ApiError(400, 'A valid Product ID is required');
+    }
+    if (!mongoose.Types.ObjectId.isValid(rawProductId)) {
+      throw new ApiError(400, 'Invalid Product ID format');
     }
     if (!userId) {
       throw new ApiError(401, 'Please log in to add items to your cart');
@@ -222,7 +232,7 @@ class CartService {
     if (rawAttributes && typeof rawAttributes === 'object') {
       const hasValues = Object.values(rawAttributes).some((v) => v !== null && v !== undefined && v !== '');
       if (hasValues) {
-        resolvedAttributes = rawAttributes;
+        resolvedAttributes = { ...rawAttributes };
       }
     }
 
@@ -231,18 +241,38 @@ class CartService {
       const firstVariant = found?.variants?.[0] || null;
       const firstCenterRow = found?.centerDiamondRows?.[0] || null;
 
+      const resolveAttrVal = (val, idVal, fallbackId) => {
+        if (typeof val === 'string' && val.trim() && !mongoose.isValidObjectId(val.trim())) {
+          return val.trim();
+        }
+        if (typeof val === 'object' && val?.name && typeof val.name === 'string') {
+          return val.name.trim();
+        }
+        const effectiveId = idVal || (val && mongoose.isValidObjectId(val) ? val : null) || fallbackId;
+        return toObjectId(effectiveId);
+      };
+
       resolvedAttributes = {
-        metalPurity: toObjectId(resolvedAttributes?.metalPurityId || resolvedAttributes?.metalPurity || firstVariant?.metalPurityId || found?.metalPurityIds?.[0]),
-        metalColor: toObjectId(resolvedAttributes?.metalColorId || resolvedAttributes?.metalColor || firstVariant?.metalColorId || found?.metalColorIds?.[0]),
-        diamondType: toObjectId(resolvedAttributes?.diamondTypeId || resolvedAttributes?.diamondType || firstVariant?.diamondTypeId || firstCenterRow?.diamondTypeId),
-        diamondShape: toObjectId(resolvedAttributes?.diamondShapeId || resolvedAttributes?.diamondShape || firstVariant?.diamondShapeId || firstCenterRow?.diamondShapeId),
-        diamondClarity: toObjectId(resolvedAttributes?.diamondClarityId || resolvedAttributes?.diamondClarity || firstVariant?.diamondClarityId || firstCenterRow?.diamondClarityId),
-        diamondColor: toObjectId(resolvedAttributes?.diamondColorId || resolvedAttributes?.diamondColor || firstVariant?.diamondColorId || firstCenterRow?.diamondColorId),
+        metalPurity: resolveAttrVal(resolvedAttributes?.metalPurity, resolvedAttributes?.metalPurityId, firstVariant?.metalPurityId || found?.metalPurityIds?.[0]),
+        metalColor: resolveAttrVal(resolvedAttributes?.metalColor, resolvedAttributes?.metalColorId, firstVariant?.metalColorId || found?.metalColorIds?.[0]),
+        diamondType: resolveAttrVal(resolvedAttributes?.diamondType, resolvedAttributes?.diamondTypeId, firstVariant?.diamondTypeId || firstCenterRow?.diamondTypeId),
+        diamondShape: resolveAttrVal(resolvedAttributes?.diamondShape, resolvedAttributes?.diamondShapeId, firstVariant?.diamondShapeId || firstCenterRow?.diamondShapeId),
+        diamondClarity: resolveAttrVal(resolvedAttributes?.diamondClarity, resolvedAttributes?.diamondClarityId, firstVariant?.diamondClarityId || firstCenterRow?.diamondClarityId),
+        diamondColor: resolveAttrVal(resolvedAttributes?.diamondColor, resolvedAttributes?.diamondColorId, firstVariant?.diamondColorId || firstCenterRow?.diamondColorId),
         caratWeight: resolvedAttributes?.caratWeight != null ? Number(resolvedAttributes.caratWeight) : (firstVariant?.caratWeight ?? firstCenterRow?.caratWeight ?? null),
         sizeRange: resolvedAttributes?.sizeRange || (typeof resolvedAttributes?.size === 'string' && !mongoose.isValidObjectId(resolvedAttributes.size) ? resolvedAttributes.size : null),
-        size: toObjectId(resolvedAttributes?.sizeId || resolvedAttributes?.size),
+        size: resolveAttrVal(resolvedAttributes?.size, resolvedAttributes?.sizeId, null),
       };
     }
+
+    const resolvedSelectedMetal = selectedMetal || options?.selectedMetal || (
+      resolvedAttributes?.metalColor && resolvedAttributes?.metalPurity
+        ? `${resolvedAttributes.metalPurity} ${resolvedAttributes.metalColor}`
+        : (resolvedAttributes?.metalColor || resolvedAttributes?.metalPurity || '')
+    );
+    const resolvedSelectedSize = selectedSize || options?.selectedSize || (
+      typeof resolvedAttributes?.size === 'string' ? resolvedAttributes.size : (resolvedAttributes?.sizeRange || '')
+    );
 
     // Merge if same product already exists in cart, else push new item
     const existingIndex = cart.items.findIndex((item) => {
@@ -258,10 +288,18 @@ class CartService {
       if (resolvedAttributes) {
         cart.items[existingIndex].selectedAttributes = resolvedAttributes;
       }
+      if (resolvedSelectedMetal) {
+        cart.items[existingIndex].selectedMetal = resolvedSelectedMetal;
+      }
+      if (resolvedSelectedSize) {
+        cart.items[existingIndex].selectedSize = resolvedSelectedSize;
+      }
     } else {
       cart.items.push({
         productId: rawProductId,
         quantity: parsedQty,
+        selectedMetal: resolvedSelectedMetal,
+        selectedSize: resolvedSelectedSize,
         selectedAttributes: resolvedAttributes || undefined,
         price: resolvedPrice,
         totalItemPrice: resolvedTotal,
@@ -276,10 +314,14 @@ class CartService {
 
   // ------------------------------- update quantity ----------------------------
   async updateQuantity({ userId, productId, quantity } = {}) {
-    if (!productId) throw new ApiError(400, 'Product ID is required');
+    let cleanProductId = productId;
+    if (typeof cleanProductId === 'object' && cleanProductId !== null) {
+      cleanProductId = cleanProductId._id || cleanProductId.id;
+    }
+    const productIdStr = String(cleanProductId || '').trim();
+    if (!productIdStr || productIdStr === '[object Object]') throw new ApiError(400, 'A valid Product ID is required');
     if (!userId) throw new ApiError(401, 'Please log in to update cart items');
 
-    const productIdStr = String(productId).trim();
     const newQty = parseInt(quantity, 10);
     const cart = await this.findOrCreateCart(userId);
     if (!cart) throw new ApiError(404, 'Cart not found');
@@ -305,10 +347,14 @@ class CartService {
 
   // ------------------------------- remove item ----------------------------
   async removeItem({ userId, productId } = {}) {
-    if (!productId) throw new ApiError(400, 'Product ID is required');
+    let cleanProductId = productId;
+    if (typeof cleanProductId === 'object' && cleanProductId !== null) {
+      cleanProductId = cleanProductId._id || cleanProductId.id;
+    }
+    const productIdStr = String(cleanProductId || '').trim();
+    if (!productIdStr || productIdStr === '[object Object]') throw new ApiError(400, 'A valid Product ID is required');
     if (!userId) throw new ApiError(401, 'Please log in to remove cart items');
 
-    const productIdStr = String(productId).trim();
     const cart = await this.findOrCreateCart(userId);
     if (!cart) return this.formatCart(null);
 

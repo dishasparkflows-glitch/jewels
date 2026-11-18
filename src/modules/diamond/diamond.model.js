@@ -67,9 +67,18 @@ const diamondSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'inactive'],
+      enum: ['active', 'inactive', 'draft', 'approved'],
       default: 'active',
       index: true,
+    },
+    visibility: {
+      web: { type: Boolean, default: true },
+      app: { type: Boolean, default: true },
+    },
+    demoMetrics: {
+      soldCount: { type: Number, default: 0 },
+      reviewCount: { type: Number, default: 0 },
+      rating: { type: Number, default: 5 },
     },
   },
   {

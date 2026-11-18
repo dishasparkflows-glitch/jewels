@@ -77,6 +77,25 @@ class UserService {
       if (existingUser) throw new ApiError(409, 'Email already registered');
     }
 
+    if (data.profile) {
+      if (data.profile.phone) {
+        const phoneStr = String(data.profile.phone).trim();
+        const match = phoneStr.match(/^(\+\d{1,4})[\s.-]?(\d+)$/);
+        if (match) {
+          if (!data.profile.countryCode) {
+            data.profile.countryCode = match[1];
+          }
+          data.profile.phone = match[2];
+        } else {
+          data.profile.phone = phoneStr.replace(/^\+\d{1,4}\s*/, '').replace(/\s+/g, '');
+        }
+      }
+      if (data.profile.countryCode) {
+        const codeStr = String(data.profile.countryCode).trim();
+        data.profile.countryCode = codeStr.startsWith('+') ? codeStr : `+${codeStr}`;
+      }
+    }
+
     const user = await User.create(data);
     return this.formatUser(user);
   }
@@ -104,6 +123,25 @@ class UserService {
     delete data.password;
     if (data.auth) delete data.auth.password;
 
+    if (data.profile) {
+      if (data.profile.phone) {
+        const phoneStr = String(data.profile.phone).trim();
+        const match = phoneStr.match(/^(\+\d{1,4})[\s.-]?(\d+)$/);
+        if (match) {
+          if (!data.profile.countryCode) {
+            data.profile.countryCode = match[1];
+          }
+          data.profile.phone = match[2];
+        } else {
+          data.profile.phone = phoneStr.replace(/^\+\d{1,4}\s*/, '').replace(/\s+/g, '');
+        }
+      }
+      if (data.profile.countryCode) {
+        const codeStr = String(data.profile.countryCode).trim();
+        data.profile.countryCode = codeStr.startsWith('+') ? codeStr : `+${codeStr}`;
+      }
+    }
+
     // Validate email uniqueness if email is being updated
     if (data.auth?.email) {
       data.auth.email = data.auth.email.trim().toLowerCase();
@@ -125,6 +163,22 @@ class UserService {
 
     if (!user) throw new ApiError(404, 'User not found');
     return this.formatUser(user);
+  }
+
+  // ------------------------------- bulk delete users ----------------------------
+  async bulkDelete(ids = []) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'ids array is required for bulk delete');
+    }
+    const result = await User.updateMany(
+      { _id: { $in: ids } },
+      { $set: { isActive: false, 'meta.deletedAt': new Date() } }
+    );
+    return {
+      message: `${result.modifiedCount || 0} user(s) deleted successfully`,
+      deletedCount: result.modifiedCount || 0,
+      ids,
+    };
   }
 
   // ------------------------------- delete user ----------------------------

@@ -54,6 +54,14 @@ class FeaturedController {
     ApiResponse.success(res, null, 'Featured items reordered successfully');
   });
 
+  // ------------------------------- bulk delete featured items ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await featuredService.bulkDelete(ids);
+    await redisClient.deleteByPattern('featured:*');
+    ApiResponse.success(res, result, result.message);
+  });
+
   // ------------------------------- delete featured item ----------------------------
 
   delete = catchAsync(async (req, res) => {

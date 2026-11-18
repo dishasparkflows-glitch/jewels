@@ -32,6 +32,13 @@ router.put(
   featuredController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  featuredController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

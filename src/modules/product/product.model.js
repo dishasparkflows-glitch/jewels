@@ -269,10 +269,10 @@ const productSchema = new mongoose.Schema(
       enum: ['draft', 'approved'],
       default: 'draft',
       index: true,
-    },
+    },  
     visibility: {
-      web: { type: Boolean, default: true },
-      app: { type: Boolean, default: true },
+      web: { type: Boolean, default: true, index: true },
+      app: { type: Boolean, default: true, index: true },
     },
     birthMonth: {
       type: [{

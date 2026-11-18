@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const Razorpay = require('razorpay');
 const BasePaymentProvider = require('./base.provider');
 const Order = require('../../order/order.model');
@@ -20,11 +21,12 @@ class RazorpayService extends BasePaymentProvider {
     }
   }
 
-    // ------------------------------- check if razorpay configured ----------------------------
+  // ------------------------------- check if razorpay configured ----------------------------
   isConfigured() {
     return Boolean(this.keyId && this.keySecret);
   }
 
+  // ------------------------------- get razorpay client ----------------------------
   getClient() {
     if (!this.client) {
       this.keyId = process.env.RAZORPAY_KEY_ID || '';
@@ -45,7 +47,7 @@ class RazorpayService extends BasePaymentProvider {
     return this.client;
   }
 
-    // ------------------------------- get razorpay public config ----------------------------
+  // ------------------------------- get razorpay public config ----------------------------
   getPublicConfig() {
     return {
       id: this.name,
@@ -57,7 +59,7 @@ class RazorpayService extends BasePaymentProvider {
     };
   }
 
-    // ------------------------------- create razorpay gateway order ----------------------------
+  // ------------------------------- create razorpay gateway order ----------------------------
   async createGatewayOrder({ amount, receipt, currency = 'INR', notes = {} }) {
     const client = this.getClient();
     const amountInPaise = Math.round(Number(amount) * 100);
@@ -86,7 +88,7 @@ class RazorpayService extends BasePaymentProvider {
     };
   }
 
-    // ------------------------------- verify razorpay payment signature ----------------------------
+  // ------------------------------- verify payment signature ----------------------------
   verifyPaymentSignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature }) {
     if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       throw new ApiError(400, 'Missing required Razorpay signature parameters');
@@ -114,30 +116,46 @@ class RazorpayService extends BasePaymentProvider {
     return true;
   }
 
-  verifyWebhookSignature(rawBody, signature, webhookSecret = this.webhookSecret || process.env.RAZORPAY_WEBHOOK_SECRET) {
+  // ------------------------------- get webhook secret ----------------------------
+  getWebhookSecret() {
+    return process.env.RAZORPAY_WEBHOOK_SECRET || this.webhookSecret || '';
+  }
+
+  // ------------------------------- verify webhook signature ----------------------------
+  verifyWebhookSignature(rawBody, signature, webhookSecret = this.getWebhookSecret()) {
     if (!webhookSecret) {
-      throw new ApiError(500, 'Razorpay webhook secret is not configured');
+      throw new ApiError(500, 'Razorpay webhook secret (RAZORPAY_WEBHOOK_SECRET) is not configured in .env');
     }
     if (!signature) {
       throw new ApiError(400, 'Missing x-razorpay-signature header');
     }
 
+    const bodyBuffer = Buffer.isBuffer(rawBody)
+      ? rawBody
+      : Buffer.from(typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody), 'utf8');
+
     const expectedSignature = crypto
       .createHmac('sha256', webhookSecret)
-      .update(rawBody)
+      .update(bodyBuffer)
       .digest('hex');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(expectedSignature, 'utf8'),
-      Buffer.from(signature, 'utf8')
-    );
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+    const signatureBuffer = Buffer.from(signature, 'utf8');
+
+    if (expectedBuffer.length !== signatureBuffer.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
   }
 
+  // ------------------------------- fetch payment details ----------------------------
   async fetchPayment(paymentId) {
     const client = this.getClient();
     return await client.payments.fetch(paymentId);
   }
 
+  // ------------------------------- initiate payment ----------------------------
   async initiatePayment({ order, amount }) {
     const razorpayData = await this.createGatewayOrder({
       amount,
@@ -167,6 +185,7 @@ class RazorpayService extends BasePaymentProvider {
     };
   }
 
+  // ------------------------------- verify payment ----------------------------
   async verifyPayment({ orderId, orderNumber, razorpayOrderId, razorpayPaymentId, razorpaySignature }) {
     this.verifyPaymentSignature({
       razorpayOrderId,
@@ -207,12 +226,22 @@ class RazorpayService extends BasePaymentProvider {
     });
   }
 
+  // ------------------------------- handle razorpay webhook ----------------------------
   async handleWebhook({ rawBody, signature, eventData }) {
-    this.verifyWebhookSignature(rawBody, signature);
+    if (!eventData || typeof eventData !== 'object') {
+      throw new ApiError(400, 'Invalid webhook payload');
+    }
+
+    // 1. Validate signature
+    const isValid = this.verifyWebhookSignature(rawBody, signature);
+    if (!isValid) {
+      throw new ApiError(400, 'Invalid Razorpay webhook signature');
+    }
 
     const event = eventData.event;
-    const payload = eventData.payload;
+    const payload = eventData.payload || {};
 
+    // 2. Handle Payment Captured & Order Paid
     if (event === 'payment.captured' || event === 'order.paid') {
       const paymentEntity = payload.payment?.entity;
       const orderEntity = payload.order?.entity;
@@ -223,44 +252,109 @@ class RazorpayService extends BasePaymentProvider {
       const orderId = paymentEntity?.notes?.orderId || orderEntity?.notes?.orderId;
 
       const query = [];
-      if (orderId) query.push({ _id: orderId });
-      if (razorpayOrderId) query.push({ 'payment.gatewayOrderId': razorpayOrderId });
-      if (receipt) query.push({ orderNumber: receipt });
+      if (orderId && mongoose.isValidObjectId(orderId)) {
+        query.push({ _id: orderId });
+      }
+      if (razorpayOrderId) {
+        query.push({ 'payment.gatewayOrderId': razorpayOrderId });
+      }
+      if (receipt) {
+        query.push({ orderNumber: receipt });
+      }
 
       if (query.length > 0) {
         const order = await Order.findOne({ $or: query });
-        if (order && order.payment.status !== 'paid') {
-          await this.markOrderAsPaid(order, {
-            transactionId: paymentId,
-            gatewayOrderId: razorpayOrderId,
-            paymentMode: paymentEntity?.method,
-            paymentDetails: paymentEntity,
-            timelineMessage: `Payment confirmed via Razorpay webhook (${paymentId})`,
-          });
+        if (order) {
+          if (order.payment.status !== 'paid') {
+            const amountInPaise = paymentEntity?.amount || orderEntity?.amount_paid;
+            const paidAmount = amountInPaise ? amountInPaise / 100 : undefined;
+
+            await this.markOrderAsPaid(order, {
+              transactionId: paymentId,
+              gatewayOrderId: razorpayOrderId,
+              paidAmount,
+              paymentMode: paymentEntity?.method,
+              paymentDetails: paymentEntity || orderEntity,
+              timelineMessage: `Payment confirmed via Razorpay webhook (${event}: ${paymentId})`,
+            });
+          }
+          return { status: 'processed', event, orderId: order._id, orderNumber: order.orderNumber };
         }
       }
-    } else if (event === 'payment.failed') {
+      return { status: 'ignored', reason: 'order_not_found', event };
+    }
+
+    // 3. Handle Payment Authorized (auto-capture if needed)
+    if (event === 'payment.authorized') {
+      const paymentEntity = payload.payment?.entity;
+      const paymentId = paymentEntity?.id;
+      const amount = paymentEntity?.amount;
+
+      // If merchant account doesn't have auto-capture, capture authorized payment
+      if (paymentId && amount) {
+        try {
+          const client = this.getClient();
+          await client.payments.capture(paymentId, amount);
+        } catch (captureErr) {
+          console.warn('[RazorpayWebhook] Auto-capture of authorized payment notice:', captureErr.message);
+        }
+      }
+      return { status: 'authorized', event, paymentId };
+    }
+
+    // 4. Handle Payment Failed
+    if (event === 'payment.failed') {
       const paymentEntity = payload.payment?.entity;
       const razorpayOrderId = paymentEntity?.order_id;
       const orderId = paymentEntity?.notes?.orderId;
+      const receipt = paymentEntity?.notes?.orderNumber;
 
       const query = [];
-      if (orderId) query.push({ _id: orderId });
-      if (razorpayOrderId) query.push({ 'payment.gatewayOrderId': razorpayOrderId });
+      if (orderId && mongoose.isValidObjectId(orderId)) {
+        query.push({ _id: orderId });
+      }
+      if (razorpayOrderId) {
+        query.push({ 'payment.gatewayOrderId': razorpayOrderId });
+      }
+      if (receipt) {
+        query.push({ orderNumber: receipt });
+      }
 
       if (query.length > 0) {
         const order = await Order.findOne({ $or: query });
         if (order && order.payment.status !== 'paid') {
+          const reason = paymentEntity?.error_description || paymentEntity?.error_reason || 'Payment failed';
           await this.markOrderAsFailed(order, {
-            reason: paymentEntity?.error_description || 'Payment failed',
+            reason,
             paymentDetails: paymentEntity,
-            timelineMessage: `Payment failure reported via Razorpay webhook: ${paymentEntity?.error_description || 'Unknown'}`,
+            timelineMessage: `Payment failure reported via Razorpay webhook: ${reason}`,
           });
+          return { status: 'failed', event, orderId: order._id, reason };
         }
       }
+      return { status: 'ignored', reason: 'order_not_found_or_already_paid', event };
     }
 
-    return { status: 'ok' };
+    // 5. Handle Refunds (refund.created, refund.processed)
+    if (event === 'refund.created' || event === 'refund.processed') {
+      const refundEntity = payload.refund?.entity;
+      const paymentId = refundEntity?.payment_id;
+
+      if (paymentId) {
+        const order = await Order.findOne({ 'payment.transactionId': paymentId });
+        if (order) {
+          order.payment.refundStatus = refundEntity.status || 'processed';
+          order.payment.refundId = refundEntity.id;
+          order.payment.refundedAmount = (refundEntity.amount || 0) / 100;
+          await order.save();
+          return { status: 'refund_recorded', event, orderId: order._id };
+        }
+      }
+      return { status: 'ignored', reason: 'refund_order_not_found', event };
+    }
+
+    // 6. Default acknowledgement for any other Razorpay events
+    return { status: 'acknowledged', event };
   }
 }
 

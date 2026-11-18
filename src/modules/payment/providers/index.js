@@ -10,26 +10,32 @@ const ApiError = require('../../../utils/ApiError');
  */
 const providers = {
   [razorpayService.name]: razorpayService,
-  [ccavenueService.name]: ccavenueService,
+  [ccavenueService.name]: ccavenueService
 };
 
 const getProvider = (name) => {
   if (!name) {
-    const defaultName = (process.env.DEFAULT_PAYMENT_GATEWAY || 'razorpay').toLowerCase();
+    const defaultName = (
+      process.env.PAYMENT_PROVIDER || 'razorpay'
+    ).toLowerCase();
     return providers[defaultName] || razorpayService;
   }
 
   const key = String(name).toLowerCase().trim();
   const provider = providers[key];
   if (!provider) {
-    throw new ApiError(400, `Unsupported payment provider: "${name}". Available providers: ${Object.keys(providers).join(', ')}`);
+    throw new ApiError(
+      400,
+      `Unsupported payment provider: "${name}". Available providers: ${Object.keys(providers).join(', ')}`
+    );
   }
   return provider;
 };
 
 const getAllProviders = () => Object.values(providers);
 
-const getActiveProviders = () => Object.values(providers).filter((p) => p.isConfigured());
+const getActiveProviders = () =>
+  Object.values(providers).filter((p) => p.isConfigured());
 
 const registerProvider = (providerInstance) => {
   if (!providerInstance || !providerInstance.name) {
@@ -43,5 +49,5 @@ module.exports = {
   getAllProviders,
   getActiveProviders,
   registerProvider,
-  providers,
+  providers
 };

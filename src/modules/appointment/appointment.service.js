@@ -6,12 +6,6 @@ class AppointmentService {
   // ------------------------------- create appointment ----------------------------
   async create(data) {
     const payload = { ...data };
-
-    delete payload.fullName;
-    delete payload.phoneNumber;
-    delete payload.appointmentDate;
-    delete payload.preferredTime;
-
     return await Appointment.create(payload);
   }
 

@@ -106,11 +106,23 @@ class CouponService {
     }
 
     const items = await Coupon.find(filter)
-      .select('_id categoryId coupon discount validity usage status meta')
+      .select('_id categoryId coupon.code coupon.description discount.type discount.value discount.minimumOrderAmount')
       .sort({ 'discount.value': -1, 'coupon.code': 1 })
       .lean();
 
-    return items;
+    return items.map((item) => ({
+      _id: item._id,
+      categoryId: item.categoryId || null,
+      coupon: {
+        code: item.coupon?.code || '',
+        description: item.coupon?.description || '',
+      },
+      discount: {
+        type: item.discount?.type || 'Percentage',
+        value: Number(item.discount?.value ?? 0),
+        minimumOrderAmount: Number(item.discount?.minimumOrderAmount ?? 0),
+      },
+    }));
   }
 
   // ------------------------------- validate coupon ----------------------------
@@ -201,6 +213,22 @@ class CouponService {
     }
 
     return coupon;
+  }
+
+  // ------------------------------- bulk delete coupons ----------------------------
+  async bulkDelete(ids = []) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'ids array is required for bulk delete');
+    }
+    const result = await Coupon.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+    return {
+      message: `${result.modifiedCount || 0} coupon(s) deleted successfully`,
+      deletedCount: result.modifiedCount || 0,
+      ids,
+    };
   }
 
   // ------------------------------- delete coupon ----------------------------

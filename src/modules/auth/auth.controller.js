@@ -2,6 +2,13 @@ const authService = require('./auth.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 
+// ------------------------------- check email & phone availability ----------------------------
+const checkAvailability = catchAsync(async (req, res) => {
+  const { email, phone } = req.body;
+  const result = await authService.checkAvailability({ email, phone });
+  return ApiResponse.success(res, result, 'Available');
+});
+
 // ------------------------------- register user ----------------------------
 const register = catchAsync(async (req, res) => {
   const { user, token } = await authService.register(req.body);
@@ -10,8 +17,8 @@ const register = catchAsync(async (req, res) => {
 
 // ------------------------------- login user ----------------------------
 const login = catchAsync(async (req, res) => {
-  const { email, identifier, password } = req.body;
-  const { user, token } = await authService.login(identifier || email, password);
+  const { email, identifier, password, countryCode, phone } = req.body;
+  const { user, token } = await authService.login(identifier || phone || email, password, countryCode);
   return ApiResponse.success(res, { user, token }, 'Login successful');
 });
 
@@ -46,6 +53,7 @@ const getMe = catchAsync(async (req, res) => {
 });
 
 module.exports = {
+  checkAvailability,
   register,
   login,
   googleLogin,

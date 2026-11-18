@@ -1,4 +1,4 @@
-
+// ------------------------------- format order items ----------------------------
 const formatOrderItems = (items) => {
   if (!items || !Array.isArray(items) || items.length === 0) {
     return '1. Luxury Jewellery Selection';
@@ -21,6 +21,7 @@ const formatOrderItems = (items) => {
   return lines.join('\n');
 };
 
+// ------------------------------- format currency ----------------------------
 const formatCurrency = (val) => {
   if (val === undefined || val === null || val === '') return '0.00';
   const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[^\d.-]/g, ''));
@@ -28,6 +29,7 @@ const formatCurrency = (val) => {
   return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+// ------------------------------- format date ----------------------------
 const formatDate = (val) => {
   if (!val) return '';
   if (typeof val === 'string' && /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i.test(val)) {
@@ -43,6 +45,7 @@ const formatDate = (val) => {
   });
 };
 
+// ------------------------------- format time ----------------------------
 const formatTime = (val) => {
   if (!val) return '';
   const str = String(val).trim();
@@ -61,6 +64,7 @@ const formatTime = (val) => {
   return str;
 };
 
+// ------------------------------- format address ----------------------------
 const formatAddress = (address) => {
   if (!address) return '';
   if (typeof address === 'string') return address.trim();
@@ -89,6 +93,7 @@ const templateFormatters = {
   address: formatAddress,
 };
 
+// ------------------------------- get formatter ----------------------------
 const getFormatter = (name) => {
   if (!name || typeof name !== 'string') return null;
   return templateFormatters[name.trim()] || null;

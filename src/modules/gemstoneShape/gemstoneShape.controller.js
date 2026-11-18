@@ -49,6 +49,14 @@ class GemstoneShapeController {
     await redisClient.deleteByPattern('gemstone-shapes:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete gemstone shapes ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await gemstoneShapeService.bulkDelete(ids);
+    await redisClient.deleteByPattern('gemstone-shapes:*');
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new GemstoneShapeController();

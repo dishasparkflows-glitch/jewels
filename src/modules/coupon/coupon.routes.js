@@ -34,6 +34,13 @@ router.put(
   couponController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  couponController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

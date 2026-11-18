@@ -54,6 +54,13 @@ router.patch(
   productController.updateStatus
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  productController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

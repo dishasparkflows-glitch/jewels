@@ -49,6 +49,14 @@ class MetalPurityController {
     await redisClient.deleteByPattern('metal-purities:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete metal purities ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await metalPurityService.bulkDelete(ids);
+    await redisClient.deleteByPattern('metal-purities:*');
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new MetalPurityController();

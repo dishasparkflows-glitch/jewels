@@ -63,6 +63,14 @@ class BannerController {
     ApiResponse.success(res, null, result.message);
   });
 
+  // ------------------------------- bulk delete banners ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await bannerService.bulkDelete(ids);
+    await redisClient.deleteByPattern('banners:*');
+    ApiResponse.success(res, result, result.message);
+  });
+
   // ------------------------------- get themes lookup for banners ----------------------------
   getThemesLookup = catchAsync(async (_req, res) => {
     const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');

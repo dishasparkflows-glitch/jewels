@@ -150,10 +150,6 @@ class WishlistService {
     if (!productId) {
       throw new ApiError(400, 'Product ID is required');
     }
-    const productIdStr = String(productId).trim();
-    if (!mongoose.isValidObjectId(productIdStr)) {
-      throw new ApiError(400, 'Invalid Product ID');
-    }
 
     const wishlist = await this.findOrCreateWishlist(userId);
 

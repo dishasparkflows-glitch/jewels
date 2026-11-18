@@ -24,6 +24,13 @@ router.put(
   diamondClarityController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  diamondClarityController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

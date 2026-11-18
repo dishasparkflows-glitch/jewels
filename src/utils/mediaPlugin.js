@@ -1,5 +1,6 @@
 const { normalizeMedia, normalizeAssets } = require('./media');
 
+// ------------------------------- media mongoose plugin ----------------------------
 module.exports = function mediaPlugin(schema) {
   if (schema.$mediaPluginInstalled) return;
   schema.$mediaPluginInstalled = true;

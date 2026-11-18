@@ -100,6 +100,24 @@ class MetalColorService {
 
     return { message: 'Metal color deleted successfully', id };
   }
+
+  // ------------------------------- bulk delete metal colors ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of metal color IDs to delete');
+    }
+
+    const result = await MetalColor.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+
+    return {
+      message: `${result.modifiedCount} metal color(s) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new MetalColorService();

@@ -49,6 +49,14 @@ class GemstoneTypeController {
     await redisClient.deleteByPattern('gemstone-types:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete gemstone types ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await gemstoneTypeService.bulkDelete(ids);
+    await redisClient.deleteByPattern('gemstone-types:*');
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new GemstoneTypeController();

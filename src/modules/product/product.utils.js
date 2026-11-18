@@ -763,6 +763,7 @@ const formatStorefrontProductDetail = (p) => {
     inWishlist: Boolean(p.inWishlist),
     sizeChart: p.sizeChart || null,
     stockStatus: p.stockStatus || 'In Stock',
+    reviews: Array.isArray(p.reviews) ? p.reviews : [],
     seo: p.seo || undefined,
     ...(p.ornate ? {
       ornate: {

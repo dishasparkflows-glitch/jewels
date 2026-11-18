@@ -59,6 +59,14 @@ class CouponController {
     ApiResponse.success(res, null, 'Coupon updated successfully');
   });
 
+  // ------------------------------- bulk delete coupons ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await couponService.bulkDelete(ids);
+    await redisClient.deleteByPattern('coupons:*');
+    ApiResponse.success(res, result, result.message);
+  });
+
   // ------------------------------- delete coupon ----------------------------
 
   delete = catchAsync(async (req, res) => {

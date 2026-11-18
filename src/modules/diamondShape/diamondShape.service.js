@@ -100,6 +100,24 @@ class DiamondShapeService {
 
     return { message: 'Diamond shape deleted successfully', id };
   }
+
+  // ------------------------------- bulk delete diamond shapes ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of diamond shape IDs to delete');
+    }
+
+    const result = await DiamondShape.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+
+    return {
+      message: `${result.modifiedCount} diamond shape(s) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new DiamondShapeService();

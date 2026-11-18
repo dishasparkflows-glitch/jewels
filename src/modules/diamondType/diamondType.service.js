@@ -100,6 +100,24 @@ class DiamondTypeService {
 
     return { message: 'Diamond type deleted successfully', id };
   }
+
+  // ------------------------------- bulk delete diamond types ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of diamond type IDs to delete');
+    }
+
+    const result = await DiamondType.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+
+    return {
+      message: `${result.modifiedCount} diamond type(s) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new DiamondTypeService();

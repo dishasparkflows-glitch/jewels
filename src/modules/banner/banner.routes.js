@@ -38,6 +38,13 @@ router.put(
   bannerController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  bannerController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

@@ -4,6 +4,7 @@ const authController = require('./auth.controller');
 const { authenticate } = require('../../middleware/auth.middleware');
 
 // Public routes
+router.post('/check-availability', authController.checkAvailability);
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/google', authController.googleLogin);

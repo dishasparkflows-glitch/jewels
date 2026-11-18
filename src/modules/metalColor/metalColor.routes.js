@@ -24,6 +24,13 @@ router.put(
   metalColorController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  metalColorController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

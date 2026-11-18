@@ -100,6 +100,24 @@ class DiamondClarityService {
 
     return { message: 'Diamond clarity deleted successfully', id };
   }
+
+  // ------------------------------- bulk delete diamond clarities ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of diamond clarity IDs to delete');
+    }
+
+    const result = await DiamondClarity.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+
+    return {
+      message: `${result.modifiedCount} diamond clarity/clarities deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new DiamondClarityService();

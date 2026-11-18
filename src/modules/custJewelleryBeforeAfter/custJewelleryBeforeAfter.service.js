@@ -66,6 +66,22 @@ class CustJewelleryBeforeAfterService {
     return item;
   }
 
+  // ------------------------------- bulk delete cust jewellery before after ----------------------------
+  async bulkDelete(ids = []) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'ids array is required for bulk delete');
+    }
+    const result = await CustJewelleryBeforAfter.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+    return {
+      message: `${result.modifiedCount || 0} showcase entry/entries deleted successfully`,
+      deletedCount: result.modifiedCount || 0,
+      ids,
+    };
+  }
+
   // ------------------------------- delete cust jewellery before after ----------------------------
   async delete(id) {
     const item = await CustJewelleryBeforAfter.findOneAndUpdate(

@@ -49,6 +49,14 @@ class DiamondColorController {
     await redisClient.deleteByPattern('diamond-colors:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete diamond colors ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await diamondColorService.bulkDelete(ids);
+    await redisClient.deleteByPattern('diamond-colors:*');
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new DiamondColorController();

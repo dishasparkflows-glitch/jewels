@@ -148,7 +148,7 @@ class GalleryService {
 
     const {
       page = 1,
-      limit = 24,
+      limit = 10,
       themeId,
       type = 'all',
       placement,
@@ -159,7 +159,7 @@ class GalleryService {
     } = queryParams;
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 24));
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
     const skip = (pageNum - 1) * limitNum;
 
     const activeTheme = await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null }).lean();

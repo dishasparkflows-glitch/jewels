@@ -116,6 +116,13 @@ class ProductController {
     ApiResponse.success(res, { status: product.status }, `Product switched to ${displayStatus} successfully`);
   });
 
+  // ------------------------------- bulk delete products ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await productService.bulkDelete(ids, req.user?._id);
+    ApiResponse.success(res, result, result.message);
+  });
+
   // ------------------------------- delete product ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await productService.delete(req.params.id, req.user?._id);

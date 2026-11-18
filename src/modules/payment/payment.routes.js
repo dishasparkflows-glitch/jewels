@@ -16,7 +16,7 @@ router.post('/razorpay/verify', optionalAuth, paymentController.verifyRazorpay);
 router.post('/ccavenue/response', paymentController.handleCCAvenueResponse);
 router.get('/ccavenue/response', paymentController.handleCCAvenueResponse);
 
-// Razorpay Webhook endpoint
+// Razorpay Webhook endpoints
 router.post('/razorpay/webhook', paymentController.handleRazorpayWebhook);
 
 // CCAvenue S2S Webhook endpoint

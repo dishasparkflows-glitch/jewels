@@ -96,6 +96,22 @@ class ReviewService {
     return item;
   }
 
+  // ------------------------------- bulk delete reviews ----------------------------
+  async bulkDelete(ids = []) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'ids array is required for bulk delete');
+    }
+    const result = await Review.updateMany(
+      { _id: { $in: ids } },
+      { $set: { 'meta.deletedAt': new Date() } }
+    );
+    return {
+      message: `${result.modifiedCount || 0} review(s) deleted successfully`,
+      deletedCount: result.modifiedCount || 0,
+      ids,
+    };
+  }
+
   // ------------------------------- delete review ----------------------------
   async delete(id) {
     const item = await Review.findOneAndUpdate(

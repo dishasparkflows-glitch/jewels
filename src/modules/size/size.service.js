@@ -127,6 +127,22 @@ class SizeService {
     return item;
   }
 
+  // ------------------------------- bulk delete sizes ----------------------------
+  async bulkDelete(ids = []) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'ids array is required for bulk delete');
+    }
+    const result = await Size.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+    return {
+      message: `${result.modifiedCount || 0} size(s) deleted successfully`,
+      deletedCount: result.modifiedCount || 0,
+      ids,
+    };
+  }
+
   // ------------------------------- delete size ----------------------------
 
   async delete(id) {

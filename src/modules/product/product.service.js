@@ -22,6 +22,7 @@ const MenuItem = require('../menuItem/menuItem.model');
 const ProductGroup = require('../productGroup/productGroup.model');
 const productGroupService = require('../productGroup/productGroup.service');
 const HomeSection = require('../homeSection/homeSection.model');
+const Review = require('../review/review.model');
 const { SHOP_FOR_OPTIONS, getShopForGenders } = require('./product.filters');
 const ApiError = require('../../utils/ApiError');
 const { getRequestContext } = require('../../utils/context');
@@ -170,16 +171,27 @@ class ProductService {
       throw new ApiError(404, 'Product not found');
     }
 
-    const setting = await Setting.findOne().select('certificateImage').lean();
+    const [setting, wishlistedSet, sizeChart, reviews] = await Promise.all([
+      Setting.findOne().select('certificateImage').lean(),
+      this._getWishlistSet(userId),
+      this._extractSizeChart(product),
+      Review.find({
+        productId: product._id,
+        status: 'approved',
+        'meta.deletedAt': null,
+      })
+        .sort({ 'review.reviewDate': -1, 'meta.createdAt': -1 })
+        .select('-meta')
+        .lean(),
+    ]);
+
     const certificateImage = product.certificateImage?.url
       ? product.certificateImage
       : setting?.certificateImage || null;
 
-    const wishlistedSet = await this._getWishlistSet(userId);
     const inWishlist = wishlistedSet.has(String(product._id));
-    const sizeChart = await this._extractSizeChart(product);
 
-    return withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart });
+    return withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart, reviews: reviews || [] });
   }
 
   // ------------------------------- get product by sku or tag ----------------------------
@@ -190,16 +202,27 @@ class ProductService {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
     }
 
-    const setting = await Setting.findOne().select('certificateImage').lean();
+    const [setting, wishlistedSet, sizeChart, reviews] = await Promise.all([
+      Setting.findOne().select('certificateImage').lean(),
+      this._getWishlistSet(userId),
+      this._extractSizeChart(product),
+      Review.find({
+        productId: product._id,
+        status: 'approved',
+        'meta.deletedAt': null,
+      })
+        .sort({ 'review.reviewDate': -1, 'meta.createdAt': -1 })
+        .select('-meta')
+        .lean(),
+    ]);
+
     const certificateImage = product.certificateImage?.url
       ? product.certificateImage
       : setting?.certificateImage || null;
 
-    const wishlistedSet = await this._getWishlistSet(userId);
     const inWishlist = wishlistedSet.has(String(product._id));
-    const sizeChart = await this._extractSizeChart(product);
 
-    const fullProduct = withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart });
+    const fullProduct = withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart, reviews: reviews || [] });
     return formatStorefrontProductDetail(fullProduct);
   }
 
@@ -256,6 +279,37 @@ class ProductService {
       if (!isOrnateSpecified) {
         filter.status = 'approved';
       }
+    }
+
+    // Platform visibility filter (web / app)
+    const isForWeb =
+      queryParams.forweb === 'true' ||
+      queryParams.forweb === true ||
+      queryParams.forWeb === 'true' ||
+      queryParams.forWeb === true;
+
+    const isForApp =
+      queryParams.forapp === 'true' ||
+      queryParams.forapp === true ||
+      queryParams.forApp === 'true' ||
+      queryParams.forApp === true;
+
+    if (queryParams['visibility.web'] !== undefined) {
+      const v = queryParams['visibility.web'];
+      filter['visibility.web'] = (v === 'true' || v === true) ? { $ne: false } : false;
+    } else if (queryParams.forweb === 'false' || queryParams.forweb === false) {
+      filter['visibility.web'] = false;
+    } else if (isForWeb || queryParams.view === 'storefront') {
+      filter['visibility.web'] = { $ne: false };
+    }
+
+    if (queryParams['visibility.app'] !== undefined) {
+      const v = queryParams['visibility.app'];
+      filter['visibility.app'] = (v === 'true' || v === true) ? { $ne: false } : false;
+    } else if (queryParams.forapp === 'false' || queryParams.forapp === false) {
+      filter['visibility.app'] = false;
+    } else if (isForApp) {
+      filter['visibility.app'] = { $ne: false };
     }
 
     if (queryParams.category) {
@@ -796,6 +850,18 @@ class ProductService {
       { status: 'approved' }
     ];
 
+    const isSearchForApp =
+      queryParams.forapp === 'true' ||
+      queryParams.forapp === true ||
+      queryParams.forApp === 'true' ||
+      queryParams.forApp === true;
+
+    if (isSearchForApp) {
+      conditions.push({ 'visibility.app': { $ne: false } });
+    } else {
+      conditions.push({ 'visibility.web': { $ne: false } });
+    }
+
     let searchRegex = null;
     if (searchTerm) {
       const safeTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -976,6 +1042,18 @@ class ProductService {
       status: 'approved'
     };
 
+    const isHomeForApp =
+      queryParams.forapp === 'true' ||
+      queryParams.forapp === true ||
+      queryParams.forApp === 'true' ||
+      queryParams.forApp === true;
+
+    if (isHomeForApp) {
+      filter['visibility.app'] = { $ne: false };
+    } else {
+      filter['visibility.web'] = { $ne: false };
+    }
+
     if (queryParams.category) {
       const catInputs = String(queryParams.category).split(',').map((s) => s.trim()).filter(Boolean);
       const validIds = catInputs.filter((id) => mongoose.isValidObjectId(id));
@@ -1113,11 +1191,18 @@ class ProductService {
       const selectFields =
         '_id colorImages metalColorIds stockStatus categoryIds basicInfo pricing ornate productType isOrnate';
 
-      const products = await Product.find({
+      const productQuery = {
         _id: { $in: uniqueProductIds.map((id) => new mongoose.Types.ObjectId(id)) },
         'meta.deletedAt': null,
         status: 'approved',
-      })
+      };
+      if (queryParams.forapp === 'true' || queryParams.forapp === true) {
+        productQuery['visibility.app'] = { $ne: false };
+      } else {
+        productQuery['visibility.web'] = { $ne: false };
+      }
+
+      const products = await Product.find(productQuery)
         .select(selectFields)
         .populate('metalColorIds colorImages.metalColorId', 'name code colorCode colorCodeEnd')
         .lean();
@@ -1225,6 +1310,12 @@ class ProductService {
       'meta.deletedAt': null,
       status: 'approved',
     };
+
+    if (queryParams.forapp === 'true' || queryParams.forapp === true) {
+      filter['visibility.app'] = { $ne: false };
+    } else {
+      filter['visibility.web'] = { $ne: false };
+    }
 
     if (mongoose.isValidObjectId(queryParams.productId)) {
       filter._id = { $ne: new mongoose.Types.ObjectId(queryParams.productId) };
@@ -1463,6 +1554,33 @@ class ProductService {
     }
 
     return product;
+  }
+
+  // ------------------------------- bulk delete products ----------------------------
+  async bulkDelete(ids = [], userId) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'ids array is required for bulk delete');
+    }
+    const actorId = userId || getRequestContext('userId');
+    const updatePayload = { status: 'draft', 'meta.deletedAt': new Date(), 'meta.updatedAt': new Date() };
+    if (actorId) {
+      updatePayload['meta.deletedBy'] = actorId;
+      updatePayload['meta.updatedBy'] = actorId;
+    }
+    const result = await Product.updateMany(
+      { _id: { $in: ids } },
+      { $set: updatePayload }
+    );
+    try {
+      await Promise.allSettled(ids.map((id) => productGroupService.refreshAffectedGroups(id)));
+    } catch (err) {
+      console.error('Error refreshing groups after product bulk delete:', err);
+    }
+    return {
+      message: `${result.modifiedCount || 0} product(s) deleted successfully`,
+      deletedCount: result.modifiedCount || 0,
+      ids,
+    };
   }
 
   // ------------------------------- delete product ----------------------------

@@ -53,6 +53,14 @@ class CodSequenceController {
     ApiResponse.success(res, null, 'COD sequence tier updated successfully');
   });
 
+  // ------------------------------- bulk delete cod sequences ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await codSequenceService.bulkDelete(ids);
+    await redisClient.deleteByPattern('cod-sequences:*');
+    ApiResponse.success(res, result, result.message);
+  });
+
   // ------------------------------- delete cod sequence ----------------------------
 
   delete = catchAsync(async (req, res) => {

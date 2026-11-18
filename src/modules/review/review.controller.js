@@ -43,6 +43,14 @@ class ReviewController {
     ApiResponse.success(res, null, 'Review updated successfully');
   });
 
+  // ------------------------------- bulk delete reviews ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await reviewService.bulkDelete(ids);
+    await redisClient.deleteByPattern('reviews:*');
+    ApiResponse.success(res, result, result.message);
+  });
+
   // ------------------------------- delete review ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await reviewService.delete(req.params.id);

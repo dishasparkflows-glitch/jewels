@@ -24,6 +24,13 @@ router.put(
   metalPurityController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  metalPurityController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

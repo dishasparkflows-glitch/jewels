@@ -109,6 +109,22 @@ class CodSequenceService {
     return item;
   }
 
+  // ------------------------------- bulk delete cod sequences ----------------------------
+  async bulkDelete(ids = []) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'ids array is required for bulk delete');
+    }
+    const result = await CodSequence.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+    return {
+      message: `${result.modifiedCount || 0} COD sequence tier(s) deleted successfully`,
+      deletedCount: result.modifiedCount || 0,
+      ids,
+    };
+  }
+
   // ------------------------------- delete cod sequence ----------------------------
 
   async delete(id) {

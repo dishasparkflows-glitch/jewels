@@ -6,7 +6,7 @@ class AddressService {
   async getUserAddresses(userId) {
     const addresses = await Address.find({
       userId,
-      'meta.isDeleted': { $ne: true },
+      'meta.deletedAt': null,
     }).sort({ 'defaults.isDefault': -1, 'defaults.isShippingDefault': -1, 'meta.createdAt': -1 });
 
     return addresses;
@@ -16,7 +16,7 @@ class AddressService {
   async getAddressById(userId, addressId, isAdmin = false) {
     const query = {
       _id: addressId,
-      'meta.isDeleted': { $ne: true },
+      'meta.deletedAt': null,
     };
     if (!isAdmin) {
       query.userId = userId;
@@ -33,7 +33,7 @@ class AddressService {
   async createAddress(userId, data) {
     const existingCount = await Address.countDocuments({
       userId,
-      'meta.isDeleted': { $ne: true },
+      'meta.deletedAt': null,
     });
 
     const isFirst = existingCount === 0;
@@ -44,14 +44,14 @@ class AddressService {
     // If making default, reset existing defaults
     if (isDefault || isShippingDefault) {
       await Address.updateMany(
-        { userId, 'meta.isDeleted': { $ne: true } },
+        { userId, 'meta.deletedAt': null },
         { 'defaults.isDefault': false, 'defaults.isShippingDefault': false }
       );
     }
 
     if (isBillingDefault) {
       await Address.updateMany(
-        { userId, 'meta.isDeleted': { $ne: true } },
+        { userId, 'meta.deletedAt': null },
         { 'defaults.isBillingDefault': false }
       );
     }
@@ -73,7 +73,7 @@ class AddressService {
   async updateAddress(userId, addressId, data, isAdmin = false) {
     const query = {
       _id: addressId,
-      'meta.isDeleted': { $ne: true },
+      'meta.deletedAt': null,
     };
     if (!isAdmin) {
       query.userId = userId;
@@ -86,14 +86,14 @@ class AddressService {
 
     if (data.defaults?.isDefault || data.defaults?.isShippingDefault) {
       await Address.updateMany(
-        { userId: addressDoc.userId, _id: { $ne: addressId }, 'meta.isDeleted': { $ne: true } },
+        { userId: addressDoc.userId, _id: { $ne: addressId }, 'meta.deletedAt': null },
         { 'defaults.isDefault': false, 'defaults.isShippingDefault': false }
       );
     }
 
     if (data.defaults?.isBillingDefault) {
       await Address.updateMany(
-        { userId: addressDoc.userId, _id: { $ne: addressId }, 'meta.isDeleted': { $ne: true } },
+        { userId: addressDoc.userId, _id: { $ne: addressId }, 'meta.deletedAt': null },
         { 'defaults.isBillingDefault': false }
       );
     }
@@ -113,7 +113,7 @@ class AddressService {
   async deleteAddress(userId, addressId, isAdmin = false) {
     const query = {
       _id: addressId,
-      'meta.isDeleted': { $ne: true },
+      'meta.deletedAt': null,
     };
     if (!isAdmin) {
       query.userId = userId;
@@ -125,7 +125,6 @@ class AddressService {
     }
 
     addressDoc.meta = addressDoc.meta || {};
-    addressDoc.meta.isDeleted = true;
     addressDoc.meta.deletedAt = new Date();
     await addressDoc.save();
 
@@ -137,7 +136,7 @@ class AddressService {
       const fallback = await Address.findOne({
         userId: addressDoc.userId,
         _id: { $ne: addressId },
-        'meta.isDeleted': { $ne: true },
+        'meta.deletedAt': null,
       }).sort({ 'meta.createdAt': -1 });
 
       if (fallback) {
@@ -161,7 +160,6 @@ class AddressService {
     const addressDoc = await Address.findOne({
       _id: addressId,
       userId,
-      'meta.isDeleted': { $ne: true },
     });
 
     if (!addressDoc) {
@@ -172,7 +170,7 @@ class AddressService {
 
     if (type === 'shipping' || type === 'both') {
       await Address.updateMany(
-        { userId, 'meta.isDeleted': { $ne: true } },
+        { userId },
         { 'defaults.isDefault': false, 'defaults.isShippingDefault': false }
       );
       addressDoc.defaults.isDefault = true;
@@ -181,7 +179,7 @@ class AddressService {
 
     if (type === 'billing' || type === 'both') {
       await Address.updateMany(
-        { userId, 'meta.isDeleted': { $ne: true } },
+        { userId },
         { 'defaults.isBillingDefault': false }
       );
       addressDoc.defaults.isBillingDefault = true;

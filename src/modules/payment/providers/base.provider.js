@@ -50,6 +50,19 @@ class BasePaymentProvider {
     order.payment.paidAt = new Date();
     order.payment.paidAmount = payableAmount;
 
+    // Advance orderStatus if pending
+    if (order.orderStatus === 'pending') {
+      order.orderStatus = 'processing';
+    }
+
+    if (!order.orderTimeline) {
+      order.orderTimeline = {};
+    }
+    if (!order.orderTimeline.accepted) {
+      order.orderTimeline.accepted = {};
+    }
+    order.orderTimeline.accepted.at = order.orderTimeline.accepted.at || new Date();
+
     await order.save();
 
     // Clear cart if this order belongs to a registered user
@@ -63,6 +76,16 @@ class BasePaymentProvider {
       } catch (err) {
         console.warn('Failed to clear user cart after payment:', err.message);
       }
+    }
+
+    // Automated Dispatch: Generate PDF invoice and deliver to customer email in background
+    try {
+      const orderService = require('../../order/order.service');
+      orderService.dispatchInvoice(order._id, ['email']).catch((err) => {
+        console.warn('[AutoInvoice] Background order invoice dispatch failed:', err.message);
+      });
+    } catch {
+      // Ignored if invoice service is not available
     }
 
     return order;

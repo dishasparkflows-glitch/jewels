@@ -13,30 +13,48 @@ const normalizePhone = (rawPhone) => {
   return String(rawPhone || '').replace(/\D/g, '').trim();
 };
 
+const normalizeCountryCode = (code) => {
+  if (!code) return '+91';
+  const cleaned = String(code).trim();
+  return cleaned.startsWith('+') ? cleaned : `+${cleaned}`;
+};
+
 class OtpService {
   /**
    * Generates and sends a 4-digit OTP to the recipient's phone number
    */
-  async sendOtp(rawPhone, purpose = 'order_verification') {
+  async sendOtp(rawPhone, purpose = 'order_verification', rawCountryCode = '+91') {
     const phone = normalizePhone(rawPhone);
+    const countryCode = normalizeCountryCode(rawCountryCode);
     if (!phone) {
       throw new ApiError(400, 'Mobile number is required to send OTP');
     }
 
     // Generate 4-digit OTP
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    const storeKey = `${purpose}:${phone}`;
+    const primaryKey = `${purpose}:${countryCode}:${phone}`;
+    const fallbackKey = `${purpose}:${phone}`;
 
     // Store in memory with expiration
-    otpStore.set(storeKey, {
+    const record = {
       otp,
+      countryCode,
+      phone,
       expiresAt: Date.now() + OTP_EXPIRY_MS,
-    });
+    };
+    otpStore.set(primaryKey, record);
+    otpStore.set(fallbackKey, record);
+
+    // Format destination number: for international, include country code digits
+    const cleanDigits = countryCode.replace(/\D/g, '');
+    const fullMobile = cleanDigits && cleanDigits !== '91'
+      ? `${cleanDigits}${phone}`
+      : phone;
 
     // Send SMS via provider
-    const smsResult = await smsService.sendOtp({ to: phone, otp });
+    const smsResult = await smsService.sendOtp({ to: fullMobile, otp, countryCode });
 
-    const isDev = process.env.NODE_ENV !== 'production' || !process.env.NETSMS_API_KEY;
+    const isDev = process.env.NODE_ENV !== 'production';
     const maskedPhone =
       phone.length > 4
         ? `${phone.slice(0, 2)}****${phone.slice(-2)}`
@@ -44,8 +62,9 @@ class OtpService {
 
     return {
       success: true,
-      message: `OTP sent successfully to ${maskedPhone}`,
+      message: `OTP sent successfully to ${countryCode} ${maskedPhone}`,
       phone,
+      countryCode,
       expiresIn: Math.floor(OTP_EXPIRY_MS / 1000),
       ...(isDev ? { devOtp: otp } : {}),
       smsResult,
@@ -55,8 +74,9 @@ class OtpService {
   /**
    * Verifies the 4-digit OTP for the given phone number
    */
-  async verifyOtp(rawPhone, inputOtp, purpose = 'order_verification') {
+  async verifyOtp(rawPhone, inputOtp, purpose = 'order_verification', rawCountryCode = '+91') {
     const phone = normalizePhone(rawPhone);
+    const countryCode = normalizeCountryCode(rawCountryCode);
     const otp = String(inputOtp || '').trim();
 
     if (!phone) {
@@ -67,11 +87,13 @@ class OtpService {
       throw new ApiError(400, 'Please enter a valid 4-digit OTP');
     }
 
-    const storeKey = `${purpose}:${phone}`;
-    const record = otpStore.get(storeKey);
+    const primaryKey = `${purpose}:${countryCode}:${phone}`;
+    const fallbackKey = `${purpose}:${phone}`;
+    const record = otpStore.get(primaryKey) || otpStore.get(fallbackKey);
 
     if (!record || Date.now() > record.expiresAt) {
-      otpStore.delete(storeKey);
+      otpStore.delete(primaryKey);
+      otpStore.delete(fallbackKey);
       throw new ApiError(400, 'OTP expired or not found. Please click Resend OTP.');
     }
 
@@ -80,12 +102,14 @@ class OtpService {
     }
 
     // Clear OTP after successful use
-    otpStore.delete(storeKey);
+    otpStore.delete(primaryKey);
+    otpStore.delete(fallbackKey);
 
     // Generate short-lived verification token
     const verificationToken = crypto.randomBytes(16).toString('hex');
     verifiedStore.set(verificationToken, {
       phone,
+      countryCode,
       expiresAt: Date.now() + VERIFIED_TOKEN_EXPIRY_MS,
     });
 
@@ -94,6 +118,7 @@ class OtpService {
       verified: true,
       verificationToken,
       phone,
+      countryCode,
       message: 'Mobile number verified successfully',
     };
   }

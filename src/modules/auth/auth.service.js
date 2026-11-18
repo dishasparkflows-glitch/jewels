@@ -5,6 +5,7 @@ const User = require('../user/user.model');
 const ApiError = require('../../utils/ApiError');
 const { JWT_SECRET, JWT_EXPIRES_IN } = require('../../config/constants');
 const smsService = require('../sms/sms.service');
+const otpService = require('../otp/otp.service');
 const { sendEmail } = require('../../utils/emailService');
 const { getPasswordResetHtml } = require('../../template');
 
@@ -19,12 +20,38 @@ class AuthService {
     );
   }
 
+  // ------------------------------- check email & phone availability ----------------------------
+  async checkAvailability({ email, phone }) {
+    if (email) {
+      const normalizedEmail = email.trim().toLowerCase();
+      const existingEmailUser = await User.findOne({ 'auth.email': normalizedEmail, 'meta.deletedAt': null });
+      if (existingEmailUser) {
+        throw new ApiError(409, 'An account with this email already exists. Please log in.');
+      }
+    }
+
+    if (phone) {
+      const digits = String(phone).replace(/\D/g, '').trim();
+      if (digits) {
+        const existingPhoneUser = await User.findOne({
+          $or: [{ 'profile.phone': digits }, { 'profile.phone': phone.trim() }],
+          'meta.deletedAt': null,
+        });
+        if (existingPhoneUser) {
+          throw new ApiError(409, 'An account with this mobile number already exists. Please log in.');
+        }
+      }
+    }
+
+    return { available: true };
+  }
+
   // ------------------------------- register user ----------------------------
   async register(data) {
     const email = (data.auth?.email || '').trim().toLowerCase();
     if (!email) throw new ApiError(400, 'Email is required');
 
-    const existingUser = await User.findOne({ 'auth.email': email });
+    const existingUser = await User.findOne({ 'auth.email': email, 'meta.deletedAt': null });
     if (existingUser) throw new ApiError(409, 'Email already registered');
 
     const password = (data.auth?.password || data.password || '').trim();
@@ -33,6 +60,48 @@ class AuthService {
     }
     if (password.length < 6) {
       throw new ApiError(400, 'Password must be at least 6 characters');
+    }
+
+    if (data.profile) {
+      let rawPhone = String(data.profile.phone || '').trim();
+      let countryCode = String(data.profile.countryCode || '').trim();
+
+      const plusMatch = rawPhone.match(/^(\+\d{1,4})[\s.-]?(\d+)$/);
+      if (plusMatch) {
+        if (!countryCode) countryCode = plusMatch[1];
+        rawPhone = plusMatch[2];
+      } else {
+        rawPhone = rawPhone.replace(/^\+\d{1,4}\s*/, '').replace(/\s+/g, '');
+      }
+
+      if (countryCode && !countryCode.startsWith('+')) {
+        countryCode = `+${countryCode}`;
+      }
+
+      data.profile.phone = rawPhone;
+      data.profile.countryCode = countryCode || '+91';
+
+      if (data.profile.phone) {
+        const cleanPhone = String(data.profile.phone).replace(/\D/g, '').trim();
+        if (cleanPhone) {
+          const existingPhone = await User.findOne({
+            $or: [{ 'profile.phone': cleanPhone }, { 'profile.phone': data.profile.phone }],
+            'meta.deletedAt': null,
+          });
+          if (existingPhone) {
+            throw new ApiError(409, 'Mobile number already registered. Please sign in instead.');
+          }
+        }
+      }
+
+      if (data.verificationToken && data.profile.phone) {
+        const isVerified = await otpService.isPhoneVerified(data.profile.phone, data.verificationToken);
+        if (isVerified) {
+          data.profile.isPhoneVerified = true;
+        }
+      } else if (data.profile.isPhoneVerified) {
+        data.profile.isPhoneVerified = true;
+      }
     }
 
     const user = await User.create(data);
@@ -49,7 +118,7 @@ class AuthService {
   }
 
   // ------------------------------- login user ----------------------------
-  async login(email, password) {
+  async login(email, password, countryCode = null) {
     const identifier = (email || '').trim();
     const isEmail = identifier.includes('@');
     let user;
@@ -59,11 +128,44 @@ class AuthService {
       user = await User.findOne({ 'auth.email': normalizedEmail }).select('+auth.password');
     } else {
       const digits = identifier.replace(/\D/g, '');
-      if (digits.length < 7 || digits.length > 15) throw new ApiError(401, 'Invalid mobile number or password');
-      const localDigits = digits.length > 10 && digits.startsWith('91') ? digits.slice(2) : digits;
-      const phonePattern = localDigits.split('').map((digit) => `${digit}\\D*`).join('');
-      const phoneRegex = new RegExp(`(?:^|\\D)(?:91\\D*)?${phonePattern}$`);
-      user = await User.findOne({ 'profile.phone': phoneRegex }).select('+auth.password');
+      if (!digits) throw new ApiError(401, 'Invalid email/mobile number or password');
+
+      const queries = [
+        { 'profile.phone': identifier },
+        { 'profile.phone': digits },
+      ];
+
+      // If countryCode was provided explicitly
+      if (countryCode) {
+        const formattedCode = countryCode.startsWith('+') ? countryCode : `+${countryCode}`;
+        queries.unshift({
+          'profile.phone': digits,
+          'profile.countryCode': formattedCode,
+        });
+      }
+
+      // If user typed with country code prefix (e.g. +91 9825032534, +919825032534, +1...)
+      const plusMatch = identifier.match(/^\+(\d{1,4})[\s.-]?(\d+)$/);
+      if (plusMatch) {
+        const code = `+${plusMatch[1]}`;
+        const phone = plusMatch[2];
+        queries.push({
+          'profile.phone': phone,
+          'profile.countryCode': code,
+        });
+        queries.push({ 'profile.phone': phone });
+      } else if (digits.length > 10) {
+        // e.g. 919825032534 -> countryCode: +91, phone: 9825032534
+        const phone = digits.slice(-10);
+        const code = `+${digits.slice(0, digits.length - 10)}`;
+        queries.push({
+          'profile.phone': phone,
+          'profile.countryCode': code,
+        });
+        queries.push({ 'profile.phone': phone });
+      }
+
+      user = await User.findOne({ $or: queries }).select('+auth.password');
     }
 
     if (!user) throw new ApiError(401, 'Invalid email/mobile number or password');

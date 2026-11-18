@@ -1,4 +1,5 @@
 class ApiResponse {
+  // ------------------------------- success response ----------------------------
   static success(res, data = null, message = 'Success', statusCode = 200) {
     let resData = data;
     let resMessage = message;
@@ -19,6 +20,7 @@ class ApiResponse {
     return res.status(statusCode).json(payload);
   }
 
+  // ------------------------------- created response ----------------------------
   static created(res, data = null, message = 'Created successfully') {
     let resData = data;
     let resMessage = message;
@@ -39,6 +41,7 @@ class ApiResponse {
     return res.status(201).json(payload);
   }
 
+  // ------------------------------- paginated response ----------------------------
   static paginated(res, data, pagination, message = 'Success', facets) {
     return res.status(200).json({
       success: true,
@@ -49,6 +52,7 @@ class ApiResponse {
     });
   }
 
+  // ------------------------------- error response ----------------------------
   static error(res, message = 'Something went wrong', statusCode = 500) {
     return res.status(statusCode).json({
       success: false,

@@ -113,6 +113,24 @@ class GemstoneTypeService {
 
     return { message: 'Gemstone type deleted successfully', id };
   }
+
+  // ------------------------------- bulk delete gemstone types ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of gemstone type IDs to delete');
+    }
+
+    const result = await GemstoneType.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+
+    return {
+      message: `${result.modifiedCount} gemstone type(s) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new GemstoneTypeService();

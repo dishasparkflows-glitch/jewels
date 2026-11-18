@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 
+// ------------------------------- get smtp config ----------------------------
 function getSmtpConfig() {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = Number(process.env.SMTP_PORT || 587);
@@ -17,6 +18,7 @@ function getSmtpConfig() {
 
 let transporterInstance = null;
 
+// ------------------------------- get transporter ----------------------------
 function getTransporter() {
   if (!transporterInstance) {
     const config = getSmtpConfig();
@@ -38,6 +40,7 @@ function getTransporter() {
   return transporterInstance;
 }
 
+// ------------------------------- verify transporter ----------------------------
 async function verifyTransporter() {
   const transporter = getTransporter();
   try {
@@ -50,6 +53,7 @@ async function verifyTransporter() {
   }
 }
 
+// ------------------------------- send email ----------------------------
 async function sendEmail({ to, subject, text, html, from, attachments = [], ...rest }) {
   if (!to) {
     throw new Error('Recipient email ("to") is required');
@@ -87,4 +91,3 @@ module.exports = {
   sendEmail,
   getSmtpConfig,
 };
-

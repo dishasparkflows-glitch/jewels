@@ -25,6 +25,13 @@ router.put(
   codSequenceController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  codSequenceController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

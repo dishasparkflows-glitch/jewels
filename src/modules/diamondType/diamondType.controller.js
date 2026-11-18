@@ -49,6 +49,14 @@ class DiamondTypeController {
     await redisClient.deleteByPattern('diamond-types:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete diamond types ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await diamondTypeService.bulkDelete(ids);
+    await redisClient.deleteByPattern('diamond-types:*');
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new DiamondTypeController();

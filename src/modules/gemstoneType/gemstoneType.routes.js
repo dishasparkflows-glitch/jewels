@@ -24,6 +24,13 @@ router.put(
   gemstoneTypeController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  gemstoneTypeController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

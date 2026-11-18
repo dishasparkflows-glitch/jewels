@@ -26,6 +26,13 @@ const update = catchAsync(async (req, res) => {
   return ApiResponse.success(res, null, 'User updated successfully');
 });
 
+// ------------------------------- bulk delete users ----------------------------
+const bulkDelete = catchAsync(async (req, res) => {
+  const ids = req.body?.ids || [];
+  const result = await userService.bulkDelete(ids);
+  return ApiResponse.success(res, result, result.message);
+});
+
 // ------------------------------- delete user ----------------------------
 const remove = catchAsync(async (req, res) => {
   await userService.delete(req.params.id);
@@ -56,6 +63,7 @@ module.exports = {
   getById,
   create,
   update,
+  bulkDelete,
   remove,
   toggleStatus,
   getMe,

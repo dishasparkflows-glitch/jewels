@@ -42,6 +42,14 @@ class SizeController {
     ApiResponse.success(res, null, 'Size updated successfully');
   });
 
+  // ------------------------------- bulk delete sizes ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await sizeService.bulkDelete(ids);
+    await redisClient.deleteByPattern('sizes:*');
+    ApiResponse.success(res, result, result.message);
+  });
+
   // ------------------------------- delete size ----------------------------
 
   delete = catchAsync(async (req, res) => {

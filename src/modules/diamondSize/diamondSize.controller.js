@@ -49,6 +49,14 @@ class DiamondSizeController {
     await redisClient.deleteByPattern('diamond-sizes:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete diamond sizes ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await diamondSizeService.bulkDelete(ids);
+    await redisClient.deleteByPattern('diamond-sizes:*');
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new DiamondSizeController();

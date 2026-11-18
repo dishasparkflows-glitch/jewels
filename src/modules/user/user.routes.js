@@ -16,6 +16,7 @@ router.get('/', authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), userController.getAll
 router.get('/:id', authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), userController.getById);
 router.post('/', authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), userController.create);
 router.put('/:id', authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), userController.update);
+router.post('/bulk-delete', authorize(ROLES.SUPER_ADMIN), userController.bulkDelete);
 router.delete('/:id', authorize(ROLES.SUPER_ADMIN), userController.remove);
 router.patch('/:id/toggle-status', authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), userController.toggleStatus);
 

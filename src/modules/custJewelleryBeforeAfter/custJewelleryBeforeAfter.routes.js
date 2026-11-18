@@ -24,6 +24,13 @@ router.put(
   custJewelleryBeforeAfterController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  custJewelleryBeforeAfterController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

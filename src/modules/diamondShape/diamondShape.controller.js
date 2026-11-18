@@ -49,6 +49,14 @@ class DiamondShapeController {
     await redisClient.deleteByPattern('diamond-shapes:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete diamond shapes ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await diamondShapeService.bulkDelete(ids);
+    await redisClient.deleteByPattern('diamond-shapes:*');
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new DiamondShapeController();

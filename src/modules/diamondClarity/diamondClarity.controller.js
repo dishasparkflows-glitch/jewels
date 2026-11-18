@@ -49,6 +49,14 @@ class DiamondClarityController {
     await redisClient.deleteByPattern('diamond-clarities:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete diamond clarities ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await diamondClarityService.bulkDelete(ids);
+    await redisClient.deleteByPattern('diamond-clarities:*');
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new DiamondClarityController();

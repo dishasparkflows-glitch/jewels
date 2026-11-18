@@ -2,6 +2,7 @@ const crypto = require('crypto');
 
 const ALGORITHM = 'aes-256-gcm';
 
+// ------------------------------- get encryption key ----------------------------
 const getEncryptionKey = () => {
   const keyHex =
     process.env.INTEGRATION_TOKEN_ENCRYPTION_KEY ||
@@ -17,6 +18,7 @@ const getEncryptionKey = () => {
   return crypto.createHash('sha256').update(secret).digest();
 };
 
+// ------------------------------- encrypt token ----------------------------
 const encryptToken = (text) => {
   if (!text) return null;
   try {
@@ -35,6 +37,7 @@ const encryptToken = (text) => {
   }
 };
 
+// ------------------------------- decrypt token ----------------------------
 const decryptToken = (encryptedPayload) => {
   if (!encryptedPayload) return null;
   try {

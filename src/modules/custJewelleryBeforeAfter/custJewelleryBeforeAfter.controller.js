@@ -58,6 +58,14 @@ class CustJewelleryBeforeAfterController {
     );
   });
 
+  // ------------------------------- bulk delete cust jewellery before after ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await custJewelleryBeforeAfterService.bulkDelete(ids);
+    await redisClient.deleteByPattern('cust-jewellery-before-after:*');
+    ApiResponse.success(res, result, result.message);
+  });
+
   // ------------------------------- delete cust jewellery before after ----------------------------
   delete = catchAsync(async (req, res) => {
     const result = await custJewelleryBeforeAfterService.delete(req.params.id);

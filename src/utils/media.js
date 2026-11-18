@@ -1,8 +1,6 @@
 function publicBase() {
   return (
-    process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN ||
-    process.env.CLOUDFLARE_R2_PUBLIC_URL ||
-    'https://pub-82427c7fd20e4acaa4bdb3b933c0a3bf.r2.dev'
+    process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN
   ).replace(/\/+$/, '');
 }
 

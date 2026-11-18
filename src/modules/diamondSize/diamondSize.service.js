@@ -112,6 +112,24 @@ class DiamondSizeService {
 
     return { message: 'Diamond size deleted successfully', id };
   }
+
+  // ------------------------------- bulk delete diamond sizes ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of diamond size IDs to delete');
+    }
+
+    const result = await DiamondSize.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+
+    return {
+      message: `${result.modifiedCount} diamond size(s) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new DiamondSizeService();

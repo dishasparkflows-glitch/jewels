@@ -753,6 +753,24 @@ class BannerService {
     return { message: 'Banner deleted successfully', id };
   }
 
+  // ------------------------------- bulk delete banners ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of banner IDs to delete');
+    }
+
+    const result = await Banner.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+
+    return {
+      message: `${result.modifiedCount} banner(s) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
+
   // ----------------------- auto delete expired offers (cron) -----------------
   async autoDeleteExpiredOffers() {
     const now = new Date();

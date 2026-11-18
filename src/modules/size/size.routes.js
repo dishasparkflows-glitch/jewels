@@ -24,6 +24,13 @@ router.put(
   sizeController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  sizeController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

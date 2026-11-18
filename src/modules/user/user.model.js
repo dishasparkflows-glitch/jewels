@@ -32,6 +32,10 @@ const userSchema = new mongoose.Schema(
         default: '+91',
         trim: true,
       },
+      isPhoneVerified: {
+        type: Boolean,
+        default: false,
+      },
       location: {
         type: String,
         default: '',
@@ -97,6 +101,29 @@ const userSchema = new mongoose.Schema(
     versionKey: false,
   }
 );
+
+// Clean phone and normalize countryCode before saving
+userSchema.pre('save', function (next) {
+  if (this.profile) {
+    if (this.profile.phone) {
+      const phoneStr = String(this.profile.phone).trim();
+      const match = phoneStr.match(/^(\+\d{1,4})[\s.-]?(\d+)$/);
+      if (match) {
+        if (!this.profile.countryCode || this.profile.countryCode === '+91') {
+          this.profile.countryCode = match[1];
+        }
+        this.profile.phone = match[2];
+      } else {
+        this.profile.phone = phoneStr.replace(/^\+\d{1,4}\s*/, '').replace(/\s+/g, '');
+      }
+    }
+    if (this.profile.countryCode) {
+      const codeStr = String(this.profile.countryCode).trim();
+      this.profile.countryCode = codeStr.startsWith('+') ? codeStr : `+${codeStr}`;
+    }
+  }
+  next();
+});
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {

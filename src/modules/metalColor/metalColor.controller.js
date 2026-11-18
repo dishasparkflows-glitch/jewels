@@ -49,6 +49,14 @@ class MetalColorController {
     await redisClient.deleteByPattern('metal-colors:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete metal colors ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await metalColorService.bulkDelete(ids);
+    await redisClient.deleteByPattern('metal-colors:*');
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new MetalColorController();

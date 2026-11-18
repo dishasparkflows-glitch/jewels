@@ -51,12 +51,6 @@ router.post(
   appointmentController.bulkDelete
 );
 
-router.delete(
-  '/bulk-delete',
-  authenticate,
-  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
-  appointmentController.bulkDelete
-);
 
 router.delete(
   '/:id',

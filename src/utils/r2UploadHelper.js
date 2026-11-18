@@ -48,6 +48,7 @@ const MODULE_CONFIG = {
 
 const CANONICAL_MODULES = Object.keys(MODULE_CONFIG);
 
+// ------------------------------- generate r2 object key ----------------------------
 function generateR2ObjectKey({ module: rawModule, contentType, productId, subfolder }) {
   if (!rawModule || typeof rawModule !== 'string' || !rawModule.trim()) {
     throw new ApiError(400, 'Module is required. Examples: "users", "categories", "products"');
@@ -129,4 +130,3 @@ module.exports = {
   CANONICAL_MODULES,
   generateR2ObjectKey,
 };
-

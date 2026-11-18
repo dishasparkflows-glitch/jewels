@@ -80,9 +80,6 @@ const orderTimelineSchema = new mongoose.Schema(
       at: { type: Date, default: null },
       by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     },
-    packed: {
-      at: { type: Date, default: null },
-    },
     shipped: {
       at: { type: Date, default: null },
       by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
@@ -200,7 +197,6 @@ const orderSchema = new mongoose.Schema(
         placed: { at: new Date(), by: null },
         accepted: { at: null, by: null },
         cancelled: { at: null, by: null },
-        packed: { at: null },
         shipped: { at: null, by: null },
         delivered: { at: null, by: null },
       }),

@@ -32,7 +32,6 @@ class CurrencyService {
   async getAll(queryParams = {}) {
 
     const filter = {
-      'metadata.isDeleted': { $ne: true },
       'meta.deletedAt': { $in: [null, undefined] },
     };
 
@@ -85,7 +84,6 @@ class CurrencyService {
   async getOne(id) {
     const currency = await Currency.findOne({
       _id: id,
-      'metadata.isDeleted': { $ne: true },
       'meta.deletedAt': { $in: [null, undefined] },
     });
     if (!currency) {
@@ -98,7 +96,6 @@ class CurrencyService {
   async getByCode(code) {
     const currency = await Currency.findOne({
       'currencyInfo.code': code.toUpperCase(),
-      'metadata.isDeleted': { $ne: true },
       'meta.deletedAt': { $in: [null, undefined] },
     });
     if (!currency) {
@@ -117,7 +114,6 @@ class CurrencyService {
     // Check if code already exists
     const existing = await Currency.findOne({
       'currencyInfo.code': code,
-      'metadata.isDeleted': { $ne: true },
       'meta.deletedAt': { $in: [null, undefined] },
     });
     if (existing) {
@@ -166,7 +162,6 @@ class CurrencyService {
   async update(id, data) {
     const currency = await Currency.findOne({
       _id: id,
-      'metadata.isDeleted': { $ne: true },
       'meta.deletedAt': { $in: [null, undefined] },
     });
     if (!currency) {
@@ -180,7 +175,6 @@ class CurrencyService {
         const existing = await Currency.findOne({
           _id: { $ne: id },
           'currencyInfo.code': nextCode,
-          'metadata.isDeleted': { $ne: true },
           'meta.deletedAt': { $in: [null, undefined] },
         });
         if (existing) {
@@ -231,7 +225,6 @@ class CurrencyService {
   async delete(id) {
     const currency = await Currency.findOne({
       _id: id,
-      'metadata.isDeleted': { $ne: true },
       'meta.deletedAt': { $in: [null, undefined] },
     });
     if (!currency) {
@@ -241,11 +234,8 @@ class CurrencyService {
       throw new ApiError(400, 'Cannot delete the base currency');
     }
 
-    if (!currency.metadata) currency.metadata = {};
-    currency.metadata.isDeleted = true;
     if (!currency.meta) currency.meta = {};
     currency.meta.deletedAt = new Date();
-    currency.markModified('metadata');
     currency.markModified('meta');
     await currency.save();
     return { id, message: `${currency.currencyInfo.code} deleted successfully` };
@@ -260,7 +250,6 @@ class CurrencyService {
 
     // Determine the base currency and its rate against USD
     const baseCurDoc = await Currency.findOne({
-      'metadata.isDeleted': { $ne: true },
       'meta.deletedAt': { $in: [null, undefined] },
       'settings.isBaseCurrency': true,
     }).lean();
@@ -268,7 +257,6 @@ class CurrencyService {
     const basePerUsd = liveRates[baseCode] || liveRates['INR'] || 1;
 
     const currencies = await Currency.find({
-      'metadata.isDeleted': { $ne: true },
       'meta.deletedAt': { $in: [null, undefined] },
       'settings.isBaseCurrency': false,
       'settings.useLiveRate': true,
@@ -312,7 +300,6 @@ class CurrencyService {
   async syncOneRate(id) {
     const currency = await Currency.findOne({
       _id: id,
-      'metadata.isDeleted': { $ne: true },
       'meta.deletedAt': { $in: [null, undefined] },
     });
     if (!currency) {
@@ -328,7 +315,6 @@ class CurrencyService {
     }
 
     const baseCurDoc = await Currency.findOne({
-      'metadata.isDeleted': { $ne: true },
       'meta.deletedAt': { $in: [null, undefined] },
       'settings.isBaseCurrency': true,
     }).lean();

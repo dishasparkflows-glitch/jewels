@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const Blog = require('./blog.model');
+const BlogCategory = require('../blogCategory/blogCategory.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -56,8 +58,29 @@ class BlogService {
       filter.status = queryParams.status;
     }
 
-    if (queryParams.blogCategory || queryParams.category) {
-      filter.blogCategory = queryParams.blogCategory || queryParams.category;
+    const rawCategory = queryParams.blogCategory || queryParams.category;
+    if (rawCategory && rawCategory !== 'all' && rawCategory !== 'undefined' && rawCategory !== 'null') {
+      const trimmedCategory = String(rawCategory).trim();
+      if (
+        mongoose.Types.ObjectId.isValid(trimmedCategory) &&
+        String(new mongoose.Types.ObjectId(trimmedCategory)) === trimmedCategory
+      ) {
+        filter.blogCategory = new mongoose.Types.ObjectId(trimmedCategory);
+      } else {
+        const catDoc = await BlogCategory.findOne({
+          $or: [
+            { slug: trimmedCategory.toLowerCase() },
+            { name: { $regex: new RegExp(`^${trimmedCategory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+          ],
+          'meta.deletedAt': null,
+        }).select('_id');
+
+        if (catDoc) {
+          filter.blogCategory = catDoc._id;
+        } else {
+          filter.blogCategory = new mongoose.Types.ObjectId();
+        }
+      }
     }
 
     if (queryParams.search) {

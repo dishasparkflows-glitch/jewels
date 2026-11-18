@@ -122,7 +122,7 @@ class CategoryService {
     }
 
     return await Category.find(filter)
-      .select('_id name status icon type slug sizingConfig order')
+      .select('_id name status icon type slug sizingConfig order promoBanners')
       .collation({ locale: 'en', strength: 2 })
       .sort({ order: 1, name: 1 })
       .lean();

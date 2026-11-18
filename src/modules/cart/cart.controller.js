@@ -12,8 +12,9 @@ class CartController {
 
   // ------------------------------- get cart & wishlist counts ----------------------------
   getCounts = catchAsync(async (req, res) => {
-    const { userId } = this.getIdentity(req);
-    const data = await cartService.getCounts({ userId });
+    const userId = req.user?._id || req.body?.userId || req.query?.userId || null;
+    const userEmail = req.user?.auth?.email || req.user?.email || null;
+    const data = await cartService.getCounts({ userId, userEmail });
     ApiResponse.success(res, data, 'Counts retrieved successfully');
   });
 

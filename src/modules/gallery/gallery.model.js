@@ -8,6 +8,18 @@ const gallerySchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    linkedRecord: {
+      module: {
+        type: String,
+        default: null,
+        index: true,
+      },
+      recordId: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: null,
+        index: true,
+      },
+    },
     placement: {
       type: String,
       enum: [
@@ -41,6 +53,13 @@ const gallerySchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
+    meta: {
+      createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now },
+      deletedAt: { type: Date, default: null },
+    },
   },
   {
     versionKey: false,
@@ -48,5 +67,6 @@ const gallerySchema = new mongoose.Schema(
   }
 );
 
+gallerySchema.index({ 'linkedRecord.module': 1, 'linkedRecord.recordId': 1 });
 
 module.exports = mongoose.model('Gallery', gallerySchema, 'galleries');

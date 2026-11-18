@@ -22,7 +22,6 @@ class MenuItemService {
   }
 
   // ------------------------------- get one menu item ----------------------------
-
   async getOne(id) {
     const item = await MenuItem.findOne({ _id: id, 'meta.deletedAt': null })
       .populate('menuSectionId', 'title categoryId')
@@ -35,7 +34,6 @@ class MenuItemService {
   }
 
   // ------------------------------- get all menu items ----------------------------
-
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -66,7 +64,6 @@ class MenuItemService {
   }
 
   // ------------------------------- get menu item lookup ----------------------------
-
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null, status: 'active' };
     if (queryParams.menuSectionId) {
@@ -83,7 +80,6 @@ class MenuItemService {
   }
 
   // ------------------------------- update menu item ----------------------------
-
   async update(id, data) {
     if (data.menuSectionId !== undefined) await requireParent(MenuSection, data.menuSectionId, 'Menu section');
     const item = await MenuItem.findOneAndUpdate(
@@ -121,7 +117,6 @@ class MenuItemService {
   }
 
   // ------------------------------- delete menu item ----------------------------
-
   async delete(id) {
     const item = await MenuItem.findOneAndUpdate(
       { _id: id },

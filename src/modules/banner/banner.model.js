@@ -2,11 +2,6 @@ const mongoose = require('mongoose');
 
 const bannerSchema = new mongoose.Schema(
   {
-    themeId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'WebsiteTheme',
-      index: true,
-    },
     content: {
       _id: false,
       title: {
@@ -86,15 +81,6 @@ const bannerSchema = new mongoose.Schema(
         default: 'image',
       },
     },
-    media: {
-      _id: false,
-      url: String,
-      key: String,
-      mediaType: {
-        type: String,
-        default: 'image',
-      },
-    },
     mobileImage: {
       _id: false,
       url: String,
@@ -112,11 +98,6 @@ const bannerSchema = new mongoose.Schema(
         key: { type: String },
       }],
       default: undefined,
-    },
-    mediaType: {
-      type: String,
-      enum: ['image', 'video'],
-      default: 'image',
     },
     startDate: {
       type: Date,
@@ -139,7 +120,7 @@ const bannerSchema = new mongoose.Schema(
 
 // Pre-save cleanup to ensure no default '' or null values are stored
 bannerSchema.pre('save', function (next) {
-  ['themeId', 'targetAudience', 'appStoreUrl', 'googlePlayUrl', 'startDate', 'endDate'].forEach((field) => {
+  ['targetAudience', 'appStoreUrl', 'googlePlayUrl', 'startDate', 'endDate'].forEach((field) => {
     if (this[field] === '' || this[field] === null) {
       this[field] = undefined;
     }
@@ -167,23 +148,22 @@ bannerSchema.pre('save', function (next) {
     }
   }
 
-  // Unified media & image synchronization
-  const incomingMedia = this.media || this.image;
+  // Media & image synchronization
+  const incomingMedia = this.image || this.media;
   if (incomingMedia && incomingMedia.url) {
-    const isVid = (incomingMedia.mediaType === 'video') || (this.mediaType === 'video') || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(incomingMedia.url);
-    const mType = isVid ? 'video' : (incomingMedia.mediaType || this.mediaType || 'image');
+    const isVid = (incomingMedia.mediaType === 'video') || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(incomingMedia.url);
+    const mType = isVid ? 'video' : (incomingMedia.mediaType || 'image');
     const unified = {
       url: incomingMedia.url,
       key: incomingMedia.key || undefined,
       mediaType: mType,
     };
     this.image = unified;
-    this.media = unified;
-    this.mediaType = mType;
   } else {
     this.image = undefined;
-    this.media = undefined;
   }
+  this.media = undefined;
+  this.mediaType = undefined;
 
   if (this.mobileImage) {
     if (!this.mobileImage.url) {

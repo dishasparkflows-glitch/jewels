@@ -9,6 +9,7 @@ const adminOnly = [authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN)];
 // ------------------------------- gallery routes ----------------------------
 router.get('/themes', ...adminOnly, galleryController.getThemesLookup);
 router.get('/banners', ...adminOnly, galleryController.getBannersLookup);
+router.get('/featured', ...adminOnly, galleryController.getFeaturedsLookup);
 router.get('/', ...adminOnly, galleryController.list);
 router.get('/:id', ...adminOnly, galleryController.getOne);
 router.post('/', ...adminOnly, galleryController.create);

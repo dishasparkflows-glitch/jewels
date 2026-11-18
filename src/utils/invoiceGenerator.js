@@ -388,15 +388,6 @@ async function generateInvoicePDF(order, options = {}) {
       // Background warm ivory tint
       doc.rect(0, 0, pageWidth, pageHeight).fill('#FAF7F2');
 
-      // Decorative Filigree Top Right Corner
-      doc.save();
-      doc.strokeColor('#E2D5C3').lineWidth(0.8).opacity(0.6);
-      doc.path('M 520,0 C 530,25 560,35 595,40').stroke();
-      doc.path('M 540,0 C 550,20 570,30 595,25').stroke();
-      doc.path('M 500,0 C 515,35 550,55 595,60').stroke();
-      doc.path('M 480,0 C 500,45 540,75 595,85').stroke();
-      doc.restore();
-
       let y = 36;
 
       const brandName = (

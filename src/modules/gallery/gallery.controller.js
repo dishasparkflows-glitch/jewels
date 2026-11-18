@@ -51,6 +51,12 @@ class GalleryController {
     ApiResponse.success(res, banners, 'Banners lookup retrieved successfully');
   });
 
+  // ------------------------------- featureds lookup ----------------------------
+  getFeaturedsLookup = catchAsync(async (req, res) => {
+    const featureds = await galleryService.getFeaturedsLookup(req.query.themeId);
+    ApiResponse.success(res, featureds, 'Featureds lookup retrieved successfully');
+  });
+
   // ------------------------------- delete gallery item ----------------------------
   deleteItem = catchAsync(async (req, res) => {
     const result = await galleryService.deleteItem(req.params.id, req.query, req.user?._id);

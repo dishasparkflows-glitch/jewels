@@ -132,7 +132,6 @@ class OrderService {
         },
         accepted: { at: null, by: null },
         cancelled: { at: null, by: null },
-        packed: { at: null },
         shipped: { at: null, by: null },
         delivered: { at: null, by: null },
       },
@@ -377,7 +376,6 @@ class OrderService {
         placed: { at: order.meta?.createdAt || new Date(), by: order.userId || null },
         accepted: { at: null, by: null },
         cancelled: { at: null, by: null },
-        packed: { at: null },
         shipped: { at: null, by: null },
         delivered: { at: null, by: null },
       };
@@ -391,9 +389,6 @@ class OrderService {
       if (!order.orderTimeline.accepted) order.orderTimeline.accepted = {};
       order.orderTimeline.accepted.at = order.orderTimeline.accepted.at || now;
       if (adminId) order.orderTimeline.accepted.by = adminId;
-    } else if (normalizedStatus === 'packed') {
-      if (!order.orderTimeline.packed) order.orderTimeline.packed = {};
-      order.orderTimeline.packed.at = order.orderTimeline.packed.at || now;
     } else if (normalizedStatus === 'shipped') {
       if (!order.orderTimeline.shipped) order.orderTimeline.shipped = {};
       order.orderTimeline.shipped.at = order.orderTimeline.shipped.at || now;
@@ -431,7 +426,6 @@ class OrderService {
         placed: { at: order.meta?.createdAt || new Date(), by: order.userId || null },
         accepted: { at: null, by: null },
         cancelled: { at: null, by: null },
-        packed: { at: null },
         shipped: { at: null, by: null },
         delivered: { at: null, by: null },
       };

@@ -4,6 +4,7 @@ const ftp = require('basic-ftp');
 const { Writable } = require('stream');
 const path = require('path');
 const Product = require('../product/product.model');
+const Category = require('../category/category.model');
 const cloudflareR2 = require('../../utils/cloudflareR2');
 const ornateUtils = require('./ornate.utils');
 const productGroupService = require('../productGroup/productGroup.service');
@@ -20,12 +21,10 @@ const {
   callOrnateApi,
   fetchOrnateLabelData,
   getOrnateEvents,
-  resolveCategory,
   extractLabelIdentifiers,
   calculateLabelPrice,
   normalizeLabelSummary,
   buildProductIdentifierQuery,
-  mapStuddedDetails,
   generateProductSlug,
   buildProductPayloadFromLabel,
   cleanPayload,
@@ -95,7 +94,6 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
   }
 
   const labelDetails = data?.LabelDetail || [];
-  const studdedDetails = data?.StuddedDetail || [];
   const newSessionId = data?.Session?.[0]?.SessionId;
 
   if (labelDetails.length === 0) {
@@ -137,7 +135,12 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
   let upsertedCount = 0;
   let errorCount = 0;
   const errors = [];
-  const categoryCache = new Map();
+
+  // Resolve "Silver Collection" category for all ornate products
+  const silverCategory = await Category.findOne({
+    name: { $regex: /^Silver Collection$/i },
+  }).select('_id');
+  const silverCategoryId = silverCategory?._id || null;
 
   // Setup FTP for downloading images directly to Cloudflare R2
   const ftpClient = new ftp.Client();
@@ -218,16 +221,14 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
         }
       }
 
-      // Resolve category
-      const categoryId = await resolveCategory(label.GroupName, categoryCache);
+      // All ornate products belong to the "Silver Collection" category
+      const categoryId = silverCategoryId;
 
       // Build product payload strictly matching product.model.js
       const { setFields } = buildProductPayloadFromLabel(label, {
-        studdedDetails,
         existingProduct,
         categoryId,
         newlyUploadedImages,
-        sessionId: newSessionId || sessionIdToPass,
       });
 
       // Upsert into Product collection with 1 flag: isOrnate: true

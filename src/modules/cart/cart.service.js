@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const Cart = require('./cart.model');
 const Product = require('../product/product.model');
 const Wishlist = require('../wishlist/wishlist.model');
+const Order = require('../order/order.model');
+const Return = require('../return/return.model');
 const ApiError = require('../../utils/ApiError');
 
 const cartPopulateOptions = [
@@ -380,23 +382,54 @@ class CartService {
   }
 
   // ------------------------------- get counts ----------------------------
-  async getCounts({ userId } = {}) {
+  async getCounts({ userId, userEmail } = {}) {
     let cartCount = 0;
     let wishlistCount = 0;
+    let orderCount = 0;
+    let returnOrderCount = 0;
 
     if (userId) {
-      const [cart, wishlist] = await Promise.all([
-        Cart.findOne({ userId }).select('items.quantity').lean(),
-        Wishlist.findOne({ userId }).select('productIds').lean(),
+      const uId = mongoose.isValidObjectId(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+      const orderFilter = { 'meta.deletedAt': null };
+      if (userEmail) {
+        const escapedEmail = String(userEmail).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const emailRegex = new RegExp(`^${escapedEmail}$`, 'i');
+        orderFilter.$or = [
+          { userId: uId },
+          { 'customer.email': emailRegex },
+          { 'shippingAddress.email': emailRegex },
+        ];
+      } else {
+        orderFilter.userId = uId;
+      }
+
+      const returnFilter = {
+        $or: [{ userId: uId }],
+      };
+      if (userEmail) {
+        const escapedEmail = String(userEmail).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const emailRegex = new RegExp(`^${escapedEmail}$`, 'i');
+        returnFilter.$or.push({ 'customer.email': emailRegex });
+      }
+
+      const [cart, wishlist, ordersCount, returnsCount] = await Promise.all([
+        Cart.findOne({ userId: uId }).select('items.quantity').lean(),
+        Wishlist.findOne({ userId: uId }).select('productIds').lean(),
+        Order.countDocuments(orderFilter),
+        Return.countDocuments(returnFilter),
       ]);
 
       cartCount = cart?.items?.length || 0;
       wishlistCount = wishlist?.productIds?.length || 0;
+      orderCount = ordersCount || 0;
+      returnOrderCount = returnsCount || 0;
     }
 
     return {
       cartCount,
       wishlistCount,
+      orderCount,
+      returnOrderCount,
       totalItems: cartCount,
     };
   }

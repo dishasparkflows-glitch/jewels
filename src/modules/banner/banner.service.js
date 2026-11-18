@@ -52,7 +52,7 @@ function sanitizeBannerPayload(data) {
   }
 
   // Root fields
-  for (const field of ['themeId', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status']) {
+  for (const field of ['appStoreUrl', 'googlePlayUrl', 'startDate', 'endDate', 'status']) {
     if (!isNullOrEmpty(data[field])) {
       clean[field] = sanitizeStr(data[field]);
     }
@@ -62,7 +62,7 @@ function sanitizeBannerPayload(data) {
   const incomingMedia = data.media || data.image;
   if (incomingMedia && typeof incomingMedia === 'object' && !isNullOrEmpty(incomingMedia.url)) {
     const isVid = incomingMedia.mediaType === 'video' || data.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(incomingMedia.url);
-    const mType = isVid ? 'video' : (incomingMedia.mediaType || data.mediaType || 'image');
+    const mType = isVid ? 'video' : (incomingMedia.mediaType || 'image');
     const cleanMedia = {
       url: sanitizeStr(incomingMedia.url),
       mediaType: mType,
@@ -71,8 +71,6 @@ function sanitizeBannerPayload(data) {
       cleanMedia.key = sanitizeStr(incomingMedia.key);
     }
     clean.image = cleanMedia;
-    clean.media = cleanMedia;
-    clean.mediaType = mType;
   }
 
   // Mobile Image
@@ -156,7 +154,7 @@ function buildBannerUpdateOps(data) {
   }
 
   // Root fields
-  const simpleFields = ['themeId', 'appStoreUrl', 'googlePlayUrl', 'mediaType', 'startDate', 'endDate', 'status'];
+  const simpleFields = ['appStoreUrl', 'googlePlayUrl', 'startDate', 'endDate', 'status'];
   for (const field of simpleFields) {
     if (data[field] !== undefined) {
       if (isNullOrEmpty(data[field])) {
@@ -173,17 +171,18 @@ function buildBannerUpdateOps(data) {
     if (isNullOrEmpty(incomingMedia) || isNullOrEmpty(incomingMedia.url)) {
       $unset['image'] = 1;
       $unset['media'] = 1;
+      $unset['mediaType'] = 1;
     } else if (typeof incomingMedia === 'object') {
       const isVid = incomingMedia.mediaType === 'video' || data.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(incomingMedia.url);
-      const mType = isVid ? 'video' : (incomingMedia.mediaType || data.mediaType || 'image');
+      const mType = isVid ? 'video' : (incomingMedia.mediaType || 'image');
       const cleanMedia = {
         url: sanitizeStr(incomingMedia.url),
         mediaType: mType,
       };
       if (!isNullOrEmpty(incomingMedia.key)) cleanMedia.key = sanitizeStr(incomingMedia.key);
       $set['image'] = cleanMedia;
-      $set['media'] = cleanMedia;
-      $set['mediaType'] = mType;
+      $unset['media'] = 1;
+      $unset['mediaType'] = 1;
     }
   }
 
@@ -235,18 +234,18 @@ class BannerService {
   _formatBanner(banner) {
     if (!banner) return null;
     const doc = banner.toObject ? banner.toObject() : { ...banner };
-    const m = doc.media || doc.image;
+    delete doc.media;
+    delete doc.mediaType;
+    const m = doc.image;
     if (m && typeof m === 'object' && m.url) {
-      const isVid = m.mediaType === 'video' || doc.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(m.url);
-      const mType = isVid ? 'video' : (m.mediaType || doc.mediaType || 'image');
+      const isVid = m.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(m.url);
+      const mType = isVid ? 'video' : (m.mediaType || 'image');
       const unifiedMedia = {
         url: m.url,
         key: m.key,
         mediaType: mType,
       };
       doc.image = unifiedMedia;
-      doc.media = unifiedMedia;
-      doc.mediaType = mType;
     }
     if (doc.mobileImage && typeof doc.mobileImage === 'object' && doc.mobileImage.url) {
       if (!doc.mobileImage.mediaType) {
@@ -325,10 +324,6 @@ class BannerService {
 
     if (queryParams.status) {
       andConditions.push({ status: queryParams.status });
-    }
-
-    if (queryParams.themeId) {
-      andConditions.push({ themeId: queryParams.themeId });
     }
 
     // 1. Exclude expired offer banners unless explicitly included
@@ -565,12 +560,6 @@ class BannerService {
                 key: categoryDoc.banner?.key || '',
                 mediaType: 'image',
               },
-              media: {
-                url: bannerUrl,
-                key: categoryDoc.banner?.key || '',
-                mediaType: 'image',
-              },
-              mediaType: 'image',
               display: {
                 type: 'categorybanner',
                 platform: selectedPlatform,
@@ -598,35 +587,17 @@ class BannerService {
       const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');
       const activeTheme = await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id name').lean();
 
-      let themeBanner = null;
-      if (activeTheme) {
-        themeBanner = await Banner.findOne({
-          $and: [
-            { status: 'active' },
-            { 'display.type': 'categorybanner' },
-            { themeId: activeTheme._id },
-            platformCondition,
-          ],
-        })
-          .select('-meta')
-          .populate('display.categoryId', 'name slug')
-          .sort({ 'display.order': 1, _id: -1 })
-          .lean();
-      }
-
-      if (!themeBanner) {
-        themeBanner = await Banner.findOne({
-          $and: [
-            { status: 'active' },
-            { 'display.type': 'categorybanner' },
-            platformCondition,
-          ],
-        })
-          .select('-meta')
-          .populate('display.categoryId', 'name slug')
-          .sort({ 'display.order': 1, _id: -1 })
-          .lean();
-      }
+      const themeBanner = await Banner.findOne({
+        $and: [
+          { status: 'active' },
+          { 'display.type': 'categorybanner' },
+          platformCondition,
+        ],
+      })
+        .select('-meta')
+        .populate('display.categoryId', 'name slug')
+        .sort({ 'display.order': 1, _id: -1 })
+        .lean();
 
       if (themeBanner) {
         return {
@@ -655,8 +626,6 @@ class BannerService {
                 description: '',
               },
               image: galleryItem.image,
-              media: galleryItem.image,
-              mediaType: 'image',
               display: {
                 type: 'categorybanner',
                 platform: selectedPlatform,

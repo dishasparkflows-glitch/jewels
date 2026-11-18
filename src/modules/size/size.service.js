@@ -31,7 +31,6 @@ class SizeService {
   }
 
   // ------------------------------- get one size ----------------------------
-
   async getOne(id) {
     const item = await Size.findOne({ _id: id })
       .populate('categoryId', 'name slug type')
@@ -44,7 +43,6 @@ class SizeService {
   }
 
   // ------------------------------- get all sizes ----------------------------
-
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -74,7 +72,6 @@ class SizeService {
   }
 
   // ------------------------------- get size lookup ----------------------------
-
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null, status: 'active' };
     const categoryId = queryParams.categoryId || queryParams.category;
@@ -90,7 +87,6 @@ class SizeService {
   }
 
   // ------------------------------- update size ----------------------------
-
   async update(id, data) {
     const categoryId = data.categoryId || data.category;
 
@@ -144,7 +140,6 @@ class SizeService {
   }
 
   // ------------------------------- delete size ----------------------------
-
   async delete(id) {
     const item = await Size.findOneAndUpdate(
       { _id: id },

@@ -3,6 +3,7 @@ const Gallery = require('./gallery.model');
 const Banner = require('../banner/banner.model');
 const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');
 const Featured = require('../featured/featured.model');
+const Category = require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
 const { getPaginationMeta } = require('../../utils/pagination');
 
@@ -113,32 +114,112 @@ class GalleryService {
     }));
   }
 
+  // ------------------------------- normalize linkedRecord ----------------------------
+  _normalizeLinkedRecord(lr, defaultModule = 'banner') {
+    if (!lr) return null;
+    const recordId = lr.recordId || lr.id || lr._id;
+    if (!recordId || !mongoose.isValidObjectId(recordId)) return null;
+    return {
+      module: lr.module || defaultModule,
+      recordId: new mongoose.Types.ObjectId(recordId),
+    };
+  }
+
   // ------------------------------- get banners lookup ----------------------------
   async getBannersLookup(themeId = null, type = null) {
+    let theme = null;
+    if (themeId && mongoose.isValidObjectId(themeId)) {
+      theme = await WebsiteTheme.findOne({ _id: themeId, 'meta.deletedAt': null })
+        .select('_id name config.bannerSelections')
+        .lean();
+    }
+
     const filter = { 'meta.deletedAt': null };
     if (type && type !== 'all') {
-      filter['display.type'] = type;
-    }
-    if (themeId && mongoose.isValidObjectId(themeId)) {
-      filter.themeId = themeId;
+      const typeAliases = {
+        category: ['category', 'categorybanner'],
+        categorybanner: ['category', 'categorybanner'],
+        hero: ['hero', 'herobanner'],
+        herobanner: ['hero', 'herobanner'],
+        collection: ['collection', 'collectionbanner'],
+        collectionbanner: ['collection', 'collectionbanner'],
+        offer: ['offer', 'offerbanner'],
+        offerbanner: ['offer', 'offerbanner'],
+        mobileapp: ['mobileapp', 'mobileappbanner', 'app'],
+        mobileappbanner: ['mobileapp', 'mobileappbanner', 'app'],
+        bookappointbanner: ['bookappointbanner', 'appointment'],
+        appointment: ['bookappointbanner', 'appointment'],
+        customizebanner: ['customizebanner', 'custom'],
+        custom: ['customizebanner', 'custom'],
+      };
+
+      const matchTypes = typeAliases[type] || [type];
+      filter['display.type'] = { $in: matchTypes };
     }
 
     const banners = await Banner.find(filter)
-      .select('_id content.title display image status themeId')
-      .populate('themeId', 'name status')
+      .select('_id content.title display image status')
+      .populate('display.categoryId', 'name')
       .sort({ 'meta.createdAt': -1 })
       .limit(100)
       .lean();
+
+    const themeBannerIds = new Set(
+      (theme?.config?.bannerSelections || [])
+        .map((b) => String(b.bannerId))
+        .filter(Boolean)
+    );
 
     return banners.map((b) => ({
       _id: b._id,
       title: b.content?.title || `${b.display?.type || 'banner'}`,
       type: b.display?.type || 'herobanner',
+      displayType: b.display?.type || 'banner',
       platform: b.display?.platform || 'web',
-      themeId: b.themeId?._id || b.themeId || null,
-      themeName: b.themeId?.name || null,
+      categoryName: b.display?.categoryId?.name || null,
+      themeId: theme?._id || null,
+      themeName: theme?.name || null,
+      isSelectedInTheme: themeBannerIds.has(String(b._id)),
       status: b.status || 'active',
       image: b.image,
+    }));
+  }
+
+  // ------------------------------- get featureds lookup ----------------------------
+  async getFeaturedsLookup(themeId = null) {
+    let theme = null;
+    if (themeId && mongoose.isValidObjectId(themeId)) {
+      theme = await WebsiteTheme.findOne({ _id: themeId, 'meta.deletedAt': null })
+        .select('_id name config.featuredSelections')
+        .lean();
+    }
+
+    const filter = { 'meta.deletedAt': null };
+    const items = await Featured.find(filter)
+      .select('_id name display image status categoryId')
+      .populate('categoryId', 'name')
+      .sort({ 'display.type': 1, 'display.order': 1, name: 1 })
+      .lean();
+
+    const themeFeaturedIds = new Set(
+      (theme?.config?.featuredSelections || [])
+        .map((f) => String(f.featuredId || f.recordId))
+        .filter(Boolean)
+    );
+
+    return items.map((f) => ({
+      _id: f._id,
+      title: f.name || 'Featured Item',
+      name: f.name || 'Featured Item',
+      type: (f.display?.type || 'Celebrate').toLowerCase(),
+      displayType: f.display?.type || 'Celebrate',
+      platform: f.display?.platform || 'web',
+      themeId: theme?._id || null,
+      themeName: theme?.name || null,
+      isSelectedInTheme: themeFeaturedIds.has(String(f._id)),
+      status: f.status || 'active',
+      image: f.image,
+      categoryName: f.categoryId?.name || null,
     }));
   }
 
@@ -186,7 +267,11 @@ class GalleryService {
     // Placement filter
     const targetType = type !== 'all' ? type : (placement && placement !== 'all' ? placement : null);
     if (targetType) {
-      andConditions.push({ placement: targetType });
+      if (targetType === 'category' || targetType === 'categorybanner') {
+        andConditions.push({ placement: { $in: ['category', 'categorybanner'] } });
+      } else {
+        andConditions.push({ placement: targetType });
+      }
     }
 
     // Platform filter
@@ -203,6 +288,14 @@ class GalleryService {
     // Status filter
     if (status && status !== 'all') {
       andConditions.push({ status });
+    }
+
+    // LinkedRecord filter
+    if (queryParams.module) {
+      andConditions.push({ 'linkedRecord.module': queryParams.module });
+    }
+    if (queryParams.recordId && mongoose.isValidObjectId(queryParams.recordId)) {
+      andConditions.push({ 'linkedRecord.recordId': new mongoose.Types.ObjectId(queryParams.recordId) });
     }
 
     // Search filter (searches URL, key, placement)
@@ -270,9 +363,63 @@ class GalleryService {
       }
     });
 
+    const bannerIds = docs
+      .filter((d) => d.linkedRecord?.module === 'banner' && d.linkedRecord?.recordId)
+      .map((d) => d.linkedRecord.recordId);
+
+    const featuredIds = docs
+      .filter((d) => d.linkedRecord?.module === 'featured' && d.linkedRecord?.recordId)
+      .map((d) => d.linkedRecord.recordId);
+
+    let bannerLookup = {};
+    if (bannerIds.length > 0) {
+      try {
+        const banners = await Banner.find({ _id: { $in: bannerIds } })
+          .select('_id content.title display image status')
+          .populate('display.categoryId', 'name')
+          .lean();
+        bannerLookup = banners.reduce((acc, b) => {
+          acc[String(b._id)] = {
+            _id: b._id,
+            title: b.content?.title || `${b.display?.type || 'Banner'}`,
+            type: b.display?.type || 'herobanner',
+            categoryName: b.display?.categoryId?.name || null,
+            status: b.status,
+          };
+          return acc;
+        }, {});
+      } catch (err) {
+        console.warn('Failed to populate linked banner lookup in gallery:', err.message);
+      }
+    }
+
+    let featuredLookup = {};
+    if (featuredIds.length > 0) {
+      try {
+        const featureds = await Featured.find({ _id: { $in: featuredIds } })
+          .select('_id name display image status')
+          .lean();
+        featuredLookup = featureds.reduce((acc, f) => {
+          acc[String(f._id)] = {
+            _id: f._id,
+            title: f.name || 'Featured Item',
+            name: f.name,
+            type: f.display?.type || 'Celebrate',
+            status: f.status,
+          };
+          return acc;
+        }, {});
+      } catch (err) {
+        console.warn('Failed to populate linked featured lookup in gallery:', err.message);
+      }
+    }
+
     const items = docs.map((doc) => ({
       _id: doc._id,
       themeId: doc.themeId || null,
+      linkedRecord: doc.linkedRecord || null,
+      linkedBanner: doc.linkedRecord?.recordId ? bannerLookup[String(doc.linkedRecord.recordId)] || null : null,
+      linkedFeatured: doc.linkedRecord?.recordId ? featuredLookup[String(doc.linkedRecord.recordId)] || null : null,
       placement: doc.placement,
       platform: doc.platform,
       image: {
@@ -311,9 +458,49 @@ class GalleryService {
       throw new ApiError(404, 'Gallery media item not found');
     }
 
+    let linkedBanner = null;
+    if (item.linkedRecord?.module === 'banner' && item.linkedRecord?.recordId) {
+      try {
+        const b = await Banner.findById(item.linkedRecord.recordId)
+          .select('_id content.title display image status')
+          .populate('display.categoryId', 'name')
+          .lean();
+        if (b) {
+          linkedBanner = {
+            _id: b._id,
+            title: b.content?.title || `${b.display?.type || 'Banner'}`,
+            type: b.display?.type || 'herobanner',
+            categoryName: b.display?.categoryId?.name || null,
+            status: b.status,
+          };
+        }
+      } catch (e) {}
+    }
+
+    let linkedFeatured = null;
+    if (item.linkedRecord?.module === 'featured' && item.linkedRecord?.recordId) {
+      try {
+        const f = await Featured.findById(item.linkedRecord.recordId)
+          .select('_id name display image status')
+          .lean();
+        if (f) {
+          linkedFeatured = {
+            _id: f._id,
+            title: f.name || 'Featured Item',
+            name: f.name,
+            type: f.display?.type || 'Celebrate',
+            status: f.status,
+          };
+        }
+      } catch (e) {}
+    }
+
     return {
       _id: item._id,
       themeId: item.themeId || null,
+      linkedRecord: item.linkedRecord || null,
+      linkedBanner,
+      linkedFeatured,
       placement: item.placement,
       platform: item.platform,
       image: {
@@ -334,6 +521,7 @@ class GalleryService {
       platform = 'common',
       image,
       images,
+      linkedRecord,
       status = 'active',
     } = payload;
 
@@ -347,6 +535,9 @@ class GalleryService {
       }
     }
 
+    const targetModule = actualPlacement === 'celebrate' ? 'featured' : 'banner';
+    const defaultLinkedRecord = this._normalizeLinkedRecord(linkedRecord, targetModule);
+
     // Support both single image and multiple images batch creation
     const rawImages = Array.isArray(images) && images.length > 0
       ? images
@@ -355,8 +546,21 @@ class GalleryService {
     const validImages = rawImages
       .map((item) => {
         if (!item) return null;
-        if (typeof item === 'string') return { url: item, key: '' };
-        if (item.url) return { url: item.url, key: item.key || '' };
+        if (typeof item === 'string') {
+          return {
+            url: item,
+            key: '',
+            linkedRecord: defaultLinkedRecord,
+          };
+        }
+        if (item.url) {
+          const itemLinkedRecord = this._normalizeLinkedRecord(item.linkedRecord, targetModule) || defaultLinkedRecord;
+          return {
+            url: item.url,
+            key: item.key || '',
+            linkedRecord: itemLinkedRecord,
+          };
+        }
         return null;
       })
       .filter(Boolean);
@@ -369,6 +573,7 @@ class GalleryService {
       const single = validImages[0];
       const galleryItem = await Gallery.create({
         themeId: theme?._id || null,
+        linkedRecord: single.linkedRecord || null,
         placement: actualPlacement,
         platform,
         image: { url: single.url, key: single.key || '' },
@@ -381,6 +586,7 @@ class GalleryService {
     // Multiple images: store as separate database records
     const docs = validImages.map((img) => ({
       themeId: theme?._id || null,
+      linkedRecord: img.linkedRecord || null,
       placement: actualPlacement,
       platform,
       image: { url: img.url, key: img.key || '' },
@@ -416,6 +622,10 @@ class GalleryService {
     if (data.status !== undefined) item.status = data.status;
     if (data.image?.url) {
       item.image = { url: data.image.url, key: data.image.key || '' };
+    }
+    if (data.linkedRecord !== undefined) {
+      const targetModule = (data.placement || item.placement) === 'celebrate' ? 'featured' : 'banner';
+      item.linkedRecord = this._normalizeLinkedRecord(data.linkedRecord, targetModule);
     }
 
     item.meta = {

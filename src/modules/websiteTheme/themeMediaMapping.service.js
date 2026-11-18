@@ -159,6 +159,36 @@ class ThemeMediaMappingService {
       mappingsByRecord.get(rId).push(m);
     });
 
+    // Also auto-match Gallery items that have this themeId and linkedRecord.recordId
+    const galleryMatches = await Gallery.find({
+      themeId,
+      'linkedRecord.recordId': { $in: recordIds },
+      status: 'active',
+      'meta.deletedAt': null,
+    }).lean();
+
+    galleryMatches.forEach((gItem) => {
+      const rId = String(gItem.linkedRecord?.recordId);
+      const existing = mappingsByRecord.get(rId) || [];
+      const hasMatch = existing.some(
+        (m) => String(m.mediaId?._id || m.mediaId) === String(gItem._id)
+      );
+      if (!hasMatch) {
+        existing.push({
+          _id: gItem._id,
+          themeId,
+          module: normModule,
+          recordId: gItem.linkedRecord.recordId,
+          mediaId: gItem,
+          device: gItem.platform === 'app' ? 'mobile' : 'desktop',
+          placement: gItem.placement || 'primary',
+          status: 'active',
+          isAutoMatchedFromGallery: true,
+        });
+        mappingsByRecord.set(rId, existing);
+      }
+    });
+
     // Transform records for clean UI presentation
     const items = rawRecords.map((rec) => {
       const recId = String(rec._id);
@@ -436,6 +466,18 @@ class ThemeMediaMappingService {
       setDefaultsOnInsert: true,
     }).populate('mediaId');
 
+    // Bi-directionally sync linkedRecord in Gallery module
+    await Gallery.updateOne(
+      { _id: mediaId },
+      {
+        $set: {
+          themeId,
+          linkedRecord: { module: normModule, recordId },
+          'meta.updatedAt': new Date(),
+        },
+      }
+    );
+
     return {
       message: 'Theme media mapping saved successfully.',
       mapping: {
@@ -468,6 +510,14 @@ class ThemeMediaMappingService {
       throw new ApiError(404, 'Media mapping not found');
     }
 
+    // Unlink in Gallery
+    if (deleted.mediaId) {
+      await Gallery.updateOne(
+        { _id: deleted.mediaId, 'linkedRecord.recordId': deleted.recordId },
+        { $set: { linkedRecord: null, 'meta.updatedAt': new Date() } }
+      );
+    }
+
     return {
       message: 'Media mapping removed successfully. Original record and gallery asset remain intact.',
       id: mappingId,
@@ -489,6 +539,12 @@ class ThemeMediaMappingService {
     };
 
     await ThemeMediaMapping.deleteMany(filter);
+
+    // Unlink records in Gallery for this target record
+    await Gallery.updateMany(
+      { themeId, 'linkedRecord.recordId': recordId },
+      { $set: { linkedRecord: null, 'meta.updatedAt': new Date() } }
+    );
 
     return {
       message: 'Theme media mapping removed successfully.',

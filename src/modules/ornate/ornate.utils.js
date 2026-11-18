@@ -1,5 +1,4 @@
 const axios = require('axios');
-const Category = require('../category/category.model');
 
 const ORNATE_BASE_URL = process.env.ORNATE_BASE_URL;
 const ORNATE_USERNAME = process.env.ORNATE_USERNAME;
@@ -117,36 +116,6 @@ async function getOrnateEvents() {
   return callOrnateApi('GetEventData_API', 'EventList');
 }
 
-// ------------------------------- resolve category ----------------------------
-async function resolveCategory(groupName, categoryCache) {
-  if (!groupName || typeof groupName !== 'string') return null;
-  const name = groupName.trim();
-  if (!name) return null;
-  const cacheKey = name.toLowerCase();
-
-  if (categoryCache && categoryCache.has(cacheKey)) {
-    return categoryCache.get(cacheKey);
-  }
-
-  // Only match existing categories in our catalog - NEVER auto-create new categories
-  let cat = await Category.findOne({
-    name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-  });
-
-  if (!cat) {
-    // Optional plural match (e.g. "Ring" -> "Rings")
-    cat = await Category.findOne({
-      name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?$`, 'i') },
-    });
-  }
-
-  const resultId = cat?._id || null;
-  if (categoryCache) {
-    categoryCache.set(cacheKey, resultId);
-  }
-  return resultId;
-}
-
 // ------------------------------- extract label identifiers ----------------------------
 function extractLabelIdentifiers(label = {}) {
   const uniqueLabelID = label.UniqueLabelID ? String(label.UniqueLabelID).trim() : '';
@@ -170,30 +139,6 @@ function calculateLabelPrice(label = {}) {
 
   const mrp = Number(label.MRP) || salePrice;
   return { salePrice, mrp };
-}
-
-// ------------------------------- map studded details ----------------------------
-function mapStuddedDetails(studdedDetails = [], uniqueLabelID = '', barcodeNo = '') {
-  if (!Array.isArray(studdedDetails) || studdedDetails.length === 0) return [];
-  const uId = String(uniqueLabelID).toLowerCase();
-  const bNo = String(barcodeNo).toLowerCase();
-
-  return studdedDetails
-    .filter((s) => {
-      const sId = String(s.UniqueLabelId || '').toLowerCase();
-      return (uId && sId === uId) || (bNo && sId === bNo);
-    })
-    .map((s) => ({
-      stoneName: s.StyleName || s.MetalName || 'Stone',
-      pieces: Number(s.Pcs) || 0,
-      caratWeight: Number(s.NetWt) || Number(s.GrossWt) || 0,
-      rate: Number(s.Rate) || 0,
-      amount: Number(s.Amount) || 0,
-      clarity: s.Clarity || '',
-      color: s.Colour || '',
-      cut: s.CutShape || '',
-      shape: s.CutShape || '',
-    }));
 }
 
 // ------------------------------- generate product slug ----------------------------
@@ -258,7 +203,6 @@ function buildProductPayloadFromLabel(label, {
 
   const barcodeValue = barcode || label.BarcodeNo || '';
   const generatedSlug = generateProductSlug(title, barcodeValue || sku);
-  const activeSlug = generatedSlug;
 
   const availableImages = Array.isArray(newlyUploadedImages) && newlyUploadedImages.length > 0
     ? newlyUploadedImages
@@ -279,7 +223,7 @@ function buildProductPayloadFromLabel(label, {
     basicInfo: {
       title,
       sku: tagNo || sku,
-      slug: activeSlug,
+      slug: generatedSlug,
       description: description?.trim() || undefined,
       remark: label.Remark?.trim() || undefined,
     },
@@ -404,12 +348,10 @@ module.exports = {
   callOrnateApi,
   fetchOrnateLabelData,
   getOrnateEvents,
-  resolveCategory,
   extractLabelIdentifiers,
   calculateLabelPrice,
   normalizeLabelSummary,
   buildProductIdentifierQuery,
-  mapStuddedDetails,
   generateProductSlug,
   buildProductPayloadFromLabel,
   cleanPayload,

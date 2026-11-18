@@ -59,6 +59,7 @@ const paymentRoutes = require('../modules/payment/payment.routes');
 const filterRoutes = require('../modules/filter/filter.routes');
 const otpRoutes = require('../modules/otp/otp.routes');
 const shiprocketRoutes = require('../modules/shiprocket/shiprocket.routes');
+const logisticsRoutes = require('../modules/logistics/logistics.routes');
 const returnRoutes = require('../modules/return/return.routes');
 
 // Mount routes
@@ -74,6 +75,7 @@ router.use('/wishlist', wishlistRoutes);
 router.use('/cart', cartRoutes);
 router.use('/orders', orderRoutes);
 router.use('/payments', paymentRoutes);
+router.use('/logistics', logisticsRoutes);
 router.use('/shiprocket', shiprocketRoutes);
 router.use('/returns', returnRoutes);
 router.use('/whatsapp', whatsappRoutes);

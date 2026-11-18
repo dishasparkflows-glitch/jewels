@@ -115,7 +115,6 @@ class WebsiteThemeService {
     const categoryIds = [
       ...(config.categoryAppearances || []).map((row) => row.categoryId?._id || row.categoryId),
       ...(config.navigation || []).map((row) => row.categoryId?._id || row.categoryId),
-      ...(config.banners || []).flatMap((banner) => (banner.collectionImages || []).map((row) => row.categoryId?._id || row.categoryId)),
     ].filter(Boolean);
     if (categoryIds.some((id) => !mongoose.isValidObjectId(id))) {
       throw new ApiError(400, 'Theme category settings must reference valid category IDs.');
@@ -124,7 +123,6 @@ class WebsiteThemeService {
       const existingCount = await Category.countDocuments({ _id: { $in: categoryIds }, 'meta.deletedAt': null });
       if (existingCount !== new Set(categoryIds.map(String)).size) throw new ApiError(400, 'Theme category settings must reference existing categories.');
     }
-    if ((config.banners || []).length > 20) throw new ApiError(400, 'A theme can contain at most 20 banners.');
     if ((config.categoryAppearances || []).length > 100) throw new ApiError(400, 'A theme can contain at most 100 category overrides.');
     const validateAsset = (asset) => {
       if (!asset?.url) return;
@@ -133,28 +131,6 @@ class WebsiteThemeService {
       }
       if (asset.key && asset.key.includes('..')) throw new ApiError(400, 'Invalid theme media storage key.');
     };
-    for (const banner of config.banners || []) {
-      if (banner.link && !banner.link.startsWith('/') && !/^https:\/\//i.test(banner.link)) {
-        throw new ApiError(400, 'Banner links must be site paths or HTTPS URLs.');
-      }
-      validateAsset(banner.desktopImage);
-      validateAsset(banner.mobileImage);
-      for (const item of banner.collectionImages || []) {
-        validateAsset(item.image);
-        if (item.link && !item.link.startsWith('/') && !/^https:\/\//i.test(item.link)) throw new ApiError(400, 'Collection links must be site paths or HTTPS URLs.');
-      }
-      if (banner.placement === 'collection' && (banner.collectionImages || []).length > 4) {
-        throw new ApiError(400, 'A collection banner can contain exactly four image slots.');
-      }
-      if (requireComplete && banner.visible !== false) {
-        if (banner.placement === 'collection' && ((banner.collectionImages || []).length !== 4 || banner.collectionImages.some((item) => !item.image?.url))) {
-          throw new ApiError(400, 'Each collection banner must contain exactly four images before publishing.');
-        }
-        if (['hero', 'promo'].includes(banner.placement) && !banner.desktopImage?.url) {
-          throw new ApiError(400, 'Visible hero and promo banners need a desktop image before publishing.');
-        }
-      }
-    }
     for (const category of config.categoryAppearances || []) validateAsset(category.icon);
   }
 

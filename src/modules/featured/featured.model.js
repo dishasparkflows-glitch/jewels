@@ -2,12 +2,6 @@ const mongoose = require('mongoose');
 
 const featuredSchema = new mongoose.Schema(
   {
-    themeId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'WebsiteTheme',
-      default: null,
-      index: true,
-    },
     name: {
       type: String,
       trim: true,

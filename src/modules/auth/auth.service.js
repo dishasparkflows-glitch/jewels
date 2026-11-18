@@ -22,8 +22,18 @@ class AuthService {
   // ------------------------------- register user ----------------------------
   async register(data) {
     const email = (data.auth?.email || '').trim().toLowerCase();
+    if (!email) throw new ApiError(400, 'Email is required');
+
     const existingUser = await User.findOne({ 'auth.email': email });
     if (existingUser) throw new ApiError(409, 'Email already registered');
+
+    const password = (data.auth?.password || data.password || '').trim();
+    if (!password) {
+      throw new ApiError(400, 'Password is required');
+    }
+    if (password.length < 6) {
+      throw new ApiError(400, 'Password must be at least 6 characters');
+    }
 
     const user = await User.create(data);
     try {

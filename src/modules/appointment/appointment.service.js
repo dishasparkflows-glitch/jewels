@@ -7,33 +7,10 @@ class AppointmentService {
   async create(data) {
     const payload = { ...data };
 
-    // Standardize customer if passed in alternative formats
-    if (!payload.customer && (payload.fullName || payload.name || payload.email || payload.phoneNumber || payload.phone)) {
-      payload.customer = {
-        name: payload.fullName || payload.name || '',
-        email: payload.email || '',
-        phone: {
-          countryCode: '91',
-          number: String(payload.phoneNumber || payload.phone || '').replace(/^\+91\s*/, ''),
-        },
-      };
-    }
-
-    // Standardize appointment if passed in alternative formats
-    if (!payload.appointment && (payload.appointmentDate || payload.date || payload.preferredTime || payload.serviceType)) {
-      payload.appointment = {
-        date: payload.appointmentDate || payload.date || null,
-        preferredTime: payload.preferredTime || payload.time || '',
-        serviceType: payload.serviceType || payload.service || 'Jewellery Viewing',
-      };
-    }
-
-    // Discard any extra top-level fields
     delete payload.fullName;
     delete payload.phoneNumber;
     delete payload.appointmentDate;
     delete payload.preferredTime;
-    delete payload.serviceType;
 
     return await Appointment.create(payload);
   }
@@ -62,8 +39,6 @@ class AppointmentService {
         { 'customer.name': reg },
         { 'customer.email': reg },
         { 'customer.phone.number': reg },
-        { 'appointment.serviceType': reg },
-        { customId: reg },
       ];
     }
 
@@ -98,7 +73,6 @@ class AppointmentService {
     delete payload.phoneNumber;
     delete payload.appointmentDate;
     delete payload.preferredTime;
-    delete payload.serviceType;
 
     const item = await Appointment.findOneAndUpdate(
       { _id: id },

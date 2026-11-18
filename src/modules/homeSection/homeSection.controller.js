@@ -20,17 +20,6 @@ class HomeSectionController {
     );
   });
 
-  // ------------------------------- Get Public Home Sections (Storefront) ----------------------------
-  getPublic = catchAsync(async (req, res) => {
-    const sections = await homeSectionService.getPublic(req.query);
-    ApiResponse.success(res, sections, 'Public home sections retrieved successfully');
-  });
-
-  // ------------------------------- Get By Identifier Key ----------------------------
-  getByKey = catchAsync(async (req, res) => {
-    const section = await homeSectionService.getByKey(req.params.key);
-    ApiResponse.success(res, section, 'Home section retrieved successfully');
-  });
 
   // ------------------------------- Get One Home Section ----------------------------
   getOne = catchAsync(async (req, res) => {
@@ -68,11 +57,6 @@ class HomeSectionController {
     ApiResponse.success(res, null, `${result.count} home sections deleted successfully`);
   });
 
-  // ------------------------------- Reset / Seed Defaults ----------------------------
-  seed = catchAsync(async (req, res) => {
-    const { items, pagination } = await homeSectionService.getAll({});
-    ApiResponse.success(res, items, 'Default home sections seeded successfully');
-  });
 }
 
 module.exports = new HomeSectionController();

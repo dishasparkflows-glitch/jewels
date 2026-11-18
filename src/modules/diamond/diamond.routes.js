@@ -34,6 +34,13 @@ router.put(
   diamondController.update
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  diamondController.bulkDelete
+);
+
 router.delete(
   '/:id',
   authenticate,

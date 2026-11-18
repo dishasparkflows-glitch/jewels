@@ -17,11 +17,11 @@ const DiamondClarity = require('../diamondClarity/diamondClarity.model');
 const GemstoneType = require('../gemstoneType/gemstoneType.model');
 const GemstoneShape = require('../gemstoneShape/gemstoneShape.model');
 const Featured = require('../featured/featured.model');
-const Wishlist = require('../wishlist/wishlist.model');
 const Category = require('../category/category.model');
 const MenuItem = require('../menuItem/menuItem.model');
 const ProductGroup = require('../productGroup/productGroup.model');
 const productGroupService = require('../productGroup/productGroup.service');
+const HomeSection = require('../homeSection/homeSection.model');
 const { SHOP_FOR_OPTIONS, getShopForGenders } = require('./product.filters');
 const ApiError = require('../../utils/ApiError');
 const { getRequestContext } = require('../../utils/context');
@@ -1077,163 +1077,130 @@ class ProductService {
     };
   }
 
+  // ------------------------------- get home sections with products ----------------------------
+  async getHomeSections(queryParams = {}, userId = null) {
+    await this.refreshCalculatedPrices();
+
+    const filter = {
+      status: 'active',
+      'visibility.website': { $ne: false },
+    };
+
+    const sections = await HomeSection.find(filter)
+      .sort({ order: 1, _id: 1 })
+      .lean();
+
+    if (!sections.length) {
+      return [];
+    }
+
+    // Collect all valid product IDs across all sections
+    const allProductIds = [];
+    sections.forEach((sec) => {
+      (sec.productIds || []).forEach((pId) => {
+        const idStr = String(pId?._id || pId || '');
+        if (idStr && mongoose.isValidObjectId(idStr)) {
+          allProductIds.push(idStr);
+        }
+      });
+    });
+
+    const uniqueProductIds = [...new Set(allProductIds)];
+    const wishlistedSet = await this._getWishlistSet(userId);
+
+    const productMap = new Map();
+    if (uniqueProductIds.length > 0) {
+      const selectFields =
+        '_id colorImages metalColorIds stockStatus categoryIds basicInfo pricing ornate productType isOrnate';
+
+      const products = await Product.find({
+        _id: { $in: uniqueProductIds.map((id) => new mongoose.Types.ObjectId(id)) },
+        'meta.deletedAt': null,
+        status: 'approved',
+      })
+        .select(selectFields)
+        .populate('metalColorIds colorImages.metalColorId', 'name code colorCode colorCodeEnd')
+        .lean();
+
+      products.forEach((raw) => {
+        const formatted = formatHomeProduct(raw);
+        if (formatted) {
+          const pId = String(raw._id);
+          formatted._id = raw._id;
+          formatted.id = pId;
+          formatted.title = raw.basicInfo?.title || raw.title || formatted.title || '';
+          formatted.sku = raw.basicInfo?.sku || raw.sku || formatted.sku || '';
+          formatted.price = Number(raw.pricing?.salePrice || formatted.price || 0);
+          formatted.productType = raw.productType || formatted.productType || '';
+          formatted.isSilver = Boolean(raw.isOrnate || String(raw.productType || '').toLowerCase() === 'silver');
+          formatted.inWishlist = wishlistedSet.has(pId);
+          productMap.set(pId, formatted);
+        }
+      });
+    }
+
+    // Assemble sections with curated products
+    const result = sections
+      .map((sec) => {
+        const curatedProducts = [];
+        const seenIds = new Set();
+
+        (sec.productIds || []).forEach((pId) => {
+          const pIdStr = String(pId?._id || pId || '');
+          if (pIdStr && productMap.has(pIdStr) && !seenIds.has(pIdStr)) {
+            seenIds.add(pIdStr);
+            curatedProducts.push(productMap.get(pIdStr));
+          }
+        });
+
+        return {
+          _id: sec._id,
+          title: sec.title,
+          subtitle: sec.subtitle || '',
+          slug: sec.slug || '',
+          sectionKey: sec.slug || '',
+          order: sec.order || 0,
+          visibility: sec.visibility,
+          products: curatedProducts,
+        };
+      })
+      .filter((sec) => sec.products.length > 0);
+
+    return result;
+  }
+
   // ------------------------------- get similar products ----------------------------
   async getSimilarProducts(idOrCode, queryParams = {}, userId = null) {
     await this.refreshCalculatedPrices();
-    const product = await resolveProductByCodeOrId(idOrCode, [
-      ...this._getProductPopulateOptions(),
-      { path: 'menuItemIds', select: 'title slug', strictPopulate: false },
-    ]);
+    const product = await resolveProductByCodeOrId(idOrCode, this._getProductPopulateOptions());
     if (!product) {
       throw new ApiError(404, 'Product not found');
     }
 
-    const productId = product._id;
     const categoryIds = (product.categoryIds || [])
       .map((c) => (c?._id ? c._id : c))
       .filter(Boolean);
-    const menuItemIds = (product.menuItemIds || [])
-      .map((m) => (m?._id ? m._id : m))
-      .filter(Boolean);
-    const productType = (product.productType || 'gold').toLowerCase();
+    const limit = Math.min(Math.max(1, Number(queryParams.limit) || 12), 24);
 
-    // Target price (salePrice or calculatedPrice or mrp)
-    const targetPrice = Number(
-      product.pricing?.calculatedPrice ||
-      product.pricing?.salePrice ||
-      product.pricing?.mrp ||
-      0
-    );
-
-    // Build dynamic tabs matching the product
-    const tabs = [
-      { id: 'recommended', label: 'Recommended' },
-    ];
-
-    // Primary category tab
-    const primaryCat = Array.isArray(product.categoryIds) && product.categoryIds[0];
-    const catName = primaryCat?.name || primaryCat?.title;
-    if (catName) {
-      tabs.push({
-        id: 'category',
-        label: catName,
-        filterType: 'category',
-      });
-    }
-
-    // Subcategory / Menu item style tab (e.g. "Tennis Bracelets")
-    const primaryMenu = Array.isArray(product.menuItemIds) && product.menuItemIds[0];
-    const menuTitle = primaryMenu?.title || primaryMenu?.name;
-    if (menuTitle && menuTitle !== catName) {
-      tabs.push({
-        id: 'style',
-        label: menuTitle,
-        filterType: 'menuItem',
-      });
-    }
-
-    // Metal / Product type tab (e.g. "Gold Jewellery" or "Silver Collection")
-    const typeLabel = productType === 'silver' ? 'Silver Collection' : 'Gold Jewellery';
-    tabs.push({
-      id: 'metal',
-      label: typeLabel,
-      filterType: 'productType',
-    });
-
-    // Budget tab if price > 0
-    if (targetPrice > 0) {
-      const budgetLower = Math.max(0, Math.round(targetPrice * 0.7));
-      const budgetUpper = Math.round(targetPrice * 1.3);
-      const formatK = (val) => {
-        if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
-        if (val >= 1000) return `₹${Math.round(val / 1000)}K`;
-        return `₹${val}`;
-      };
-      tabs.push({
-        id: 'budget',
-        label: `${formatK(budgetLower)} - ${formatK(budgetUpper)}`,
-        filterType: 'budget',
-      });
-    }
-
-    const selectedTab = (queryParams.tab || 'recommended').toLowerCase();
-    const limit = Math.min(Math.max(1, Number(queryParams.limit) || 12), 12);
-
-    // If target product has no categories, do not return other products
     if (categoryIds.length === 0) {
-      return {
-        targetProduct: {
-          id: String(product._id),
-          title: product.basicInfo?.title || product.name || '',
-          slug: product.basicInfo?.slug || '',
-          productType,
-          price: targetPrice,
-        },
-        tabs,
-        activeTab: selectedTab,
-        items: [],
-        total: 0,
-      };
+      return { items: [], total: 0 };
     }
 
-    // STRICT: Only query products with the exact same categoryIds
-    const baseFilter = {
-      _id: { $ne: productId },
+    const filter = {
+      _id: { $ne: product._id },
       'meta.deletedAt': null,
       status: 'approved',
       categoryIds: { $in: categoryIds },
     };
 
-    let queryConditions = { ...baseFilter };
-
-    if (selectedTab === 'category') {
-      // Handled by baseFilter.categoryIds
-    } else if (selectedTab === 'style' && menuItemIds.length > 0) {
-      queryConditions.menuItemIds = { $in: menuItemIds };
-    } else if (selectedTab === 'metal') {
-      queryConditions.productType = productType;
-    } else if (selectedTab === 'budget' && targetPrice > 0) {
-      const minP = Math.max(0, targetPrice * 0.7);
-      const maxP = targetPrice * 1.3;
-      queryConditions.$or = [
-        { 'pricing.salePrice': { $gte: minP, $lte: maxP } },
-        { 'pricing.mrp': { $gte: minP, $lte: maxP } },
-        { 'pricing.calculatedPrice': { $gte: minP, $lte: maxP } },
-      ];
-    } else {
-      // Recommended:
-      // Match within the same category, prioritizing same productType or same menu items
-      const orClauses = [];
-      if (menuItemIds.length > 0) {
-        orClauses.push({ menuItemIds: { $in: menuItemIds } });
-      }
-      orClauses.push({ productType });
-      queryConditions.$or = orClauses;
-    }
-
-    let rawItems = await Product.find(queryConditions)
-      .populate(this._getProductPopulateOptions())
-      .limit(limit)
-      .lean();
-
-    // If recommended filter with specific sub-criteria yields fewer than limit,
-    // backfill ONLY from other products with the SAME categoryIds (never outside categoryIds!)
-    if (selectedTab === 'recommended' && rawItems.length < limit) {
-      const existingIds = new Set(rawItems.map((r) => String(r._id)));
-      existingIds.add(String(productId));
-
-      const sameCategoryMore = await Product.find({
-        ...baseFilter,
-        _id: { $nin: Array.from(existingIds) },
-      })
+    const [rawItems, wishlistedSet] = await Promise.all([
+      Product.find(filter)
         .populate(this._getProductPopulateOptions())
-        .limit(limit - rawItems.length)
-        .lean();
+        .limit(limit)
+        .lean(),
+      this._getWishlistSet(userId),
+    ]);
 
-      rawItems = [...rawItems, ...sameCategoryMore];
-    }
-
-    const wishlistedSet = await this._getWishlistSet(userId);
     const formattedItems = rawItems
       .map(formatStorefrontProduct)
       .filter((item) => item && (item.images?.length > 0 || item.image))
@@ -1244,15 +1211,6 @@ class ProductService {
       }));
 
     return {
-      targetProduct: {
-        id: String(product._id),
-        title: product.basicInfo?.title || product.name || '',
-        slug: product.basicInfo?.slug || '',
-        productType,
-        price: targetPrice,
-      },
-      tabs,
-      activeTab: selectedTab,
       items: formattedItems,
       total: formattedItems.length,
     };
@@ -1263,100 +1221,31 @@ class ProductService {
     await this.refreshCalculatedPrices();
     const limit = Math.min(Number(queryParams.limit) || 6, 24);
 
-    // Resolve current product ID to exclude from recommendations
-    let currentId = queryParams.productId || queryParams.excludeId;
-    let excludeObjId = null;
+    const filter = {
+      'meta.deletedAt': null,
+      status: 'approved',
+    };
 
-    if (currentId) {
-      if (mongoose.isValidObjectId(currentId)) {
-        excludeObjId = new mongoose.Types.ObjectId(currentId);
-      } else {
-        const found = await Product.findOne({
-          $or: [{ 'basicInfo.slug': currentId }, { sku: currentId }],
-        })
-          .select('_id')
-          .lean();
-        if (found) {
-          excludeObjId = found._id;
-          currentId = String(found._id);
-        }
-      }
+    if (mongoose.isValidObjectId(queryParams.productId)) {
+      filter._id = { $ne: new mongoose.Types.ObjectId(queryParams.productId) };
     }
 
-    // 1. Query Wishlist table to aggregate the most wishlisted/liked product IDs
-    const aggregationPipeline = [
-      { $unwind: '$productIds' },
-      ...(excludeObjId ? [{ $match: { productIds: { $ne: excludeObjId } } }] : []),
-      {
-        $group: {
-          _id: '$productIds',
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { count: -1 } },
-      { $limit: limit },
-    ];
-
-    const mostLikedWishlistDocs = await Wishlist.aggregate(aggregationPipeline);
-    const mostLikedProductIds = mostLikedWishlistDocs
-      .map((row) => row._id)
-      .filter((id) => mongoose.isValidObjectId(id));
-
-    let rawItems = [];
-
-    if (mostLikedProductIds.length > 0) {
-      const wishlistProducts = await Product.find({
-        _id: { $in: mostLikedProductIds },
-        'meta.deletedAt': null,
-        status: 'approved',
-      })
+    const [rawItems, wishlistedSet] = await Promise.all([
+      Product.find(filter)
         .populate(this._getProductPopulateOptions())
-        .lean();
+        .sort({ 'demoMetrics.soldCount': -1, 'meta.createdAt': -1 })
+        .limit(limit)
+        .lean(),
+      this._getWishlistSet(userId),
+    ]);
 
-      // Preserve popularity order from aggregation
-      const productMap = new Map(wishlistProducts.map((p) => [String(p._id), p]));
-      rawItems = mostLikedProductIds
-        .map((id) => productMap.get(String(id)))
-        .filter(Boolean);
-    }
-
-    // 2. If fewer than limit (e.g. wishlist table has fewer than 6 products),
-    // backfill with approved storefront products
-    if (rawItems.length < limit) {
-      const existingIds = new Set(rawItems.map((r) => String(r._id)));
-      if (excludeObjId) existingIds.add(String(excludeObjId));
-
-      const fallbackFilter = {
-        'meta.deletedAt': null,
-        status: 'approved',
-        _id: { $nin: Array.from(existingIds) },
-      };
-
-      const backfill = await Product.find(fallbackFilter)
-        .populate(this._getProductPopulateOptions())
-        .sort({
-          'metrics.likes': -1,
-          'metrics.views': -1,
-          'demoMetrics.soldCount': -1,
-          'meta.createdAt': -1,
-        })
-        .limit(limit - rawItems.length)
-        .lean();
-
-      rawItems = [...rawItems, ...backfill];
-    }
-
-    const wishlistedSet = await this._getWishlistSet(userId);
-    const items = rawItems
+    return rawItems
       .map(formatStorefrontProduct)
       .filter((item) => item && (item.images?.length > 0 || item.image))
-      .slice(0, limit)
       .map((item) => ({
         ...item,
         inWishlist: wishlistedSet.has(String(item.id || item._id)),
       }));
-
-    return items;
   }
 
   // ------------------------------- get product lookup ----------------------------

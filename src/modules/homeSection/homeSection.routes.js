@@ -4,10 +4,6 @@ const homeSectionController = require('./homeSection.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
-// ─── Public Storefront Endpoints ────────────────────────
-router.get('/public', homeSectionController.getPublic);
-router.get('/key/:key', homeSectionController.getByKey);
-
 // ─── Admin Endpoints ────────────────────────────────────
 router.get('/', homeSectionController.getAll);
 router.get('/:id', homeSectionController.getOne);
@@ -31,13 +27,6 @@ router.post(
   authenticate,
   authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
   homeSectionController.bulkDelete
-);
-
-router.post(
-  '/seed',
-  authenticate,
-  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
-  homeSectionController.seed
 );
 
 router.patch(

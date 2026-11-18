@@ -141,21 +141,6 @@ const assets = [
       <path d="M3.5 22v6c0 2.5 4.7 4.5 10.5 4.5s10.5-2 10.5-4.5v-6" stroke="#9B7347" stroke-width="3.2" fill="none"/>
       <path d="M3.5 28v6c0 2.5 4.7 4.5 10.5 4.5s10.5-2 10.5-4.5v-6" stroke="#9B7347" stroke-width="3.2" fill="none"/>
     `
-  },
-  {
-    name: 'email-lace-pattern',
-    width: 600,
-    height: 24,
-    svg: `
-      <defs>
-        <pattern id="lacePat" width="30" height="24" patternUnits="userSpaceOnUse">
-          <path d="M 0,24 C 7.5,8 22.5,8 30,24" stroke="#B8956F" stroke-width="1.2" fill="none"/>
-          <path d="M 0,16 C 7.5,4 22.5,4 30,16" stroke="#B8956F" stroke-width="0.9" fill="none"/>
-          <circle cx="15" cy="10" r="2.2" fill="#B8956F"/>
-        </pattern>
-      </defs>
-      <rect width="600" height="24" fill="url(#lacePat)"/>
-    `
   }
 ];
 
@@ -203,8 +188,6 @@ ${item.svg}
 
   const manifestPath = path.join(ASSETS_DIR, 'assets-manifest.json');
   fs.writeFileSync(manifestPath, JSON.stringify(uploadedUrls, null, 2));
-  console.log('\nManifest saved to:', manifestPath);
-  console.log(JSON.stringify(uploadedUrls, null, 2));
 }
 
 main().catch(console.error);

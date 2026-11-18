@@ -29,6 +29,18 @@ class PaymentController {
       razorpayPaymentId,
       razorpaySignature,
     });
+
+    if (order && order._id) {
+      try {
+        const orderService = require('../order/order.service');
+        orderService.dispatchInvoice(order._id, ['email']).catch((err) => {
+          console.warn('[AutoInvoice] Post-payment invoice dispatch failed:', err.message);
+        });
+      } catch (e) {
+        console.warn('[AutoInvoice] Could not trigger invoice dispatch:', e.message);
+      }
+    }
+
     ApiResponse.success(res, { order }, 'Payment verified successfully');
   });
 

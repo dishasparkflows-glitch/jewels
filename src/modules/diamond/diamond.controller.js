@@ -72,6 +72,14 @@ class DiamondController {
     const result = await diamondService.delete(req.params.id);
     ApiResponse.success(res, { id: result.id }, result.message);
   });
+
+  // ------------------------------- bulk delete diamonds ----------------------------
+
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await diamondService.bulkDelete(ids);
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new DiamondController();

@@ -34,11 +34,6 @@ const appointmentSchema = new mongoose.Schema(
         type: String,
         trim: true,
       },
-      serviceType: {
-        type: String,
-        trim: true,
-        default: 'Jewellery Viewing',
-      },
     },
 
     status: {
@@ -47,7 +42,7 @@ const appointmentSchema = new mongoose.Schema(
       default: 'pending',
       index: true,
     },
-    adminNotes: {
+    notes: {
       type: String,
       default: '',
       trim: true,

@@ -9,7 +9,7 @@ class AppointmentController {
   create = catchAsync(async (req, res) => {
     const item = await appointmentService.create(req.body);
     await redisClient.deleteByPattern('appointments:*');
-    ApiResponse.created(res, null, 'Appointment booked successfully');
+    ApiResponse.created(res, item, 'Appointment booked successfully');
   });
 
   // ------------------------------- get all appointments ----------------------------
@@ -40,7 +40,7 @@ class AppointmentController {
   update = catchAsync(async (req, res) => {
     const item = await appointmentService.update(req.params.id, req.body);
     await redisClient.deleteByPattern('appointments:*');
-    ApiResponse.success(res, null, 'Appointment updated successfully');
+    ApiResponse.success(res, item, 'Appointment updated successfully');
   });
 
   // ------------------------------- update status ----------------------------
@@ -48,7 +48,7 @@ class AppointmentController {
     const { status } = req.body;
     const item = await appointmentService.updateStatus(req.params.id, status);
     await redisClient.deleteByPattern('appointments:*');
-    ApiResponse.success(res, null, `Appointment status updated to ${status}`);
+    ApiResponse.success(res, item, `Appointment status updated to ${status}`);
   });
 
 

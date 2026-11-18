@@ -54,8 +54,15 @@ const userSchema = new mongoose.Schema(
       },
       password: {
         type: String,
-        required: [true, 'Password is required'],
-        minlength: 6,
+        required: false,
+        default: null,
+        validate: {
+          validator: function (v) {
+            if (v === null || v === undefined || v === '') return true;
+            return typeof v === 'string' && v.length >= 6;
+          },
+          message: 'Password must be at least 6 characters',
+        },
         select: false,
       },
       passwordResetTokenHash: { type: String, select: false },
@@ -98,7 +105,10 @@ userSchema.pre('save', async function (next) {
   if (!this.isModified('auth.password')) return next();
 
   const pwd = this.auth.password;
-  if (!pwd) return next();
+  if (!pwd || typeof pwd !== 'string' || !pwd.trim()) {
+    this.auth.password = null;
+    return next();
+  }
 
   // If already hashed with bcrypt ($2a$, $2b$, or $2y$), skip
   if (/^\$2[aby]\$\d{2}\$/.test(pwd)) return next();

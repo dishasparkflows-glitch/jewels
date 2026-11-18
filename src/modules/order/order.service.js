@@ -142,10 +142,8 @@ class OrderService {
     await order.save();
 
     // Payment initialization
-    // Payment initialization - Online payment integration temporarily commented out for testing
     let paymentResponse = null;
 
-    /*
     if (paymentMethod === 'online' || (paymentMethod === 'cod' && pricing.codDueNow > 0)) {
       paymentResponse = await paymentService.initiateOrderPayment({
         order,
@@ -154,6 +152,7 @@ class OrderService {
     } else {
       // Pure COD with no advance charge required
       order.orderStatus = 'pending';
+      order.payment.status = 'pending';
       await order.save();
 
       // Clear user's cart
@@ -163,29 +162,12 @@ class OrderService {
           { $set: { items: [] } }
         );
       }
-    }
-    */
 
-    // Keep order status as pending; mark payment paid if online
-    order.orderStatus = 'pending';
-    if (paymentMethod === 'online') {
-      order.payment.status = 'paid';
-      order.payment.paidAt = new Date();
+      // Automated Dispatch: Generate PDF invoice and deliver to customer email in background
+      this.dispatchInvoice(order._id, ['email']).catch((err) => {
+        console.warn('[AutoInvoice] Background order invoice dispatch failed:', err.message);
+      });
     }
-    await order.save();
-
-    // Clear user's cart
-    if (effectiveUserId) {
-      await Cart.updateOne(
-        { userId: effectiveUserId },
-        { $set: { items: [] } }
-      );
-    }
-
-    // Automated Dispatch: Generate PDF invoice and deliver to customer email in background
-    this.dispatchInvoice(order._id, ['email']).catch((err) => {
-      console.warn('[AutoInvoice] Background order invoice dispatch failed:', err.message);
-    });
 
     return {
       order,
@@ -193,7 +175,7 @@ class OrderService {
     };
   }
 
-  // ------------------------------- Invoice Generation & Dispatch ----------------------------
+  // ------------------------------- get order for invoice ----------------------------
   async getOrderForInvoice(orderId) {
     const order = await Order.findById(orderId)
       .populate('userId', 'profile.firstName profile.lastName auth.email')
@@ -205,6 +187,7 @@ class OrderService {
     return order;
   }
 
+  // ------------------------------- get store setting ----------------------------
   async getStoreSetting() {
     try {
       return (await Setting.findOne({ 'meta.deletedAt': null }).lean()) || (await Setting.findOne().lean()) || {};
@@ -213,6 +196,7 @@ class OrderService {
     }
   }
 
+  // ------------------------------- generate order invoice ----------------------------
   async generateOrderInvoice(orderId, user = null) {
     const order = await this.getOrderForInvoice(orderId);
     if (user && user.role !== 'admin' && user.role !== 'superadmin') {
@@ -223,6 +207,7 @@ class OrderService {
     return { order, pdfBuffer };
   }
 
+  // ------------------------------- dispatch invoice ----------------------------
   async dispatchInvoice(orderId, methods = ['email', 'whatsapp']) {
     const order = await this.getOrderForInvoice(orderId);
     const setting = await this.getStoreSetting();

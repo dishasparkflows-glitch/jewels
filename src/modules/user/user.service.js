@@ -71,65 +71,56 @@ class UserService {
 
   // ------------------------------- create user ----------------------------
   async create(data) {
-    const email = (data.auth?.email || '').trim().toLowerCase();
-    const existingUser = await User.findOne({ 'auth.email': email });
-    if (existingUser) throw new ApiError(409, 'Email already registered');
+    if (data.auth?.email) {
+      data.auth.email = data.auth.email.trim().toLowerCase();
+      const existingUser = await User.findOne({ 'auth.email': data.auth.email });
+      if (existingUser) throw new ApiError(409, 'Email already registered');
+    }
 
     const user = await User.create(data);
-    const userObj = user.toObject();
-    if (userObj.auth) delete userObj.auth.password;
-    return this.formatUser(userObj);
+    return this.formatUser(user);
+  }
+
+  toDotNotation(obj, prefix = '') {
+    return Object.keys(obj).reduce((acc, key) => {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (
+        obj[key] !== null &&
+        typeof obj[key] === 'object' &&
+        !Array.isArray(obj[key]) &&
+        !(obj[key] instanceof Date)
+      ) {
+        Object.assign(acc, this.toDotNotation(obj[key], path));
+      } else if (obj[key] !== undefined) {
+        acc[path] = obj[key];
+      }
+      return acc;
+    }, {});
   }
 
   // ------------------------------- update user ----------------------------
   async update(id, data) {
-    // Don't allow password update through this method
+    // Prevent updating password through generic update method
     delete data.password;
     if (data.auth) delete data.auth.password;
 
-    const updateFields = {};
-
-    // Map top-level profile fields into profile.<key> so MongoDB saves them into document
-    const profileKeys = ['firstName', 'lastName', 'phone', 'countryCode', 'location', 'bio', 'avatar', 'themeColor'];
-    for (const key of profileKeys) {
-      if (data[key] !== undefined) {
-        updateFields[`profile.${key}`] = data[key];
-      }
+    // Validate email uniqueness if email is being updated
+    if (data.auth?.email) {
+      data.auth.email = data.auth.email.trim().toLowerCase();
+      const duplicate = await User.findOne({
+        _id: { $ne: id },
+        'auth.email': data.auth.email,
+      });
+      if (duplicate) throw new ApiError(409, 'Email is already in use');
     }
 
-    // If nested profile object was passed
-    if (data.profile && typeof data.profile === 'object') {
-      for (const [k, v] of Object.entries(data.profile)) {
-        updateFields[`profile.${k}`] = v;
-      }
-    }
-
-    // Map auth fields into auth.<key>
-    if (data.email !== undefined) {
-      updateFields['auth.email'] = (data.email || '').trim().toLowerCase();
-    }
-    if (data.auth && typeof data.auth === 'object') {
-      for (const [k, v] of Object.entries(data.auth)) {
-        if (k !== 'password') {
-          updateFields[`auth.${k}`] = v;
-        }
-      }
-    }
-
-    // Pass through any other root-level schema fields (e.g. role, isActive, etc.)
-    for (const [key, value] of Object.entries(data)) {
-      if (!profileKeys.includes(key) && key !== 'profile' && key !== 'auth' && key !== 'email') {
-        updateFields[key] = value;
-      }
-    }
+    // Flatten nested objects into dot-notation for atomic MongoDB $set
+    const updateFields = this.toDotNotation(data);
 
     const user = await User.findByIdAndUpdate(
       id,
       { $set: updateFields },
-      {
-        returnDocument: 'after',
-        runValidators: true,
-      }
+      { returnDocument: 'after', runValidators: true }
     ).select('-auth.password');
 
     if (!user) throw new ApiError(404, 'User not found');

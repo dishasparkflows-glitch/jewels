@@ -25,6 +25,12 @@ class ProductController {
     ApiResponse.success(res, data, 'Home products retrieved successfully');
   });
 
+  // ------------------------------- get home sections with products ----------------------------
+  getHomeSections = catchAsync(async (req, res) => {
+    const data = await productService.getHomeSections(req.query, req.user?._id);
+    ApiResponse.success(res, data, 'Home sections retrieved successfully');
+  });
+
   // ------------------------------- get storefront products (clean lightweight info) ----------------------------
   getStorefrontProducts = catchAsync(async (req, res) => {
     const { items, pagination, facets } = await productService.getStorefrontProducts(req.query, req.user?._id);

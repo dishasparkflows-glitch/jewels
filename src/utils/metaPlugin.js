@@ -1,19 +1,42 @@
 const mongoose = require('mongoose');
 const { getRequestContext } = require('./context');
+const mediaPlugin = require('./mediaPlugin');
 
-function metaPlugin(schema) {
-  // Only apply metadata tracking to top-level/root schemas.
-  // Embedded subdocuments (e.g. schemas with _id: false or explicit skipMeta: true) are excluded.
-  if (schema.options?.skipMeta || schema.options?._id === false) {
+// Centralized registry of models/collections that should NOT have audit metadata (meta object)
+const EXCLUDED_MODELS = new Set([
+  'cart',
+  'carts',
+  'wishlist',
+  'wishlists',
+  'otp',
+  'otps',
+  'codsequence',
+  'cod_sequences',
+  'codsequences',
+  'integrationtoken',
+  'integration_tokens',
+  'integrationtokens',
+  'whatsappmessage',
+  'whatsapp_messages',
+  'whatsappmessages',
+]);
+
+function isExcluded(name, collection) {
+  if (name && EXCLUDED_MODELS.has(String(name).toLowerCase())) return true;
+  if (collection && EXCLUDED_MODELS.has(String(collection).toLowerCase())) return true;
+  return false;
+}
+
+/**
+ * Applies audit meta tracking to a top-level schema.
+ * Only called on top-level models, never on sub-schemas/subdocuments.
+ */
+function applyMetaPlugin(schema) {
+  if (!schema || schema.path('meta') || schema.paths?.['meta.createdAt']) {
     return;
   }
-  schema.plugin(require('./mediaPlugin'));
-  // Prevent duplicate plugin registration
-  if (schema.path('meta') || schema.paths?.['meta.createdAt']) {
-    return;
-  }
 
-  // Turn off timestamps so Mongoose does not add root createdAt/updatedAt
+  // Disable default timestamps so Mongoose does not add root createdAt/updatedAt
   schema.set('timestamps', false);
 
   schema.add({
@@ -30,7 +53,10 @@ function metaPlugin(schema) {
   // Index meta.deletedAt for performant soft-delete queries
   schema.index({ 'meta.deletedAt': 1 });
 
-  // Query pre-hook: seamlessly map isDeleted to meta.deletedAt
+  // Attach mediaPlugin
+  schema.plugin(mediaPlugin);
+
+  // Query pre-hook: map isDeleted to meta.deletedAt
   schema.pre(
     [
       'find',
@@ -44,27 +70,19 @@ function metaPlugin(schema) {
     ],
     function () {
       const filter = this.getFilter();
-      if (filter && typeof filter === 'object') {
-        if ('isDeleted' in filter) {
-          if (filter.isDeleted === false) {
-            filter['meta.deletedAt'] = null;
-          } else if (filter.isDeleted === true) {
-            filter['meta.deletedAt'] = { $ne: null };
-          }
-          delete filter.isDeleted;
+      if (filter && typeof filter === 'object' && 'isDeleted' in filter) {
+        if (filter.isDeleted === false) {
+          filter['meta.deletedAt'] = null;
+        } else if (filter.isDeleted === true) {
+          filter['meta.deletedAt'] = { $ne: null };
         }
+        delete filter.isDeleted;
       }
     }
   );
 
-  // Auto-set meta.createdAt & meta.createdBy on new docs, meta.updatedAt & meta.updatedBy on every save
+  // Pre-save hook: auto-set createdAt/createdBy, updatedAt/updatedBy
   schema.pre('save', function (next) {
-    // Only apply to top-level/root documents, never to embedded subdocuments
-    if (this.$isSubdocument || (typeof this.ownerDocument === 'function' && this.ownerDocument() !== this)) {
-      if (typeof next === 'function') return next();
-      return;
-    }
-
     if (!this.meta) {
       this.meta = {};
     }
@@ -83,8 +101,7 @@ function metaPlugin(schema) {
     if (typeof next === 'function') next();
   });
 
-  // Auto-set meta.updatedAt & meta.updatedBy on findOneAndUpdate / updateOne / updateMany
-  // Also seamlessly map $set.isDeleted: true -> meta.deletedAt: now
+  // Pre-update hooks
   schema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function (next) {
     const currentUserId = getRequestContext('userId');
     const now = new Date();
@@ -124,31 +141,45 @@ function metaPlugin(schema) {
     if (typeof next === 'function') next();
   });
 
-  // Auto-set meta fields on insertMany
+  // Pre-insertMany hook
   schema.pre('insertMany', function (next, docs) {
     const currentUserId = getRequestContext('userId');
     const now = new Date();
     if (Array.isArray(docs)) {
       for (const doc of docs) {
         if (!doc.meta) doc.meta = {};
-        if (!doc.meta.createdAt) {
-          doc.meta.createdAt = now;
-        }
-        if (!doc.meta.updatedAt) {
-          doc.meta.updatedAt = now;
-        }
-        if (currentUserId && !doc.meta.createdBy) {
-          doc.meta.createdBy = currentUserId;
-        }
-        if (currentUserId) {
-          doc.meta.updatedBy = currentUserId;
-        }
+        if (!doc.meta.createdAt) doc.meta.createdAt = now;
+        if (!doc.meta.updatedAt) doc.meta.updatedAt = now;
+        if (currentUserId && !doc.meta.createdBy) doc.meta.createdBy = currentUserId;
+        if (currentUserId) doc.meta.updatedBy = currentUserId;
       }
     }
     if (typeof next === 'function') next();
   });
 }
 
+// Automatically apply metaPlugin ONLY when a top-level model is registered
+if (!mongoose._metaPluginModelIntercepted) {
+  mongoose._metaPluginModelIntercepted = true;
+  const originalModel = mongoose.model.bind(mongoose);
+  mongoose.model = function (name, schema, collection) {
+    if (schema) {
+      const collName = collection || schema.options?.collection;
+      if (!isExcluded(name, collName)) {
+        applyMetaPlugin(schema);
+      }
+    }
+    return originalModel(name, schema, collection);
+  };
+}
+
+function metaPlugin(schema) {
+  if (schema) {
+    applyMetaPlugin(schema);
+  }
+}
+
 module.exports = metaPlugin;
 module.exports.metaPlugin = metaPlugin;
 module.exports.default = metaPlugin;
+module.exports.EXCLUDED_MODELS = EXCLUDED_MODELS;

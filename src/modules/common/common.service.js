@@ -1,7 +1,7 @@
 const settingService = require('../setting/setting.service');
 const categoryService = require('../category/category.service');
-const websiteThemeService = require('../websiteTheme/websiteTheme.service');
-const { WebsiteThemeSettings } = require('../websiteTheme/websiteTheme.model');
+const themeService = require('../theme/theme.service');
+const { ThemeSettings } = require('../theme/theme.model');
 
 class CommonService {
   /**
@@ -10,7 +10,7 @@ class CommonService {
    */
   async bumpRevision() {
     try {
-      const updated = await WebsiteThemeSettings.findOneAndUpdate(
+      const updated = await ThemeSettings.findOneAndUpdate(
         { key: 'storefront' },
         { $inc: { revision: 1 } },
         { new: true, upsert: true, setDefaultsOnInsert: true }
@@ -27,7 +27,7 @@ class CommonService {
    */
   async getRevision() {
     try {
-      const doc = await WebsiteThemeSettings.findOne({ key: 'storefront' }).select('revision updatedAt').lean();
+      const doc = await ThemeSettings.findOne({ key: 'storefront' }).select('revision updatedAt').lean();
       return {
         revision: doc?.revision || 0,
         updatedAt: doc?.updatedAt || new Date().toISOString(),
@@ -45,7 +45,7 @@ class CommonService {
     const [commonRes, navRes, configRes] = await Promise.allSettled([
       settingService.getCommonSettings(),
       categoryService.getNavigation(),
-      websiteThemeService.getPublicConfig(),
+      themeService.getPublicConfig(),
     ]);
 
     const common = commonRes.status === 'fulfilled' ? commonRes.value : {};

@@ -22,6 +22,7 @@ class FeaturedService {
     delete data.products;
     delete data.productCount;
     delete data.position;
+    delete data.themeId;
     const incomingPlacement = data.placement;
     const incomingOrder = data.order;
     delete data.placement;
@@ -139,7 +140,9 @@ class FeaturedService {
     const filter = { 'meta.deletedAt': null };
 
     if (queryParams.status) {
-      filter.status = queryParams.status;
+      if (queryParams.status !== 'all') {
+        filter.status = queryParams.status;
+      }
     } else {
       filter.status = 'active';
     }
@@ -149,11 +152,23 @@ class FeaturedService {
       filter['display.type'] = new RegExp(`^${p}$`, 'i');
     }
 
-    return await Featured.find(filter)
-      .sort({ 'display.order': 1, name: 1 })
-      .select('_id name display image status categoryId productIds menuItemIds')
-      .populate('categoryId', 'name type slug')
-      .lean();
+    if (queryParams.platform && queryParams.platform !== 'all') {
+      filter['display.platform'] = queryParams.platform;
+    }
+
+    const isTheme = queryParams.theme === 'true' || queryParams.forTheme === 'true' || queryParams.minimal === 'true';
+
+    let query = Featured.find(filter).sort({ 'display.order': 1, name: 1 });
+
+    if (isTheme) {
+      query = query.select('_id name display.type display.platform display.order display.position image status categoryId');
+    } else {
+      query = query
+        .select('_id name display image status categoryId productIds menuItemIds')
+        .populate('categoryId', 'name type slug');
+    }
+
+    return await query.lean();
   }
 
   // ------------------------------- update featured item ----------------------------
@@ -173,6 +188,7 @@ class FeaturedService {
     delete data.products;
     delete data.productCount;
     delete data.position;
+    delete data.themeId;
     const incomingPlacement = data.placement;
     const incomingOrder = data.order;
     delete data.placement;

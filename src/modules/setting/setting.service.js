@@ -13,14 +13,14 @@ class SettingService {
 
     if (!setting) return {};
 
-    // If currentThemeId is not set, initialize it with active theme from website themes
+    // If currentThemeId is not set, initialize it with active theme from themes
     if (!setting.currentThemeId) {
       try {
-        const { WebsiteTheme, WebsiteThemeSettings } = require('../websiteTheme/websiteTheme.model');
-        const themeSettings = await WebsiteThemeSettings.findOne({ key: 'storefront' }).lean();
+        const { Theme, ThemeSettings } = require('../theme/theme.model');
+        const themeSettings = await ThemeSettings.findOne({ key: 'storefront' }).lean();
         const activeTheme = themeSettings?.activeThemeId
-          ? await WebsiteTheme.findOne({ _id: themeSettings.activeThemeId }).select('name code status description').lean()
-          : await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null }).select('name code status description').lean();
+          ? await Theme.findOne({ _id: themeSettings.activeThemeId }).select('name code status description').lean()
+          : await Theme.findOne({ status: 'active', 'meta.deletedAt': null }).select('name code status description').lean();
 
         if (activeTheme) {
           setting.currentThemeId = activeTheme;
@@ -144,21 +144,21 @@ class SettingService {
       await settings.save();
     }
 
-    // If currentThemeId was updated, sync it with WebsiteThemeSettings and activate the theme
+    // If currentThemeId was updated, sync it with ThemeSettings and activate the theme
     if (data.currentThemeId) {
       try {
-        const { WebsiteTheme, WebsiteThemeSettings } = require('../websiteTheme/websiteTheme.model');
-        await WebsiteThemeSettings.findOneAndUpdate(
+        const { Theme, ThemeSettings } = require('../theme/theme.model');
+        await ThemeSettings.findOneAndUpdate(
           { key: 'storefront' },
           { $set: { activeThemeId: data.currentThemeId }, $inc: { revision: 1 } },
           { upsert: true }
         );
         // Set selected theme to active and other themes to draft
-        await WebsiteTheme.updateMany(
+        await Theme.updateMany(
           { _id: { $ne: data.currentThemeId }, status: 'active' },
           { $set: { status: 'draft' } }
         );
-        await WebsiteTheme.updateOne(
+        await Theme.updateOne(
           { _id: data.currentThemeId },
           { $set: { status: 'active' } }
         );
@@ -169,10 +169,10 @@ class SettingService {
 
     if (data.buttonColor) {
       try {
-        const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');
+        const { Theme } = require('../theme/theme.model');
         const themeId = data.currentThemeId || settings.currentThemeId;
         if (themeId) {
-          await WebsiteTheme.updateOne(
+          await Theme.updateOne(
             { _id: themeId },
             { $set: { 'config.colors.primary': data.buttonColor } }
           );

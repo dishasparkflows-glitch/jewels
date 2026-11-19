@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Gallery = require('./gallery.model');
 const Banner = require('../banner/banner.model');
-const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');
+const { Theme } = require('../theme/theme.model');
 const Featured = require('../featured/featured.model');
 const Category = require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
@@ -31,7 +31,7 @@ class GalleryService {
       const count = await Gallery.countDocuments({ 'meta.deletedAt': null });
       if (count > 0) return;
 
-      const themes = await WebsiteTheme.find({ 'meta.deletedAt': null }).lean();
+      const themes = await Theme.find({ 'meta.deletedAt': null }).lean();
       const activeTheme = themes.find((t) => t.status === 'active');
       const activeThemeId = activeTheme?._id || null;
 
@@ -99,7 +99,7 @@ class GalleryService {
 
   // ------------------------------- get themes lookup ----------------------------
   async getThemesLookup() {
-    const themes = await WebsiteTheme.find({ 'meta.deletedAt': null })
+    const themes = await Theme.find({ 'meta.deletedAt': null })
       .select('_id name code status config.bannerSelections schedule')
       .sort({ status: 1, 'meta.createdAt': -1 })
       .lean();
@@ -129,7 +129,7 @@ class GalleryService {
   async getBannersLookup(themeId = null, type = null) {
     let theme = null;
     if (themeId && mongoose.isValidObjectId(themeId)) {
-      theme = await WebsiteTheme.findOne({ _id: themeId, 'meta.deletedAt': null })
+      theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null })
         .select('_id name config.bannerSelections')
         .lean();
     }
@@ -189,7 +189,7 @@ class GalleryService {
   async getFeaturedsLookup(themeId = null) {
     let theme = null;
     if (themeId && mongoose.isValidObjectId(themeId)) {
-      theme = await WebsiteTheme.findOne({ _id: themeId, 'meta.deletedAt': null })
+      theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null })
         .select('_id name config.featuredSelections')
         .lean();
     }
@@ -243,7 +243,7 @@ class GalleryService {
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
     const skip = (pageNum - 1) * limitNum;
 
-    const activeTheme = await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null }).lean();
+    const activeTheme = await Theme.findOne({ status: 'active', 'meta.deletedAt': null }).lean();
     const activeThemeId = activeTheme ? String(activeTheme._id) : null;
 
     const andConditions = [{ 'meta.deletedAt': null }];
@@ -529,9 +529,9 @@ class GalleryService {
 
     let theme = null;
     if (themeId && mongoose.isValidObjectId(themeId)) {
-      theme = await WebsiteTheme.findOne({ _id: themeId, 'meta.deletedAt': null });
+      theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null });
       if (!theme) {
-        throw new ApiError(404, 'Selected website theme not found');
+        throw new ApiError(404, 'Selected theme not found');
       }
     }
 

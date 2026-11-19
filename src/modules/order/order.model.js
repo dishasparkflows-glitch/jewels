@@ -45,7 +45,7 @@ const orderItemSchema = new mongoose.Schema(
       default: null,
     },
   },
-  { _id: true, skipMeta: true }
+  { _id: true }
 );
 
 const addressSnapshotSchema = new mongoose.Schema(

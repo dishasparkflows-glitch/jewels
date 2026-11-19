@@ -1,8 +1,5 @@
 const mongoose = require('mongoose');
-const metaPlugin = require('../utils/metaPlugin');
-
-// Register metaPlugin globally on Mongoose so all current and future schemas inherit audit tracking
-mongoose.plugin(metaPlugin);
+require('../utils/metaPlugin');
 
 const connectDB = async () => {
   try {

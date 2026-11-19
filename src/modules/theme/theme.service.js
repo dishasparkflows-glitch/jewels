@@ -4,7 +4,7 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const Category = require('../category/category.model');
 const Banner = require('../banner/banner.model');
 const Featured = require('../featured/featured.model');
-const { WebsiteTheme, WebsiteThemeSettings } = require('./websiteTheme.model');
+const { Theme, ThemeSettings } = require('./theme.model');
 const themeMedia = require('./themeMedia');
 const Setting = require('../setting/setting.model');
 const TIMEZONE = 'Asia/Kolkata';
@@ -32,7 +32,7 @@ const snapshotOf = (theme) => ({
   config: theme.config?.toObject ? theme.config.toObject() : theme.config,
 });
 
-class WebsiteThemeService {
+class ThemeService {
   async validateConfig(config = {}, { requireComplete = false, requireActiveBanners = false } = {}) {
     for (const row of config.mediaOverrides || []) {
       await themeMedia.validateTarget(row.module, row.recordId, row.slot);
@@ -144,7 +144,7 @@ class WebsiteThemeService {
     const code = (data.code || data.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     if (!code) throw new ApiError(400, 'Theme code is required.');
     await this.validateConfig(data.config);
-    const theme = await WebsiteTheme.create({
+    const theme = await Theme.create({
       name: data.name.trim(), code, description: data.description || '',
       config: data.config || {}, schedule: data.schedule || {}, meta: { createdBy: actorId, updatedBy: actorId },
     });
@@ -166,12 +166,12 @@ class WebsiteThemeService {
       ];
     }
     const [items, total] = await Promise.all([
-      WebsiteTheme.find(filter)
+      Theme.find(filter)
         .sort({ 'meta.updatedAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      WebsiteTheme.countDocuments(filter),
+      Theme.countDocuments(filter),
     ]);
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
@@ -184,7 +184,7 @@ class WebsiteThemeService {
   // ------------------------------- get one website theme ----------------------------
   async getById(id) {
     if (!mongoose.isValidObjectId(id)) throw new ApiError(400, 'Invalid theme ID.');
-    const theme = await WebsiteTheme.findOne({ _id: id, 'meta.deletedAt': null });
+    const theme = await Theme.findOne({ _id: id, 'meta.deletedAt': null });
     if (!theme) throw new ApiError(404, 'Theme not found.');
     return theme;
   }
@@ -208,7 +208,7 @@ class WebsiteThemeService {
     }
     if (data.code !== undefined) {
       const code = String(data.code).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      const duplicate = await WebsiteTheme.exists({ _id: { $ne: theme._id }, code });
+      const duplicate = await Theme.exists({ _id: { $ne: theme._id }, code });
       if (!code || duplicate) throw new ApiError(409, 'Theme code is empty or already in use.');
       theme.code = code;
     }
@@ -230,8 +230,8 @@ class WebsiteThemeService {
     const codeBase = `${source.code}-copy`;
     let code = codeBase;
     let index = 2;
-    while (await WebsiteTheme.exists({ code })) code = `${codeBase}-${index++}`;
-    const theme = await WebsiteTheme.create({
+    while (await Theme.exists({ code })) code = `${codeBase}-${index++}`;
+    const theme = await Theme.create({
       name: `${source.name} Copy`, code, description: source.description,
       config: source.publishedSnapshot?.config || source.config,
       meta: { createdBy: actorId, updatedBy: actorId },
@@ -242,12 +242,12 @@ class WebsiteThemeService {
 
   async settings() {
     try {
-      return await WebsiteThemeSettings.findOneAndUpdate(
+      return await ThemeSettings.findOneAndUpdate(
         { key: 'storefront' }, { $setOnInsert: { key: 'storefront' } },
         { new: true, upsert: true, setDefaultsOnInsert: true }
       );
     } catch (error) {
-      if (error.code === 11000) return WebsiteThemeSettings.findOne({ key: 'storefront' });
+      if (error.code === 11000) return ThemeSettings.findOne({ key: 'storefront' });
       throw error;
     }
   }
@@ -263,15 +263,15 @@ class WebsiteThemeService {
       : settings.previousThemeId;
 
     // The settings document is the single atomic source of truth read by storefront clients.
-    const updatedSettings = await WebsiteThemeSettings.findOneAndUpdate(
+    const updatedSettings = await ThemeSettings.findOneAndUpdate(
       { key: 'storefront' },
       { $set: { activeThemeId: theme._id, scheduledThemeId: null, previousThemeId: previousId || null }, $inc: { revision: 1 } },
       { new: true }
     );
     if (settings.scheduledThemeId && String(settings.scheduledThemeId) !== String(theme._id)) {
-      await WebsiteTheme.updateOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null }, { $set: { status: 'draft', 'schedule.startAt': null } });
+      await Theme.updateOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null }, { $set: { status: 'draft', 'schedule.startAt': null } });
     }
-    await WebsiteTheme.updateMany({ status: 'active', _id: { $ne: theme._id } }, { $set: { status: 'draft' } });
+    await Theme.updateMany({ status: 'active', _id: { $ne: theme._id } }, { $set: { status: 'draft' } });
     theme.status = 'active';
     theme.publishedAt = new Date();
     theme.schedule.startAt = null;
@@ -306,7 +306,7 @@ class WebsiteThemeService {
       await theme.save();
       const settings = await this.settings();
       if (settings.scheduledThemeId && String(settings.scheduledThemeId) !== String(theme._id)) {
-        await WebsiteTheme.updateOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null }, { $set: { status: 'draft', 'schedule.startAt': null } });
+        await Theme.updateOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null }, { $set: { status: 'draft', 'schedule.startAt': null } });
       }
       settings.scheduledThemeId = theme._id;
       await settings.save();
@@ -329,10 +329,10 @@ class WebsiteThemeService {
     await theme.save();
     // Clear only references to this theme; preserve unrelated live/scheduled themes.
     for (const field of ['activeThemeId', 'scheduledThemeId', 'previousThemeId']) {
-      await WebsiteThemeSettings.updateOne({ key: 'storefront', [field]: theme._id }, { $set: { [field]: null } });
+      await ThemeSettings.updateOne({ key: 'storefront', [field]: theme._id }, { $set: { [field]: null } });
     }
-    await WebsiteTheme.updateMany({ 'schedule.fallbackThemeId': theme._id }, { $set: { 'schedule.fallbackThemeId': null } });
-    const settings = await WebsiteThemeSettings.findOneAndUpdate(
+    await Theme.updateMany({ 'schedule.fallbackThemeId': theme._id }, { $set: { 'schedule.fallbackThemeId': null } });
+    const settings = await ThemeSettings.findOneAndUpdate(
       { key: 'storefront' }, { $inc: { revision: 1 } }, { new: true }
     );
     await this.writeHistory(theme, 'deleted', actorId, 'Theme deleted. Shared media retained.', settings?.revision || 0);
@@ -374,7 +374,7 @@ class WebsiteThemeService {
   async getMediaLibrary(id) {
     let theme = null;
     if (id && mongoose.isValidObjectId(id)) {
-      theme = await WebsiteTheme.findOne({ _id: id, 'meta.deletedAt': null }).lean();
+      theme = await Theme.findOne({ _id: id, 'meta.deletedAt': null }).lean();
     }
 
     const config = theme?.config || {};
@@ -575,12 +575,12 @@ class WebsiteThemeService {
     }
 
     if (!activeThemeId) {
-      const active = await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id').lean();
+      const active = await Theme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id').lean();
       if (active) activeThemeId = active._id;
     }
 
     if (!activeThemeId) return { revision: settings.revision, timezone: TIMEZONE, theme: null };
-    const theme = await WebsiteTheme.findOne({ _id: activeThemeId, 'meta.deletedAt': null }).lean();
+    const theme = await Theme.findOne({ _id: activeThemeId, 'meta.deletedAt': null }).lean();
     return {
       revision: settings.revision,
       timezone: TIMEZONE,
@@ -598,17 +598,17 @@ class WebsiteThemeService {
     const settings = await this.settings();
     const now = new Date();
     if (settings.scheduledThemeId) {
-      const scheduled = await WebsiteTheme.findOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null });
+      const scheduled = await Theme.findOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null });
       if (scheduled?.schedule?.startAt && scheduled.schedule.startAt <= now) {
         await this.setActive(scheduled, null, 'activated');
         return { activatedThemeId: scheduled._id };
       }
     }
     if (settings.activeThemeId) {
-      const active = await WebsiteTheme.findOne({ _id: settings.activeThemeId, 'meta.deletedAt': null });
+      const active = await Theme.findOne({ _id: settings.activeThemeId, 'meta.deletedAt': null });
       if (active?.schedule?.endAt && active.schedule.endAt <= now) {
         const fallbackId = active.schedule.fallbackThemeId || settings.previousThemeId;
-        const fallback = fallbackId ? await WebsiteTheme.findOne({ _id: fallbackId, 'meta.deletedAt': null }) : null;
+        const fallback = fallbackId ? await Theme.findOne({ _id: fallbackId, 'meta.deletedAt': null }) : null;
         active.status = 'draft';
         await active.save();
         if (fallback?.publishedSnapshot) {
@@ -616,7 +616,7 @@ class WebsiteThemeService {
           await this.setActive(fallback, null, 'expired');
           return { expiredThemeId: active._id, activatedThemeId: fallback._id };
         } else {
-          const updated = await WebsiteThemeSettings.findOneAndUpdate(
+          const updated = await ThemeSettings.findOneAndUpdate(
             { key: 'storefront', activeThemeId: active._id },
             { $set: { activeThemeId: null, scheduledThemeId: null, previousThemeId: active._id }, $inc: { revision: 1 } },
             { new: true }
@@ -630,6 +630,6 @@ class WebsiteThemeService {
   }
 }
 
-const websiteThemeService = new WebsiteThemeService();
-Object.setPrototypeOf(module.exports, WebsiteThemeService.prototype);
-Object.assign(module.exports, websiteThemeService);
+const themeService = new ThemeService();
+Object.setPrototypeOf(module.exports, ThemeService.prototype);
+Object.assign(module.exports, themeService);

@@ -3,11 +3,11 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const redisClient = require('../../utils/redisClient');
 const { CACHE_TTL } = require('../../config/constants');
-const { WebsiteThemeSettings } = require('../websiteTheme/websiteTheme.model');
+const { ThemeSettings } = require('../theme/theme.model');
 
 async function bumpStorefrontRevision() {
   try {
-    await WebsiteThemeSettings.findOneAndUpdate(
+    await ThemeSettings.findOneAndUpdate(
       { key: 'storefront' },
       { $inc: { revision: 1 } },
       { upsert: true }

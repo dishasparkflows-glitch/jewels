@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-router.use(require('../websiteTheme/themeMedia').storefront('banner'));
+router.use(require('../theme/themeMedia').storefront('banner'));
 const bannerController = require('./banner.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
@@ -9,8 +9,7 @@ const { ROLES } = require('../../config/constants');
 router.get('/category-display', bannerController.getCategoryDisplayBanner);
 router.get('/counts', bannerController.getCounts);
 router.get('/lookup', bannerController.getLookup);
-router.get('/themes/lookup', bannerController.getThemesLookup);
-router.get('/themes-lookup', bannerController.getThemesLookup);
+router.get('/theme-lookup', bannerController.getThemeLookup);
 router.get('/theme-images', bannerController.getThemeImages);
 
 router.get('/', bannerController.getAll);

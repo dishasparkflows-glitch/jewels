@@ -4,7 +4,7 @@ const gallerySchema = new mongoose.Schema(
   {
     themeId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'WebsiteTheme',
+      ref: 'Theme',
       default: null,
       index: true,
     },

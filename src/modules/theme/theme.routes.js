@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const websiteThemeController = require('./websiteTheme.controller');
+const themeController = require('./theme.controller');
 const themeMediaMappingController = require('./themeMediaMapping.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
@@ -8,7 +8,7 @@ const { ROLES } = require('../../config/constants');
 const adminOnly = [authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN)];
 
 // ------------------------------- get public config ----------------------------
-router.get('/config', websiteThemeController.getPublicConfig);
+router.get('/config', themeController.getPublicConfig);
 
 // ------------------------------- theme media mapping endpoints ----------------------------
 router.get('/themes/modules', ...adminOnly, themeMediaMappingController.getSupportedModules);
@@ -40,44 +40,44 @@ router.post('/themes/:themeId/activate', ...adminOnly, themeMediaMappingControll
 router.post('/:themeId/activate', ...adminOnly, themeMediaMappingController.activateTheme);
 
 // ------------------------------- get theme publishing history ----------------------------
-router.get('/themes/history', ...adminOnly, websiteThemeController.history);
+router.get(['/themes/history', '/history'], ...adminOnly, themeController.history);
 
-// ------------------------------- get all website themes ----------------------------
-router.get('/themes', ...adminOnly, websiteThemeController.list);
+// ------------------------------- get all themes ----------------------------
+router.get(['/themes', '/'], ...adminOnly, themeController.list);
 
 // ------------------------------- get themes lookup ----------------------------
-router.get('/themes/lookup', ...adminOnly, websiteThemeController.getLookup);
+router.get(['/themes/lookup', '/lookup'], ...adminOnly, themeController.getLookup);
 
-// ------------------------------- create website theme ----------------------------
-router.post('/themes', ...adminOnly, websiteThemeController.create);
+// ------------------------------- create theme ----------------------------
+router.post(['/themes', '/'], ...adminOnly, themeController.create);
 
 // ------------------------------- save theme media ----------------------------
-router.put('/themes/:id/media', ...adminOnly, websiteThemeController.saveMedia);
+router.put(['/themes/:id/media', '/:id/media'], ...adminOnly, themeController.saveMedia);
 
-// ------------------------------- preview website theme ----------------------------
-router.get('/themes/:id/preview', ...adminOnly, websiteThemeController.preview);
+// ------------------------------- preview theme ----------------------------
+router.get(['/themes/:id/preview', '/:id/preview'], ...adminOnly, themeController.preview);
 
 // ------------------------------- theme media library ----------------------------
-router.get('/themes/:id/media-library', ...adminOnly, websiteThemeController.getMediaLibrary);
+router.get(['/themes/:id/media-library', '/:id/media-library'], ...adminOnly, themeController.getMediaLibrary);
 
-// ------------------------------- duplicate website theme ----------------------------
-router.post('/themes/:id/duplicate', ...adminOnly, websiteThemeController.duplicate);
+// ------------------------------- duplicate theme ----------------------------
+router.post(['/themes/:id/duplicate', '/:id/duplicate'], ...adminOnly, themeController.duplicate);
 
-// ------------------------------- publish website theme ----------------------------
-router.post('/themes/:id/publish', ...adminOnly, websiteThemeController.publish);
+// ------------------------------- publish theme ----------------------------
+router.post(['/themes/:id/publish', '/:id/publish'], ...adminOnly, themeController.publish);
 
-// ------------------------------- rollback website theme ----------------------------
-router.post('/themes/:id/rollback', ...adminOnly, websiteThemeController.rollback);
+// ------------------------------- rollback theme ----------------------------
+router.post(['/themes/:id/rollback', '/:id/rollback'], ...adminOnly, themeController.rollback);
 
-// ------------------------------- archive website theme ----------------------------
-router.post('/themes/:id/archive', ...adminOnly, websiteThemeController.archive);
+// ------------------------------- archive theme ----------------------------
+router.post(['/themes/:id/archive', '/:id/archive'], ...adminOnly, themeController.archive);
 
-// ------------------------------- get one website theme ----------------------------
-router.get('/themes/:id', ...adminOnly, websiteThemeController.getOne);
+// ------------------------------- get one theme ----------------------------
+router.get(['/themes/:id', '/:id'], ...adminOnly, themeController.getOne);
 
-// ------------------------------- update website theme ----------------------------
-router.put('/themes/:id', ...adminOnly, websiteThemeController.update);
+// ------------------------------- update theme ----------------------------
+router.put(['/themes/:id', '/:id'], ...adminOnly, themeController.update);
 
-router.delete('/themes/:id', ...adminOnly, websiteThemeController.remove);
+router.delete(['/themes/:id', '/:id'], ...adminOnly, themeController.remove);
 
 module.exports = router;

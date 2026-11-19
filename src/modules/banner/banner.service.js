@@ -417,9 +417,16 @@ class BannerService {
   // ------------------------------- get banner lookup ----------------------------
   async getLookup(queryParams = {}) {
     const filter = {
-      status: 'active',
       'meta.deletedAt': null,
     };
+
+    if (queryParams.status) {
+      if (queryParams.status !== 'all') {
+        filter.status = queryParams.status;
+      }
+    } else {
+      filter.status = 'active';
+    }
 
     if (queryParams.type) {
       filter['display.type'] = queryParams.type;
@@ -436,14 +443,25 @@ class BannerService {
       ];
     }
 
-    const items = await Banner.find(filter)
-      .select('-meta')
-      .populate('display.categoryId', 'name slug')
-      .populate('collectionImages.categoryId', 'name slug')
-      .populate('display.menuItemIds', 'title menuSectionId')
-      .sort({ 'display.order': 1, _id: -1 })
-      .lean();
+    const isTheme = queryParams.theme === 'true' || queryParams.forTheme === 'true' || queryParams.minimal === 'true';
 
+    let query = Banner.find(filter)
+      .sort({ 'display.order': 1, _id: -1 });
+
+    if (isTheme) {
+      query = query.select(
+        '_id content.title content.subtitle display.type display.platform display.order display.position display.collectionGroup display.categoryId image mobileImage collectionImages.url collectionImages.key status'
+      );
+    } else {
+      query = query
+        .select(
+          '_id content.title content.subtitle display.type display.platform display.order display.position display.collectionGroup display.categoryId image mobileImage collectionImages status'
+        )
+        .populate('display.categoryId', 'name slug')
+        .populate('collectionImages.categoryId', 'name slug');
+    }
+
+    const items = await query.lean();
     return items;
   }
 
@@ -584,8 +602,8 @@ class BannerService {
 
     // 4. Fallback to active theme or default category banner
     try {
-      const { WebsiteTheme } = require('../websiteTheme/websiteTheme.model');
-      const activeTheme = await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id name').lean();
+      const { Theme } = require('../theme/theme.model');
+      const activeTheme = await Theme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id name').lean();
 
       const themeBanner = await Banner.findOne({
         $and: [

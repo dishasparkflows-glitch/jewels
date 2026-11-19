@@ -16,7 +16,7 @@ class ProductController {
   // ------------------------------- create product ----------------------------
   create = catchAsync(async (req, res) => {
     const product = await productService.create(req.body, req.user?._id);
-    ApiResponse.created(res, null, 'Product created successfully');
+    ApiResponse.created(res, { product }, 'Product created successfully');
   });
 
   // ------------------------------- get home products (streamlined info) ----------------------------
@@ -105,7 +105,7 @@ class ProductController {
   // ------------------------------- update product ----------------------------
   update = catchAsync(async (req, res) => {
     const product = await productService.update(req.params.id, req.body, req.user?._id);
-    ApiResponse.success(res, null, 'Product updated successfully');
+    ApiResponse.success(res, { product }, 'Product updated successfully');
   });
 
   // ------------------------------- update product status ----------------------------

@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-router.use(require('../websiteTheme/themeMedia').storefront('featured'));
+router.use(require('../theme/themeMedia').storefront('featured'));
 const featuredController = require('./featured.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
 // Public or storefront lookup
 router.get('/lookup', featuredController.getLookup);
+router.get('/theme-lookup', featuredController.getThemeLookup);
 router.get('/', featuredController.getAll);
 router.get('/:id', featuredController.getOne);
 

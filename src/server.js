@@ -5,7 +5,7 @@ const { connectRedis } = require('./config/redis');
 const app = require('./app');
 const { startBannerCron } = require('./modules/banner/banner.cron');
 const { startCouponExpirationCron } = require('./modules/coupon/coupon.cron');
-const { startWebsiteThemeCron } = require('./modules/websiteTheme/websiteTheme.cron');
+const { startThemeCron } = require('./modules/theme/theme.cron');
 
 const http = require('http');
 const { initViewerSocket } = require('./socket/viewers.socket');
@@ -24,7 +24,7 @@ connectDB().then(async () => {
   startCouponExpirationCron();
 
   // Activate scheduled storefront themes and apply campaign expiry fallbacks.
-  startWebsiteThemeCron();
+  startThemeCron();
 
   const server = http.createServer(app);
   initViewerSocket(server);

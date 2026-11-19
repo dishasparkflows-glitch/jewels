@@ -282,34 +282,11 @@ class ProductService {
     }
 
     // Platform visibility filter (web / app)
-    const isForWeb =
-      queryParams.forweb === 'true' ||
-      queryParams.forweb === true ||
-      queryParams.forWeb === 'true' ||
-      queryParams.forWeb === true;
-
-    const isForApp =
-      queryParams.forapp === 'true' ||
-      queryParams.forapp === true ||
-      queryParams.forApp === 'true' ||
-      queryParams.forApp === true;
-
-    if (queryParams['visibility.web'] !== undefined) {
-      const v = queryParams['visibility.web'];
-      filter['visibility.web'] = (v === 'true' || v === true) ? { $ne: false } : false;
-    } else if (queryParams.forweb === 'false' || queryParams.forweb === false) {
-      filter['visibility.web'] = false;
-    } else if (isForWeb || queryParams.view === 'storefront') {
-      filter['visibility.web'] = { $ne: false };
+    if (queryParams.forweb || queryParams.view === 'storefront') {
+      filter['visibility.web'] = true;
     }
-
-    if (queryParams['visibility.app'] !== undefined) {
-      const v = queryParams['visibility.app'];
-      filter['visibility.app'] = (v === 'true' || v === true) ? { $ne: false } : false;
-    } else if (queryParams.forapp === 'false' || queryParams.forapp === false) {
-      filter['visibility.app'] = false;
-    } else if (isForApp) {
-      filter['visibility.app'] = { $ne: false };
+    if (queryParams.forapp) {
+      filter['visibility.app'] = true;
     }
 
     if (queryParams.category) {
@@ -342,6 +319,18 @@ class ProductService {
       filter.$and = [
         ...(filter.$and || []),
         { $or: [{ menuItemIds: queryParams.menuItem }] }
+      ];
+    }
+
+    if (queryParams.promoBanner) {
+      const bannerStr = String(queryParams.promoBanner).trim();
+      const matchers = [bannerStr];
+      if (mongoose.isValidObjectId(bannerStr)) {
+        matchers.push(new mongoose.Types.ObjectId(bannerStr));
+      }
+      filter.$and = [
+        ...(filter.$and || []),
+        { promoBanner: { $in: matchers } },
       ];
     }
 

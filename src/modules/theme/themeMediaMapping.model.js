@@ -4,7 +4,7 @@ const themeMediaMappingSchema = new mongoose.Schema(
   {
     themeId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'WebsiteTheme',
+      ref: 'Theme',
       required: [true, 'Theme ID is required'],
       index: true,
     },
@@ -44,7 +44,7 @@ const themeMediaMappingSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
+    timestamps: false,
     collection: 'theme_media_mappings',
     versionKey: false,
   }

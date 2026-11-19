@@ -53,6 +53,7 @@ class ThemeMediaMappingController {
       userId: req.user?._id,
     });
 
+    await redisClient.deleteByPattern('themes:*');
     await redisClient.deleteByPattern('website-themes:*');
     ApiResponse.success(res, result.mapping, result.message);
   });
@@ -66,6 +67,7 @@ class ThemeMediaMappingController {
       mappingId,
     });
 
+    await redisClient.deleteByPattern('themes:*');
     await redisClient.deleteByPattern('website-themes:*');
     ApiResponse.success(res, null, result.message);
   });
@@ -82,6 +84,7 @@ class ThemeMediaMappingController {
       placement,
     });
 
+    await redisClient.deleteByPattern('themes:*');
     await redisClient.deleteByPattern('website-themes:*');
     ApiResponse.success(res, null, result.message);
   });
@@ -96,6 +99,7 @@ class ThemeMediaMappingController {
       userId: req.user?._id,
     });
 
+    await redisClient.deleteByPattern('themes:*');
     await redisClient.deleteByPattern('website-themes:*');
     ApiResponse.success(res, null, result.message);
   });
@@ -111,6 +115,7 @@ class ThemeMediaMappingController {
     const { themeId } = req.params;
 
     const result = await themeMediaMappingService.activateTheme(themeId, req.user?._id);
+    await redisClient.deleteByPattern('themes:*');
     await redisClient.deleteByPattern('website-themes:*');
     ApiResponse.success(res, null, result.message);
   });

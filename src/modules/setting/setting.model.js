@@ -96,7 +96,7 @@ const settingSchema = new mongoose.Schema(
     // Storefront Theme & Colors (Object for buttons, header, top bar, footer)
     currentThemeId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'WebsiteTheme',
+      ref: 'Theme',
       default: null,
     },
     themeColors: {

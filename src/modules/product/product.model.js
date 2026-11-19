@@ -14,7 +14,7 @@ const basicInfoSchema = new mongoose.Schema({
     }],
     default: undefined,
   },
-}, { _id: false, skipMeta: true });
+}, { _id: false });
 
 const pricingSchema = new mongoose.Schema({
   baseCarat: { type: Number, min: 0, default: 1 },
@@ -29,11 +29,11 @@ const pricingSchema = new mongoose.Schema({
   baseLabourCharge: { type: Number, default: 0 },
   certificateCharge: { type: Number, default: 0 },
   otherAmountPercentage: { type: Number, default: 0 },
-}, { _id: false, skipMeta: true });
+}, { _id: false });
 
 const specificationsSchema = new mongoose.Schema({
   metalWeight: { type: Number },
-}, { _id: false, skipMeta: true });
+}, { _id: false });
 
 const ornateSchema = new mongoose.Schema({
   tagNo: { type: String },
@@ -58,7 +58,7 @@ const ornateSchema = new mongoose.Schema({
   diamondAmt: { type: Number },
   stockQty: { type: Number },
   isSold: { type: Boolean, default: false },
-}, { _id: false, skipMeta: true });
+}, { _id: false });
 
 const variantSchema = new mongoose.Schema({
   pricingKey: String,
@@ -106,7 +106,7 @@ const variantSchema = new mongoose.Schema({
   sizeTo: Number,
   caratWeight: { type: Number, default: 0 },
   otherAmount: { type: Number, default: 0 },
-}, { _id: true, skipMeta: true });
+}, { _id: true });
 
 const seoSchema = new mongoose.Schema({
   metaTitle: { type: String, trim: true },
@@ -144,6 +144,12 @@ const productSchema = new mongoose.Schema(
       type: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'MenuItem',
+      }],
+      default: undefined,
+    },
+    promoBanner: {
+      type: [{
+        type: mongoose.Schema.Types.ObjectId,
       }],
       default: undefined,
     },

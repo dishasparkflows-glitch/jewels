@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const ApiError = require('../../utils/ApiError');
 const { publicUrl } = require('../../utils/media');
-const { WebsiteTheme } = require('./websiteTheme.model');
+const { Theme } = require('./theme.model');
 const Banner = require('../banner/banner.model');
 const Category = require('../category/category.model');
 const Featured = require('../featured/featured.model');
@@ -60,14 +60,14 @@ async function save(themeId, body, actorId) {
     throw new ApiError(400, 'Invalid theme');
   }
 
-  const theme = await WebsiteTheme.findOne({ _id: themeId, status: 'draft', 'meta.deletedAt': null });
+  const theme = await Theme.findOne({ _id: themeId, status: 'draft', 'meta.deletedAt': null });
   if (!theme) {
     throw new ApiError(409, 'Only draft themes can receive images. Duplicate a published theme first.');
   }
 
   let asset = null;
   if (key) {
-    if (typeof key !== 'string' || !/^website-themes\/[a-zA-Z0-9._/-]+$/.test(key) || key.includes('..')) {
+    if (typeof key !== 'string' || !/^(website-)?themes\/[a-zA-Z0-9._/-]+$/.test(key) || key.includes('..')) {
       throw new ApiError(400, 'Invalid theme upload key');
     }
     asset = { _id: new mongoose.Types.ObjectId(), key, url: publicUrl(key) };
@@ -87,7 +87,7 @@ async function save(themeId, body, actorId) {
     ? { 'config.mediaOverrides': previous }
     : { $or: [{ 'config.mediaOverrides': [] }, { 'config.mediaOverrides': { $exists: false } }] };
 
-  const updated = await WebsiteTheme.findOneAndUpdate(
+  const updated = await Theme.findOneAndUpdate(
     { _id: themeId, status: 'draft', ...unchanged },
     {
       $set: {
@@ -102,7 +102,8 @@ async function save(themeId, body, actorId) {
     throw new ApiError(409, 'Theme changed while uploading. Refresh and try again.');
   }
 
-  await websiteThemeService.writeHistory(updated, 'updated', actorId, 'Theme image mapping updated.');
+  const themeService = require('./theme.service');
+  await themeService.writeHistory(updated, 'updated', actorId, 'Theme image mapping updated.');
 
   return resolve(updated.config.toObject());
 }
@@ -218,8 +219,8 @@ function storefront(module) {
 
     try {
       const themeMediaMappingService = require('./themeMediaMapping.service');
-      const websiteThemeService = require('./websiteTheme.service');
-      const publicConfig = await websiteThemeService.getPublicConfig();
+      const themeService = require('./theme.service');
+      const publicConfig = await themeService.getPublicConfig();
       const rows = publicConfig.theme?.config?.mediaOverrides || [];
       const originalJson = res.json.bind(res);
 

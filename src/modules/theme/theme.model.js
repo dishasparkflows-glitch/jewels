@@ -148,7 +148,7 @@ const configSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const websiteThemeSchema = new mongoose.Schema(
+const themeSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 80 },
     code: { type: String, required: true, trim: true, lowercase: true, unique: true, index: true },
@@ -164,7 +164,7 @@ const websiteThemeSchema = new mongoose.Schema(
     schedule: {
       startAt: { type: Date, default: null },
       endAt: { type: Date, default: null },
-      fallbackThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'WebsiteTheme', default: null },
+      fallbackThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Theme', default: null },
     },
     publishedAt: { type: Date, default: null },
     meta: {
@@ -175,24 +175,31 @@ const websiteThemeSchema = new mongoose.Schema(
   { versionKey: false }
 );
 
-websiteThemeSchema.index({ status: 1, 'schedule.startAt': 1, 'schedule.endAt': 1 });
+themeSchema.index({ status: 1, 'schedule.startAt': 1, 'schedule.endAt': 1 });
 
-const websiteThemeSettingsSchema = new mongoose.Schema(
+const themeSettingsSchema = new mongoose.Schema(
   {
     key: { type: String, default: 'storefront', unique: true },
-    activeThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'WebsiteTheme', default: null },
-    scheduledThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'WebsiteTheme', default: null },
-    previousThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'WebsiteTheme', default: null },
+    activeThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Theme', default: null },
+    scheduledThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Theme', default: null },
+    previousThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Theme', default: null },
     revision: { type: Number, default: 0 },
   },
   { versionKey: false }
 );
 
+const Theme =
+  mongoose.models.Theme ||
+  mongoose.model('Theme', themeSchema, 'themes');
+
+const ThemeSettings =
+  mongoose.models.ThemeSettings ||
+  mongoose.model('ThemeSettings', themeSettingsSchema, 'theme_settings');
+
 module.exports = {
-  WebsiteTheme:
-    mongoose.models.WebsiteTheme ||
-    mongoose.model('WebsiteTheme', websiteThemeSchema, 'website_themes'),
-  WebsiteThemeSettings:
-    mongoose.models.WebsiteThemeSettings ||
-    mongoose.model('WebsiteThemeSettings', websiteThemeSettingsSchema, 'website_theme_settings'),
+  Theme,
+  ThemeSettings,
+  // Backwards compatibility aliases
+  WebsiteTheme: Theme,
+  WebsiteThemeSettings: ThemeSettings,
 };

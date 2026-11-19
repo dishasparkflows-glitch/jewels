@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const ThemeMediaMapping = require('./themeMediaMapping.model');
-const { WebsiteTheme, WebsiteThemeSettings } = require('./websiteTheme.model');
+const { Theme, ThemeSettings } = require('./theme.model');
 const Gallery = require('../gallery/gallery.model');
 const Banner = require('../banner/banner.model');
 const Featured = require('../featured/featured.model');
@@ -53,15 +53,32 @@ const MODULES_CONFIG = {
     filter: { 'display.type': 'mobileappbanner' },
     hasDeviceVariant: true,
   },
+  categorybanner: {
+    key: 'categorybanner',
+    label: 'Category Banners',
+    model: Banner,
+    filter: { 'display.type': 'categorybanner' },
+    hasDeviceVariant: true,
+  },
+  bookappointbanner: {
+    key: 'bookappointbanner',
+    label: 'Appointment Banners',
+    model: Banner,
+    filter: { 'display.type': 'bookappointbanner' },
+    hasDeviceVariant: true,
+  },
   customizebanner: {
     key: 'customizebanner',
-    label: 'Custom & Other Banners',
+    label: 'Custom Banners',
     model: Banner,
-    filter: {
-      'display.type': {
-        $in: ['customizebanner', 'bookappointbanner', 'websitebanner'],
-      },
-    },
+    filter: { 'display.type': 'customizebanner' },
+    hasDeviceVariant: true,
+  },
+  websitebanner: {
+    key: 'websitebanner',
+    label: 'Other Banners',
+    model: Banner,
+    filter: { 'display.type': 'websitebanner' },
     hasDeviceVariant: true,
   },
 };
@@ -72,10 +89,13 @@ function normalizeModule(rawModule) {
   if (m === 'herobanner' || m === 'herobanners') return 'herobanner';
   if (m === 'collectionbanner' || m === 'collectionbanners' || m === 'collections') return 'collectionbanner';
   if (m === 'celebrate' || m === 'celebrategifts' || m === 'featured' || m === 'gifts') return 'celebrate';
+  if (m === 'categorybanner' || m === 'categorybanners') return 'categorybanner';
   if (m === 'category' || m === 'categories') return 'category';
   if (m === 'offerbanner' || m === 'offerbanners' || m === 'offers') return 'offerbanner';
   if (m === 'mobileappbanner' || m === 'appbanner' || m === 'appbanners' || m === 'mobileapp') return 'mobileappbanner';
-  if (m === 'customizebanner' || m === 'otherbanner' || m === 'otherbanners' || m === 'other') return 'customizebanner';
+  if (m === 'bookappointbanner' || m === 'appointmentbanner' || m === 'appointment' || m === 'bookappointment') return 'bookappointbanner';
+  if (m === 'websitebanner' || m === 'otherbanner' || m === 'other') return 'websitebanner';
+  if (m === 'customizebanner' || m === 'custombanner' || m === 'custom') return 'customizebanner';
   return m;
 }
 
@@ -97,9 +117,9 @@ class ThemeMediaMappingService {
       throw new ApiError(400, 'Invalid Theme ID');
     }
 
-    const theme = await WebsiteTheme.findOne({ _id: themeId, 'meta.deletedAt': null }).lean();
+    const theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null }).lean();
     if (!theme) {
-      throw new ApiError(404, 'Website theme not found');
+      throw new ApiError(404, 'Theme not found');
     }
 
     const normModule = normalizeModule(module);
@@ -267,6 +287,7 @@ class ThemeMediaMappingService {
       }
 
       return {
+        ...rec,
         _id: rec._id,
         title,
         subtitle,
@@ -297,7 +318,7 @@ class ThemeMediaMappingService {
           imageUrl: m.mediaId?.image?.url || null,
           imageKey: m.mediaId?.image?.key || null,
           status: m.status,
-          createdAt: m.createdAt,
+          createdAt: m.meta?.createdAt || m.createdAt,
         })),
         desktopMapping: desktopMapping
           ? {
@@ -402,8 +423,8 @@ class ThemeMediaMappingService {
       image: m.mediaId?.image || null,
       imageUrl: m.mediaId?.image?.url || null,
       imageKey: m.mediaId?.image?.key || null,
-      createdAt: m.createdAt,
-      updatedAt: m.updatedAt,
+      createdAt: m.meta?.createdAt || m.createdAt,
+      updatedAt: m.meta?.updatedAt || m.updatedAt,
     }));
   }
 
@@ -425,7 +446,7 @@ class ThemeMediaMappingService {
     const normModule = normalizeModule(module);
 
     // Verify theme exists
-    const theme = await WebsiteTheme.findOne({ _id: themeId, 'meta.deletedAt': null }).lean();
+    const theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null }).lean();
     if (!theme) throw new ApiError(404, 'Theme not found');
 
     // Verify Gallery media item exists
@@ -557,7 +578,7 @@ class ThemeMediaMappingService {
       throw new ApiError(400, 'Mappings array cannot be empty');
     }
 
-    const theme = await WebsiteTheme.findOne({ _id: themeId, 'meta.deletedAt': null }).lean();
+    const theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null }).lean();
     if (!theme) throw new ApiError(404, 'Theme not found');
 
     const validMediaIds = mappings
@@ -637,7 +658,7 @@ class ThemeMediaMappingService {
       throw new ApiError(400, 'Invalid Theme ID');
     }
 
-    const theme = await WebsiteTheme.findOne({ _id: themeId, 'meta.deletedAt': null }).lean();
+    const theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null }).lean();
     if (!theme) throw new ApiError(404, 'Theme not found');
 
     const modules = Object.values(MODULES_CONFIG);
@@ -698,7 +719,7 @@ class ThemeMediaMappingService {
       throw new ApiError(400, 'Invalid Theme ID');
     }
 
-    const theme = await WebsiteTheme.findOne({ _id: themeId, 'meta.deletedAt': null });
+    const theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null });
     if (!theme) throw new ApiError(404, 'Theme not found');
     if (theme.status === 'archived') {
       throw new ApiError(409, 'Cannot activate an archived theme. Please duplicate or restore it first.');
@@ -707,10 +728,10 @@ class ThemeMediaMappingService {
     const summary = await this.getMappingSummary(themeId);
 
     // Atomic update of storefront settings
-    const previousActive = await WebsiteTheme.findOne({ status: 'active', 'meta.deletedAt': null });
+    const previousActive = await Theme.findOne({ status: 'active', 'meta.deletedAt': null });
     const prevId = previousActive ? previousActive._id : null;
 
-    const updatedSettings = await WebsiteThemeSettings.findOneAndUpdate(
+    const updatedSettings = await ThemeSettings.findOneAndUpdate(
       { key: 'storefront' },
       {
         $set: {
@@ -724,7 +745,7 @@ class ThemeMediaMappingService {
     );
 
     // Deactivate all previously active themes
-    await WebsiteTheme.updateMany(
+    await Theme.updateMany(
       { status: 'active', _id: { $ne: theme._id } },
       { $set: { status: 'draft' } }
     );
@@ -761,7 +782,7 @@ class ThemeMediaMappingService {
 
     let themeId = activeThemeId;
     if (!themeId) {
-      const settings = await WebsiteThemeSettings.findOne({ key: 'storefront' }).lean();
+      const settings = await ThemeSettings.findOne({ key: 'storefront' }).lean();
       themeId = settings?.activeThemeId;
     }
 

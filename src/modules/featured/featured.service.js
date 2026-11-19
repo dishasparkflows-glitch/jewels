@@ -161,7 +161,7 @@ class FeaturedService {
     let query = Featured.find(filter).sort({ 'display.order': 1, name: 1 });
 
     if (isTheme) {
-      query = query.select('_id name display.type display.platform display.order display.position image status categoryId');
+      query = query.select('_id name display.type display.platform display.order image status categoryId');
     } else {
       query = query
         .select('_id name display image status categoryId productIds menuItemIds')

@@ -6,11 +6,11 @@ class NotificationService {
   // ------------------------------- get all notifications ----------------------------
   async getAll(userId, query) {
     const { page, limit, skip } = getPagination(query);
-    const filter = { userId, 'meta.deletedAt': null };
+    const filter = { userId };
     if (query.isRead !== undefined) filter.isRead = query.isRead === 'true';
 
     const [notifications, total] = await Promise.all([
-      Notification.find(filter).sort({ 'meta.createdAt': -1 }).skip(skip).limit(limit).lean(),
+      Notification.find(filter).sort({ sendAt: -1 }).skip(skip).limit(limit).lean(),
       Notification.countDocuments(filter),
     ]);
 
@@ -19,6 +19,7 @@ class NotificationService {
 
   // ------------------------------- create notification ----------------------------
   async create(data) {
+    if (!data.sendAt) data.sendAt = new Date();
     return Notification.create(data);
   }
 

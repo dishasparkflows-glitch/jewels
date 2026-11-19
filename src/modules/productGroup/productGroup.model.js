@@ -36,11 +36,6 @@ const productGroupSchema = new mongoose.Schema(
       ref: 'Product',
       default: null,
     },
-    representativeMode: {
-      type: String,
-      enum: ['auto', 'manual'],
-      default: 'auto',
-    },
     status: {
       type: String,
       enum: ['active', 'inactive'],

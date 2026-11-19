@@ -81,6 +81,172 @@ async function getOrnateErpCategories() {
   };
 }
 
+// ------------------------------- background image sync queue & 4-worker pool ----------------------------
+const imageSyncQueue = [];
+let isImageWorkerRunning = false;
+const imageSyncStats = {
+  totalQueued: 0,
+  completed: 0,
+  failed: 0,
+  inProgress: false,
+  lastCompletedAt: null,
+};
+
+function getImageSyncStatus() {
+  return {
+    ...imageSyncStats,
+    queueRemaining: imageSyncQueue.length,
+  };
+}
+
+function enqueueOrnateImageSync(jobs = []) {
+  if (!Array.isArray(jobs) || jobs.length === 0) return;
+  imageSyncQueue.push(...jobs);
+  imageSyncStats.totalQueued += jobs.length;
+  if (!isImageWorkerRunning) {
+    processImageSyncQueue().catch((err) => {
+      console.error('[Ornate Image Worker Pool] Unexpected worker error:', err);
+    });
+  }
+}
+
+async function processImageSyncQueue() {
+  if (isImageWorkerRunning || imageSyncQueue.length === 0) return;
+  isImageWorkerRunning = true;
+  imageSyncStats.inProgress = true;
+
+  const CONCURRENCY = 4;
+  const clients = Array.from({ length: CONCURRENCY }, () => new ftp.Client());
+  clients.forEach((c) => {
+    c.ftp.timeout = 10000;
+    c.ftp.verbose = false;
+  });
+
+  const ftpConfig = {
+    host: process.env.ORNATE_FTP_HOST || '142.79.228.244',
+    user: process.env.ORNATE_FTP_USER || 'ecomm',
+    password: process.env.ORNATE_FTP_PASSWORD || 'nx@123',
+    port: Number(process.env.ORNATE_FTP_PORT) || 2166,
+    secure: false,
+  };
+
+  try {
+    // Connect all worker FTP clients concurrently
+    await Promise.allSettled(clients.map((c) => c.access(ftpConfig)));
+
+    const activeClients = clients.filter((c) => !c.closed);
+    if (activeClients.length === 0) {
+      console.error('[Ornate Image Worker Pool] Failed to connect any FTP workers.');
+      isImageWorkerRunning = false;
+      imageSyncStats.inProgress = false;
+      return;
+    }
+
+    console.log(
+      `[Ornate Image Worker Pool] Started with ${activeClients.length} concurrent FTP workers. Jobs in queue: ${imageSyncQueue.length}`
+    );
+
+    async function runWorker(workerClient, workerId) {
+      while (imageSyncQueue.length > 0) {
+        const job = imageSyncQueue.shift();
+        if (!job) break;
+
+        const { productId, rawPaths, sku } = job;
+        const newlyUploadedImages = [];
+
+        for (const rawPath of rawPaths) {
+          try {
+            const cleanPath = '/' + rawPath.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\/+/, '');
+            const chunks = [];
+            const writable = new Writable({
+              write(chunk, encoding, callback) {
+                chunks.push(chunk);
+                callback();
+              },
+            });
+
+            // Ensure client is still connected
+            if (workerClient.closed) {
+              await workerClient.access(ftpConfig);
+            }
+
+            await workerClient.downloadTo(writable, cleanPath);
+            const buffer = Buffer.concat(chunks);
+
+            if (buffer && buffer.length > 0) {
+              const filename = path.basename(cleanPath);
+              const r2Data = await cloudflareR2.uploadBuffer(buffer, filename, 'OrnateProducts', 'image/jpeg');
+
+              newlyUploadedImages.push({
+                url: r2Data.url,
+                key: r2Data.key,
+                mediaType: 'image',
+              });
+            }
+          } catch (err) {
+            // Reconnect if socket was dropped
+            if (
+              err.message &&
+              (err.message.includes('closed') ||
+                err.message.includes('timeout') ||
+                err.message.includes('ECONNRESET'))
+            ) {
+              try {
+                await workerClient.access(ftpConfig);
+              } catch {}
+            }
+          }
+        }
+
+        if (newlyUploadedImages.length > 0) {
+          try {
+            await Product.updateOne(
+              {
+                _id: productId,
+                $or: [
+                  { 'ornate.ornateImages': { $exists: false } },
+                  { 'ornate.ornateImages': { $size: 0 } },
+                ],
+              },
+              { $set: { 'ornate.ornateImages': newlyUploadedImages } }
+            );
+            imageSyncStats.completed++;
+          } catch (updateErr) {
+            console.error(
+              `[Ornate Image Worker Pool] Failed to update product ${productId} (${sku}) with images:`,
+              updateErr.message
+            );
+            imageSyncStats.failed++;
+          }
+        } else {
+          imageSyncStats.completed++;
+        }
+      }
+    }
+
+    await Promise.all(activeClients.map((client, idx) => runWorker(client, idx)));
+  } catch (poolErr) {
+    console.error('[Ornate Image Worker Pool] Worker pool execution error:', poolErr.message);
+  } finally {
+    clients.forEach((c) => {
+      try {
+        c.close();
+      } catch {}
+    });
+    isImageWorkerRunning = false;
+    imageSyncStats.inProgress = false;
+    imageSyncStats.lastCompletedAt = new Date();
+    console.log(
+      `[Ornate Image Worker Pool] Finished. Total completed: ${imageSyncStats.completed}, Failed: ${imageSyncStats.failed}`
+    );
+
+    // If new jobs were enqueued while closing, resume immediately
+    if (imageSyncQueue.length > 0) {
+      processImageSyncQueue().catch(() => {});
+    }
+  }
+}
+
 // ------------------------------- sync ornate labels ----------------------------
 async function syncOrnateLabels(sessionIdOverride, options = null) {
   const sessionIdToPass = sessionIdOverride !== undefined ? sessionIdOverride : getLastSessionId();
@@ -135,6 +301,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
   let upsertedCount = 0;
   let errorCount = 0;
   const errors = [];
+  const pendingImageJobs = [];
 
   // Resolve "Silver Collection" category for all ornate products
   const silverCategory = await Category.findOne({
@@ -142,23 +309,26 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
   }).select('_id');
   const silverCategoryId = silverCategory?._id || null;
 
-  // Setup FTP for downloading images directly to Cloudflare R2
-  const ftpClient = new ftp.Client();
-  ftpClient.ftp.verbose = false;
-  ftpClient.ftp.timeout = 15000;
-  let ftpConnected = false;
+  // Batch-fetch all existing products in 1 DB query to eliminate N serial findOne round-trips
+  const allIdentifiers = new Set();
+  for (const label of labelsToProcess) {
+    const { sku, tagNo, barcode } = extractLabelIdentifiers(label);
+    if (sku) allIdentifiers.add(sku);
+    if (tagNo) allIdentifiers.add(tagNo);
+    if (barcode) allIdentifiers.add(barcode);
+  }
 
-  try {
-    await ftpClient.access({
-      host: process.env.ORNATE_FTP_HOST || '142.79.228.244',
-      user: process.env.ORNATE_FTP_USER || 'ecomm',
-      password: process.env.ORNATE_FTP_PASSWORD || 'nx@123',
-      port: Number(process.env.ORNATE_FTP_PORT) || 2166,
-      secure: false,
-    });
-    ftpConnected = true;
-  } catch (err) {
-    console.error('[Ornate NX] FTP connection failed for image sync:', err.message);
+  const existingProducts = allIdentifiers.size > 0
+    ? await Product.find(buildProductIdentifierQuery(allIdentifiers))
+        .select('colorImages basicInfo.sku basicInfo.slug ornate pricing')
+        .lean()
+    : [];
+
+  const existingMap = new Map();
+  for (const prod of existingProducts) {
+    if (prod.basicInfo?.sku) existingMap.set(String(prod.basicInfo.sku).trim().toLowerCase(), prod);
+    if (prod.ornate?.tagNo) existingMap.set(String(prod.ornate.tagNo).trim().toLowerCase(), prod);
+    if (prod.ornate?.barcode) existingMap.set(String(prod.ornate.barcode).trim().toLowerCase(), prod);
   }
 
   for (const label of labelsToProcess) {
@@ -166,69 +336,23 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
       const { sku, tagNo, barcode } = extractLabelIdentifiers(label);
       if (!sku) throw new Error('Label has no identifier');
 
-      // Check if product already exists in Product table and has images
-      const existingProduct = await Product.findOne(
-        buildProductIdentifierQuery({ sku, tagNo, barcode })
-      )
-        .select('colorImages basicInfo.sku basicInfo.slug ornate pricing')
-        .lean();
+      // Fast in-memory lookup of existing product
+      const existingProduct =
+        existingMap.get(String(sku).toLowerCase()) ||
+        (tagNo && existingMap.get(String(tagNo).toLowerCase())) ||
+        (barcode && existingMap.get(String(barcode).toLowerCase())) ||
+        null;
 
       const hasImages =
         existingProduct &&
         (existingProduct.ornate?.ornateImages?.length > 0 ||
           existingProduct.colorImages?.some((color) => color.images?.length > 0));
 
-      // Download from FTP and upload to Cloudflare R2 only if NO images exist yet
-      const newlyUploadedImages = [];
-      if (!hasImages && ftpConnected) {
-        const rawPaths = [
-          label.ImagePath1,
-          label.ImagePath2,
-          label.ImagePath3,
-          label.ImagePath4,
-          label.ImagePath5,
-        ].filter(p => typeof p === 'string' && p.trim().length > 0);
-
-        if (rawPaths.length > 0) {
-          for (const rawPath of rawPaths) {
-            try {
-              const cleanPath = '/' + rawPath.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\/+/, '');
-              const chunks = [];
-              const writable = new Writable({
-                write(chunk, encoding, callback) {
-                  chunks.push(chunk);
-                  callback();
-                },
-              });
-
-              await ftpClient.downloadTo(writable, cleanPath);
-              const buffer = Buffer.concat(chunks);
-
-              if (buffer && buffer.length > 0) {
-                const filename = path.basename(cleanPath);
-                const r2Data = await cloudflareR2.uploadBuffer(buffer, filename, 'OrnateProducts', 'image/jpeg');
-
-                newlyUploadedImages.push({
-                  url: r2Data.url,
-                  key: r2Data.key,
-                  mediaType: 'image',
-                });
-              }
-            } catch {
-              // Silently ignore skipped image
-            }
-          }
-        }
-      }
-
-      // All ornate products belong to the "Silver Collection" category
-      const categoryId = silverCategoryId;
-
       // Build product payload strictly matching product.model.js
       const { setFields } = buildProductPayloadFromLabel(label, {
         existingProduct,
-        categoryId,
-        newlyUploadedImages,
+        categoryId: silverCategoryId,
+        newlyUploadedImages: [], // Handled asynchronously by 4-worker pool
       });
 
       // Upsert into Product collection with 1 flag: isOrnate: true
@@ -250,6 +374,25 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
         } catch (groupErr) {
           console.error(`[Ornate Sync] Auto-grouping failed for product ${upsertedProduct._id}:`, groupErr.message);
         }
+
+        // Queue image download & R2 upload if product has NO images yet
+        if (!hasImages) {
+          const rawPaths = [
+            label.ImagePath1,
+            label.ImagePath2,
+            label.ImagePath3,
+            label.ImagePath4,
+            label.ImagePath5,
+          ].filter(p => typeof p === 'string' && p.trim().length > 0);
+
+          if (rawPaths.length > 0) {
+            pendingImageJobs.push({
+              productId: upsertedProduct._id,
+              sku: upsertedProduct.basicInfo?.sku || sku,
+              rawPaths,
+            });
+          }
+        }
       }
 
       upsertedCount++;
@@ -259,10 +402,9 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
     }
   }
 
-  if (ftpConnected) {
-    try {
-      ftpClient.close();
-    } catch {}
+  // Dispatch background image sync for all newly upserted products with 4 parallel workers
+  if (pendingImageJobs.length > 0) {
+    enqueueOrnateImageSync(pendingImageJobs);
   }
 
   // Advance the global cursor only after a complete, successful batch.
@@ -273,6 +415,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
     count: upsertedCount,
     errorCount,
     errors: errors.slice(0, 20),
+    queuedImagesCount: pendingImageJobs.length,
     lastSessionId: getLastSessionId(),
   };
 }
@@ -698,6 +841,7 @@ module.exports = {
   ...ornateUtils,
   getOrnateErpCategories,
   syncOrnateLabels,
+  getImageSyncStatus,
   syncOrnateSoldLabels,
   getOrnateErpSoldLabels,
   syncSpecificSoldLabels,

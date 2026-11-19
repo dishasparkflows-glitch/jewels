@@ -3,22 +3,19 @@ const CenterDiamondPrice = require('./centerDiamondPrice.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
+const POPULATE_FIELDS = [
+  { path: 'diamondTypeId', select: '_id name' },
+  { path: 'diamondShapeId', select: '_id name' },
+  { path: 'diamondClarityId', select: '_id name' },
+  { path: 'diamondColorId', select: '_id name' },
+];
+
 function getSafePopulates() {
-  const fields = [];
-  if (mongoose.models['DiamondType']) fields.push({ path: 'diamondTypeId', select: '_id name' });
-  if (mongoose.models['DiamondShape']) fields.push({ path: 'diamondShapeId', select: '_id name' });
-  if (mongoose.models['DiamondClarity']) fields.push({ path: 'diamondClarityId', select: '_id name' });
-  if (mongoose.models['DiamondColor']) fields.push({ path: 'diamondColorId', select: '_id name' });
-  return fields;
+  return POPULATE_FIELDS;
 }
 
 function getLookupPopulates() {
-  const fields = [];
-  if (mongoose.models['DiamondType']) fields.push({ path: 'diamondTypeId', select: '_id name' });
-  if (mongoose.models['DiamondShape']) fields.push({ path: 'diamondShapeId', select: '_id name' });
-  if (mongoose.models['DiamondClarity']) fields.push({ path: 'diamondClarityId', select: '_id name' });
-  if (mongoose.models['DiamondColor']) fields.push({ path: 'diamondColorId', select: '_id name' });
-  return fields;
+  return POPULATE_FIELDS;
 }
 
 async function resolveEntityIds(modelName, values) {
@@ -30,8 +27,8 @@ async function resolveEntityIds(modelName, values) {
     if (/^[a-f\d]{24}$/i.test(v)) ids.push(v);
     else names.push(v);
   }
-  if (names.length > 0 && mongoose.models[modelName]) {
-    const records = await mongoose.models[modelName].find({
+  if (names.length > 0) {
+    const records = await mongoose.model(modelName).find({
       name: { $in: names.map((n) => new RegExp(`^${n}$`, 'i')) },
       'meta.deletedAt': null,
     }).select('_id').lean();

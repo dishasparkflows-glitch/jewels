@@ -40,17 +40,13 @@ class ThemeMediaMappingController {
 
   upsert = catchAsync(async (req, res) => {
     const { themeId } = req.params;
-    const { module, recordId, mediaId, device, placement, status } = req.body;
+    const { recordId, galleryId, mediaId, status } = req.body;
 
     const result = await themeMediaMappingService.upsertMapping({
       themeId,
-      module,
       recordId,
-      mediaId,
-      device,
-      placement,
+      galleryId: galleryId || mediaId,
       status,
-      userId: req.user?._id,
     });
 
     await redisClient.deleteByPattern('themes:*');
@@ -74,14 +70,11 @@ class ThemeMediaMappingController {
 
   deleteMappingByTarget = catchAsync(async (req, res) => {
     const { themeId } = req.params;
-    const { module, recordId, device, placement } = req.query;
+    const { recordId } = req.query;
 
     const result = await themeMediaMappingService.deleteMappingByTarget({
       themeId,
-      module,
       recordId,
-      device,
-      placement,
     });
 
     await redisClient.deleteByPattern('themes:*');

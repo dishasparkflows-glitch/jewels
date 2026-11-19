@@ -97,6 +97,72 @@ class GalleryService {
     }
   }
 
+  // ------------------------------- get gallery lookup ----------------------------
+  async getLookup(queryParams = {}) {
+    const { themeId, placement, type, platform, status, search } = queryParams;
+    const filter = { 'meta.deletedAt': null };
+
+    if (themeId && themeId !== 'all') {
+      if (mongoose.isValidObjectId(themeId)) {
+        filter.themeId = new mongoose.Types.ObjectId(themeId);
+      } else if (themeId === 'null' || themeId === 'unassigned') {
+        filter.themeId = null;
+      }
+    }
+
+    const targetType = type || placement;
+    if (targetType && targetType !== 'all') {
+      if (targetType === 'category' || targetType === 'categorybanner') {
+        filter.placement = { $in: ['category', 'categorybanner'] };
+      } else {
+        filter.placement = targetType;
+      }
+    }
+
+    if (platform && platform !== 'all') {
+      if (platform === 'common') {
+        filter.platform = 'common';
+      } else if (platform === 'web' || platform === 'desktop') {
+        filter.platform = { $in: ['web', 'desktop', 'common'] };
+      } else if (platform === 'app' || platform === 'mobile') {
+        filter.platform = { $in: ['app', 'mobile', 'common'] };
+      }
+    }
+
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      filter.$or = [
+        { 'image.url': searchRegex },
+        { 'image.key': searchRegex },
+        { placement: searchRegex },
+      ];
+    }
+
+    const items = await Gallery.find(filter)
+      .populate('themeId', 'name status code description')
+      .sort({ 'meta.createdAt': -1 })
+      .lean();
+
+    return items.map((doc) => ({
+      _id: doc._id,
+      id: doc._id,
+      themeId: doc.themeId,
+      themeName: doc.themeId?.name || null,
+      placement: doc.placement,
+      platform: doc.platform,
+      image: doc.image,
+      url: doc.image?.url || '',
+      key: doc.image?.key || '',
+      status: doc.status,
+      linkedRecord: doc.linkedRecord,
+      meta: doc.meta,
+    }));
+  }
+
   // ------------------------------- get themes lookup ----------------------------
   async getThemesLookup() {
     const themes = await Theme.find({ 'meta.deletedAt': null })

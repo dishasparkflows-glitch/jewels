@@ -151,7 +151,6 @@ class ProductGroupService {
       description: `Common product group for ${candidateName}`,
       productIds: [product._id],
       primaryProductId: product._id,
-      representativeMode: 'auto',
       status: 'active',
       meta: {
         createdAt: new Date(),
@@ -192,13 +191,13 @@ class ProductGroupService {
     const nonDeleted = list.filter((p) => p && !p.meta?.deletedAt);
     const eligibleProducts = nonDeleted.filter((p) => this.isProductEligible(p));
 
-    // 1. Manual mode check
-    if (group?.representativeMode === 'manual' && group?.primaryProductId) {
-      const manualProduct = eligibleProducts.find(
+    // 1. Primary product check: if manual primary is set, respect it as long as it exists in the group
+    if (group?.primaryProductId) {
+      const primaryProduct = nonDeleted.find(
         (p) => String(p._id) === String(group.primaryProductId)
       );
-      if (manualProduct) {
-        return manualProduct;
+      if (primaryProduct) {
+        return primaryProduct;
       }
     }
 
@@ -254,7 +253,7 @@ class ProductGroupService {
         const rep = this.selectRepresentative(group, memberProducts);
         const repId = rep?._id || null;
 
-        if (String(group.primaryProductId || '') !== String(repId || '')) {
+        if (group.primaryProductId && String(group.primaryProductId) !== String(repId || '')) {
           await ProductGroup.updateOne({ _id: groupId }, { $set: { primaryProductId: repId } });
         }
         return repId;
@@ -286,7 +285,7 @@ class ProductGroupService {
     const activeGroups = await ProductGroup.find({
       status: 'active',
       'meta.deletedAt': null,
-    }).select('_id productIds primaryProductId representativeMode');
+    }).select('_id productIds primaryProductId');
 
     let updated = 0;
     for (const g of activeGroups) {
@@ -643,7 +642,6 @@ class ProductGroupService {
         slug: g.slug,
         description: g.description,
         status: g.status,
-        representativeMode: g.representativeMode,
         primaryProductId: g.primaryProductId,
         createdAt: g.meta?.createdAt,
         updatedAt: g.meta?.updatedAt,
@@ -889,10 +887,8 @@ class ProductGroupService {
 
     // Validate primaryProductId
     let primaryProductId = data.primaryProductId || null;
-    let representativeMode = data.representativeMode || 'auto';
     if (primaryProductId && !validIds.some((id) => String(id) === String(primaryProductId))) {
       primaryProductId = null;
-      representativeMode = 'auto';
     }
 
     const group = await ProductGroup.create({
@@ -902,7 +898,6 @@ class ProductGroupService {
       description: data.description || '',
       productIds: validIds,
       primaryProductId,
-      representativeMode,
       status: data.status || 'active',
 
       meta: {
@@ -946,10 +941,6 @@ class ProductGroupService {
       group.status = data.status;
     }
 
-    if (data.representativeMode && ['auto', 'manual'].includes(data.representativeMode)) {
-      group.representativeMode = data.representativeMode;
-    }
-
     if (data.primaryProductId !== undefined || data.representativeId !== undefined) {
       const newPrimary = data.primaryProductId || data.representativeId;
       if (newPrimary) {
@@ -958,10 +949,8 @@ class ProductGroupService {
           throw new ApiError(400, 'Primary product must be a member of this group');
         }
         group.primaryProductId = newPrimary;
-        group.representativeMode = 'manual';
       } else {
         group.primaryProductId = null;
-        group.representativeMode = 'auto';
       }
     }
 
@@ -1068,7 +1057,6 @@ class ProductGroupService {
 
     if (String(group.primaryProductId) === String(productId)) {
       update.$set.primaryProductId = null;
-      update.$set.representativeMode = 'auto';
     }
 
     await ProductGroup.findByIdAndUpdate(groupId, update);
@@ -1107,7 +1095,6 @@ class ProductGroupService {
     };
     if (validIds.some((id) => String(id) === String(sourceGroup.primaryProductId))) {
       sourceUpdate.$set.primaryProductId = null;
-      sourceUpdate.$set.representativeMode = 'auto';
     }
 
     // CASE 1: Create another group with auto/custom name
@@ -1143,7 +1130,6 @@ class ProductGroupService {
         description: '',
         productIds: validIds,
         primaryProductId: validIds[0] || null,
-        representativeMode: 'auto',
         status: 'active',
 
         meta: {
@@ -1232,7 +1218,6 @@ class ProductGroupService {
         };
         if (validIds.some((id) => String(id) === String(sourceGroup.primaryProductId))) {
           sourceUpdate.$set.primaryProductId = remainingProductIds[0] || null;
-          sourceUpdate.$set.representativeMode = 'auto';
         }
         await ProductGroup.findByIdAndUpdate(sourceGroupId, sourceUpdate);
       }
@@ -1328,7 +1313,6 @@ class ProductGroupService {
         description: '',
         productIds: [p._id],
         primaryProductId: p._id,
-        representativeMode: 'auto',
         status: 'active',
         meta: {
           createdBy: userId,

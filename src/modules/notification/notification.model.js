@@ -12,6 +12,7 @@ const notificationSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     isRead: { type: Boolean, default: false },
     readAt: { type: Date, default: null },
+    sendAt: { type: Date, default: Date.now, index: true },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { versionKey: false }

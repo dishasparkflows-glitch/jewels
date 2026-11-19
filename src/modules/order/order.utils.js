@@ -4,37 +4,7 @@ const ApiError = require('../../utils/ApiError');
 
 // ------------------------------- generate order number ----------------------------
 async function generateOrderNumber() {
-  const Order = mongoose.models.Order || mongoose.model('Order');
-
-  if (typeof Order.generateOrderNumber === 'function') {
-    return await Order.generateOrderNumber();
-  }
-
-  const lastOrder = await Order.findOne({
-    orderNumber: { $regex: /^RJ\/ORD-(\d+)/i }
-  })
-    .sort({ _id: -1 })
-    .select('orderNumber')
-    .lean();
-
-  let nextSeq = 1;
-  if (lastOrder && lastOrder.orderNumber) {
-    const match = lastOrder.orderNumber.match(/^RJ\/ORD-(\d+)/i);
-    if (match) {
-      nextSeq = parseInt(match[1], 10) + 1;
-    }
-  } else {
-    const count = await Order.countDocuments();
-    nextSeq = count + 1;
-  }
-
-  let candidate = `RJ/ORD-${String(nextSeq).padStart(4, '0')}`;
-  while (await Order.exists({ orderNumber: candidate })) {
-    nextSeq += 1;
-    candidate = `RJ/ORD-${String(nextSeq).padStart(4, '0')}`;
-  }
-
-  return candidate;
+  return mongoose.model('Order').generateOrderNumber();
 }
 
 // ------------------------------- resolve payment provider ----------------------------

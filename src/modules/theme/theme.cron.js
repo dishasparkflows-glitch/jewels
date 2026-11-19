@@ -31,7 +31,7 @@ async function reconcile(source = 'cron') {
 }
 
 function startThemeCron() {
-  if (process.env.THEME_CRON_ENABLED === 'false' || process.env.WEBSITE_THEME_CRON_ENABLED === 'false' || job) return job;
+  if (process.env.THEME_CRON_ENABLED === 'false' || job) return job;
   setTimeout(() => reconcile('startup'), 3000);
   job = cron.schedule('* * * * *', () => reconcile(), { timezone: 'Asia/Kolkata' });
   console.log('[Theme] Scheduled publish and expiry check enabled (Asia/Kolkata).');
@@ -40,6 +40,5 @@ function startThemeCron() {
 
 module.exports = {
   startThemeCron,
-  startWebsiteThemeCron: startThemeCron,
   reconcile,
 };

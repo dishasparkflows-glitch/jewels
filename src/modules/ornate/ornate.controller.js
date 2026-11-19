@@ -17,7 +17,8 @@ class OrnateController {
   // ------------------------------- get ornate sync status ----------------------------
   getStatus = catchAsync(async (req, res) => {
     const status = ornateCron.getOrnateSyncStatus();
-    ApiResponse.success(res, status, 'Ornate sync status retrieved');
+    const imageSync = ornateService.getImageSyncStatus();
+    ApiResponse.success(res, { ...status, imageSync }, 'Ornate sync status retrieved');
   });
 
   // ------------------------------- trigger ornate full sync ----------------------------
@@ -39,7 +40,10 @@ class OrnateController {
     const options = (categories || productIds) ? { categories, productIds } : null;
     const result = await ornateService.syncOrnateLabels(sessionId, options);
     if (!result.success) return res.status(500).json({ success: false, message: 'Ornate label sync failed for one or more records', data: result });
-    ApiResponse.success(res, result, `Synced ${result.count || 0} labels from Ornate ERP`);
+    const msg = result.queuedImagesCount > 0
+      ? `Successfully synced ${result.count || 0} products from Ornate ERP (${result.queuedImagesCount} images syncing in background)`
+      : `Successfully synced ${result.count || 0} products from Ornate ERP`;
+    ApiResponse.success(res, result, msg);
   });
 
   // ------------------------------- sync ornate sold labels ----------------------------

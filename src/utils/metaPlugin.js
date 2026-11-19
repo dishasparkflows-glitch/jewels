@@ -2,28 +2,34 @@ const mongoose = require('mongoose');
 const { getRequestContext } = require('./context');
 const mediaPlugin = require('./mediaPlugin');
 
-// Centralized registry of models/collections that should NOT have audit metadata (meta object)
+// Centralized registry of models that should NOT have audit metadata (meta object)
 const EXCLUDED_MODELS = new Set([
   'cart',
-  'carts',
   'wishlist',
-  'wishlists',
-  'otp',
-  'otps',
   'codsequence',
-  'cod_sequences',
-  'codsequences',
   'integrationtoken',
-  'integration_tokens',
-  'integrationtokens',
   'whatsappmessage',
-  'whatsapp_messages',
-  'whatsappmessages',
+  'notification',
+  'address',
+  'thememediamapping',
 ]);
 
 function isExcluded(name, collection) {
-  if (name && EXCLUDED_MODELS.has(String(name).toLowerCase())) return true;
-  if (collection && EXCLUDED_MODELS.has(String(collection).toLowerCase())) return true;
+  const normName = String(name || '').toLowerCase().replace(/[-_]/g, '');
+  const normCollection = String(collection || '').toLowerCase().replace(/[-_]/g, '');
+
+  for (const m of EXCLUDED_MODELS) {
+    if (
+      normName === m ||
+      normName === m + 's' ||
+      (m === 'address' && normName === 'addresses') ||
+      normCollection === m ||
+      normCollection === m + 's' ||
+      (m === 'address' && normCollection === 'addresses')
+    ) {
+      return true;
+    }
+  }
   return false;
 }
 

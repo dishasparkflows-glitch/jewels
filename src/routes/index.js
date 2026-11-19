@@ -120,6 +120,7 @@ router.use('/upload', uploadRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/settings', settingRoutes);
 router.use('/themes', themeRoutes);
+router.use('/website/themes', themeRoutes);
 router.use('/website', themeRoutes);
 router.use('/gallery', galleryRoutes);
 router.use('/analytics', analyticsRoutes);

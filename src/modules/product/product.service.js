@@ -416,7 +416,7 @@ class ProductService {
         }
 
         const activeGroups = await ProductGroup.find(groupFilter)
-          .select('_id groupCode groupName slug description productIds primaryProductId representativeMode categoryId')
+          .select('_id groupCode groupName slug description productIds primaryProductId categoryId')
           .lean();
 
         // 2. Resolve representative product IDs for active groups
@@ -926,7 +926,7 @@ class ProductService {
         }
 
         const activeGroups = await ProductGroup.find(groupFilter)
-          .select('_id groupCode groupName slug description productIds primaryProductId representativeMode categoryId')
+          .select('_id groupCode groupName slug description productIds primaryProductId categoryId')
           .lean();
 
         const repProductIds = [];

@@ -4,264 +4,19 @@ const Category = require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
-function sanitizeStr(s) {
-  return typeof s === 'string' ? s.trim() : s;
-}
-
-function isEmptyStr(s) {
-  return typeof s === 'string' && s.trim() === '';
-}
-
-function isNullOrEmpty(v) {
-  return v === null || v === undefined || isEmptyStr(v);
-}
-
-function sanitizeBannerPayload(data) {
-  if (!data || typeof data !== 'object') return data;
-
-  const clean = {};
-
-  // Content
-  if (data.content && typeof data.content === 'object') {
-    const cleanContent = {};
-    for (const field of ['title', 'subtitle', 'description']) {
-      if (!isNullOrEmpty(data.content[field])) {
-        cleanContent[field] = sanitizeStr(data.content[field]);
-      }
-    }
-    if (Object.keys(cleanContent).length > 0) {
-      clean.content = cleanContent;
-    }
-  }
-
-  // Display
-  if (data.display && typeof data.display === 'object') {
-    const cleanDisplay = {};
-    for (const field of ['categoryId', 'collectionGroup', 'type', 'platform', 'position', 'order']) {
-      if (!isNullOrEmpty(data.display[field])) {
-        cleanDisplay[field] = sanitizeStr(data.display[field]);
-      }
-    }
-    if (Array.isArray(data.display.menuItemIds) && data.display.menuItemIds.length > 0) {
-      const cleanMenuIds = data.display.menuItemIds.filter((id) => !isNullOrEmpty(id));
-      if (cleanMenuIds.length > 0) cleanDisplay.menuItemIds = cleanMenuIds;
-    }
-    if (Object.keys(cleanDisplay).length > 0) {
-      clean.display = cleanDisplay;
-    }
-  }
-
-  // Root fields
-  for (const field of ['appStoreUrl', 'googlePlayUrl', 'startDate', 'endDate', 'status']) {
-    if (!isNullOrEmpty(data[field])) {
-      clean[field] = sanitizeStr(data[field]);
-    }
-  }
-
-  // Unified Media / Image
-  const incomingMedia = data.media || data.image;
-  if (incomingMedia && typeof incomingMedia === 'object' && !isNullOrEmpty(incomingMedia.url)) {
-    const isVid = incomingMedia.mediaType === 'video' || data.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(incomingMedia.url);
-    const mType = isVid ? 'video' : (incomingMedia.mediaType || 'image');
-    const cleanMedia = {
-      url: sanitizeStr(incomingMedia.url),
-      mediaType: mType,
-    };
-    if (!isNullOrEmpty(incomingMedia.key)) {
-      cleanMedia.key = sanitizeStr(incomingMedia.key);
-    }
-    clean.image = cleanMedia;
-  }
-
-  // Mobile Image
-  if (data.mobileImage && typeof data.mobileImage === 'object' && !isNullOrEmpty(data.mobileImage.url)) {
-    const isMobileVid = data.mobileImage.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(data.mobileImage.url);
-    const cleanMobileImg = {
-      url: sanitizeStr(data.mobileImage.url),
-      mediaType: isMobileVid ? 'video' : (data.mobileImage.mediaType || 'image'),
-    };
-    if (!isNullOrEmpty(data.mobileImage.key)) {
-      cleanMobileImg.key = sanitizeStr(data.mobileImage.key);
-    }
-    clean.mobileImage = cleanMobileImg;
-  }
-
-  // CollectionImages
-  if (Array.isArray(data.collectionImages) && data.collectionImages.length > 0) {
-    const cleanImgs = data.collectionImages
-      .map((img) => {
-        if (!img || isNullOrEmpty(img.url)) return null;
-        const item = { url: sanitizeStr(img.url) };
-        if (!isNullOrEmpty(img.categoryId)) item.categoryId = img.categoryId;
-        if (!isNullOrEmpty(img.key)) item.key = sanitizeStr(img.key);
-        return item;
-      })
-      .filter(Boolean);
-    if (cleanImgs.length > 0) {
-      clean.collectionImages = cleanImgs;
-    }
-  }
-
-  return clean;
-}
-
-function buildBannerUpdateOps(data) {
-  if (!data || typeof data !== 'object') return { $set: data || {} };
-
-  const $set = {};
-  const $unset = {};
-
-  // Content
-  if (data.content !== undefined) {
-    if (isNullOrEmpty(data.content)) {
-      $unset['content'] = 1;
-    } else if (typeof data.content === 'object') {
-      for (const field of ['title', 'subtitle', 'description']) {
-        if (data.content[field] !== undefined) {
-          if (isNullOrEmpty(data.content[field])) {
-            $unset[`content.${field}`] = 1;
-          } else {
-            $set[`content.${field}`] = sanitizeStr(data.content[field]);
-          }
-        }
-      }
-    }
-  }
-
-  // Display
-  if (data.display !== undefined) {
-    if (isNullOrEmpty(data.display)) {
-      $unset['display'] = 1;
-    } else if (typeof data.display === 'object') {
-      const displayFields = ['categoryId', 'collectionGroup', 'type', 'platform', 'position', 'order'];
-      for (const field of displayFields) {
-        if (data.display[field] !== undefined) {
-          if (isNullOrEmpty(data.display[field])) {
-            $unset[`display.${field}`] = 1;
-          } else {
-            $set[`display.${field}`] = sanitizeStr(data.display[field]);
-          }
-        }
-      }
-      if (data.display.menuItemIds !== undefined) {
-        if (!Array.isArray(data.display.menuItemIds) || data.display.menuItemIds.length === 0) {
-          $unset['display.menuItemIds'] = 1;
-        } else {
-          $set['display.menuItemIds'] = data.display.menuItemIds.filter((id) => !isNullOrEmpty(id));
-        }
-      }
-    }
-  }
-
-  // Root fields
-  const simpleFields = ['appStoreUrl', 'googlePlayUrl', 'startDate', 'endDate', 'status'];
-  for (const field of simpleFields) {
-    if (data[field] !== undefined) {
-      if (isNullOrEmpty(data[field])) {
-        $unset[field] = 1;
-      } else {
-        $set[field] = sanitizeStr(data[field]);
-      }
-    }
-  }
-
-  // Unified Media / Image
-  if (data.media !== undefined || data.image !== undefined) {
-    const incomingMedia = data.media !== undefined ? data.media : data.image;
-    if (isNullOrEmpty(incomingMedia) || isNullOrEmpty(incomingMedia.url)) {
-      $unset['image'] = 1;
-      $unset['media'] = 1;
-      $unset['mediaType'] = 1;
-    } else if (typeof incomingMedia === 'object') {
-      const isVid = incomingMedia.mediaType === 'video' || data.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(incomingMedia.url);
-      const mType = isVid ? 'video' : (incomingMedia.mediaType || 'image');
-      const cleanMedia = {
-        url: sanitizeStr(incomingMedia.url),
-        mediaType: mType,
-      };
-      if (!isNullOrEmpty(incomingMedia.key)) cleanMedia.key = sanitizeStr(incomingMedia.key);
-      $set['image'] = cleanMedia;
-      $unset['media'] = 1;
-      $unset['mediaType'] = 1;
-    }
-  }
-
-  // Mobile Image
-  if (data.mobileImage !== undefined) {
-    if (isNullOrEmpty(data.mobileImage) || isNullOrEmpty(data.mobileImage.url)) {
-      $unset['mobileImage'] = 1;
-    } else if (typeof data.mobileImage === 'object') {
-      const isMobileVid = data.mobileImage.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(data.mobileImage.url);
-      const cleanMobile = {
-        url: sanitizeStr(data.mobileImage.url),
-        mediaType: isMobileVid ? 'video' : (data.mobileImage.mediaType || 'image'),
-      };
-      if (!isNullOrEmpty(data.mobileImage.key)) cleanMobile.key = sanitizeStr(data.mobileImage.key);
-      $set['mobileImage'] = cleanMobile;
-    }
-  }
-
-  // CollectionImages
-  if (data.collectionImages !== undefined) {
-    if (!Array.isArray(data.collectionImages) || data.collectionImages.length === 0) {
-      $unset['collectionImages'] = 1;
-    } else {
-      const cleanImages = data.collectionImages
-        .map((img) => {
-          if (!img || isNullOrEmpty(img.url)) return null;
-          const item = { url: sanitizeStr(img.url) };
-          if (!isNullOrEmpty(img.categoryId)) item.categoryId = img.categoryId;
-          if (!isNullOrEmpty(img.key)) item.key = sanitizeStr(img.key);
-          return item;
-        })
-        .filter(Boolean);
-      if (cleanImages.length > 0) {
-        $set['collectionImages'] = cleanImages;
-      } else {
-        $unset['collectionImages'] = 1;
-      }
-    }
-  }
-
-  const updateQuery = {};
-  if (Object.keys($set).length > 0) updateQuery.$set = $set;
-  if (Object.keys($unset).length > 0) updateQuery.$unset = $unset;
-
-  return updateQuery;
-}
-
 class BannerService {
   _formatBanner(banner) {
     if (!banner) return null;
     const doc = banner.toObject ? banner.toObject() : { ...banner };
-    delete doc.media;
-    delete doc.mediaType;
-    const m = doc.image;
-    if (m && typeof m === 'object' && m.url) {
-      const isVid = m.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(m.url);
-      const mType = isVid ? 'video' : (m.mediaType || 'image');
-      const unifiedMedia = {
-        url: m.url,
-        key: m.key,
-        mediaType: mType,
-      };
-      doc.image = unifiedMedia;
-    }
-    if (doc.mobileImage && typeof doc.mobileImage === 'object' && doc.mobileImage.url) {
-      if (!doc.mobileImage.mediaType) {
-        doc.mobileImage.mediaType = /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(doc.mobileImage.url) ? 'video' : 'image';
-      }
+    if (Array.isArray(doc.collectionImages) && doc.collectionImages.length > 0) {
+      doc.collectionImages.sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
     }
     return doc;
   }
 
   // ------------------------------- create banner ----------------------------
   async create(data) {
-    if (data.display?.type === 'collectionbanner' && Array.isArray(data.collectionImages) && data.collectionImages.length > 0 && data.collectionImages.length !== 4) {
-      throw new ApiError(400, 'Collection banners must contain exactly four images if images are provided');
-    }
-    const cleanData = sanitizeBannerPayload(data);
-    return await Banner.create(cleanData);
+    return await Banner.create(data);
   }
 
   // ------------------------------- get one banner ----------------------------
@@ -270,6 +25,7 @@ class BannerService {
       .populate('display.categoryId', 'name slug')
       .populate('collectionImages.categoryId', 'name slug')
       .populate('display.menuItemIds', 'title menuSectionId');
+
     if (!banner) {
       throw new ApiError(404, 'Banner not found');
     }
@@ -366,19 +122,13 @@ class BannerService {
       andConditions.push({ 'display.bannerKey': queryParams.bannerKey });
     }
 
-    // 5. Filter by position
-    if (queryParams.position && queryParams.position !== 'all') {
-      andConditions.push({ 'display.position': queryParams.position });
-    }
-
-    // 6. Search query
+    // 5. Search query
     if (queryParams.search) {
       const searchRegex = new RegExp(queryParams.search, 'i');
       andConditions.push({
         $or: [
           { 'content.title': searchRegex },
           { 'content.subtitle': searchRegex },
-          { 'display.position': searchRegex },
         ],
       });
     }
@@ -428,8 +178,13 @@ class BannerService {
       filter.status = 'active';
     }
 
-    if (queryParams.type) {
-      filter['display.type'] = queryParams.type;
+    const targetType = queryParams.type || queryParams.module;
+    if (targetType && targetType !== 'all') {
+      if (targetType === 'category' || targetType === 'categorybanner') {
+        filter['display.type'] = { $in: ['category', 'categorybanner'] };
+      } else {
+        filter['display.type'] = targetType;
+      }
     }
 
     if (queryParams.category) {
@@ -443,25 +198,21 @@ class BannerService {
       ];
     }
 
-    const isTheme = queryParams.theme === 'true' || queryParams.forTheme === 'true' || queryParams.minimal === 'true';
+    const items = await Banner.find(filter)
+      .select(
+        '_id content.title content.subtitle display.type display.platform display.order display.collectionGroup display.categoryId image mobileImage collectionImages status'
+      )
+      .populate('display.categoryId', 'name slug')
+      .populate('collectionImages.categoryId', 'name slug')
+      .sort({ 'display.order': 1, _id: -1 })
+      .lean();
 
-    let query = Banner.find(filter)
-      .sort({ 'display.order': 1, _id: -1 });
+    items.forEach((item) => {
+      if (Array.isArray(item.collectionImages) && item.collectionImages.length > 0) {
+        item.collectionImages.sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0));
+      }
+    });
 
-    if (isTheme) {
-      query = query.select(
-        '_id content.title content.subtitle display.type display.platform display.order display.position display.collectionGroup display.categoryId image mobileImage collectionImages.url collectionImages.key status'
-      );
-    } else {
-      query = query
-        .select(
-          '_id content.title content.subtitle display.type display.platform display.order display.position display.collectionGroup display.categoryId image mobileImage collectionImages status'
-        )
-        .populate('display.categoryId', 'name slug')
-        .populate('collectionImages.categoryId', 'name slug');
-    }
-
-    const items = await query.lean();
     return items;
   }
 
@@ -587,7 +338,6 @@ class BannerService {
                   slug: categoryDoc.slug,
                 },
                 order: 0,
-                position: 'none',
               },
             },
             source: 'category_model',
@@ -653,7 +403,6 @@ class BannerService {
                   slug: categoryDoc.slug,
                 } : null,
                 order: 0,
-                position: 'none',
               },
             },
             source: 'gallery_categorybanner',
@@ -699,22 +448,9 @@ class BannerService {
 
   // ------------------------------- update banner ----------------------------
   async update(id, data) {
-    if (data.display?.type === 'collectionbanner' || data.collectionImages !== undefined) {
-      const existing = await Banner.findById(id).select('display.type collectionImages').lean();
-      if (!existing) throw new ApiError(404, 'Banner not found');
-      const nextType = data.display?.type || existing.display?.type;
-      const nextImages = data.collectionImages !== undefined ? data.collectionImages : existing.collectionImages;
-      if (nextType === 'collectionbanner' && Array.isArray(nextImages) && nextImages.length > 0 && nextImages.length !== 4) {
-        throw new ApiError(400, 'Collection banners must contain exactly four images if images are provided');
-      }
-    }
-    const updateOps = buildBannerUpdateOps(data);
-    if (!updateOps.$set && !updateOps.$unset) {
-      return this.getOne(id);
-    }
     const banner = await Banner.findOneAndUpdate(
       { _id: id },
-      updateOps,
+      { $set: data },
       { returnDocument: 'after', runValidators: true }
     );
 

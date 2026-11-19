@@ -39,6 +39,12 @@ class GalleryController {
     ApiResponse.success(res, null, 'Gallery item status updated successfully');
   });
 
+  // ------------------------------- gallery lookup ----------------------------
+  getLookup = catchAsync(async (req, res) => {
+    const items = await galleryService.getLookup(req.query);
+    ApiResponse.success(res, items, 'Gallery lookup retrieved successfully');
+  });
+
   // ------------------------------- themes lookup ----------------------------
   getThemesLookup = catchAsync(async (req, res) => {
     const themes = await galleryService.getThemesLookup();

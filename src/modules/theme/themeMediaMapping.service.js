@@ -15,71 +15,60 @@ const MODULES_CONFIG = {
     label: 'Hero Banners',
     model: Banner,
     filter: { 'display.type': 'herobanner' },
-    hasDeviceVariant: true,
   },
   collectionbanner: {
     key: 'collectionbanner',
     label: 'Collection Banners',
     model: Banner,
     filter: { 'display.type': 'collectionbanner' },
-    hasDeviceVariant: true,
-    hasTiles: true,
   },
   celebrate: {
     key: 'celebrate',
     label: 'Celebrate & Gifts',
     model: Featured,
     filter: {},
-    hasDeviceVariant: false,
   },
   category: {
     key: 'category',
     label: 'Categories',
     model: Category,
     filter: {},
-    hasCategoryPlacements: true, // icon & banner
   },
   offerbanner: {
     key: 'offerbanner',
     label: 'Offer Banners',
     model: Banner,
     filter: { 'display.type': 'offerbanner' },
-    hasDeviceVariant: true,
   },
   mobileappbanner: {
     key: 'mobileappbanner',
     label: 'App Banners',
     model: Banner,
     filter: { 'display.type': 'mobileappbanner' },
-    hasDeviceVariant: true,
   },
   categorybanner: {
     key: 'categorybanner',
     label: 'Category Banners',
     model: Banner,
-    filter: { 'display.type': 'categorybanner' },
-    hasDeviceVariant: true,
+    filter: { 'display.type': { $in: ['categorybanner', 'category'] } },
   },
   bookappointbanner: {
     key: 'bookappointbanner',
     label: 'Appointment Banners',
     model: Banner,
     filter: { 'display.type': 'bookappointbanner' },
-    hasDeviceVariant: true,
   },
   customizebanner: {
     key: 'customizebanner',
     label: 'Custom Banners',
     model: Banner,
     filter: { 'display.type': 'customizebanner' },
-    hasDeviceVariant: true,
   },
   websitebanner: {
     key: 'websitebanner',
     label: 'Other Banners',
     model: Banner,
     filter: { 'display.type': 'websitebanner' },
-    hasDeviceVariant: true,
   },
 };
 
@@ -100,18 +89,15 @@ function normalizeModule(rawModule) {
 }
 
 class ThemeMediaMappingService {
-    // ------------------------------- get supported modules ----------------------------
+  // ------------------------------- get supported modules ----------------------------
   getSupportedModules() {
     return Object.values(MODULES_CONFIG).map((cfg) => ({
       key: cfg.key,
       label: cfg.label,
-      hasDeviceVariant: Boolean(cfg.hasDeviceVariant),
-      hasTiles: Boolean(cfg.hasTiles),
-      hasCategoryPlacements: Boolean(cfg.hasCategoryPlacements),
     }));
   }
 
-    // ------------------------------- get module records ----------------------------
+  // ------------------------------- get module records ----------------------------
   async getModuleRecords({ themeId, module = 'herobanner', page = 1, limit = 50, search = '' }) {
     if (!mongoose.isValidObjectId(themeId)) {
       throw new ApiError(400, 'Invalid Theme ID');
@@ -147,89 +133,69 @@ class ThemeMediaMappingService {
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 50));
     const skip = (pageNum - 1) * limitNum;
 
+    const recordQuery = Model.find(filter)
+      .sort({ 'display.order': 1, order: 1, 'meta.createdAt': -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    if (Model === Banner) {
+      recordQuery.populate('display.categoryId', 'name slug');
+      recordQuery.populate('collectionImages.categoryId', 'name slug');
+    }
+
     const [total, rawRecords] = await Promise.all([
       Model.countDocuments(filter),
-      Model.find(filter)
-        .sort({ 'display.order': 1, order: 1, 'meta.createdAt': -1 })
-        .skip(skip)
-        .limit(limitNum)
-        .lean(),
+      recordQuery.lean(),
     ]);
 
     const recordIds = rawRecords.map((r) => r._id);
+    const tileIds = [];
+    rawRecords.forEach((r) => {
+      if (Array.isArray(r.collectionImages)) {
+        r.collectionImages.forEach((t) => {
+          if (t._id) tileIds.push(t._id);
+        });
+      }
+    });
 
-    // Fetch existing mappings for this theme and module
+    const allTargetIds = [...recordIds, ...tileIds];
+
+    // Fetch existing mappings for this theme and records
     const mappings = await ThemeMediaMapping.find({
       themeId,
-      module: normModule,
-      recordId: { $in: recordIds },
+      recordId: { $in: allTargetIds },
       status: 'active',
-      'meta.deletedAt': null,
     })
-      .populate('mediaId')
+      .populate('galleryId')
       .lean();
 
-    // Group mappings by recordId
+    // Map by recordId
     const mappingsByRecord = new Map();
     mappings.forEach((m) => {
       const rId = String(m.recordId);
-      if (!mappingsByRecord.has(rId)) {
-        mappingsByRecord.set(rId, []);
-      }
-      mappingsByRecord.get(rId).push(m);
-    });
-
-    // Also auto-match Gallery items that have this themeId and linkedRecord.recordId
-    const galleryMatches = await Gallery.find({
-      themeId,
-      'linkedRecord.recordId': { $in: recordIds },
-      status: 'active',
-      'meta.deletedAt': null,
-    }).lean();
-
-    galleryMatches.forEach((gItem) => {
-      const rId = String(gItem.linkedRecord?.recordId);
-      const existing = mappingsByRecord.get(rId) || [];
-      const hasMatch = existing.some(
-        (m) => String(m.mediaId?._id || m.mediaId) === String(gItem._id)
-      );
-      if (!hasMatch) {
-        existing.push({
-          _id: gItem._id,
-          themeId,
-          module: normModule,
-          recordId: gItem.linkedRecord.recordId,
-          mediaId: gItem,
-          device: gItem.platform === 'app' ? 'mobile' : 'desktop',
-          placement: gItem.placement || 'primary',
-          status: 'active',
-          isAutoMatchedFromGallery: true,
-        });
-        mappingsByRecord.set(rId, existing);
-      }
+      mappingsByRecord.set(rId, m);
     });
 
     // Transform records for clean UI presentation
     const items = rawRecords.map((rec) => {
       const recId = String(rec._id);
-      const recMappings = mappingsByRecord.get(recId) || [];
+      const mapping = mappingsByRecord.get(recId);
+      const isMapped = Boolean(mapping);
 
-      // Identify placement / device mappings
-      const desktopMapping = recMappings.find(
-        (m) =>
-          ((m.device === 'desktop' || m.device === 'common') && m.placement === 'primary') ||
-          m.device === 'desktop'
-      );
-      const mobileMapping = recMappings.find(
-        (m) => m.device === 'mobile' || m.placement === 'mobile'
-      );
-      const iconMapping = recMappings.find((m) => m.placement === 'icon');
-      const bannerMapping = recMappings.find((m) => m.placement === 'banner');
+      const gItem = mapping?.galleryId;
+      const gId = gItem?._id || gItem || null;
+      const mappingImageUrl = gItem?.image?.url || null;
 
-      // For collection banners with tiles
-      const tileMappings = recMappings.filter((m) => String(m.placement || '').startsWith('tile:'));
-
-      const isMapped = recMappings.length > 0;
+      const mappedSlot = mapping
+        ? {
+            _id: mapping._id,
+            galleryId: gId,
+            mediaId: gId,
+            imageUrl: mappingImageUrl,
+            imageKey: gItem?.image?.key || null,
+            status: mapping.status,
+          }
+        : null;
 
       // Determine titles & fallbacks based on module
       let title = '';
@@ -278,13 +244,44 @@ class ThemeMediaMappingService {
             ? rec.content.subtitle
             : rec.display?.collectionGroup
             ? `Collection Group: ${rec.display.collectionGroup.toUpperCase()}`
-            : rec.display?.position
-            ? `Position: ${rec.display.position}`
             : `Storefront Display Slide #${orderNum}`;
         originalDesktopImage = rec.image?.url || null;
         originalMobileImage = rec.mobileImage?.url || rec.image?.url || null;
         targetLink = rec.link || rec.content?.link || rec.appStoreUrl || '';
       }
+
+      // Resolve tiles for collection banner
+      const tiles = Array.isArray(rec.collectionImages)
+        ? [...rec.collectionImages]
+            .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0))
+            .map((tile, idx) => {
+              const tileId = String(tile._id);
+              const tileMapping = mappingsByRecord.get(tileId);
+              const g = tileMapping?.galleryId;
+              const gId = g?._id || g || null;
+              const mUrl = g?.image?.url || null;
+
+              return {
+                _id: tile._id,
+                bannerId: rec._id,
+                order: tile.order ?? idx + 1,
+                originalUrl: tile.url,
+                key: tile.key,
+                categoryId: tile.categoryId?._id || tile.categoryId,
+                categoryName: tile.categoryId?.name || '',
+                isMapped: Boolean(tileMapping),
+                mappingId: tileMapping?._id || null,
+                mappedImageUrl: mUrl,
+                imageUrl: mUrl || tile.url,
+                galleryId: gId,
+                status: tileMapping?.status || 'active',
+              };
+            })
+        : [];
+
+      const isRecordMapped = tiles.length > 0
+        ? tiles.some((t) => t.isMapped)
+        : isMapped;
 
       return {
         ...rec,
@@ -309,70 +306,60 @@ class ThemeMediaMappingService {
           bannerUrl: originalBanner,
         },
         collectionImages: rec.collectionImages || [],
-        isMapped,
-        mappings: recMappings.map((m) => ({
-          _id: m._id,
-          device: m.device,
-          placement: m.placement,
-          mediaId: m.mediaId?._id || m.mediaId,
-          imageUrl: m.mediaId?.image?.url || null,
-          imageKey: m.mediaId?.image?.key || null,
-          status: m.status,
-          createdAt: m.meta?.createdAt || m.createdAt,
-        })),
-        desktopMapping: desktopMapping
-          ? {
-              _id: desktopMapping._id,
-              mediaId: desktopMapping.mediaId?._id || desktopMapping.mediaId,
-              imageUrl: desktopMapping.mediaId?.image?.url || null,
-              device: desktopMapping.device,
-              placement: desktopMapping.placement,
-            }
-          : null,
-        mobileMapping: mobileMapping
-          ? {
-              _id: mobileMapping._id,
-              mediaId: mobileMapping.mediaId?._id || mobileMapping.mediaId,
-              imageUrl: mobileMapping.mediaId?.image?.url || null,
-              device: mobileMapping.device,
-              placement: mobileMapping.placement,
-            }
-          : null,
-        iconMapping: iconMapping
-          ? {
-              _id: iconMapping._id,
-              mediaId: iconMapping.mediaId?._id || iconMapping.mediaId,
-              imageUrl: iconMapping.mediaId?.image?.url || null,
-              placement: 'icon',
-            }
-          : null,
-        bannerMapping: bannerMapping
-          ? {
-              _id: bannerMapping._id,
-              mediaId: bannerMapping.mediaId?._id || bannerMapping.mediaId,
-              imageUrl: bannerMapping.mediaId?.image?.url || null,
-              placement: 'banner',
-            }
-          : null,
-        tileMappings: tileMappings.map((tm) => ({
-          _id: tm._id,
-          mediaId: tm.mediaId?._id || tm.mediaId,
-          imageUrl: tm.mediaId?.image?.url || null,
-          placement: tm.placement,
-        })),
+        tiles,
+        isMapped: isRecordMapped,
+        mappings: mappedSlot ? [mappedSlot] : [],
+        desktopMapping: mappedSlot,
+        mobileMapping: mappedSlot,
+        iconMapping: mappedSlot,
+        bannerMapping: mappedSlot,
+        tileMappings: mappedSlot ? [mappedSlot] : [],
       };
     });
 
     // Calculate module mapping stats
-    const totalModuleMapped = await ThemeMediaMapping.distinct('recordId', {
-      themeId,
-      module: normModule,
-      status: 'active',
-      'meta.deletedAt': null,
-    });
+    const allModRecordIds = await Model.distinct('_id', filter);
+    let totalTargetCount = total;
+    let mappedCount = 0;
 
-    const mappedCount = totalModuleMapped.length;
-    const unmappedCount = Math.max(0, total - mappedCount);
+    if (normModule === 'collectionbanner') {
+      const banners = await Model.find(filter).select('collectionImages._id').lean();
+      const allTileIds = [];
+      banners.forEach((b) => {
+        if (Array.isArray(b.collectionImages)) {
+          b.collectionImages.forEach((t) => {
+            if (t._id) allTileIds.push(t._id);
+          });
+        }
+      });
+      const allTargets = [...allModRecordIds, ...allTileIds];
+      const mappedTargets = allTargets.length > 0
+        ? await ThemeMediaMapping.distinct('recordId', {
+            themeId,
+            recordId: { $in: allTargets },
+            status: 'active',
+          })
+        : [];
+      if (allTileIds.length > 0) {
+        totalTargetCount = allTileIds.length;
+        const mappedSet = new Set(mappedTargets.map(String));
+        mappedCount = allTileIds.filter((tid) => mappedSet.has(String(tid))).length;
+      } else {
+        totalTargetCount = allModRecordIds.length;
+        mappedCount = mappedTargets.length;
+      }
+    } else {
+      const totalModuleMapped = allModRecordIds.length > 0
+        ? await ThemeMediaMapping.distinct('recordId', {
+            themeId,
+            recordId: { $in: allModRecordIds },
+            status: 'active',
+          })
+        : [];
+      mappedCount = totalModuleMapped.length;
+    }
+
+    const unmappedCount = Math.max(0, totalTargetCount - mappedCount);
 
     return {
       module: normModule,
@@ -382,15 +369,15 @@ class ThemeMediaMappingService {
       total,
       pagination: getPaginationMeta(total, pageNum, limitNum),
       stats: {
-        totalRecords: total,
+        totalRecords: totalTargetCount,
         mappedRecords: mappedCount,
         unmappedRecords: unmappedCount,
-        completionPercentage: total > 0 ? Math.round((mappedCount / total) * 100) : 100,
+        completionPercentage: totalTargetCount > 0 ? Math.round((mappedCount / totalTargetCount) * 100) : 100,
       },
     };
   }
 
-    // ------------------------------- get theme mappings ----------------------------
+  // ------------------------------- get theme mappings ----------------------------
   async getThemeMappings({ themeId, module = null }) {
     if (!mongoose.isValidObjectId(themeId)) {
       throw new ApiError(400, 'Invalid Theme ID');
@@ -399,85 +386,67 @@ class ThemeMediaMappingService {
     const filter = {
       themeId,
       status: 'active',
-      'meta.deletedAt': null,
     };
 
     if (module && module !== 'all') {
-      filter.module = normalizeModule(module);
+      const normModule = normalizeModule(module);
+      const modConfig = MODULES_CONFIG[normModule];
+      if (modConfig) {
+        const modRecordIds = await modConfig.model.distinct('_id', { ...modConfig.filter, 'meta.deletedAt': null });
+        filter.recordId = { $in: modRecordIds };
+      }
     }
 
     const mappings = await ThemeMediaMapping.find(filter)
-      .populate('mediaId')
-      .sort({ 'meta.createdAt': -1 })
+      .populate('galleryId')
       .lean();
 
-    return mappings.map((m) => ({
-      _id: m._id,
-      themeId: m.themeId,
-      module: m.module,
-      recordId: m.recordId,
-      mediaId: m.mediaId?._id || m.mediaId,
-      device: m.device,
-      placement: m.placement,
-      status: m.status,
-      image: m.mediaId?.image || null,
-      imageUrl: m.mediaId?.image?.url || null,
-      imageKey: m.mediaId?.image?.key || null,
-      createdAt: m.meta?.createdAt || m.createdAt,
-      updatedAt: m.meta?.updatedAt || m.updatedAt,
-    }));
+    return mappings.map((m) => {
+      const gItem = m.galleryId;
+      const gId = gItem?._id || gItem;
+      return {
+        _id: m._id,
+        themeId: m.themeId,
+        recordId: m.recordId,
+        galleryId: gId,
+        status: m.status,
+        image: gItem?.image || null,
+        imageUrl: gItem?.image?.url || null,
+        imageKey: gItem?.image?.key || null,
+      };
+    });
   }
 
-    // ------------------------------- upsert theme mapping ----------------------------
+  // ------------------------------- upsert theme mapping ----------------------------
   async upsertMapping({
     themeId,
-    module,
     recordId,
+    galleryId,
     mediaId,
-    device = 'common',
-    placement = 'primary',
     status = 'active',
-    userId = null,
   }) {
+    const targetGalleryId = galleryId || mediaId;
     if (!mongoose.isValidObjectId(themeId)) throw new ApiError(400, 'Invalid Theme ID');
     if (!mongoose.isValidObjectId(recordId)) throw new ApiError(400, 'Invalid Record ID');
-    if (!mongoose.isValidObjectId(mediaId)) throw new ApiError(400, 'Invalid Media ID');
-
-    const normModule = normalizeModule(module);
+    if (!mongoose.isValidObjectId(targetGalleryId)) throw new ApiError(400, 'Invalid Gallery ID');
 
     // Verify theme exists
     const theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null }).lean();
     if (!theme) throw new ApiError(404, 'Theme not found');
 
     // Verify Gallery media item exists
-    const galleryAsset = await Gallery.findOne({ _id: mediaId, 'meta.deletedAt': null }).lean();
+    const galleryAsset = await Gallery.findOne({ _id: targetGalleryId, 'meta.deletedAt': null }).lean();
     if (!galleryAsset) throw new ApiError(404, 'Gallery media asset not found');
-
-    const cleanDevice = ['desktop', 'mobile', 'app', 'common'].includes(device)
-      ? device
-      : 'common';
-    const cleanPlacement = placement ? String(placement).trim() : 'primary';
 
     const filter = {
       themeId,
-      module: normModule,
       recordId,
-      placement: cleanPlacement,
-      device: cleanDevice,
     };
 
     const update = {
       $set: {
-        mediaId,
+        galleryId: targetGalleryId,
         status: status || 'active',
-        'meta.updatedBy': userId,
-        'meta.updatedAt': new Date(),
-        'meta.deletedAt': null,
-        'meta.deletedBy': null,
-      },
-      $setOnInsert: {
-        'meta.createdBy': userId,
-        'meta.createdAt': new Date(),
       },
     };
 
@@ -485,38 +454,36 @@ class ThemeMediaMappingService {
       upsert: true,
       returnDocument: 'after',
       setDefaultsOnInsert: true,
-    }).populate('mediaId');
+    }).populate('galleryId');
 
-    // Bi-directionally sync linkedRecord in Gallery module
     await Gallery.updateOne(
-      { _id: mediaId },
+      { _id: targetGalleryId },
       {
         $set: {
           themeId,
-          linkedRecord: { module: normModule, recordId },
           'meta.updatedAt': new Date(),
         },
       }
     );
+
+    const gAsset = mapping.galleryId;
+    const gAssetId = gAsset?._id || gAsset;
 
     return {
       message: 'Theme media mapping saved successfully.',
       mapping: {
         _id: mapping._id,
         themeId: mapping.themeId,
-        module: mapping.module,
         recordId: mapping.recordId,
-        mediaId: mapping.mediaId?._id || mapping.mediaId,
-        device: mapping.device,
-        placement: mapping.placement,
+        galleryId: gAssetId,
         status: mapping.status,
-        imageUrl: mapping.mediaId?.image?.url || null,
-        imageKey: mapping.mediaId?.image?.key || null,
+        imageUrl: gAsset?.image?.url || null,
+        imageKey: gAsset?.image?.key || null,
       },
     };
   }
 
-    // ------------------------------- delete theme mapping ----------------------------
+  // ------------------------------- delete theme mapping ----------------------------
   async deleteMapping({ themeId, mappingId }) {
     if (!mongoose.isValidObjectId(themeId) || !mongoose.isValidObjectId(mappingId)) {
       throw new ApiError(400, 'Invalid Theme ID or Mapping ID');
@@ -531,48 +498,28 @@ class ThemeMediaMappingService {
       throw new ApiError(404, 'Media mapping not found');
     }
 
-    // Unlink in Gallery
-    if (deleted.mediaId) {
-      await Gallery.updateOne(
-        { _id: deleted.mediaId, 'linkedRecord.recordId': deleted.recordId },
-        { $set: { linkedRecord: null, 'meta.updatedAt': new Date() } }
-      );
-    }
-
     return {
       message: 'Media mapping removed successfully. Original record and gallery asset remain intact.',
       id: mappingId,
     };
   }
 
-  async deleteMappingByTarget({ themeId, module, recordId, device = 'common', placement = 'primary' }) {
+  async deleteMappingByTarget({ themeId, recordId }) {
     if (!mongoose.isValidObjectId(themeId) || !mongoose.isValidObjectId(recordId)) {
       throw new ApiError(400, 'Invalid Theme ID or Record ID');
     }
 
-    const normModule = normalizeModule(module);
-    const filter = {
+    await ThemeMediaMapping.deleteMany({
       themeId,
-      module: normModule,
       recordId,
-      placement: placement || 'primary',
-      device: device || 'common',
-    };
-
-    await ThemeMediaMapping.deleteMany(filter);
-
-    // Unlink records in Gallery for this target record
-    await Gallery.updateMany(
-      { themeId, 'linkedRecord.recordId': recordId },
-      { $set: { linkedRecord: null, 'meta.updatedAt': new Date() } }
-    );
+    });
 
     return {
       message: 'Theme media mapping removed successfully.',
     };
   }
 
-  async bulkSaveMappings({ themeId, mappings = [], userId = null }) {
+  async bulkSaveMappings({ themeId, mappings = [] }) {
     if (!mongoose.isValidObjectId(themeId)) throw new ApiError(400, 'Invalid Theme ID');
     if (!Array.isArray(mappings) || mappings.length === 0) {
       throw new ApiError(400, 'Mappings array cannot be empty');
@@ -581,13 +528,13 @@ class ThemeMediaMappingService {
     const theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null }).lean();
     if (!theme) throw new ApiError(404, 'Theme not found');
 
-    const validMediaIds = mappings
-      .map((m) => m.mediaId)
+    const validGalleryIds = mappings
+      .map((m) => m.galleryId || m.mediaId)
       .filter((id) => mongoose.isValidObjectId(id));
 
     // Verify all media assets exist
     const existingMedia = await Gallery.find({
-      _id: { $in: validMediaIds },
+      _id: { $in: validGalleryIds },
       'meta.deletedAt': null,
     })
       .select('_id')
@@ -598,38 +545,22 @@ class ThemeMediaMappingService {
     const skipped = [];
 
     mappings.forEach((m, idx) => {
-      if (!mongoose.isValidObjectId(m.recordId) || !existingMediaSet.has(String(m.mediaId))) {
-        skipped.push({ index: idx, error: 'Invalid recordId or mediaId' });
+      const gId = m.galleryId || m.mediaId;
+      if (!mongoose.isValidObjectId(m.recordId) || !existingMediaSet.has(String(gId))) {
+        skipped.push({ index: idx, error: 'Invalid recordId or galleryId' });
         return;
       }
-
-      const normMod = normalizeModule(m.module);
-      const cleanDevice = ['desktop', 'mobile', 'app', 'common'].includes(m.device)
-        ? m.device
-        : 'common';
-      const cleanPlacement = m.placement ? String(m.placement).trim() : 'primary';
 
       ops.push({
         updateOne: {
           filter: {
             themeId,
-            module: normMod,
             recordId: m.recordId,
-            placement: cleanPlacement,
-            device: cleanDevice,
           },
           update: {
             $set: {
-              mediaId: m.mediaId,
+              galleryId: gId,
               status: m.status || 'active',
-              'meta.updatedBy': userId,
-              'meta.updatedAt': new Date(),
-              'meta.deletedAt': null,
-              'meta.deletedBy': null,
-            },
-            $setOnInsert: {
-              'meta.createdBy': userId,
-              'meta.createdAt': new Date(),
             },
           },
           upsert: true,
@@ -665,17 +596,48 @@ class ThemeMediaMappingService {
 
     const breakdown = await Promise.all(
       modules.map(async (mod) => {
-        const [total, mappedRecordIds] = await Promise.all([
-          mod.model.countDocuments({ ...mod.filter, 'meta.deletedAt': null }),
-          ThemeMediaMapping.distinct('recordId', {
-            themeId,
-            module: mod.key,
-            status: 'active',
-            'meta.deletedAt': null,
-          }),
-        ]);
+        const modRecordIds = await mod.model.distinct('_id', { ...mod.filter, 'meta.deletedAt': null });
+        let total = modRecordIds.length;
+        let mapped = 0;
 
-        const mapped = mappedRecordIds.length;
+        if (mod.key === 'collectionbanner') {
+          const banners = await Banner.find({ ...mod.filter, 'meta.deletedAt': null })
+            .select('collectionImages._id')
+            .lean();
+          const tileIds = [];
+          banners.forEach((b) => {
+            if (Array.isArray(b.collectionImages)) {
+              b.collectionImages.forEach((t) => {
+                if (t._id) tileIds.push(t._id);
+              });
+            }
+          });
+          const allTargetIds = [...modRecordIds, ...tileIds];
+          const mappedRecordIds = allTargetIds.length > 0
+            ? await ThemeMediaMapping.distinct('recordId', {
+                themeId,
+                recordId: { $in: allTargetIds },
+                status: 'active',
+              })
+            : [];
+          const totalCount = tileIds.length > 0 ? tileIds.length : modRecordIds.length;
+          const mappedSet = new Set(mappedRecordIds.map(String));
+          const mappedCount = tileIds.length > 0
+            ? tileIds.filter((tid) => mappedSet.has(String(tid))).length
+            : mappedRecordIds.length;
+          total = totalCount;
+          mapped = mappedCount;
+        } else {
+          const mappedRecordIds = total > 0
+            ? await ThemeMediaMapping.distinct('recordId', {
+                themeId,
+                recordId: { $in: modRecordIds },
+                status: 'active',
+              })
+            : [];
+          mapped = mappedRecordIds.length;
+        }
+
         const missing = Math.max(0, total - mapped);
 
         return {
@@ -793,96 +755,90 @@ class ThemeMediaMappingService {
     const isArray = Array.isArray(records);
     const recordList = isArray ? records : [records];
     const recordIds = recordList.map((r) => r._id).filter(Boolean);
+    const tileIds = [];
+    recordList.forEach((r) => {
+      if (Array.isArray(r.collectionImages)) {
+        r.collectionImages.forEach((t) => {
+          if (t._id) tileIds.push(t._id);
+        });
+      }
+    });
 
-    if (recordIds.length === 0) return records;
+    const allTargetIds = [...recordIds, ...tileIds];
+    if (allTargetIds.length === 0) return records;
 
     const mappings = await ThemeMediaMapping.find({
       themeId,
-      module: normModule,
-      recordId: { $in: recordIds },
+      recordId: { $in: allTargetIds },
       status: 'active',
-      'meta.deletedAt': null,
     })
-      .populate('mediaId')
+      .populate('galleryId')
       .lean();
 
     if (mappings.length === 0) return records;
 
-    // Group mappings by recordId
     const mapByRecord = new Map();
     mappings.forEach((m) => {
-      const rId = String(m.recordId);
-      if (!mapByRecord.has(rId)) mapByRecord.set(rId, []);
-      mapByRecord.get(rId).push(m);
+      mapByRecord.set(String(m.recordId), m);
     });
 
     const resolved = recordList.map((item) => {
       const rId = String(item._id);
-      const mList = mapByRecord.get(rId);
-      if (!mList || mList.length === 0) return item;
+      const mapping = mapByRecord.get(rId);
 
-      const clone = { ...item, isThemeMedia: true };
+      const clone = { ...item };
+      let hasThemeOverride = false;
 
-      if (normModule === 'category') {
-        const iconMap = mList.find((m) => m.placement === 'icon');
-        const bannerMap = mList.find((m) => m.placement === 'banner');
-        if (iconMap?.mediaId?.image?.url) {
-          clone.icon = {
-            url: iconMap.mediaId.image.url,
-            key: iconMap.mediaId.image.key || '',
-          };
-        }
-        if (bannerMap?.mediaId?.image?.url) {
-          clone.banner = {
-            url: bannerMap.mediaId.image.url,
-            key: bannerMap.mediaId.image.key || '',
-          };
-        }
-      } else if (normModule === 'celebrate') {
-        const primaryMap = mList.find((m) => m.placement === 'primary' || !m.placement);
-        if (primaryMap?.mediaId?.image?.url) {
-          clone.image = {
-            url: primaryMap.mediaId.image.url,
-            key: primaryMap.mediaId.image.key || '',
-          };
-        }
-      } else {
-        // Banner modules
-        const desktopMap = mList.find(
-          (m) => (m.device === 'desktop' || m.device === 'common') && m.placement === 'primary'
-        );
-        const mobileMap = mList.find(
-          (m) => m.device === 'mobile' || m.placement === 'mobile'
-        );
+      // Map individual collectionImages tiles if any
+      if (Array.isArray(clone.collectionImages) && clone.collectionImages.length > 0) {
+        clone.collectionImages = clone.collectionImages.map((tile) => {
+          const tId = String(tile._id);
+          const tMap = mapByRecord.get(tId);
+          if (tMap?.galleryId?.image?.url) {
+            hasThemeOverride = true;
+            return {
+              ...tile,
+              url: tMap.galleryId.image.url,
+              key: tMap.galleryId.image.key || '',
+              isThemeMedia: true,
+            };
+          }
+          return tile;
+        });
+      }
 
-        if (desktopMap?.mediaId?.image?.url) {
-          clone.image = {
-            url: desktopMap.mediaId.image.url,
-            key: desktopMap.mediaId.image.key || '',
-          };
-        }
-        if (mobileMap?.mediaId?.image?.url) {
-          clone.mobileImage = {
-            url: mobileMap.mediaId.image.url,
-            key: mobileMap.mediaId.image.key || '',
-          };
-        }
-
-        // Collection banner tiles: tile:0, tile:1, etc.
-        const tileMaps = mList.filter((m) => String(m.placement || '').startsWith('tile:'));
-        if (tileMaps.length > 0 && Array.isArray(clone.collectionImages)) {
-          clone.collectionImages = clone.collectionImages.map((tile, idx) => {
-            const tileMap = tileMaps.find((tm) => tm.placement === `tile:${idx}`);
-            if (tileMap?.mediaId?.image?.url) {
-              return {
-                ...tile,
-                url: tileMap.mediaId.image.url,
-                key: tileMap.mediaId.image.key || '',
+      if (mapping) {
+        const gAsset = mapping.galleryId;
+        const img = gAsset?.image;
+        if (img?.url) {
+          hasThemeOverride = true;
+          if (normModule === 'category') {
+            clone.banner = {
+              url: img.url,
+              key: img.key || '',
+            };
+          } else if (normModule === 'celebrate') {
+            clone.image = {
+              url: img.url,
+              key: img.key || '',
+            };
+          } else {
+            clone.image = {
+              url: img.url,
+              key: img.key || '',
+            };
+            if (!clone.mobileImage || clone.mobileImage.url) {
+              clone.mobileImage = {
+                url: img.url,
+                key: img.key || '',
               };
             }
-            return tile;
-          });
+          }
         }
+      }
+
+      if (hasThemeOverride) {
+        clone.isThemeMedia = true;
       }
 
       return clone;

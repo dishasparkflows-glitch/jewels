@@ -1,15 +1,16 @@
-const mongoose = require('mongoose');
 const DiamondPrice = require('./diamondPrice.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
+const POPULATE_FIELDS = [
+  { path: 'diamondTypeId', select: '_id name' },
+  { path: 'diamondShapeId', select: '_id name' },
+  { path: 'diamondClarityId', select: '_id name' },
+  { path: 'diamondColorId', select: '_id name' },
+];
+
 function getSafePopulates() {
-  const fields = [];
-  if (mongoose.models['DiamondType']) fields.push({ path: 'diamondTypeId', select: '_id name' });
-  if (mongoose.models['DiamondShape']) fields.push({ path: 'diamondShapeId', select: '_id name' });
-  if (mongoose.models['DiamondClarity']) fields.push({ path: 'diamondClarityId', select: '_id name' });
-  if (mongoose.models['DiamondColor']) fields.push({ path: 'diamondColorId', select: '_id name' });
-  return fields;
+  return POPULATE_FIELDS;
 }
 
 class DiamondPriceService {

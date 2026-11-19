@@ -188,18 +188,10 @@ const themeSettingsSchema = new mongoose.Schema(
   { versionKey: false }
 );
 
-const Theme =
-  mongoose.models.Theme ||
-  mongoose.model('Theme', themeSchema, 'themes');
-
-const ThemeSettings =
-  mongoose.models.ThemeSettings ||
-  mongoose.model('ThemeSettings', themeSettingsSchema, 'theme_settings');
+const Theme = mongoose.model('Theme', themeSchema, 'themes');
+const ThemeSettings = mongoose.model('ThemeSettings', themeSettingsSchema, 'theme_settings');
 
 module.exports = {
   Theme,
   ThemeSettings,
-  // Backwards compatibility aliases
-  WebsiteTheme: Theme,
-  WebsiteThemeSettings: ThemeSettings,
 };

@@ -8,33 +8,16 @@ const themeMediaMappingSchema = new mongoose.Schema(
       required: [true, 'Theme ID is required'],
       index: true,
     },
-    module: {
-      type: String,
-      required: [true, 'Module name is required'],
-      trim: true,
-      index: true,
-    },
     recordId: {
       type: mongoose.Schema.Types.ObjectId,
       required: [true, 'Record ID is required'],
       index: true,
     },
-    mediaId: {
+    galleryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Gallery',
-      required: [true, 'Media asset ID is required'],
+      required: [true, 'Gallery asset ID is required'],
       index: true,
-    },
-    device: {
-      type: String,
-      enum: ['desktop', 'mobile', 'app', 'common'],
-      default: 'common',
-      required: true,
-    },
-    placement: {
-      type: String,
-      default: 'primary',
-      trim: true,
     },
     status: {
       type: String,
@@ -50,15 +33,11 @@ const themeMediaMappingSchema = new mongoose.Schema(
   }
 );
 
-
-// Unique compound index: one document per theme, module, record, placement, device
+// Unique compound index: one document per theme and record
 themeMediaMappingSchema.index(
   {
     themeId: 1,
-    module: 1,
     recordId: 1,
-    placement: 1,
-    device: 1,
   },
   {
     unique: true,
@@ -66,9 +45,5 @@ themeMediaMappingSchema.index(
 );
 
 themeMediaMappingSchema.index({ themeId: 1, status: 1 });
-themeMediaMappingSchema.index({ themeId: 1, module: 1, status: 1 });
 
-module.exports =
-  mongoose.models.ThemeMediaMapping ||
-  mongoose.model('ThemeMediaMapping', themeMediaMappingSchema, 'theme_media_mappings');
-
+module.exports = mongoose.model('ThemeMediaMapping', themeMediaMappingSchema, 'theme_media_mappings');

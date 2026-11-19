@@ -10,13 +10,15 @@ const MetalPurity = require('../metalPurity/metalPurity.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
+const POPULATE_FIELDS = [
+  { path: 'colorId' },
+  { path: 'clarityId' },
+  { path: 'shapeId' },
+  { path: 'typeId' },
+];
+
 function getSafePopulates() {
-  const fields = [];
-  if (mongoose.models['DiamondColor']) fields.push({ path: 'colorId' });
-  if (mongoose.models['DiamondClarity']) fields.push({ path: 'clarityId' });
-  if (mongoose.models['DiamondShape']) fields.push({ path: 'shapeId' });
-  if (mongoose.models['DiamondType']) fields.push({ path: 'typeId' });
-  return fields;
+  return POPULATE_FIELDS;
 }
 
 class DiamondService {

@@ -15,14 +15,12 @@ class CouponController {
   });
 
   // ------------------------------- get all coupons ----------------------------
-
   getAll = catchAsync(async (req, res) => {
     const { items, pagination } = await couponService.getAll(req.query);
     ApiResponse.paginated(res, items, pagination, 'Coupons retrieved successfully');
   });
 
   // ------------------------------- get coupon lookup ----------------------------
-
   getLookup = catchAsync(async (req, res) => {
     const cacheKey = `coupons:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
     const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => couponService.getLookup(req.query));
@@ -30,21 +28,18 @@ class CouponController {
   });
 
   // ------------------------------- get one coupon ----------------------------
-
   getOne = catchAsync(async (req, res) => {
     const item = await couponService.getOne(req.params.id);
     ApiResponse.success(res, item, 'Coupon retrieved successfully');
   });
 
   // ------------------------------- get coupon by code ----------------------------
-
   getByCode = catchAsync(async (req, res) => {
     const item = await couponService.getByCode(req.params.code);
     ApiResponse.success(res, item, 'Coupon retrieved successfully');
   });
 
   // ------------------------------- validate coupon ----------------------------
-
   validateCoupon = catchAsync(async (req, res) => {
     const { code, cartAmount } = req.body;
     const result = await couponService.validateCoupon(code, cartAmount);
@@ -52,7 +47,6 @@ class CouponController {
   });
 
   // ------------------------------- update coupon ----------------------------
-
   update = catchAsync(async (req, res) => {
     const item = await couponService.update(req.params.id, req.body);
     await redisClient.deleteByPattern('coupons:*');
@@ -68,7 +62,6 @@ class CouponController {
   });
 
   // ------------------------------- delete coupon ----------------------------
-
   delete = catchAsync(async (req, res) => {
     const result = await couponService.delete(req.params.id);
     await redisClient.deleteByPattern('coupons:*');
@@ -76,7 +69,6 @@ class CouponController {
   });
 
   // ------------------------------- manual trigger cron / expiration ----------------------------
-
   runCron = catchAsync(async (req, res) => {
     const couponResult = await expireCoupons('manual_admin_trigger');
 

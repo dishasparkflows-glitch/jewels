@@ -1,4 +1,5 @@
 const axios = require('axios');
+const mongoose = require('mongoose');
 
 const ORNATE_BASE_URL = process.env.ORNATE_BASE_URL;
 const ORNATE_USERNAME = process.env.ORNATE_USERNAME;
@@ -152,9 +153,22 @@ function generateProductSlug(title = '', identifier = '') {
     .replace(/^-+|-+$/g, '');
 }
 
+function isSpecialType(obj) {
+  if (!obj || typeof obj !== 'object') return false;
+  return (
+    obj._bsontype === 'ObjectId' ||
+    obj.constructor?.name === 'ObjectId' ||
+    (mongoose?.Types?.ObjectId && obj instanceof mongoose.Types.ObjectId) ||
+    obj instanceof Date ||
+    obj instanceof RegExp ||
+    Buffer.isBuffer(obj)
+  );
+}
+
 // ------------------------------- clean payload ----------------------------
 function cleanPayload(obj) {
   if (obj === null || obj === undefined) return undefined;
+  if (isSpecialType(obj)) return obj;
   if (typeof obj !== 'object') {
     if (typeof obj === 'string') {
       const trimmed = obj.trim();
@@ -166,14 +180,24 @@ function cleanPayload(obj) {
     if (obj.length === 0) return undefined;
     const cleanedArr = obj
       .map((item) => cleanPayload(item))
-      .filter((item) => item !== undefined && item !== null && (typeof item !== 'object' || Object.keys(item).length > 0));
+      .filter((item) => {
+        if (item === undefined || item === null) return false;
+        if (isSpecialType(item)) return true;
+        if (typeof item === 'object') return Object.keys(item).length > 0;
+        return true;
+      });
     return cleanedArr.length > 0 ? cleanedArr : undefined;
   }
   const result = {};
   for (const [key, value] of Object.entries(obj)) {
     const cleaned = cleanPayload(value);
     if (cleaned !== undefined && cleaned !== null) {
-      if (typeof cleaned === 'object' && !Array.isArray(cleaned) && Object.keys(cleaned).length === 0) {
+      if (
+        typeof cleaned === 'object' &&
+        !Array.isArray(cleaned) &&
+        !isSpecialType(cleaned) &&
+        Object.keys(cleaned).length === 0
+      ) {
         continue;
       }
       result[key] = cleaned;
@@ -264,6 +288,10 @@ function buildProductPayloadFromLabel(label, {
     productType: 'silver',
     isOrnate: true,
     stockStatus: isSold ? 'Out of Stock' : 'In Stock',
+    visibility: {
+      web: existingProduct?.visibility?.web !== undefined ? Boolean(existingProduct.visibility.web) : true,
+      app: existingProduct?.visibility?.app !== undefined ? Boolean(existingProduct.visibility.app) : true,
+    },
   };
 
   if (categoryId) {

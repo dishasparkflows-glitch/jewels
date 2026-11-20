@@ -268,7 +268,6 @@ const productSchema = new mongoose.Schema(
     // ── Status & Metadata ─────────────────────────────────────
     stockStatus: {
       type: String,
-      enum: ['In Stock', 'Out of Stock', 'Made to Order'],
     },
     status: {
       type: String,

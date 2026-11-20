@@ -15,38 +15,9 @@ class FeaturedService {
       if (existing) {
         throw new ApiError(409, `Featured item "${data.name}" already exists`);
       }
-    } else {
-      data.name = '';
     }
 
-    delete data.products;
-    delete data.productCount;
-    delete data.position;
-    delete data.themeId;
-    const incomingPlacement = data.placement;
-    const incomingOrder = data.order;
-    delete data.placement;
-    delete data.order;
-
-    const productIds = data.productIds || [];
-    if (Array.isArray(productIds)) {
-      data.productIds = productIds;
-    }
-
-    if (!data.display) {
-      data.display = {};
-    }
-    if (!data.display.type && (data.type || incomingPlacement)) {
-      data.display.type = data.type || incomingPlacement;
-    }
-    if (!data.display.platform && data.platform) {
-      data.display.platform = data.platform;
-    }
-    if (data.display.order === undefined && typeof incomingOrder === 'number') {
-      data.display.order = incomingOrder;
-    }
-
-    if (data.categoryId === '' || data.categoryId === undefined) {
+    if (data.categoryId === '') {
       data.categoryId = null;
     }
 
@@ -183,28 +154,6 @@ class FeaturedService {
       if (existing) {
         throw new ApiError(409, `Featured item "${data.name}" already exists`);
       }
-    }
-
-    delete data.products;
-    delete data.productCount;
-    delete data.position;
-    delete data.themeId;
-    const incomingPlacement = data.placement;
-    const incomingOrder = data.order;
-    delete data.placement;
-    delete data.order;
-
-    if (!data.display) {
-      data.display = {};
-    }
-    if (!data.display.type && (data.type || incomingPlacement)) {
-      data.display.type = data.type || incomingPlacement;
-    }
-    if (!data.display.platform && data.platform) {
-      data.display.platform = data.platform;
-    }
-    if (data.display.order === undefined && typeof incomingOrder === 'number') {
-      data.display.order = incomingOrder;
     }
 
     if (data.categoryId === '') {

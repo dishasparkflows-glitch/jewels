@@ -9,7 +9,6 @@ class CodSequenceService {
   }
 
   // ------------------------------- get one cod sequence ----------------------------
-
   async getOne(id) {
     const item = await CodSequence.findOne({ _id: id });
     if (!item) {
@@ -19,7 +18,6 @@ class CodSequenceService {
   }
 
   // ------------------------------- get all cod sequences ----------------------------
-
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
@@ -48,7 +46,6 @@ class CodSequenceService {
   }
 
   // ------------------------------- get cod sequence lookup ----------------------------
-
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null, status: 'active' };
     return await CodSequence.find(filter)
@@ -94,7 +91,6 @@ class CodSequenceService {
   }
 
   // ------------------------------- update cod sequence ----------------------------
-
   async update(id, data) {
     const item = await CodSequence.findOneAndUpdate(
       { _id: id },
@@ -126,7 +122,6 @@ class CodSequenceService {
   }
 
   // ------------------------------- delete cod sequence ----------------------------
-
   async delete(id) {
     const item = await CodSequence.findOneAndUpdate(
       { _id: id },

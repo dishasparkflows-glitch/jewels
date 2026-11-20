@@ -305,7 +305,10 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
 
   // Resolve "Silver Collection" category for all ornate products
   const silverCategory = await Category.findOne({
-    name: { $regex: /^Silver Collection$/i },
+    $or: [
+      { slug: 'silver-collection' },
+      { name: { $regex: /silver collection/i } },
+    ],
   }).select('_id');
   const silverCategoryId = silverCategory?._id || null;
 
@@ -320,7 +323,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
 
   const existingProducts = allIdentifiers.size > 0
     ? await Product.find(buildProductIdentifierQuery(allIdentifiers))
-        .select('colorImages basicInfo.sku basicInfo.slug ornate pricing')
+        .select('colorImages basicInfo.sku basicInfo.slug ornate pricing categoryIds visibility')
         .lean()
     : [];
 
@@ -469,6 +472,10 @@ async function syncOrnateSoldLabels() {
             (label.BarcodeNo ? String(label.BarcodeNo).trim() : '') || sku
           ),
           status: 'draft',
+          visibility: {
+            web: true,
+            app: true,
+          },
           'ornate.tagNo': tagNo,
           'ornate.barcode': String(label.BarcodeNo || uniqueLabelID),
         }) || {},

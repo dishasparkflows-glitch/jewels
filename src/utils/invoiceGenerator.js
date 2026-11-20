@@ -453,12 +453,6 @@ async function generateInvoicePDF(order, options = {}) {
         characterSpacing: 1,
       });
 
-      doc.font('Sans').fontSize(6.5).fillColor('#786B5D').text('ORIGINAL FOR RECIPIENT', badgeX, y + 32, {
-        width: badgeWidth,
-        align: 'center',
-        characterSpacing: 1,
-      });
-
       y += 56;
 
       // ─── 2. Order Information Row ───
@@ -780,30 +774,40 @@ async function generateInvoicePDF(order, options = {}) {
       }
 
       const fTextY = footerY + 8;
-      let curX = leftMargin;
+
+      // Calculate widths in advance to center footer contact info horizontally
+      doc.font('Sans').fontSize(8);
+      const phoneW = doc.widthOfString(mobileNumber);
+      const emailW = doc.widthOfString(emailAddress);
+      const websiteW = doc.widthOfString(website);
+
+      const phoneItemW = 13 + phoneW;
+      const emailItemW = 15 + emailW;
+      const websiteItemW = 14 + websiteW;
+      const itemGap = 20;
+
+      const totalFooterW = phoneItemW + itemGap + emailItemW + itemGap + websiteItemW;
+      let curX = Math.round((pageWidth - totalFooterW) / 2);
 
       // Phone
       drawPhoneIcon(doc, curX, fTextY + 1, '#8C6D46');
       doc.font('Sans').fontSize(8).fillColor('#4A3E31');
       doc.text(mobileNumber, curX + 13, fTextY, { lineBreak: false });
-      const phoneW = doc.widthOfString(mobileNumber);
       const cleanPhone = mobileNumber.replace(/\s+/g, '');
       doc.link(curX + 13, fTextY - 1, phoneW, 11, `tel:${cleanPhone}`);
-      curX += 13 + phoneW + 18;
+      curX += phoneItemW + itemGap;
 
       // Email
       drawMailIcon(doc, curX, fTextY + 1.5, '#8C6D46');
       doc.font('Sans').fontSize(8).fillColor('#4A3E31');
       doc.text(emailAddress, curX + 15, fTextY, { lineBreak: false });
-      const emailW = doc.widthOfString(emailAddress);
       doc.link(curX + 15, fTextY - 1, emailW, 11, `mailto:${emailAddress}`);
-      curX += 15 + emailW + 18;
+      curX += emailItemW + itemGap;
 
       // Website
       drawGlobeIcon(doc, curX, fTextY + 0.5, '#8C6D46');
       doc.font('Sans').fontSize(8).fillColor('#4A3E31');
       doc.text(website, curX + 14, fTextY, { lineBreak: false });
-      const websiteW = doc.widthOfString(website);
       const webUrl = website.startsWith('http') ? website : `https://${website}`;
       doc.link(curX + 14, fTextY - 1, websiteW, 11, webUrl);
 

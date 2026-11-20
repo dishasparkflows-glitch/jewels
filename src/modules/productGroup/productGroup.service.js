@@ -1120,7 +1120,21 @@ class ProductGroupService {
       const groupCode = await this.generateGroupCode();
 
       // Pull from source group
-      await ProductGroup.findByIdAndUpdate(sourceGroupId, sourceUpdate);
+      const updatedSource = await ProductGroup.findByIdAndUpdate(sourceGroupId, sourceUpdate, { returnDocument: 'after' });
+      let sourceGroupDeleted = false;
+      if (!updatedSource?.productIds?.length) {
+        await ProductGroup.findByIdAndUpdate(sourceGroupId, {
+          $set: {
+            productIds: [],
+            primaryProductId: null,
+            'meta.deletedAt': new Date(),
+            'meta.deletedBy': userId,
+          },
+        });
+        sourceGroupDeleted = true;
+      } else {
+        await this.recalculateGroupRepresentative(sourceGroupId);
+      }
 
       // Create new group
       const newGroup = await ProductGroup.create({
@@ -1146,6 +1160,7 @@ class ProductGroupService {
         targetGroupId: newGroup._id,
         newGroup,
         movedCount: validIds.length,
+        sourceGroupDeleted,
       };
     }
 
@@ -1161,7 +1176,21 @@ class ProductGroupService {
     if (!targetGroup) throw new ApiError(404, 'Target group not found');
 
     // Pull from source
-    await ProductGroup.findByIdAndUpdate(sourceGroupId, sourceUpdate);
+    const updatedSource = await ProductGroup.findByIdAndUpdate(sourceGroupId, sourceUpdate, { returnDocument: 'after' });
+    let sourceGroupDeleted = false;
+    if (!updatedSource?.productIds?.length) {
+      await ProductGroup.findByIdAndUpdate(sourceGroupId, {
+        $set: {
+          productIds: [],
+          primaryProductId: null,
+          'meta.deletedAt': new Date(),
+          'meta.deletedBy': userId,
+        },
+      });
+      sourceGroupDeleted = true;
+    } else {
+      await this.recalculateGroupRepresentative(sourceGroupId);
+    }
 
     // Push to target
     await ProductGroup.findByIdAndUpdate(targetGroupId, {
@@ -1169,7 +1198,6 @@ class ProductGroupService {
       $set: { 'meta.updatedBy': userId, 'meta.updatedAt': new Date() },
     });
 
-    await this.recalculateGroupRepresentative(sourceGroupId);
     await this.recalculateGroupRepresentative(targetGroupId);
 
     return {
@@ -1177,6 +1205,7 @@ class ProductGroupService {
       sourceGroupId,
       targetGroupId,
       movedCount: validIds.length,
+      sourceGroupDeleted,
     };
   }
 

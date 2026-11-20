@@ -217,8 +217,8 @@ class ThemeMediaMappingService {
         targetLink = rec.slug ? `/category/${rec.slug}` : '';
       } else if (normModule === 'celebrate') {
         title = rec.name || rec.title || 'Featured Showcase Card';
-        subtitle = rec.placement || 'Celebrate & Gifts Section';
-        slotLabel = 'Homepage Celebrate Card';
+        subtitle = rec.display?.type ? `${rec.display.type} Showcase` : (rec.placement || 'Celebrate & Gifts Section');
+        slotLabel = `${rec.display?.type || 'Celebrate'} Showcase Card`;
         originalDesktopImage = rec.image?.url || null;
         originalMobileImage = rec.image?.url || null;
         targetLink = rec.link || '';
@@ -283,6 +283,8 @@ class ThemeMediaMappingService {
         ? tiles.some((t) => t.isMapped)
         : isMapped;
 
+      const effectiveType = rec.display?.type || rec.placement || normModule;
+
       return {
         ...rec,
         _id: rec._id,
@@ -290,7 +292,8 @@ class ThemeMediaMappingService {
         subtitle,
         slotLabel,
         targetLink,
-        type: rec.display?.type || rec.placement || normModule,
+        type: effectiveType,
+        placement: effectiveType,
         platform: rec.display?.platform || 'web',
         order: rec.display?.order ?? rec.order ?? 0,
         status: rec.status || 'active',

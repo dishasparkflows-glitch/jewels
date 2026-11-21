@@ -9,8 +9,9 @@ class CloudflareR2Service {
     this.accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID;
     this.secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
     this.bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME;
-    this.publicDomain = process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN || process.env.CLOUDFLARE_R2_PUBLIC_URL;
-
+    this.publicDomain =
+      process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN ||
+      process.env.CLOUDFLARE_R2_PUBLIC_URL;
     const endpoint =
       process.env.CLOUDFLARE_R2_ENDPOINT ||
       (this.accountId ? `https://${this.accountId}.r2.cloudflarestorage.com` : undefined);

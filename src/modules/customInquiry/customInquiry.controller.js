@@ -57,6 +57,15 @@ class CustomInquiryController {
     await redisClient.deleteByPattern('custom-inquiries:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete custom inquiries ----------------------------
+
+  bulkDelete = catchAsync(async (req, res) => {
+    const { ids } = req.body;
+    const result = await customInquiryService.bulkDelete(ids);
+    await redisClient.deleteByPattern('custom-inquiries:*');
+    ApiResponse.success(res, null, result.message);
+  });
 }
 
 module.exports = new CustomInquiryController();

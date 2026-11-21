@@ -43,4 +43,11 @@ router.delete(
   customInquiryController.delete
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  customInquiryController.bulkDelete
+);
+
 module.exports = router;

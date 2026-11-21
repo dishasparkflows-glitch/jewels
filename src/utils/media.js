@@ -1,7 +1,8 @@
 function publicBase() {
-  return (
-    process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN
-  ).replace(/\/+$/, '');
+  const base =
+    process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN ||
+    process.env.CLOUDFLARE_R2_PUBLIC_URL;
+  return String(base || '').replace(/\/+$/, '');
 }
 
 function publicUrl(key) {

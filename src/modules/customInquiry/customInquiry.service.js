@@ -112,6 +112,24 @@ class CustomInquiryService {
 
     return { message: 'Custom inquiry deleted successfully', id };
   }
+
+  // ------------------------------- bulk delete custom inquiries ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of inquiry IDs to delete');
+    }
+
+    const result = await CustomInquiry.updateMany(
+      { _id: { $in: ids } },
+      { $set: { 'meta.deletedAt': new Date() } }
+    );
+
+    return {
+      message: `${result.modifiedCount} custom inquiry(ies) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new CustomInquiryService();

@@ -172,9 +172,6 @@ const themeSchema = new mongoose.Schema(
 themeSchema.index({ 'schedule.startAt': 1, 'schedule.endAt': 1 });
 
 const Theme = mongoose.model('Theme', themeSchema, 'themes');
-const Setting = require('../setting/setting.model');
-
 module.exports = {
   Theme,
-  ThemeSettings: Setting,
 };

@@ -1,4 +1,5 @@
 const BlogCategory = require('./blogCategory.model');
+const { escapeRegex } = require('../../utils/string');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -53,7 +54,7 @@ class BlogCategoryService {
     }
 
     if (queryParams.search) {
-      const searchRegex = new RegExp(queryParams.search, 'i');
+      const searchRegex = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
       filter.$or = [{ name: searchRegex }, { slug: searchRegex }, { description: searchRegex }];
     }
 

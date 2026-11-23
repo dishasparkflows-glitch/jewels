@@ -242,14 +242,24 @@ function buildCustomerInfo(shippingAddress, user = null) {
 
 // ------------------------------- check order access ----------------------------
 function checkOrderAccess(order, user = null) {
-  if (user && user.role !== 'admin' && user.role !== 'super_admin') {
-    const rawOwner = order.userId;
-    const ownerId = rawOwner?._id
-      ? rawOwner._id.toString()
-      : rawOwner
-        ? rawOwner.toString()
-        : null;
+  // Admin / super admin has access
+  if (user && (user.role === 'admin' || user.role === 'super_admin')) {
+    return;
+  }
 
+  const rawOwner = order.userId;
+  const ownerId = rawOwner?._id
+    ? rawOwner._id.toString()
+    : rawOwner
+      ? rawOwner.toString()
+      : null;
+
+  // If order belongs to an authenticated user, an unauthenticated guest cannot access it
+  if (ownerId && !user) {
+    throw new ApiError(401, 'Authentication required to access this order');
+  }
+
+  if (user) {
     const currentUserId = user._id ? user._id.toString() : null;
 
     // Direct owner ID match
@@ -337,18 +347,23 @@ function buildUserOrderFilters(userId, queryParams = {}, userEmail = null) {
 function buildAdminOrderFilters(queryParams = {}) {
   const filter = { 'meta.deletedAt': null };
 
-  if (queryParams.orderStatus && queryParams.orderStatus !== 'all') {
-    const statusVal = String(queryParams.orderStatus).toLowerCase();
+  const status = queryParams.orderStatus || queryParams.status;
+  if (status && status !== 'all') {
+    const statusVal = String(status).toLowerCase();
     if (statusVal === 'pending') {
       filter.orderStatus = 'pending';
     } else if (statusVal === 'processing') {
       filter.orderStatus = {
-        $in: ['processing', 'shipped', 'out_for_delivery']
+        $in: ['processing', 'accepted']
+      };
+    } else if (statusVal === 'shipped') {
+      filter.orderStatus = {
+        $in: ['shipped', 'out_for_delivery']
       };
     } else if (statusVal.includes(',')) {
       filter.orderStatus = { $in: statusVal.split(',').map((s) => s.trim()) };
     } else {
-      filter.orderStatus = queryParams.orderStatus;
+      filter.orderStatus = statusVal;
     }
   }
   if (queryParams.paymentStatus) {
@@ -361,13 +376,20 @@ function buildAdminOrderFilters(queryParams = {}) {
     filter['payment.method'] = queryParams.paymentMethod;
   }
   if (queryParams.search) {
-    const reg = new RegExp(queryParams.search, 'i');
+    const escaped = String(queryParams.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const reg = new RegExp(escaped, 'i');
     filter.$or = [
       { orderNumber: reg },
       { 'customer.firstName': reg },
       { 'customer.lastName': reg },
       { 'customer.email': reg },
-      { 'customer.phone': reg }
+      { 'customer.phone': reg },
+      { 'shippingAddress.fullName': reg },
+      { 'shippingAddress.firstName': reg },
+      { 'shippingAddress.lastName': reg },
+      { 'shippingAddress.phone': reg },
+      { 'shippingAddress.email': reg },
+      { 'shippingAddress.city': reg }
     ];
   }
 

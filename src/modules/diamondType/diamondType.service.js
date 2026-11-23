@@ -1,4 +1,5 @@
 const DiamondType = require('./diamondType.model');
+const { escapeRegex } = require('../../utils/string');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -36,7 +37,7 @@ class DiamondTypeService {
     }
 
     if (queryParams.search) {
-      filter.name = new RegExp(queryParams.search, 'i');
+      filter.name = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
     }
 
     const [items, total] = await Promise.all([

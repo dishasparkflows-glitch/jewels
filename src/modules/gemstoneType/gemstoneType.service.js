@@ -1,4 +1,5 @@
 const GemstoneType = require('./gemstoneType.model');
+const { escapeRegex } = require('../../utils/string');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -41,8 +42,8 @@ class GemstoneTypeService {
 
     if (queryParams.search) {
       filter.$or = [
-        { name: new RegExp(queryParams.search, 'i') },
-        { birthstoneMonth: new RegExp(queryParams.search, 'i') },
+        { name: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { birthstoneMonth: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
       ];
     }
 

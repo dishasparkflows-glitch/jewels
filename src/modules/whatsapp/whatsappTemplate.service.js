@@ -1,4 +1,5 @@
 const WhatsAppTemplate = require('./whatsappTemplate.model');
+const { escapeRegex } = require('../../utils/string');
 const connectWhatsClient = require('./connectWhats.client');
 const { getFormatter } = require('../../utils/templateFormatters');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -219,9 +220,9 @@ class WhatsAppTemplateService {
     if (queryParams.isActive !== undefined) filter.isActive = queryParams.isActive === 'true';
     if (queryParams.search) {
       filter.$or = [
-        { name: new RegExp(queryParams.search, 'i') },
-        { displayName: new RegExp(queryParams.search, 'i') },
-        { body: new RegExp(queryParams.search, 'i') },
+        { name: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { displayName: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { body: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
       ];
     }
 

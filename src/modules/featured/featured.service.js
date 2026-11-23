@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { escapeRegex } = require('../../utils/string');
 const Featured = require('./featured.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -75,7 +76,7 @@ class FeaturedService {
       filter['display.platform'] = queryParams.platform;
     }
     if (queryParams.search) {
-      filter.name = new RegExp(queryParams.search, 'i');
+      filter.name = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
     }
 
     let query = Featured.find(filter)

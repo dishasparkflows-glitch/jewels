@@ -21,7 +21,6 @@ const customInquiryRoutes = require('../modules/customInquiry/customInquiry.rout
 const diamondRoutes = require('../modules/diamond/diamond.routes');
 const diamondClarityRoutes = require('../modules/diamondClarity/diamondClarity.routes');
 const diamondColorRoutes = require('../modules/diamondColor/diamondColor.routes');
-const diamondPriceRoutes = require('../modules/diamondPrice/diamondPrice.routes');
 const diamondShapeRoutes = require('../modules/diamondShape/diamondShape.routes');
 const diamondSizeRoutes = require('../modules/diamondSize/diamondSize.routes');
 const diamondTypeRoutes = require('../modules/diamondType/diamondType.routes');
@@ -95,7 +94,6 @@ router.use('/custom-inquiries', customInquiryRoutes);
 router.use('/diamonds', diamondRoutes);
 router.use('/diamond-clarities', diamondClarityRoutes);
 router.use('/diamond-colors', diamondColorRoutes);
-router.use('/diamond-prices', diamondPriceRoutes);
 router.use('/diamond-shapes', diamondShapeRoutes);
 router.use('/diamond-sizes', diamondSizeRoutes);
 router.use('/diamond-types', diamondTypeRoutes);

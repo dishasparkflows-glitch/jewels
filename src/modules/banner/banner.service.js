@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { escapeRegex } = require('../../utils/string');
 const Banner = require('./banner.model');
 const Category = require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
@@ -124,7 +125,7 @@ class BannerService {
 
     // 5. Search query
     if (queryParams.search) {
-      const searchRegex = new RegExp(queryParams.search, 'i');
+      const searchRegex = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
       andConditions.push({
         $or: [
           { 'content.title': searchRegex },

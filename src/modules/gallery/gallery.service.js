@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { escapeRegex } = require('../../utils/string');
 const Gallery = require('./gallery.model');
 const Banner = require('../banner/banner.model');
 const { Theme } = require('../theme/theme.model');
@@ -135,7 +136,7 @@ class GalleryService {
     }
 
     if (search && search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i');
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
       filter.$or = [
         { 'image.url': searchRegex },
         { 'image.key': searchRegex },
@@ -367,7 +368,7 @@ class GalleryService {
 
     // Search filter (searches URL, key, placement)
     if (search && search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i');
+      const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
       andConditions.push({
         $or: [
           { 'image.url': searchRegex },

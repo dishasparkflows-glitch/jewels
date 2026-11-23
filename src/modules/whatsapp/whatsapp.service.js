@@ -1,4 +1,5 @@
 const WhatsAppMessage = require('./whatsappMessage.model');
+const { escapeRegex } = require('../../utils/string');
 const WhatsAppTemplate = require('./whatsappTemplate.model');
 const IntegrationToken = require('./integrationToken.model');
 const connectWhatsClient = require('./connectWhats.client');
@@ -341,10 +342,10 @@ class WhatsAppService {
     }
     if (queryParams.search) {
       filter.$or = [
-        { to: new RegExp(queryParams.search, 'i') },
-        { templateName: new RegExp(queryParams.search, 'i') },
-        { message: new RegExp(queryParams.search, 'i') },
-        { renderedPreview: new RegExp(queryParams.search, 'i') },
+        { to: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { templateName: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { message: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { renderedPreview: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
       ];
     }
 

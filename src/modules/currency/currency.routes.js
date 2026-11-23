@@ -1,20 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const currencyController = require('./currency.controller');
+const { authenticate, authorize } = require('../../middleware/auth.middleware');
+const { ROLES } = require('../../config/constants');
 
 // Public & Storefront endpoints
 router.get('/', currencyController.getAll);
 router.get('/code/:code', currencyController.getByCode);
 router.get('/:id', currencyController.getOne);
 
-// Sync exchange rates
-router.post('/sync-rates', currencyController.syncLiveRates);
-router.post('/:id/sync', currencyController.syncOneRate);
+// Sync exchange rates (Admin only)
+router.post('/sync-rates', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), currencyController.syncLiveRates);
+router.post('/:id/sync', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), currencyController.syncOneRate);
 
-// Management endpoints
-router.post('/', currencyController.create);
-router.post('/bulk-delete', currencyController.bulkDelete);
-router.put('/:id', currencyController.update);
-router.delete('/:id', currencyController.delete);
+// Management endpoints (Admin only)
+router.post('/', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), currencyController.create);
+router.post('/bulk-delete', authenticate, authorize(ROLES.SUPER_ADMIN), currencyController.bulkDelete);
+router.put('/:id', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), currencyController.update);
+router.delete('/:id', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), currencyController.delete);
 
 module.exports = router;

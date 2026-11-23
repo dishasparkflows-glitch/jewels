@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { escapeRegex } = require('../../utils/string');
 const Diamond = require('./diamond.model');
 const DiamondColor = require('../diamondColor/diamondColor.model');
 const DiamondClarity = require('../diamondClarity/diamondClarity.model');
@@ -201,9 +202,9 @@ class DiamondService {
 
     if (queryParams.search) {
       filter.$or = [
-        { sku: new RegExp(queryParams.search, 'i') },
-        { title: new RegExp(queryParams.search, 'i') },
-        { description: new RegExp(queryParams.search, 'i') },
+        { sku: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { title: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { description: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
       ];
     }
 

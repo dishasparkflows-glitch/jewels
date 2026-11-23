@@ -1,4 +1,5 @@
 const CustJewelleryBeforAfter = require('./custJewelleryBeforeAfter.model');
+const { escapeRegex } = require('../../utils/string');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const cloudflareR2 = require('../../utils/cloudflareR2');
@@ -53,7 +54,7 @@ class CustJewelleryBeforeAfterService {
     }
 
     if (queryParams.search) {
-      filter.alt = new RegExp(queryParams.search, 'i');
+      filter.alt = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
     }
 
     const [items, total] = await Promise.all([

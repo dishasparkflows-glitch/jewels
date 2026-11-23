@@ -1,4 +1,5 @@
 const Coupon = require('./coupon.model');
+const { escapeRegex } = require('../../utils/string');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -54,7 +55,7 @@ class CouponService {
       filter['discount.type'] = queryParams.discounttype;
     }
     if (queryParams.search) {
-      const reg = new RegExp(queryParams.search, 'i');
+      const reg = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
       const searchCondition = { $or: [
         { 'coupon.code': reg },
         { 'coupon.description': reg },
@@ -97,7 +98,7 @@ class CouponService {
       ],
     });
     if (queryParams.search) {
-      const searchCond = { 'coupon.code': new RegExp(queryParams.search.trim(), 'i') };
+      const searchCond = { 'coupon.code': new RegExp(escapeRegex(queryParams.search.trim()), 'i') };
       if (filter.$and) {
         filter.$and.push(searchCond);
       } else {

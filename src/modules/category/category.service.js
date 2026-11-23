@@ -1,4 +1,5 @@
 const Category = require('./category.model');
+const { escapeRegex } = require('../../utils/string');
 const MenuSection = require('../menuSection/menuSection.model');
 const MenuItem = require('../menuItem/menuItem.model');
 const ApiError = require('../../utils/ApiError');
@@ -62,6 +63,19 @@ function normalizeSizeChart(data) {
   delete data.sizeChartKey;
 }
 
+function sanitizePromoBanners(promoBanners) {
+  if (!Array.isArray(promoBanners)) return [];
+  return promoBanners.map((pb) => ({
+    _id: pb._id,
+    title: pb.title || '',
+    image: {
+      url: pb.image?.url || '',
+      ...(pb.image?.key ? { key: pb.image.key } : {}),
+    },
+    order: pb.order !== undefined && pb.order !== null ? Number(pb.order) : 0,
+  }));
+}
+
 class CategoryService {
   // ------------------------------- create category ----------------------------
   async create(data) {
@@ -76,7 +90,9 @@ class CategoryService {
     if (!item) {
       throw new ApiError(404, 'Category not found');
     }
-    return item;
+    const doc = item.toObject ? item.toObject() : item;
+    if (doc.promoBanners) doc.promoBanners = sanitizePromoBanners(doc.promoBanners);
+    return doc;
   }
 
   // ------------------------------- get all categories ----------------------------
@@ -89,7 +105,7 @@ class CategoryService {
       filter.status = queryParams.status;
     }
     if (queryParams.search) {
-      filter.name = new RegExp(queryParams.search, 'i');
+      filter.name = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
     }
 
     let sort = { order: 1, name: 1 };
@@ -108,6 +124,10 @@ class CategoryService {
       Category.countDocuments(filter),
     ]);
 
+    items.forEach((cat) => {
+      if (cat.promoBanners) cat.promoBanners = sanitizePromoBanners(cat.promoBanners);
+    });
+
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
@@ -121,11 +141,18 @@ class CategoryService {
       filter.type = queryParams.type;
     }
 
-    return await Category.find(filter)
+    const categories = await Category.find(filter)
       .select('_id name status icon type slug sizingConfig order promoBanners')
       .collation({ locale: 'en', strength: 2 })
       .sort({ order: 1, name: 1 })
       .lean();
+
+    return categories.map((cat) => {
+      if (cat.promoBanners) {
+        cat.promoBanners = sanitizePromoBanners(cat.promoBanners);
+      }
+      return cat;
+    });
   }
 
   // ------------------------------- update category ----------------------------

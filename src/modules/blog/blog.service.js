@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { escapeRegex } = require('../../utils/string');
 const Blog = require('./blog.model');
 const BlogCategory = require('../blogCategory/blogCategory.model');
 const ApiError = require('../../utils/ApiError');
@@ -84,7 +85,7 @@ class BlogService {
     }
 
     if (queryParams.search) {
-      const searchRegex = new RegExp(queryParams.search, 'i');
+      const searchRegex = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
       filter.$or = [
         { 'basicInfo.title': searchRegex },
         { 'basicInfo.slug': searchRegex },

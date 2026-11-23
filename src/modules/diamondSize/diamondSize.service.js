@@ -1,4 +1,5 @@
 const DiamondSize = require('./diamondSize.model');
+const { escapeRegex } = require('../../utils/string');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -39,7 +40,7 @@ class DiamondSizeService {
     }
 
     if (queryParams.search) {
-      filter.name = new RegExp(queryParams.search, 'i');
+      filter.name = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
     }
 
     if (queryParams.carat) {

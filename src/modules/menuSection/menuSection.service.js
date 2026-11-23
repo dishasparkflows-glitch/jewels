@@ -1,4 +1,5 @@
 const MenuItem = require('../menuItem/menuItem.model');
+const { escapeRegex } = require('../../utils/string');
 const Category = require('../category/category.model');
 const requireParent = require('../../utils/menuParents');
 const MenuSection = require('./menuSection.model');
@@ -36,7 +37,7 @@ class MenuSectionService {
       filter.categoryId = queryParams.categoryId;
     }
     if (queryParams.search) {
-      filter.title = new RegExp(queryParams.search, 'i');
+      filter.title = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
     }
 
     const [items, total] = await Promise.all([

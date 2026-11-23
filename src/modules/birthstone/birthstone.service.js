@@ -1,4 +1,5 @@
 const Birthstone = require('./birthstone.model');
+const { escapeRegex } = require('../../utils/string');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -64,7 +65,7 @@ class BirthstoneService {
       filter.status = queryParams.status;
     }
     if (queryParams.search) {
-      const searchRegex = new RegExp(queryParams.search, 'i');
+      const searchRegex = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
       filter.$or = [{ month: searchRegex }, { stoneName: searchRegex }];
     }
 
@@ -88,10 +89,21 @@ class BirthstoneService {
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null, status: 'active' };
 
-    return await Birthstone.find(filter)
-      .select('_id month stoneName image order')
+    const items = await Birthstone.find(filter)
+      .select('_id month stoneName image.url order')
       .sort({ order: 1 })
       .lean();
+
+    return items.map((item) => ({
+      _id: item._id,
+      month: item.month,
+      stoneName: item.stoneName,
+      image: {
+        url: item.image?.url || '',
+      },
+      imageUrl: item.image?.url || '',
+      order: item.order ?? 0,
+    }));
   }
 
   // ------------------------------- update birthstone ----------------------------

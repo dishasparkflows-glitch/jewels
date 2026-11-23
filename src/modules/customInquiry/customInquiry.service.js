@@ -1,4 +1,5 @@
 const CustomInquiry = require('./customInquiry.model');
+const { escapeRegex } = require('../../utils/string');
 const whatsappService = require('../whatsapp/whatsapp.service');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -43,7 +44,7 @@ class CustomInquiryService {
       filter['requirements.metalType'] = queryParams.metalType;
     }
     if (queryParams.search) {
-      const reg = new RegExp(queryParams.search, 'i');
+      const reg = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
       filter.$or = [
         { 'customer.name': reg },
         { 'customer.email': reg },

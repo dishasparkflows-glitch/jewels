@@ -364,7 +364,7 @@ class OrderService {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = buildAdminOrderFilters(queryParams);
 
-    const [items, total] = await Promise.all([
+    const [items, total, statusAgg] = await Promise.all([
       Order.find(filter)
         .sort({ 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
@@ -376,9 +376,41 @@ class OrderService {
         .populate('orderTimeline.cancelled.by', 'profile.firstName profile.lastName auth.email role')
         .lean(),
       Order.countDocuments(filter),
+      Order.aggregate([
+        { $match: { 'meta.deletedAt': null } },
+        {
+          $group: {
+            _id: { $toLower: '$orderStatus' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
 
-    return { items, pagination: getPaginationMeta(total, page, limit) };
+    const counts = {
+      total: 0,
+      all: 0,
+      pending: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+      returned: 0,
+    };
+    (statusAgg || []).forEach((item) => {
+      const st = String(item._id || '').toLowerCase();
+      const count = Number(item.count) || 0;
+      counts.total += count;
+      if (st === 'pending') counts.pending += count;
+      else if (st === 'processing' || st === 'confirmed' || st === 'accepted') counts.processing += count;
+      else if (st === 'shipped' || st === 'out_for_delivery') counts.shipped += count;
+      else if (st === 'delivered') counts.delivered += count;
+      else if (st === 'cancelled') counts.cancelled += count;
+      else if (st === 'returned') counts.returned += count;
+    });
+    counts.all = counts.total;
+
+    return { items, pagination: getPaginationMeta(total, page, limit), counts };
   }
   
   // ------------------------------- update order status ----------------------------

@@ -1,4 +1,5 @@
 const Size = require('./size.model');
+const { escapeRegex } = require('../../utils/string');
 require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -55,7 +56,7 @@ class SizeService {
       filter.categoryId = categoryId;
     }
     if (queryParams.search) {
-      filter.name = new RegExp(queryParams.search, 'i');
+      filter.name = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
     }
 
     const [items, total] = await Promise.all([

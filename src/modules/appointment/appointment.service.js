@@ -1,4 +1,5 @@
 const Appointment = require('./appointment.model');
+const { escapeRegex } = require('../../utils/string');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
@@ -28,7 +29,7 @@ class AppointmentService {
     }
 
     if (queryParams.search) {
-      const reg = new RegExp(queryParams.search, 'i');
+      const reg = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
       filter.$or = [
         { 'customer.name': reg },
         { 'customer.email': reg },

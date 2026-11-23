@@ -1,14 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const returnController = require('./return.controller');
-const { authenticate } = require('../../middleware/auth.middleware');
+const { authenticate, authorize } = require('../../middleware/auth.middleware');
+const { ROLES } = require('../../config/constants');
 
 router.use(authenticate);
 
 router.post('/', returnController.createReturn);
-router.get('/', returnController.getAllReturns);
 router.get('/my', returnController.getMyReturns);
 router.get('/:id', returnController.getReturnById);
-router.patch('/:id/status', returnController.updateReturnStatus);
+
+// Admin-only return management
+router.get('/', authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), returnController.getAllReturns);
+router.patch('/:id/status', authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), returnController.updateReturnStatus);
 
 module.exports = router;

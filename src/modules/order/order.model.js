@@ -166,7 +166,7 @@ const orderSchema = new mongoose.Schema(
     },
     orderStatus: {
       type: String,
-      enum: ['pending', 'processing', 'accepted', 'shipped', 'out_for_delivery', 'delivered', 'cancelled'],
+      enum: ['pending', 'processing', 'accepted', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned'],
       default: 'pending',
       index: true,
     },
@@ -270,6 +270,12 @@ orderSchema.pre('validate', async function (next) {
 
   next();
 });
+
+orderSchema.index({ userId: 1, 'meta.createdAt': -1 });
+orderSchema.index({ orderStatus: 1, 'meta.createdAt': -1 });
+orderSchema.index({ 'payment.status': 1 });
+orderSchema.index({ 'customer.email': 1, 'meta.createdAt': -1 });
+orderSchema.index({ 'customer.phone': 1, 'meta.createdAt': -1 });
 
 module.exports = mongoose.model('Order', orderSchema);
 

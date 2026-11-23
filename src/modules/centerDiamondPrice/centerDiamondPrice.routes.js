@@ -12,8 +12,8 @@ router.get('/:id', centerDiamondPriceController.getOne);
 // Authenticated workbook import
 router.post('/import', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), centerDiamondPriceController.importExcel);
 
-// Bulk save endpoint
-router.post('/bulk', centerDiamondPriceController.bulkSave);
+// Bulk save endpoint (Admin only)
+router.post('/bulk', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), centerDiamondPriceController.bulkSave);
 
 // Protected Admin endpoints
 router.post(

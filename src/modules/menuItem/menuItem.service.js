@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { escapeRegex } = require('../../utils/string');
 const MenuSection = require('../menuSection/menuSection.model');
 const requireParent = require('../../utils/menuParents');
 const MenuItem = require('./menuItem.model');
@@ -45,7 +46,7 @@ class MenuItemService {
       filter.menuSectionId = queryParams.menuSectionId;
     }
     if (queryParams.search) {
-      filter.title = new RegExp(queryParams.search, 'i');
+      filter.title = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
     }
 
     await this.applyCategoryFilter(filter, queryParams.categoryId);

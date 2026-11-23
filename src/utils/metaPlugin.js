@@ -136,6 +136,27 @@ function applyMetaPlugin(schema) {
         }
         this.set(setObj);
       }
+
+      // Handle upsert operations: guarantee meta.createdAt and meta.createdBy on newly inserted documents
+      const isUpsert = Boolean(
+        this.options?.upsert || (typeof this.getOptions === 'function' && this.getOptions()?.upsert)
+      );
+      if (isUpsert) {
+        if (!update.$setOnInsert) {
+          update.$setOnInsert = {};
+        }
+        if (!update.$setOnInsert['meta.createdAt'] && !update.$set?.['meta.createdAt'] && !update['meta.createdAt']) {
+          update.$setOnInsert['meta.createdAt'] = now;
+        }
+        if (
+          currentUserId &&
+          !update.$setOnInsert['meta.createdBy'] &&
+          !update.$set?.['meta.createdBy'] &&
+          !update['meta.createdBy']
+        ) {
+          update.$setOnInsert['meta.createdBy'] = currentUserId;
+        }
+      }
     } else {
       const setObj = { 'meta.updatedAt': now };
       if (currentUserId) {

@@ -52,7 +52,7 @@ class OrderService {
     }
 
     // Format and validate items without redundant conditions
-    const formattedItems = formatOrderItems(items);
+    const formattedItems = await formatOrderItems(items);
 
     // Calculate subtotal
     const subtotal = calculateOrderSubtotal(formattedItems);

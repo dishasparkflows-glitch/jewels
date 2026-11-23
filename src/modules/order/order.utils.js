@@ -26,14 +26,54 @@ async function resolvePaymentProvider(requestedProvider) {
 }
 
 // ------------------------------- format order items ----------------------------
-function formatOrderItems(items = []) {
+async function formatOrderItems(items = []) {
+  const Product = mongoose.model('Product');
+
+  // Extract all valid product IDs to query products in DB
+  const productIds = items
+    .map((item) => {
+      const rawId = item.productId?._id || item.productId || item.id || item._id;
+      return mongoose.isValidObjectId(rawId) ? String(rawId) : null;
+    })
+    .filter(Boolean);
+
+  const productMap = new Map();
+  if (productIds.length > 0) {
+    try {
+      const prods = await Product.find({ _id: { $in: productIds } })
+        .select('basicInfo pricing')
+        .lean();
+      prods.forEach((p) => {
+        productMap.set(String(p._id), p);
+      });
+    } catch (err) {
+      console.warn('Failed to fetch products for SKU fallback in order items:', err.message);
+    }
+  }
+
   return items.map((item) => {
     const qty = Math.max(1, Number(item.quantity) || 1);
     const price = Number(item.price) || 0;
+    const prodId = item.productId?._id || item.productId || item.id || item._id;
+    const prodIdStr = String(prodId || '');
+    const dbProduct = productMap.get(prodIdStr);
+
+    const resolvedSku =
+      item.sku ||
+      item.productId?.basicInfo?.sku ||
+      dbProduct?.basicInfo?.sku ||
+      '';
+
+    const resolvedTitle =
+      item.title ||
+      item.productId?.basicInfo?.title ||
+      dbProduct?.basicInfo?.title ||
+      '';
+
     return {
-      productId: item.productId,
-      title: item.title,
-      sku: item.sku || item.productId?.basicInfo?.sku || '',
+      productId: prodId,
+      title: resolvedTitle,
+      sku: resolvedSku,
       price,
       quantity: qty,
       totalItemPrice:
@@ -58,7 +98,7 @@ function mapCartItemsToOrderItems(cartItems = []) {
         : null;
     const prodId = prod?._id || cartItem.productId;
     const title = prod?.basicInfo?.title || cartItem.title || '';
-    const sku = prod?.basicInfo?.sku || cartItem.sku || '';
+    const sku = cartItem.sku || prod?.basicInfo?.sku || '';
 
     return {
       productId: prodId,

@@ -86,6 +86,36 @@ class AnalyticsController {
     res.status(200).json(report);
   });
 
+  // ------------------------------- GET Product Views Report ----------------------------
+  // @route   GET /api/admin/analytics/products/views
+  getProductsViewsReport = catchAsync(async (req, res) => {
+    const { startDate, endDate, limit, offset, page, sortBy, order, refresh } = req.query;
+
+    const parsedLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+    let parsedOffset = parseInt(offset, 10);
+    if (isNaN(parsedOffset)) {
+      const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+      parsedOffset = (parsedPage - 1) * parsedLimit;
+    }
+    parsedOffset = Math.max(0, parsedOffset);
+
+    const report = await analyticsService.getProductViewsReport({
+      startDate,
+      endDate,
+      limit: parsedLimit,
+      offset: parsedOffset,
+      sortBy: sortBy || 'count',
+      order: order || 'desc',
+      refresh: refresh === 'true',
+    });
+
+    if (report && report.success === false) {
+      return res.status(report.statusCode || 500).json(report);
+    }
+
+    res.status(200).json(report);
+  });
+
   // ------------------------------- GET Analytics Health ----------------------------
   // @route   GET /api/admin/analytics/health
   getAnalyticsHealth = catchAsync(async (req, res) => {

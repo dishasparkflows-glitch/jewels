@@ -73,6 +73,7 @@ class CartService {
         const prod = item.productId && typeof item.productId === 'object' ? item.productId : null;
         const prodId = prod?._id || item.productId;
         const title = prod?.basicInfo?.title || '';
+        const sku = prod?.basicInfo?.sku || '';
         const firstImg =
           prod?.colorImages?.[0]?.images?.[0] ||
           prod?.ornate?.ornateImages?.[0] ||
@@ -112,6 +113,7 @@ class CartService {
           id: prodId,
           productId: prodId,
           title,
+          sku,
           slug: prod?.basicInfo?.slug || (title ? title.toLowerCase().trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') : ''),
           price: item.price,
           totalItemPrice: itemTotal,

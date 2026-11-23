@@ -782,7 +782,7 @@ const formatLookupProduct = (p) => {
   withColorStatuses(p);
 
   const title = p.basicInfo?.title || p.title || p.name || 'Untitled product';
-  const sku = p.basicInfo?.sku || p.sku || p.ornate?.itemCode || p.ornate?.tagNo || '';
+  const sku = p.basicInfo?.sku || '';
   const effectivePrice = Number(p.pricing?.salePrice || p.pricing?.mrp || p.cataloguePrice || 0);
 
   // Extract 1st photo from colorImages (first valid image that is not a video)

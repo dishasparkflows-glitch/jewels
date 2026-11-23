@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Gallery = require('./gallery.model');
 const Banner = require('../banner/banner.model');
 const { Theme } = require('../theme/theme.model');
+const ThemeMediaMapping = require('../theme/themeMediaMapping.model');
 const Featured = require('../featured/featured.model');
 const Category = require('../category/category.model');
 const ApiError = require('../../utils/ApiError');
@@ -646,6 +647,17 @@ class GalleryService {
         status: status || 'active',
         meta: { createdBy: actorId, createdAt: new Date() },
       });
+
+      // Synchronize 1 entry into theme_media_mappings if mapped to a theme and record
+      if (galleryItem.themeId && galleryItem.linkedRecord?.recordId) {
+        await this._syncThemeMediaMapping({
+          themeId: galleryItem.themeId,
+          recordId: galleryItem.linkedRecord.recordId,
+          galleryId: galleryItem._id,
+          status: galleryItem.status || 'active',
+        });
+      }
+
       return galleryItem;
     }
 
@@ -661,7 +673,53 @@ class GalleryService {
     }));
 
     const galleryItems = await Gallery.insertMany(docs);
+
+    // Synchronize theme_media_mappings for each created gallery item with a linked record
+    for (const item of galleryItems) {
+      if (item.themeId && item.linkedRecord?.recordId) {
+        await this._syncThemeMediaMapping({
+          themeId: item.themeId,
+          recordId: item.linkedRecord.recordId,
+          galleryId: item._id,
+          status: item.status || 'active',
+        });
+      }
+    }
+
     return galleryItems;
+  }
+
+  // ------------------------------- sync theme media mapping ----------------------------
+  async _syncThemeMediaMapping({ themeId, recordId, galleryId, status = 'active' }) {
+    if (!themeId || !recordId || !galleryId) return;
+    if (
+      !mongoose.isValidObjectId(themeId) ||
+      !mongoose.isValidObjectId(recordId) ||
+      !mongoose.isValidObjectId(galleryId)
+    ) {
+      return;
+    }
+
+    try {
+      await ThemeMediaMapping.findOneAndUpdate(
+        {
+          themeId: new mongoose.Types.ObjectId(themeId),
+          recordId: new mongoose.Types.ObjectId(recordId),
+        },
+        {
+          $set: {
+            galleryId: new mongoose.Types.ObjectId(galleryId),
+            status: status === 'inactive' ? 'inactive' : 'active',
+          },
+        },
+        {
+          upsert: true,
+          setDefaultsOnInsert: true,
+        }
+      );
+    } catch (err) {
+      console.warn('Failed to sync theme_media_mapping:', err.message);
+    }
   }
 
   // ------------------------------- upload and assign media ----------------------------
@@ -679,6 +737,9 @@ class GalleryService {
     if (!item) {
       throw new ApiError(404, 'Gallery item not found');
     }
+
+    const oldThemeId = item.themeId;
+    const oldRecordId = item.linkedRecord?.recordId;
 
     if (data.placement !== undefined) item.placement = data.placement;
     if (data.platform !== undefined) item.platform = data.platform;
@@ -701,6 +762,33 @@ class GalleryService {
     };
 
     await item.save();
+
+    // If themeId or recordId changed, clean up previous mapping if needed
+    if (oldThemeId && oldRecordId) {
+      const isSame =
+        String(item.themeId || '') === String(oldThemeId) &&
+        String(item.linkedRecord?.recordId || '') === String(oldRecordId);
+      if (!isSame) {
+        try {
+          await ThemeMediaMapping.deleteOne({
+            themeId: oldThemeId,
+            recordId: oldRecordId,
+            galleryId: item._id,
+          });
+        } catch (e) {}
+      }
+    }
+
+    // Sync current mapping if themeId and recordId are set
+    if (item.themeId && item.linkedRecord?.recordId) {
+      await this._syncThemeMediaMapping({
+        themeId: item.themeId,
+        recordId: item.linkedRecord.recordId,
+        galleryId: item._id,
+        status: item.status || 'active',
+      });
+    }
+
     return this.getOne(item._id);
   }
 
@@ -725,6 +813,13 @@ class GalleryService {
 
     if (!item) {
       throw new ApiError(404, 'Gallery media item not found');
+    }
+
+    // Clean up mapping from theme_media_mappings when gallery asset is deleted
+    try {
+      await ThemeMediaMapping.deleteMany({ galleryId: id });
+    } catch (err) {
+      console.warn('Failed to clean up theme_media_mappings for deleted asset:', err.message);
     }
 
     return { message: 'Gallery item removed successfully', id };

@@ -18,6 +18,13 @@ router.post(
   blogController.create
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  blogController.bulkDelete
+);
+
 router.put(
   '/:id',
   authenticate,

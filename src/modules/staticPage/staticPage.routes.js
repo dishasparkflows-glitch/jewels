@@ -21,6 +21,13 @@ router.post(
   staticPageController.create
 );
 
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  staticPageController.bulkDelete
+);
+
 router.put(
   '/:id',
   authenticate,

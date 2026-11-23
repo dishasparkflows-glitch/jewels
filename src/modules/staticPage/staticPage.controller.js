@@ -38,6 +38,13 @@ class StaticPageController {
     const result = await staticPageService.delete(req.params.id);
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete static pages ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await staticPageService.bulkDelete(ids);
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new StaticPageController();

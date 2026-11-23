@@ -23,7 +23,7 @@ class OrnateController {
 
   // ------------------------------- trigger ornate full sync ----------------------------
   triggerFullSync = catchAsync(async (req, res) => {
-    const result = await ornateCron.triggerOrnateSync('manual_admin_request');
+    const result = await ornateCron.triggerOrnateSync('manual_admin_request', req.user?._id);
     if (result.skipped) {
       return ApiResponse.success(res, result, 'Sync already in progress');
     }
@@ -38,7 +38,7 @@ class OrnateController {
   syncLabels = catchAsync(async (req, res) => {
     const { sessionId, categories, productIds } = req.body || {};
     const options = (categories || productIds) ? { categories, productIds } : null;
-    const result = await ornateService.syncOrnateLabels(sessionId, options);
+    const result = await ornateService.syncOrnateLabels(sessionId, options, req.user?._id);
     if (!result.success) return res.status(500).json({ success: false, message: 'Ornate label sync failed for one or more records', data: result });
     const msg = result.queuedImagesCount > 0
       ? `Successfully synced ${result.count || 0} products from Ornate ERP (${result.queuedImagesCount} images syncing in background)`
@@ -48,20 +48,20 @@ class OrnateController {
 
   // ------------------------------- sync ornate sold labels ----------------------------
   syncSold = catchAsync(async (req, res) => {
-    const result = await ornateService.syncOrnateSoldLabels();
+    const result = await ornateService.syncOrnateSoldLabels(undefined, req.user?._id);
     ApiResponse.success(res, result, result.message || 'Sold labels sync complete');
   });
 
   // ------------------------------- sync specific sold labels ----------------------------
   syncSelectedSold = catchAsync(async (req, res) => {
     const { productIds } = req.body || {};
-    const result = await ornateService.syncSpecificSoldLabels(productIds);
+    const result = await ornateService.syncSpecificSoldLabels(productIds, req.user?._id);
     ApiResponse.success(res, result, result.message);
   });
 
   // ------------------------------- sync ornate metal rates ----------------------------
   syncMetalRates = catchAsync(async (req, res) => {
-    const result = await ornateService.syncOrnateMetalRateChanges();
+    const result = await ornateService.syncOrnateMetalRateChanges(req.user?._id);
     if (!result.success) return res.status(500).json({ success: false, message: 'Ornate metal rate sync failed for one or more records', data: result });
     ApiResponse.success(res, result, `Updated metal rates for ${result.count || 0} products`);
   });

@@ -8,6 +8,32 @@ const Category = require('../category/category.model');
 const cloudflareR2 = require('../../utils/cloudflareR2');
 const ornateUtils = require('./ornate.utils');
 const productGroupService = require('../productGroup/productGroup.service');
+const { getRequestContext } = require('../../utils/context');
+
+let cachedAdminId = null;
+async function resolveAdminUserId(providedUserId = null) {
+  if (providedUserId && mongoose.isValidObjectId(providedUserId)) {
+    return new mongoose.Types.ObjectId(providedUserId);
+  }
+  const contextUserId = getRequestContext('userId');
+  if (contextUserId && mongoose.isValidObjectId(contextUserId)) {
+    return new mongoose.Types.ObjectId(contextUserId);
+  }
+  if (cachedAdminId) return cachedAdminId;
+  try {
+    const User = mongoose.model('User');
+    const adminUser = await User.findOne({
+      role: { $in: ['super_admin', 'admin', 'SUPER_ADMIN', 'ADMIN'] },
+    }).select('_id').lean();
+    if (adminUser?._id) {
+      cachedAdminId = adminUser._id;
+      return cachedAdminId;
+    }
+  } catch (err) {
+    console.error('[Ornate] Failed to resolve admin user ID:', err.message);
+  }
+  return null;
+}
 
 const {
   ORNATE_BASE_URL,
@@ -248,7 +274,8 @@ async function processImageSyncQueue() {
 }
 
 // ------------------------------- sync ornate labels ----------------------------
-async function syncOrnateLabels(sessionIdOverride, options = null) {
+async function syncOrnateLabels(sessionIdOverride, options = null, userId = null) {
+  const actorId = await resolveAdminUserId(userId);
   const sessionIdToPass = sessionIdOverride !== undefined ? sessionIdOverride : getLastSessionId();
   const data = await fetchOrnateLabelData(sessionIdToPass);
 
@@ -323,7 +350,7 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
 
   const existingProducts = allIdentifiers.size > 0
     ? await Product.find(buildProductIdentifierQuery(allIdentifiers))
-        .select('colorImages basicInfo.sku basicInfo.slug ornate pricing categoryIds visibility')
+        .select('colorImages basicInfo.sku basicInfo.slug ornate pricing categoryIds visibility meta')
         .lean()
     : [];
 
@@ -358,14 +385,39 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
         newlyUploadedImages: [], // Handled asynchronously by 4-worker pool
       });
 
+      // Maintain meta fields: ensure createdAt and createdBy are never lost or omitted
+      const existingMeta = existingProduct?.meta;
+      const createdAtVal = existingMeta?.createdAt || existingMeta?.updatedAt || new Date();
+      const createdByVal = existingMeta?.createdBy || existingMeta?.updatedBy || actorId;
+
+      if (existingProduct) {
+        if (!existingMeta?.createdAt) {
+          setFields['meta.createdAt'] = createdAtVal;
+        }
+        if (!existingMeta?.createdBy && createdByVal) {
+          setFields['meta.createdBy'] = createdByVal;
+        }
+      }
+
+      setFields['meta.updatedAt'] = new Date();
+      if (actorId) {
+        setFields['meta.updatedBy'] = actorId;
+      }
+
+      const setOnInsertFields = {
+        status: 'draft',
+        'meta.createdAt': new Date(),
+      };
+      if (actorId) {
+        setOnInsertFields['meta.createdBy'] = actorId;
+      }
+
       // Upsert into Product collection with 1 flag: isOrnate: true
       const upsertedProduct = await Product.findOneAndUpdate(
         buildProductIdentifierQuery({ sku, tagNo, barcode }),
         {
           $set: setFields,
-          $setOnInsert: {
-            status: 'draft',
-          },
+          $setOnInsert: setOnInsertFields,
         },
         { upsert: true, returnDocument: 'after', new: true, runValidators: false, setDefaultsOnInsert: false }
       );
@@ -424,7 +476,8 @@ async function syncOrnateLabels(sessionIdOverride, options = null) {
 }
 
 // ------------------------------- sync ornate sold labels ----------------------------
-async function syncOrnateSoldLabels() {
+async function syncOrnateSoldLabels(sessionIdOverride, userId = null) {
+  const actorId = await resolveAdminUserId(userId);
   const data = await callOrnateApi('GetSoldLabelData_API', 'SoldLabel', {
     RecordType: 'All',
     ReqBranchIssue: 'N',
@@ -463,6 +516,8 @@ async function syncOrnateSoldLabels() {
           'pricing.salePrice': salePrice,
           'ornate.isSold': true,
           'ornate.stockQty': 0,
+          'meta.updatedAt': new Date(),
+          ...(actorId ? { 'meta.updatedBy': actorId } : {}),
         }) || {},
         $setOnInsert: cleanPayload({
           'basicInfo.title': label.ItemName || `Ornate Item ${sku}`,
@@ -478,6 +533,8 @@ async function syncOrnateSoldLabels() {
           },
           'ornate.tagNo': tagNo,
           'ornate.barcode': String(label.BarcodeNo || uniqueLabelID),
+          'meta.createdAt': new Date(),
+          ...(actorId ? { 'meta.createdBy': actorId } : {}),
         }) || {},
       },
       { upsert: true, returnDocument: 'after', new: true, runValidators: false, setDefaultsOnInsert: false }
@@ -510,6 +567,8 @@ async function syncOrnateSoldLabels() {
           stockStatus: 'Out of Stock',
           'ornate.isSold': true,
           'ornate.stockQty': 0,
+          'meta.updatedAt': new Date(),
+          ...(actorId ? { 'meta.updatedBy': actorId } : {}),
         },
       }
     );
@@ -599,11 +658,12 @@ async function getOrnateErpSoldLabels() {
 }
 
 // ------------------------------- sync specific sold labels ----------------------------
-async function syncSpecificSoldLabels(productIds) {
+async function syncSpecificSoldLabels(productIds, userId = null) {
   if (!Array.isArray(productIds) || productIds.length === 0) {
     throw new Error('Please select at least one product to mark as sold.');
   }
 
+  const actorId = await resolveAdminUserId(userId);
   const cleanIds = productIds.map(id => String(id).trim()).filter(Boolean);
 
   const result = await Product.updateMany(
@@ -616,6 +676,8 @@ async function syncSpecificSoldLabels(productIds) {
         stockStatus: 'Out of Stock',
         'ornate.isSold': true,
         'ornate.stockQty': 0,
+        'meta.updatedAt': new Date(),
+        ...(actorId ? { 'meta.updatedBy': actorId } : {}),
       },
     }
   );
@@ -628,7 +690,8 @@ async function syncSpecificSoldLabels(productIds) {
 }
 
 // ------------------------------- sync ornate metal rate changes ----------------------------
-async function syncOrnateMetalRateChanges() {
+async function syncOrnateMetalRateChanges(userId = null) {
+  const actorId = await resolveAdminUserId(userId);
   const data = await callOrnateApi('GetLabelDataMetalRateChanges_API', 'MetalRateChanges');
   const labelDetails = data?.LabelDetail || [];
 
@@ -672,6 +735,8 @@ async function syncOrnateMetalRateChanges() {
               'pricing.salePrice': newSalePrice,
               'ornate.goldAmt': goldAmt,
               'ornate.labourAmt': labourAmt,
+              'meta.updatedAt': new Date(),
+              ...(actorId ? { 'meta.updatedBy': actorId } : {}),
             },
           }
         );
@@ -688,7 +753,7 @@ async function syncOrnateMetalRateChanges() {
 }
 
 // ------------------------------- run ornate full sync ----------------------------
-async function runOrnateFullSync() {
+async function runOrnateFullSync(userId = null) {
   const results = {};
 
   try {
@@ -697,15 +762,15 @@ async function runOrnateFullSync() {
     results.events = eventList;
 
     // Baseline: label sync (new/modified products)
-    results.labelSync = await syncOrnateLabels();
+    results.labelSync = await syncOrnateLabels(undefined, null, userId);
 
     // Check & sync sold labels
-    results.soldSync = await syncOrnateSoldLabels();
+    results.soldSync = await syncOrnateSoldLabels(undefined, userId);
 
     // Check for metal rate changes
     const hasRateEvent = eventList.some((evt) => evt.EventId === 4 || evt.EventID === 4);
     if (hasRateEvent) {
-      results.metalRateSync = await syncOrnateMetalRateChanges();
+      results.metalRateSync = await syncOrnateMetalRateChanges(userId);
     }
 
     const success = [results.labelSync, results.soldSync, results.metalRateSync].filter(Boolean).every((result) => result.success);

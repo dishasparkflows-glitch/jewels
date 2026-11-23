@@ -8,7 +8,7 @@ let lastSyncStatus = 'idle'; // 'idle', 'in_progress', 'success', 'error'
 let lastSyncResult = null;
 let lastSyncError = null;
 
-async function triggerOrnateSync(source = 'cron') {
+async function triggerOrnateSync(source = 'cron', userId = null) {
   if (isSyncing) {
     return { skipped: true, reason: 'Sync already in progress' };
   }
@@ -18,7 +18,7 @@ async function triggerOrnateSync(source = 'cron') {
   const startTime = Date.now();
 
   try {
-    const result = await ornateService.runOrnateFullSync();
+    const result = await ornateService.runOrnateFullSync(userId);
     lastSyncTime = new Date();
     lastSyncStatus = result.success ? 'success' : 'error';
     lastSyncResult = {

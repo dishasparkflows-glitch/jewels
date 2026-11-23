@@ -13,6 +13,7 @@ router.post('/:id/sync', currencyController.syncOneRate);
 
 // Management endpoints
 router.post('/', currencyController.create);
+router.post('/bulk-delete', currencyController.bulkDelete);
 router.put('/:id', currencyController.update);
 router.delete('/:id', currencyController.delete);
 

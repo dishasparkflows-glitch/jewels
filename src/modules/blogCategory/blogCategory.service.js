@@ -129,6 +129,24 @@ class BlogCategoryService {
 
     return { message: 'Blog category deleted successfully', id };
   }
+
+  // ------------------------------- bulk delete blog categories ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of category IDs to delete');
+    }
+
+    const result = await BlogCategory.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+
+    return {
+      message: `${result.modifiedCount} blog category(ies) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new BlogCategoryService();

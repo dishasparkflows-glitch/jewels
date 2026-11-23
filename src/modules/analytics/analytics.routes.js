@@ -19,5 +19,6 @@ router.get('/dashboard', analyticsController.getDashboardAll);
 // GA4 Product Activity & Lead Reports
 router.get('/products/add-to-cart', analyticsController.getProductsAddToCartReport);
 router.get('/products/wishlist', analyticsController.getProductsWishlistReport);
+router.get('/products/views', analyticsController.getProductsViewsReport);
 
 module.exports = router;

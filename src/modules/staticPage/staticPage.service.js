@@ -285,6 +285,21 @@ class StaticPageService {
     }
     return { id, message: 'Static page deleted successfully' };
   }
+
+  // ------------------------------- bulk delete static pages ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of page IDs to delete');
+    }
+
+    const result = await StaticPage.deleteMany({ _id: { $in: ids } });
+
+    return {
+      message: `${result.deletedCount} static page(s) deleted successfully`,
+      deletedCount: result.deletedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new StaticPageService();

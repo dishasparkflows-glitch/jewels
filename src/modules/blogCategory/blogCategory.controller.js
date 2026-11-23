@@ -50,6 +50,14 @@ class BlogCategoryController {
     await redisClient.deleteByPattern('blog-categories:*');
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete blog categories ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await blogCategoryService.bulkDelete(ids);
+    await redisClient.deleteByPattern('blog-categories:*');
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new BlogCategoryController();

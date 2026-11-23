@@ -43,6 +43,13 @@ class CurrencyController {
     ApiResponse.success(res, null, result.message);
   });
 
+  // ------------------------------- bulk delete currencies ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await currencyService.bulkDelete(ids);
+    ApiResponse.success(res, result, result.message);
+  });
+
   // ------------------------------- sync live rates ----------------------------
   syncLiveRates = catchAsync(async (req, res) => {
     const result = await currencyService.syncLiveRates();

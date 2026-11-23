@@ -44,6 +44,13 @@ class BlogController {
     const result = await blogService.delete(req.params.id);
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- bulk delete blog posts ----------------------------
+  bulkDelete = catchAsync(async (req, res) => {
+    const ids = req.body?.ids || [];
+    const result = await blogService.bulkDelete(ids);
+    ApiResponse.success(res, result, result.message);
+  });
 }
 
 module.exports = new BlogController();

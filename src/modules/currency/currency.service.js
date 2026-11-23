@@ -241,6 +241,33 @@ class CurrencyService {
     return { id, message: `${currency.currencyInfo.code} deleted successfully` };
   }
 
+  // ------------------------------- bulk delete currencies ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of currency IDs to delete');
+    }
+
+    const result = await Currency.updateMany(
+      {
+        _id: { $in: ids },
+        'settings.isBaseCurrency': { $ne: true },
+        'meta.deletedAt': { $in: [null, undefined] },
+      },
+      {
+        $set: {
+          'meta.deletedAt': new Date(),
+          'settings.isActive': false,
+        },
+      }
+    );
+
+    return {
+      message: `${result.modifiedCount} currency(ies) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
+
   // ------------------------------- sync live rates ----------------------------
   async syncLiveRates() {
     const liveRates = await fetchForexRates();

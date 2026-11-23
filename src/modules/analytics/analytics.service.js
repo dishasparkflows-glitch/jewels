@@ -7,6 +7,9 @@ const { GoogleAuth } = require('google-auth-library');
 const Product = require('../product/product.model');
 const Diamond = require('../diamond/diamond.model');
 const User = require('../user/user.model');
+const Cart = require('../cart/cart.model');
+const Wishlist = require('../wishlist/wishlist.model');
+require('../category/category.model');
 
 // ─── 5-Minute In-Memory Server Cache ──────────────────────────────────────────
 const reportCache = new Map();
@@ -146,7 +149,7 @@ class AnalyticsService {
 
   // ------------------------------- Resolve GA4 Configuration ----------------------------
   getAnalyticsConfig() {
-    const propertyId = (process.env.GA4_PROPERTY_ID || '555775827').trim();
+    const propertyId = (process.env.GA4_PROPERTY_ID).trim();
 
     const candidateFiles = [
       path.join(__dirname, '../../config/firebase-service-account.json'),
@@ -284,7 +287,7 @@ class AnalyticsService {
 
         (dbProducts || []).forEach((prod) => {
           const title = prod.basicInfo?.title || 'Jewellery Product';
-          const sku = prod.basicInfo?.sku || prod.ornate?.tagNo || null;
+          const sku = prod.basicInfo?.sku || null;
           const slug = prod.basicInfo?.slug || null;
           const price = prod.pricing?.salePrice || prod.pricing?.mrp || 0;
           const category = prod.categoryIds?.[0]?.name || (prod.isOrnate ? 'Ornate' : 'Jewellery');
@@ -307,7 +310,7 @@ class AnalyticsService {
 
         (dbProductsBySlug || []).forEach((prod) => {
           const title = prod.basicInfo?.title || 'Jewellery Product';
-          const sku = prod.basicInfo?.sku || prod.ornate?.tagNo || null;
+          const sku = prod.basicInfo?.sku || null;
           const slug = prod.basicInfo?.slug || null;
           const price = prod.pricing?.salePrice || prod.pricing?.mrp || 0;
           const category = prod.categoryIds?.[0]?.name || (prod.isOrnate ? 'Ornate' : 'Jewellery');
@@ -357,17 +360,21 @@ class AnalyticsService {
         if (directCustomerIds.length > 0) {
           try {
             const users = await User.find({ _id: { $in: directCustomerIds } })
-              .select('name email phone countryCode')
+              .select('profile auth name email phone countryCode')
               .lean();
 
             const userMap = new Map();
             users.forEach((u) => {
-              const rawPhone = (u.phone || '').replace(/[^0-9]/g, '');
-              const cCode = (u.countryCode || '91').replace(/[^0-9]/g, '');
+              const fullName = (u.profile?.firstName
+                ? `${u.profile.firstName} ${u.profile.lastName || ''}`.trim()
+                : null) || u.name || 'Customer';
+              const email = u.auth?.email || u.email || null;
+              const rawPhone = (u.profile?.phone || u.phone || '').replace(/[^0-9]/g, '');
+              const cCode = (u.profile?.countryCode || u.countryCode || '91').replace(/[^0-9]/g, '');
               userMap.set(String(u._id), {
                 id: String(u._id),
-                name: u.name || 'Customer',
-                email: u.email || null,
+                name: fullName,
+                email,
                 phone: rawPhone ? `+${cCode} ${rawPhone}` : null,
               });
             });
@@ -428,7 +435,7 @@ class AnalyticsService {
     const client = this.getClient();
 
     if (!client) {
-      return this._getSampleOverview(start);
+      return this.getDatabaseOverview(start, end);
     }
 
     try {
@@ -585,7 +592,7 @@ class AnalyticsService {
       return result;
     } catch (err) {
       console.error('[AnalyticsService] Error fetching GA4 overview:', err.message);
-      return this._getSampleOverview(start);
+      return this.getDatabaseOverview(start, end);
     }
   }
 
@@ -619,7 +626,7 @@ class AnalyticsService {
     const config = this.getAnalyticsConfig();
 
     if (!client || !config.propertyId) {
-      return this._getSampleProductReport('add-to-cart', parsedLimit, parsedOffset);
+      return this.getDatabaseCartReport({ startDate: start, endDate: end, limit: parsedLimit, offset: parsedOffset, sortBy, order });
     }
 
     try {
@@ -722,7 +729,7 @@ class AnalyticsService {
       return result;
     } catch (err) {
       console.error('[AnalyticsService] Error fetching Add to Cart report:', err.message);
-      return this._getSampleProductReport('add-to-cart', parsedLimit, parsedOffset);
+      return this.getDatabaseCartReport({ startDate: start, endDate: end, limit: parsedLimit, offset: parsedOffset, sortBy, order });
     }
   }
 
@@ -756,7 +763,7 @@ class AnalyticsService {
     const config = this.getAnalyticsConfig();
 
     if (!client || !config.propertyId) {
-      return this._getSampleProductReport('wishlist', parsedLimit, parsedOffset);
+      return this.getDatabaseWishlistReport({ startDate: start, endDate: end, limit: parsedLimit, offset: parsedOffset, sortBy, order });
     }
 
     try {
@@ -853,7 +860,7 @@ class AnalyticsService {
       return result;
     } catch (err) {
       console.error('[AnalyticsService] Error fetching Wishlist report:', err.message);
-      return this._getSampleProductReport('wishlist', parsedLimit, parsedOffset);
+      return this.getDatabaseWishlistReport({ startDate: start, endDate: end, limit: parsedLimit, offset: parsedOffset, sortBy, order });
     }
   }
 
@@ -930,119 +937,343 @@ class AnalyticsService {
     };
   }
 
-  async _getSampleOverview(startDate) {
+  // ------------------------------- GET Product Views Report ----------------------------
+  async getProductViewsReport({
+    startDate = '30daysAgo',
+    endDate = 'today',
+    limit = 10,
+    offset = 0,
+    sortBy = 'count',
+    order = 'desc',
+    refresh = false,
+  } = {}) {
+    const client = this.getClient();
     const config = this.getAnalyticsConfig();
-    let dbProducts = [];
+
+    if (!client || !config.propertyId) {
+      return this.getDatabaseViewsReport({ startDate, endDate, limit, offset, sortBy, order });
+    }
+
     try {
-      dbProducts = await Product.find({ 'meta.deletedAt': null })
-        .select('basicInfo pricing colorImages')
-        .limit(5)
-        .lean();
-    } catch {}
+      const property = `properties/${config.propertyId}`;
+      const isAsc = order === 'asc';
+      const parsedLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+      const parsedOffset = Math.max(0, parseInt(offset, 10) || 0);
 
-    const topProducts = dbProducts.map((p, idx) => ({
-      itemId: String(p._id),
-      name: p.basicInfo?.title || 'Jewellery Item',
-      views: Math.max(10, 48 - idx * 7),
-      product: {
-        id: String(p._id),
-        title: p.basicInfo?.title || 'Jewellery Item',
-        sku: p.basicInfo?.sku || '',
-        slug: p.basicInfo?.slug || '',
-        price: p.pricing?.salePrice || p.pricing?.mrp || 0,
-        category: 'Rings',
-        image: p.colorImages?.[0]?.images?.[0]?.url || '',
-      },
-    }));
+      const [res] = await client.runReport({
+        property,
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: 'itemId' }, { name: 'itemName' }],
+        metrics: [{ name: 'itemsViewed' }],
+        orderBys: [
+          sortBy === 'name'
+            ? { dimension: { dimensionName: 'itemName' }, desc: !isAsc }
+            : { metric: { metricName: 'itemsViewed' }, desc: !isAsc },
+        ],
+        limit: parsedLimit,
+        offset: parsedOffset,
+      });
 
-    return {
-      configured: false,
-      propertyId: config.propertyId,
-      summary: {
-        totalUsers: 1420,
-        totalSessions: 2150,
-        pageViews: 8420,
-        productViews: 3120,
-        addToCart: 184,
-        addToWishlist: 95,
-        avgDurationSec: 142,
-        bounceRate: 41.2,
-        trends: {
-          users: '+14.2%',
-          sessions: '+18.0%',
-          pageViews: '+8.5%',
-          productViews: '+21.0%',
-          addToCart: '+12.4%',
-          addToWishlist: '+5.1%',
+      const totalRowsCount = res?.rowCount || res?.rows?.length || 0;
+      const rawRows = (res?.rows || [])
+        .map((row) => ({
+          itemId: row.dimensionValues?.[0]?.value || '',
+          name: row.dimensionValues?.[1]?.value || 'Jewellery Item',
+          views: parseInt(row.metricValues?.[0]?.value || '0', 10),
+        }))
+        .filter((p) => p.itemId && p.itemId !== '(not set)');
+
+      const enrichedRows = await this.enrichProductsWithDb(rawRows, 'views');
+      const page = Math.floor(parsedOffset / parsedLimit) + 1;
+      const totalPages = Math.ceil(totalRowsCount / parsedLimit) || 1;
+
+      return {
+        success: true,
+        reportType: 'views',
+        propertyId: config.propertyId,
+        dateRange: { startDate, endDate },
+        totals: {
+          totalItemsAdded: enrichedRows.reduce((sum, r) => sum + (r.count || r.views || 0), 0),
+          uniqueProductsCount: totalRowsCount,
         },
-      },
-      timeline: [
-        { date: '2026-11-01', label: 'Nov 1', users: 120, sessions: 165, pageViews: 650, productViews: 240 },
-        { date: '2026-11-02', label: 'Nov 2', users: 145, sessions: 190, pageViews: 710, productViews: 280 },
-        { date: '2026-11-03', label: 'Nov 3', users: 138, sessions: 182, pageViews: 690, productViews: 260 },
-        { date: '2026-11-04', label: 'Nov 4', users: 160, sessions: 210, pageViews: 830, productViews: 310 },
-      ],
-      topProducts,
-      trafficSources: [
-        { channel: 'Direct', sessions: 980, percentage: 46 },
-        { channel: 'Organic Search', sessions: 650, percentage: 30 },
-        { channel: 'Paid Search', sessions: 320, percentage: 15 },
-        { channel: 'Organic Social', sessions: 200, percentage: 9 },
-      ],
-    };
+        pagination: {
+          total: totalRowsCount,
+          page,
+          limit: parsedLimit,
+          offset: parsedOffset,
+          totalPages,
+        },
+        data: enrichedRows,
+      };
+    } catch (err) {
+      console.error('[AnalyticsService] Error fetching Views report:', err.message);
+      return this.getDatabaseViewsReport({ startDate, endDate, limit, offset, sortBy, order });
+    }
   }
 
-  async _getSampleProductReport(reportType, limit = 10, offset = 0) {
-    let dbProducts = [];
+  // ------------------------------- Real Database Queries & Reports ----------------------------
+  async getDatabaseCartReport({
+    startDate = '30daysAgo',
+    endDate = 'today',
+    limit = 10,
+    offset = 0,
+    sortBy = 'count',
+    order = 'desc',
+  } = {}) {
     try {
-      dbProducts = await Product.find({ 'meta.deletedAt': null })
-        .select('basicInfo pricing colorImages')
-        .limit(limit)
-        .skip(offset)
-        .lean();
-    } catch {}
+      const parsedLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+      const parsedOffset = Math.max(0, parseInt(offset, 10) || 0);
 
-    const data = dbProducts.map((p, idx) => ({
-      itemId: String(p._id),
-      name: p.basicInfo?.title || 'Jewellery Item',
-      count: Math.max(2, 28 - idx * 3),
-      users: [
+      const cartAgg = await Cart.aggregate([
+        { $unwind: '$items' },
         {
-          id: 'lead_sample_1',
-          name: 'Priya Sharma',
-          email: 'priya.s@example.com',
-          phone: '+91 9876543210',
+          $group: {
+            _id: '$items.productId',
+            count: { $sum: '$items.quantity' },
+            customerIds: { $addToSet: '$userId' },
+          },
         },
-      ],
-      product: {
-        id: String(p._id),
-        title: p.basicInfo?.title || 'Jewellery Item',
-        sku: p.basicInfo?.sku || '',
-        slug: p.basicInfo?.slug || '',
-        price: p.pricing?.salePrice || p.pricing?.mrp || 0,
-        category: 'Jewellery',
-        image: p.colorImages?.[0]?.images?.[0]?.url || '',
-      },
-    }));
+        { $sort: { count: order === 'asc' ? 1 : -1 } },
+      ]);
 
-    return {
-      success: true,
-      reportType,
-      propertyId: '555775827',
-      dateRange: { startDate: '30daysAgo', endDate: 'today' },
-      totals: {
-        totalItemsAdded: data.reduce((s, d) => s + d.count, 0),
-        uniqueProductsCount: data.length,
-      },
-      pagination: {
-        total: data.length,
-        page: Math.floor(offset / limit) + 1,
-        limit,
-        offset,
-        totalPages: 1,
-      },
-      data,
-    };
+      const totalRowsCount = cartAgg.length;
+      const paginatedAgg = cartAgg.slice(parsedOffset, parsedOffset + parsedLimit);
+
+      const rawRows = paginatedAgg.map((r) => ({
+        itemId: String(r._id),
+        name: 'Jewellery Item',
+        count: r.count,
+        customerIds: (r.customerIds || []).map((id) => String(id)),
+      }));
+
+      const enrichedRows = await this.enrichProductsWithDb(rawRows, 'cart');
+      const page = Math.floor(parsedOffset / parsedLimit) + 1;
+      const totalPages = Math.ceil(totalRowsCount / parsedLimit) || 1;
+
+      return {
+        success: true,
+        reportType: 'add-to-cart',
+        propertyId: null,
+        dateRange: { startDate, endDate },
+        totals: {
+          totalItemsAdded: cartAgg.reduce((s, r) => s + r.count, 0),
+          uniqueProductsCount: totalRowsCount,
+        },
+        pagination: {
+          total: totalRowsCount,
+          page,
+          limit: parsedLimit,
+          offset: parsedOffset,
+          totalPages,
+        },
+        data: enrichedRows,
+      };
+    } catch (err) {
+      console.error('[AnalyticsService] Error in getDatabaseCartReport:', err.message);
+      return {
+        success: true,
+        reportType: 'add-to-cart',
+        propertyId: null,
+        dateRange: { startDate, endDate },
+        totals: { totalItemsAdded: 0, uniqueProductsCount: 0 },
+        pagination: { total: 0, page: 1, limit, offset, totalPages: 1 },
+        data: [],
+      };
+    }
+  }
+
+  async getDatabaseWishlistReport({
+    startDate = '30daysAgo',
+    endDate = 'today',
+    limit = 10,
+    offset = 0,
+    sortBy = 'count',
+    order = 'desc',
+  } = {}) {
+    try {
+      const parsedLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+      const parsedOffset = Math.max(0, parseInt(offset, 10) || 0);
+
+      const wishlistAgg = await Wishlist.aggregate([
+        { $unwind: '$productIds' },
+        {
+          $group: {
+            _id: '$productIds',
+            count: { $sum: 1 },
+            customerIds: { $addToSet: '$userId' },
+          },
+        },
+        { $sort: { count: order === 'asc' ? 1 : -1 } },
+      ]);
+
+      const totalRowsCount = wishlistAgg.length;
+      const paginatedAgg = wishlistAgg.slice(parsedOffset, parsedOffset + parsedLimit);
+
+      const rawRows = paginatedAgg.map((r) => ({
+        itemId: String(r._id),
+        name: 'Jewellery Item',
+        count: r.count,
+        customerIds: (r.customerIds || []).map((id) => String(id)),
+      }));
+
+      const enrichedRows = await this.enrichProductsWithDb(rawRows, 'wishlist');
+      const page = Math.floor(parsedOffset / parsedLimit) + 1;
+      const totalPages = Math.ceil(totalRowsCount / parsedLimit) || 1;
+
+      return {
+        success: true,
+        reportType: 'wishlist',
+        propertyId: null,
+        dateRange: { startDate, endDate },
+        totals: {
+          totalItemsAdded: wishlistAgg.reduce((s, r) => s + r.count, 0),
+          uniqueProductsCount: totalRowsCount,
+        },
+        pagination: {
+          total: totalRowsCount,
+          page,
+          limit: parsedLimit,
+          offset: parsedOffset,
+          totalPages,
+        },
+        data: enrichedRows,
+      };
+    } catch (err) {
+      console.error('[AnalyticsService] Error in getDatabaseWishlistReport:', err.message);
+      return {
+        success: true,
+        reportType: 'wishlist',
+        propertyId: null,
+        dateRange: { startDate, endDate },
+        totals: { totalItemsAdded: 0, uniqueProductsCount: 0 },
+        pagination: { total: 0, page: 1, limit, offset, totalPages: 1 },
+        data: [],
+      };
+    }
+  }
+
+  async getDatabaseViewsReport({
+    startDate = '30daysAgo',
+    endDate = 'today',
+    limit = 10,
+    offset = 0,
+    sortBy = 'count',
+    order = 'desc',
+  } = {}) {
+    try {
+      const parsedLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+      const parsedOffset = Math.max(0, parseInt(offset, 10) || 0);
+
+      const total = await Product.countDocuments({ 'meta.deletedAt': null });
+      const products = await Product.find({ 'meta.deletedAt': null })
+        .select('basicInfo pricing colorImages ornate images productType categoryIds')
+        .populate('categoryIds', 'name')
+        .sort({ createdAt: -1 })
+        .skip(parsedOffset)
+        .limit(parsedLimit)
+        .lean();
+
+      const rawRows = products.map((p) => ({
+        itemId: String(p._id),
+        name: p.basicInfo?.title || 'Jewellery Product',
+        views: 0,
+      }));
+
+      const enrichedRows = await this.enrichProductsWithDb(rawRows, 'views');
+      const page = Math.floor(parsedOffset / parsedLimit) + 1;
+      const totalPages = Math.ceil(total / parsedLimit) || 1;
+
+      return {
+        success: true,
+        reportType: 'views',
+        propertyId: null,
+        dateRange: { startDate, endDate },
+        totals: {
+          totalItemsAdded: 0,
+          uniqueProductsCount: total,
+        },
+        pagination: {
+          total,
+          page,
+          limit: parsedLimit,
+          offset: parsedOffset,
+          totalPages,
+        },
+        data: enrichedRows,
+      };
+    } catch (err) {
+      console.error('[AnalyticsService] Error in getDatabaseViewsReport:', err.message);
+      return {
+        success: true,
+        reportType: 'views',
+        propertyId: null,
+        dateRange: { startDate, endDate },
+        totals: { totalItemsAdded: 0, uniqueProductsCount: 0 },
+        pagination: { total: 0, page: 1, limit, offset, totalPages: 1 },
+        data: [],
+      };
+    }
+  }
+
+  async getDatabaseOverview(startDate, endDate) {
+    const config = this.getAnalyticsConfig();
+    try {
+      const [totalUsers, cartAgg, wishlistAgg] = await Promise.all([
+        User.countDocuments({ 'meta.deletedAt': null }),
+        Cart.aggregate([
+          { $unwind: '$items' },
+          { $group: { _id: null, total: { $sum: '$items.quantity' } } },
+        ]),
+        Wishlist.aggregate([
+          { $unwind: '$productIds' },
+          { $group: { _id: null, total: { $sum: 1 } } },
+        ]),
+      ]);
+
+      const addToCart = cartAgg[0]?.total || 0;
+      const addToWishlist = wishlistAgg[0]?.total || 0;
+
+      const topProductsReport = await this.getDatabaseViewsReport({ limit: 5 });
+
+      return {
+        configured: Boolean(config.propertyId),
+        propertyId: config.propertyId || null,
+        summary: {
+          totalUsers,
+          totalSessions: 0,
+          pageViews: 0,
+          productViews: 0,
+          addToCart,
+          addToWishlist,
+          avgDurationSec: 0,
+          bounceRate: 0,
+          trends: {},
+        },
+        timeline: [],
+        topProducts: topProductsReport.data || [],
+        trafficSources: [],
+      };
+    } catch (err) {
+      console.error('[AnalyticsService] Error in getDatabaseOverview:', err.message);
+      return {
+        configured: false,
+        propertyId: null,
+        summary: {
+          totalUsers: 0,
+          totalSessions: 0,
+          pageViews: 0,
+          productViews: 0,
+          addToCart: 0,
+          addToWishlist: 0,
+          avgDurationSec: 0,
+          bounceRate: 0,
+          trends: {},
+        },
+        timeline: [],
+        topProducts: [],
+        trafficSources: [],
+      };
+    }
   }
 }
 

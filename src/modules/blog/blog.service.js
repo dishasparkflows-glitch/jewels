@@ -158,6 +158,24 @@ class BlogService {
 
     return { message: 'Blog post deleted successfully', id };
   }
+
+  // ------------------------------- bulk delete blog posts ----------------------------
+  async bulkDelete(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please provide an array of blog IDs to delete');
+    }
+
+    const result = await Blog.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+
+    return {
+      message: `${result.modifiedCount} blog article(s) deleted successfully`,
+      deletedCount: result.modifiedCount,
+      ids,
+    };
+  }
 }
 
 module.exports = new BlogService();

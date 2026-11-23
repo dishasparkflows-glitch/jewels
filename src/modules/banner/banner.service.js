@@ -271,9 +271,6 @@ class BannerService {
       if (categorySpecificOffer) {
         return {
           banner: this._formatBanner(categorySpecificOffer),
-          source: 'offerbanner',
-          isOffer: true,
-          type: 'offerbanner',
         };
       }
     }
@@ -297,9 +294,6 @@ class BannerService {
       if (categoryBanner) {
         return {
           banner: this._formatBanner(categoryBanner),
-          source: 'categorybanner',
-          isOffer: false,
-          type: 'categorybanner',
         };
       }
     }
@@ -341,9 +335,6 @@ class BannerService {
                 order: 0,
               },
             },
-            source: 'category_model',
-            isOffer: false,
-            type: 'categorybanner',
           };
         }
       }
@@ -351,69 +342,23 @@ class BannerService {
       console.warn('Failed to fetch category model banner fallback:', catErr.message);
     }
 
-    // 4. Fallback to active theme or default category banner
-    try {
-      const { Theme } = require('../theme/theme.model');
-      const activeTheme = await Theme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id name').lean();
+    // 4. Fallback to general category banner in Banner collection
+    const defaultCategoryBanner = await Banner.findOne({
+      $and: [
+        { status: 'active' },
+        { 'display.type': 'categorybanner' },
+        platformCondition,
+      ],
+    })
+      .select('-meta')
+      .populate('display.categoryId', 'name slug')
+      .sort({ 'display.order': 1, _id: -1 })
+      .lean();
 
-      const themeBanner = await Banner.findOne({
-        $and: [
-          { status: 'active' },
-          { 'display.type': 'categorybanner' },
-          platformCondition,
-        ],
-      })
-        .select('-meta')
-        .populate('display.categoryId', 'name slug')
-        .sort({ 'display.order': 1, _id: -1 })
-        .lean();
-
-      if (themeBanner) {
-        return {
-          banner: this._formatBanner(themeBanner),
-          source: 'theme_categorybanner',
-          isOffer: false,
-          type: 'categorybanner',
-        };
-      }
-
-      if (activeTheme) {
-        const Gallery = require('../gallery/gallery.model');
-        const galleryItem = await Gallery.findOne({
-          placement: 'categorybanner',
-          themeId: activeTheme._id,
-          status: { $ne: 'inactive' },
-        }).lean();
-
-        if (galleryItem && galleryItem.image?.url) {
-          return {
-            banner: {
-              _id: `gallery-category-${galleryItem._id}`,
-              content: {
-                title: categoryDoc?.name || activeTheme.name || 'Category Banner',
-                subtitle: '',
-                description: '',
-              },
-              image: galleryItem.image,
-              display: {
-                type: 'categorybanner',
-                platform: selectedPlatform,
-                categoryId: categoryDoc ? {
-                  _id: categoryDoc._id,
-                  name: categoryDoc.name,
-                  slug: categoryDoc.slug,
-                } : null,
-                order: 0,
-              },
-            },
-            source: 'gallery_categorybanner',
-            isOffer: false,
-            type: 'categorybanner',
-          };
-        }
-      }
-    } catch (themeErr) {
-      console.warn('Failed to fetch theme category banner fallback:', themeErr.message);
+    if (defaultCategoryBanner) {
+      return {
+        banner: this._formatBanner(defaultCategoryBanner),
+      };
     }
 
     // 5. Fallback to general offer banner (if any active offer banner exists without specific category)
@@ -433,17 +378,11 @@ class BannerService {
     if (generalOffer) {
       return {
         banner: this._formatBanner(generalOffer),
-        source: 'offerbanner',
-        isOffer: true,
-        type: 'offerbanner',
       };
     }
 
     return {
       banner: null,
-      source: 'none',
-      isOffer: false,
-      type: null,
     };
   }
 

@@ -11,9 +11,7 @@ const resolveMetalColorInfo = (cObj, p = null) => {
 
   // If missing name or colorCode, try resolving from p.metalColorIds
   if ((!name || !colorCode) && p) {
-    const list = Array.isArray(p.metalColorIds) && p.metalColorIds.length > 0
-      ? p.metalColorIds
-      : (Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []);
+    const list = Array.isArray(p.metalColorIds) ? p.metalColorIds : [];
     for (const mc of list) {
       if (!mc) continue;
       const mcIsObj = typeof mc === 'object' && mc !== null;
@@ -301,33 +299,7 @@ const extractProductImages = (p) => {
     });
   }
 
-  // 4. Group representative images
-  if (p.representative) {
-    if (Array.isArray(p.representative.images)) {
-      p.representative.images.forEach((img) => {
-        const u = typeof img === 'string' ? img : img?.url;
-        if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
-      });
-    }
-    if (Array.isArray(p.representative.colorImages)) {
-      p.representative.colorImages.forEach((c) => {
-        if (Array.isArray(c?.images)) {
-          c.images.forEach((img) => {
-            const u = typeof img === 'string' ? img : img?.url;
-            if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
-          });
-        }
-      });
-    }
-    if (Array.isArray(p.representative.ornate?.ornateImages)) {
-      p.representative.ornate.ornateImages.forEach((img) => {
-        const u = typeof img === 'string' ? img : img?.url;
-        if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
-      });
-    }
-  }
-
-  // 5. Single image fallback
+  // 4. Single image fallback
   if (p.image) {
     const u = typeof p.image === 'string' ? p.image : p.image?.url;
     if (u && typeof u === 'string' && u.trim()) images.push(u.trim());
@@ -341,9 +313,7 @@ const extractMetalColors = (p) => {
   if (!p) return [];
   const colorMap = new Map();
 
-  const sourceColorImages = Array.isArray(p.colorImages) && p.colorImages.length > 0
-    ? p.colorImages
-    : (Array.isArray(p.representative?.colorImages) ? p.representative.colorImages : []);
+  const sourceColorImages = Array.isArray(p.colorImages) ? p.colorImages : [];
 
   // 1. Process colorImages rows
   for (const row of sourceColorImages) {
@@ -376,9 +346,7 @@ const extractMetalColors = (p) => {
   }
 
   // 2. Also process metalColorIds
-  const sourceMetalColors = Array.isArray(p.metalColorIds) && p.metalColorIds.length > 0
-    ? p.metalColorIds
-    : (Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []);
+  const sourceMetalColors = Array.isArray(p.metalColorIds) ? p.metalColorIds : [];
 
   for (const mc of sourceMetalColors) {
     if (!mc) continue;
@@ -525,10 +493,8 @@ const formatStorefrontProduct = (p) => {
   const gender = p.basicInfo?.gender || [];
 
   const metalColors = extractMetalColors(p);
-  const colorImages = formatColorImages(p.colorImages || p.representative?.colorImages || [], p);
-  const metalColorIds = Array.isArray(p.metalColorIds)
-    ? p.metalColorIds
-    : (Array.isArray(p.representative?.metalColorIds) ? p.representative.metalColorIds : []);
+  const colorImages = formatColorImages(p.colorImages || [], p);
+  const metalColorIds = Array.isArray(p.metalColorIds) ? p.metalColorIds : [];
 
   let selectedAttributes = undefined;
   if (p.productType === 'gold') {
@@ -668,8 +634,14 @@ const formatStorefrontProductDetail = (p) => {
           caratWeight: Number(v.caratWeight || centerWt || 0),
           centerDiamondWeight: centerWt,
           centerDiamondCost: Number(v.centerDiamondCost || 0),
+          colorStoneCost: Number(v.colorStoneCost || 0),
+          colorStoneWeight: Number(v.colorStoneWeight || 0),
+          colorStoneRate: Number(v.colorStoneRate || 3000),
           sideDiamondWeight: Number(v.sideDiamondWeight || 0),
           sideDiamondCost: Number(v.sideDiamondCost || 0),
+          sideColorStoneCost: Number(v.sideColorStoneCost || 0),
+          sideColorStoneWeight: Number(v.sideColorStoneWeight || 0),
+          sideColorStoneRate: Number(v.sideColorStoneRate || 3000),
           diamondCost: Number(
             v.diamondCost !== undefined && v.diamondCost !== null
               ? v.diamondCost
@@ -752,7 +724,11 @@ const formatStorefrontProductDetail = (p) => {
     },
     productSpecifications: Array.isArray(p.productSpecifications) ? p.productSpecifications : [],
     descriptionSections: Array.isArray(p.descriptionSections) ? p.descriptionSections : [],
+    stoneConfigType: p.stoneConfigType || 'centerDiamond',
+    colorStoneRows: Array.isArray(p.colorStoneRows) ? p.colorStoneRows : [],
     centerDiamondRows,
+    sideStoneConfigType: p.sideStoneConfigType || 'sideDiamond',
+    sideColorStoneRows: Array.isArray(p.sideColorStoneRows) ? p.sideColorStoneRows : [],
     sideDiamondRows: Array.isArray(p.sideDiamondRows) ? p.sideDiamondRows : [],
     variants,
     demoMetrics: {
@@ -964,6 +940,14 @@ const getProductPopulateOptions = () => {
     { path: 'variants.diamondShapeId', select: 'name', strictPopulate: false },
     { path: 'variants.diamondColorId', select: 'name', strictPopulate: false },
     { path: 'variants.diamondClarityId', select: 'name', strictPopulate: false },
+    { path: 'colorStoneRows.diamondTypeId', select: 'name _id image', strictPopulate: false },
+    { path: 'colorStoneRows.diamondType', select: 'name _id image', strictPopulate: false },
+    { path: 'colorStoneRows.diamondShapeId', select: 'name _id image', strictPopulate: false },
+    { path: 'colorStoneRows.diamondShape', select: 'name _id image', strictPopulate: false },
+    { path: 'sideColorStoneRows.diamondTypeId', select: 'name _id image', strictPopulate: false },
+    { path: 'sideColorStoneRows.diamondType', select: 'name _id image', strictPopulate: false },
+    { path: 'sideColorStoneRows.diamondShapeId', select: 'name _id image', strictPopulate: false },
+    { path: 'sideColorStoneRows.diamondShape', select: 'name _id image', strictPopulate: false },
   ];
 };
 

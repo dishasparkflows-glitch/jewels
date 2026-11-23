@@ -46,6 +46,84 @@ const {
   formatSizeChart,
 } = require('./product.utils');
 
+function normalizeStoneConfig(data) {
+  if (!data) return data;
+
+  if (typeof data.colorStoneRows === 'string') {
+    try { data.colorStoneRows = JSON.parse(data.colorStoneRows); } catch (e) { data.colorStoneRows = []; }
+  }
+  if (typeof data.sideColorStoneRows === 'string') {
+    try { data.sideColorStoneRows = JSON.parse(data.sideColorStoneRows); } catch (e) { data.sideColorStoneRows = []; }
+  }
+  if (typeof data.centerDiamondRows === 'string') {
+    try { data.centerDiamondRows = JSON.parse(data.centerDiamondRows); } catch (e) { data.centerDiamondRows = []; }
+  }
+  if (typeof data.sideDiamondRows === 'string') {
+    try { data.sideDiamondRows = JSON.parse(data.sideDiamondRows); } catch (e) { data.sideDiamondRows = []; }
+  }
+
+  // Normalize ID fields for colorStoneRows
+  if (Array.isArray(data.colorStoneRows)) {
+    data.colorStoneRows = data.colorStoneRows.map((r) => ({
+      diamondTypeId: r.diamondTypeId || r.diamondType?._id || r.diamondType,
+      diamondShapeId: r.diamondShapeId || r.diamondShape?._id || r.diamondShape,
+      caratWeight: Number(r.caratWeight || 0),
+      pricePerCarat: Number(r.pricePerCarat || 3000),
+    })).filter((r) => r.diamondTypeId && r.caratWeight > 0);
+  }
+
+  // Normalize ID fields for sideColorStoneRows
+  if (Array.isArray(data.sideColorStoneRows)) {
+    data.sideColorStoneRows = data.sideColorStoneRows.map((r) => ({
+      diamondTypeId: r.diamondTypeId || r.diamondType?._id || r.diamondType,
+      diamondShapeId: r.diamondShapeId || r.diamondShape?._id || r.diamondShape,
+      caratWeight: Number(r.caratWeight || 0),
+      pricePerCarat: Number(r.pricePerCarat || 3000),
+    })).filter((r) => r.diamondTypeId && r.caratWeight > 0);
+  }
+
+  // Mutual Exclusivity: centerDiamond vs colorStone
+  if (data.stoneConfigType === 'colorStone') {
+    data.centerDiamondRows = [];
+  } else if (data.stoneConfigType === 'centerDiamond') {
+    data.colorStoneRows = [];
+  }
+
+  // Side Stone Configuration
+  const hasSideDia = Array.isArray(data.sideDiamondRows) && data.sideDiamondRows.length > 0;
+  const hasSideCs = Array.isArray(data.sideColorStoneRows) && data.sideColorStoneRows.length > 0;
+
+  if (!hasSideDia) data.sideDiamondRows = [];
+  if (!hasSideCs) data.sideColorStoneRows = [];
+
+  if (hasSideDia && hasSideCs) data.sideStoneConfigType = 'both';
+  else if (hasSideCs) data.sideStoneConfigType = 'sideColorStone';
+  else if (hasSideDia) data.sideStoneConfigType = 'sideDiamond';
+  else data.sideStoneConfigType = data.sideStoneConfigType || 'none';
+
+  // Clean variant fields
+  if (Array.isArray(data.variants)) {
+    data.variants.forEach((v) => {
+      if (data.stoneConfigType === 'centerDiamond') {
+        v.colorStoneCost = 0;
+        v.colorStoneWeight = 0;
+        v.colorStoneRate = 0;
+      } else if (data.stoneConfigType === 'colorStone') {
+        v.centerDiamondCost = 0;
+        v.centerDiamondWeight = 0;
+        v.centerDiamondRate = 0;
+      }
+      if (!hasSideCs) {
+        v.sideColorStoneCost = 0;
+        v.sideColorStoneWeight = 0;
+        v.sideColorStoneRate = 0;
+      }
+    });
+  }
+
+  return data;
+}
+
 class ProductService {
   async _populateMediaSizes(product) {
     return populateMediaSizes(product);
@@ -55,6 +133,7 @@ class ProductService {
     return calculateCustomPriceBreakdown(data);
   }
   async previewPricing(data) {
+    normalizeStoneConfig(data);
     return calculateProductPricing(data, await loadPricingMasters());
   }
 
@@ -126,6 +205,7 @@ class ProductService {
 
   // ------------------------------- create product ----------------------------
   async create(data, userId) {
+    normalizeStoneConfig(data);
     const actorId = userId || getRequestContext('userId');
     if (actorId) {
       if (!data.meta) data.meta = {};
@@ -833,8 +913,8 @@ class ProductService {
     const isPriceSort = queryParams.sort && ['price-low', 'price-high', 'price_asc', 'price_desc'].includes(queryParams.sort);
     if (!isPriceSort) {
       finalItems.sort((a, b) => {
-        const isGoldA = (a.productType || a.representative?.productType || '').toLowerCase() === 'gold' ? 0 : 1;
-        const isGoldB = (b.productType || b.representative?.productType || '').toLowerCase() === 'gold' ? 0 : 1;
+        const isGoldA = (a.productType || '').toLowerCase() === 'gold' ? 0 : 1;
+        const isGoldB = (b.productType || '').toLowerCase() === 'gold' ? 0 : 1;
         return isGoldA - isGoldB;
       });
     }
@@ -1439,6 +1519,7 @@ class ProductService {
 
   // ------------------------------- update product ----------------------------
   async update(id, data, userId) {
+    normalizeStoneConfig(data);
     const actorId = userId || getRequestContext('userId');
     // Product update API does not change the status field
     delete data.status;

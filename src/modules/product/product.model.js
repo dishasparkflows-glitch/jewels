@@ -89,6 +89,12 @@ const variantSchema = new mongoose.Schema({
   centerDiamondCost: Number,
   centerDiamondWeight: Number,
   centerDiamondRate: Number,
+  colorStoneCost: Number,
+  colorStoneWeight: Number,
+  colorStoneRate: { type: Number, default: 3000 },
+  sideColorStoneCost: Number,
+  sideColorStoneWeight: Number,
+  sideColorStoneRate: { type: Number, default: 3000 },
   metalCost: Number,
   metalRate: Number,
   diamondCost: Number,
@@ -230,7 +236,23 @@ const productSchema = new mongoose.Schema(
       default: undefined,
     },
 
-    // ── Diamond Configurations ────────────────────────────────
+    // ── Stone Configurations ──────────────────────────────────
+    stoneConfigType: {
+      type: String,
+      enum: ['centerDiamond', 'colorStone'],
+      default: 'centerDiamond',
+    },
+    colorStoneRows: {
+      type: [{
+        diamondTypeId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType' },
+        diamondType: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType' },
+        diamondShapeId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape' },
+        diamondShape: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape' },
+        caratWeight: Number,
+        pricePerCarat: { type: Number, default: 3000 },
+      }],
+      default: undefined,
+    },
     centerDiamondRows: {
       type: [{
         diamondTypeId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType' },
@@ -240,6 +262,22 @@ const productSchema = new mongoose.Schema(
         caratWeight: Number,
         pricePerCarat: Number,
         rateSource: { type: String, enum: ['master', 'manual'], default: 'master' },
+      }],
+      default: undefined,
+    },
+    sideStoneConfigType: {
+      type: String,
+      enum: ['sideDiamond', 'sideColorStone', 'both', 'none'],
+      default: 'sideDiamond',
+    },
+    sideColorStoneRows: {
+      type: [{
+        diamondTypeId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType' },
+        diamondType: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType' },
+        diamondShapeId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape' },
+        diamondShape: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape' },
+        caratWeight: Number,
+        pricePerCarat: { type: Number, default: 3000 },
       }],
       default: undefined,
     },

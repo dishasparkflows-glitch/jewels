@@ -17,17 +17,14 @@ const birthstoneSchema = new mongoose.Schema(
       required: [true, 'Please add a stone name'],
       trim: true,
     },
-    color: {
-      type: String,
-      default: '',
-    },
-    meaning: {
-      type: String,
-      default: '',
-    },
     image: {
       url: { type: String, default: '' },
       key: { type: String, default: '' },
+    },
+    order: {
+      type: Number,
+      default: 0,
+      index: true,
     },
     status: {
       type: String,

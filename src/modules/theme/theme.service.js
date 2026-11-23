@@ -4,7 +4,7 @@ const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const Category = require('../category/category.model');
 const Banner = require('../banner/banner.model');
 const Featured = require('../featured/featured.model');
-const { Theme, ThemeSettings } = require('./theme.model');
+const { Theme } = require('./theme.model');
 const themeMedia = require('./themeMedia');
 const Setting = require('../setting/setting.model');
 const TIMEZONE = 'Asia/Kolkata';
@@ -241,15 +241,14 @@ class ThemeService {
   }
 
   async settings() {
-    try {
-      return await ThemeSettings.findOneAndUpdate(
-        { key: 'storefront' }, { $setOnInsert: { key: 'storefront' } },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
-      );
-    } catch (error) {
-      if (error.code === 11000) return ThemeSettings.findOne({ key: 'storefront' });
-      throw error;
+    let setting = await Setting.findOne({ 'meta.deletedAt': null });
+    if (!setting) {
+      setting = await Setting.findOne();
     }
+    return {
+      activeThemeId: setting?.currentThemeId || null,
+      revision: setting?.revision || 0,
+    };
   }
 
   async setActive(theme, actorId, action = 'published') {
@@ -257,29 +256,25 @@ class ThemeService {
       await this.validateConfig(theme.config);
       theme.publishedSnapshot = snapshotOf(theme);
     }
-    const settings = await this.settings();
-    const previousId = settings.activeThemeId && String(settings.activeThemeId) !== String(theme._id)
-      ? settings.activeThemeId
-      : settings.previousThemeId;
-
-    // The settings document is the single atomic source of truth read by storefront clients.
-    const updatedSettings = await ThemeSettings.findOneAndUpdate(
-      { key: 'storefront' },
-      { $set: { activeThemeId: theme._id, scheduledThemeId: null, previousThemeId: previousId || null }, $inc: { revision: 1 } },
-      { new: true }
+    await Setting.updateOne(
+      { 'meta.deletedAt': null },
+      { $set: { currentThemeId: theme._id } }
     );
-    if (settings.scheduledThemeId && String(settings.scheduledThemeId) !== String(theme._id)) {
-      await Theme.updateOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null }, { $set: { status: 'draft', 'schedule.startAt': null } });
-    }
-    await Theme.updateMany({ status: 'active', _id: { $ne: theme._id } }, { $set: { status: 'draft' } });
-    theme.status = 'active';
     theme.publishedAt = new Date();
-    theme.schedule.startAt = null;
+    if (theme.schedule) theme.schedule.startAt = null;
     theme.meta = theme.meta || {};
     theme.meta.updatedBy = actorId || theme.meta.updatedBy;
     await theme.save();
-    await this.writeHistory(theme, action, actorId, '', updatedSettings.revision);
-    return { theme, revision: updatedSettings.revision };
+
+    // When theme becomes active, take theme_media_mappings and sync mapped images to banner & featured tables
+    try {
+      const themeMediaMappingService = require('./themeMediaMapping.service');
+      await themeMediaMappingService.syncThemeMappingsToRecords(theme._id);
+    } catch (err) {
+      console.warn('[ThemeService.setActive] syncThemeMappingsToRecords error:', err.message);
+    }
+
+    return { theme, success: true };
   }
 
   // ------------------------------- publish website theme ----------------------------
@@ -328,12 +323,9 @@ class ThemeService {
     theme.status = 'archived';
     await theme.save();
     // Clear only references to this theme; preserve unrelated live/scheduled themes.
-    for (const field of ['activeThemeId', 'scheduledThemeId', 'previousThemeId']) {
-      await ThemeSettings.updateOne({ key: 'storefront', [field]: theme._id }, { $set: { [field]: null } });
-    }
-    await Theme.updateMany({ 'schedule.fallbackThemeId': theme._id }, { $set: { 'schedule.fallbackThemeId': null } });
-    const settings = await ThemeSettings.findOneAndUpdate(
-      { key: 'storefront' }, { $inc: { revision: 1 } }, { new: true }
+    await Setting.updateOne(
+      { currentThemeId: theme._id },
+      { $set: { currentThemeId: null }, $inc: { revision: 1 } }
     );
     await this.writeHistory(theme, 'deleted', actorId, 'Theme deleted. Shared media retained.', settings?.revision || 0);
     return { id: String(theme._id) };
@@ -564,25 +556,23 @@ class ThemeService {
 
   // ------------------------------- get public config ----------------------------
   async getPublicConfig() {
-    const settings = await this.settings();
-    let activeThemeId = settings.activeThemeId;
+    let activeThemeId;
+    let revision = 0;
+
+    try {
+      const storeSetting = await Setting.findOne({ 'meta.deletedAt': null }).select('currentThemeId').lean();
+      if (storeSetting?.currentThemeId) activeThemeId = storeSetting.currentThemeId;
+    } catch (_) {}
 
     if (!activeThemeId) {
-      try {
-        const storeSetting = await Setting.findOne().select('currentThemeId').lean();
-        if (storeSetting?.currentThemeId) activeThemeId = storeSetting.currentThemeId;
-      } catch (_) {}
+      const firstTheme = await Theme.findOne({ 'meta.deletedAt': null }).select('_id').lean();
+      if (firstTheme) activeThemeId = firstTheme._id;
     }
 
-    if (!activeThemeId) {
-      const active = await Theme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id').lean();
-      if (active) activeThemeId = active._id;
-    }
-
-    if (!activeThemeId) return { revision: settings.revision, timezone: TIMEZONE, theme: null };
+    if (!activeThemeId) return { revision, timezone: TIMEZONE, theme: null };
     const theme = await Theme.findOne({ _id: activeThemeId, 'meta.deletedAt': null }).lean();
     return {
-      revision: settings.revision,
+      revision,
       timezone: TIMEZONE,
       theme: theme?.publishedSnapshot ? { ...theme.publishedSnapshot, config: await themeMedia.resolve(theme.publishedSnapshot.config) } : (theme?.config ? { id: String(theme._id), name: theme.name, code: theme.code, config: await themeMedia.resolve(theme.config) } : null),
     };
@@ -597,31 +587,21 @@ class ThemeService {
   async reconcileSchedule() {
     const settings = await this.settings();
     const now = new Date();
-    if (settings.scheduledThemeId) {
-      const scheduled = await Theme.findOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null });
-      if (scheduled?.schedule?.startAt && scheduled.schedule.startAt <= now) {
-        await this.setActive(scheduled, null, 'activated');
-        return { activatedThemeId: scheduled._id };
-      }
-    }
     if (settings.activeThemeId) {
       const active = await Theme.findOne({ _id: settings.activeThemeId, 'meta.deletedAt': null });
       if (active?.schedule?.endAt && active.schedule.endAt <= now) {
-        const fallbackId = active.schedule.fallbackThemeId || settings.previousThemeId;
+        const fallbackId = active.schedule.fallbackThemeId;
         const fallback = fallbackId ? await Theme.findOne({ _id: fallbackId, 'meta.deletedAt': null }) : null;
-        active.status = 'draft';
         await active.save();
         if (fallback?.publishedSnapshot) {
           fallback.config = fallback.publishedSnapshot.config;
           await this.setActive(fallback, null, 'expired');
           return { expiredThemeId: active._id, activatedThemeId: fallback._id };
         } else {
-          const updated = await ThemeSettings.findOneAndUpdate(
-            { key: 'storefront', activeThemeId: active._id },
-            { $set: { activeThemeId: null, scheduledThemeId: null, previousThemeId: active._id }, $inc: { revision: 1 } },
-            { new: true }
+          await Setting.updateOne(
+            { 'meta.deletedAt': null },
+            { $set: { currentThemeId: null }, $inc: { revision: 1 } }
           );
-          if (updated) await this.writeHistory(active, 'expired', null, 'Theme expired; no fallback theme was configured.', updated.revision);
           return { expiredThemeId: active._id };
         }
       }

@@ -13,18 +13,14 @@ class SettingService {
 
     if (!setting) return {};
 
-    // If currentThemeId is not set, initialize it with active theme from themes
+    // If currentThemeId is not set, initialize it with first available theme
     if (!setting.currentThemeId) {
       try {
-        const { Theme, ThemeSettings } = require('../theme/theme.model');
-        const themeSettings = await ThemeSettings.findOne({ key: 'storefront' }).lean();
-        const activeTheme = themeSettings?.activeThemeId
-          ? await Theme.findOne({ _id: themeSettings.activeThemeId }).select('name code status description').lean()
-          : await Theme.findOne({ status: 'active', 'meta.deletedAt': null }).select('name code status description').lean();
-
-        if (activeTheme) {
-          setting.currentThemeId = activeTheme;
-          await Setting.updateOne({ _id: setting._id }, { $set: { currentThemeId: activeTheme._id } });
+        const { Theme } = require('../theme/theme.model');
+        const defaultTheme = await Theme.findOne({ 'meta.deletedAt': null }).select('name code description').lean();
+        if (defaultTheme) {
+          setting.currentThemeId = defaultTheme;
+          await Setting.updateOne({ _id: setting._id }, { $set: { currentThemeId: defaultTheme._id } });
         }
       } catch (_) {}
     }
@@ -40,10 +36,15 @@ class SettingService {
       topAnnouncementService.getPublic(),
     ]);
 
+    const settings = settingsRes.status === 'fulfilled' ? settingsRes.value : {};
+
     return {
-      settings: settingsRes.status === 'fulfilled' ? settingsRes.value : {},
+      settings,
       footerSettings: footerRes.status === 'fulfilled' ? footerRes.value : {},
       topAnnouncement: announcementRes.status === 'fulfilled' ? announcementRes.value : { isEnabled: false, items: [] },
+      birthstones: {
+        showOnStorefront: settings?.birthstones?.showOnStorefront !== false,
+      },
     };
   }
 
@@ -53,27 +54,31 @@ class SettingService {
     if (!settings) {
       settings = await Setting.create(data);
     } else {
-      if (data.socialMedia) {
-        settings.socialMedia = {
-          ...(settings.socialMedia?.toObject ? settings.socialMedia.toObject() : (settings.socialMedia || {})),
-          ...data.socialMedia,
-        };
-        settings.markModified('socialMedia');
-      }
-      if (data.socialProof) {
-        settings.socialProof = {
-          ...(settings.socialProof?.toObject ? settings.socialProof.toObject() : (settings.socialProof || {})),
-          ...data.socialProof,
-        };
-        settings.markModified('socialProof');
-      }
-      if (data.businessDetails) {
-        settings.businessDetails = {
-          ...(settings.businessDetails?.toObject ? settings.businessDetails.toObject() : (settings.businessDetails || {})),
-          ...data.businessDetails,
-        };
-        settings.markModified('businessDetails');
-      } else if (
+      // Cleanly merge nested subdocuments without overwriting untouched sibling fields
+      const subdocFields = [
+        'socialMedia',
+        'socialProof',
+        'businessDetails',
+        'themeColors',
+        'bankDetails',
+        'mediaCompression',
+        'topAnnouncement',
+        'birthstones',
+      ];
+
+      subdocFields.forEach((field) => {
+        if (data[field]) {
+          settings[field] = {
+            ...(settings[field]?.toObject ? settings[field].toObject() : (settings[field] || {})),
+            ...data[field],
+          };
+          settings.markModified(field);
+          delete data[field];
+        }
+      });
+
+      // Flat form field aliases for businessDetails
+      if (
         data.companyName !== undefined ||
         data.emailAddress !== undefined ||
         data.mobileNumber !== undefined ||
@@ -97,24 +102,8 @@ class SettingService {
         settings.markModified('businessDetails');
       }
 
-      if (data.playStoreUrl !== undefined) {
-        if (!settings.businessDetails) settings.businessDetails = {};
-        settings.businessDetails.playStoreUrl = data.playStoreUrl;
-        settings.markModified('businessDetails');
-      }
-      if (data.appStoreUrl !== undefined) {
-        if (!settings.businessDetails) settings.businessDetails = {};
-        settings.businessDetails.appStoreUrl = data.appStoreUrl;
-        settings.markModified('businessDetails');
-      }
-
-      if (data.themeColors) {
-        settings.themeColors = {
-          ...(settings.themeColors?.toObject ? settings.themeColors.toObject() : (settings.themeColors || {})),
-          ...data.themeColors,
-        };
-        settings.markModified('themeColors');
-      } else if (data.buttonColor || data.buttonHoverColor || data.buttonTextColor) {
+      // Flat form field aliases for themeColors
+      if (data.buttonColor || data.buttonHoverColor || data.buttonTextColor) {
         settings.themeColors = {
           ...(settings.themeColors?.toObject ? settings.themeColors.toObject() : (settings.themeColors || {})),
           ...(data.buttonColor ? { buttonColor: data.buttonColor } : {}),
@@ -124,13 +113,8 @@ class SettingService {
         settings.markModified('themeColors');
       }
 
-      if (data.bankDetails) {
-        settings.bankDetails = {
-          ...(settings.bankDetails?.toObject ? settings.bankDetails.toObject() : (settings.bankDetails || {})),
-          ...data.bankDetails,
-        };
-        settings.markModified('bankDetails');
-      } else if (data.bankName !== undefined || data.bankAccountNumber !== undefined || data.ifscCode !== undefined) {
+      // Flat form field aliases for bankDetails
+      if (data.bankName !== undefined || data.bankAccountNumber !== undefined || data.ifscCode !== undefined) {
         settings.bankDetails = {
           ...(settings.bankDetails?.toObject ? settings.bankDetails.toObject() : (settings.bankDetails || {})),
           ...(data.bankName !== undefined ? { bankName: data.bankName } : {}),
@@ -140,31 +124,9 @@ class SettingService {
         settings.markModified('bankDetails');
       }
 
+      // Top-level fields (logoImage, mobileLogoImage, certificateImage, loginModalImage, trustBadges, paymentProvider, currentThemeId)
       Object.assign(settings, data);
       await settings.save();
-    }
-
-    // If currentThemeId was updated, sync it with ThemeSettings and activate the theme
-    if (data.currentThemeId) {
-      try {
-        const { Theme, ThemeSettings } = require('../theme/theme.model');
-        await ThemeSettings.findOneAndUpdate(
-          { key: 'storefront' },
-          { $set: { activeThemeId: data.currentThemeId }, $inc: { revision: 1 } },
-          { upsert: true }
-        );
-        // Set selected theme to active and other themes to draft
-        await Theme.updateMany(
-          { _id: { $ne: data.currentThemeId }, status: 'active' },
-          { $set: { status: 'draft' } }
-        );
-        await Theme.updateOne(
-          { _id: data.currentThemeId },
-          { $set: { status: 'active' } }
-        );
-      } catch (err) {
-        console.error('Failed to sync theme in settings update:', err);
-      }
     }
 
     if (data.buttonColor) {

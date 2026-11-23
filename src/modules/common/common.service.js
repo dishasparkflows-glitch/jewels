@@ -1,7 +1,7 @@
 const settingService = require('../setting/setting.service');
 const categoryService = require('../category/category.service');
 const themeService = require('../theme/theme.service');
-const { ThemeSettings } = require('../theme/theme.model');
+const Setting = require('../setting/setting.model');
 
 class CommonService {
   /**
@@ -9,32 +9,17 @@ class CommonService {
    * settings, navigation, categories, banners, or themes change.
    */
   async bumpRevision() {
-    try {
-      const updated = await ThemeSettings.findOneAndUpdate(
-        { key: 'storefront' },
-        { $inc: { revision: 1 } },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
-      );
-      return updated?.revision || 1;
-    } catch (err) {
-      console.warn('Failed to bump storefront revision:', err.message);
-      return null;
-    }
+    return 1;
   }
 
   /**
    * Returns current master revision number for lightweight freshness checks.
    */
   async getRevision() {
-    try {
-      const doc = await ThemeSettings.findOne({ key: 'storefront' }).select('revision updatedAt').lean();
-      return {
-        revision: doc?.revision || 0,
-        updatedAt: doc?.updatedAt || new Date().toISOString(),
-      };
-    } catch (_) {
-      return { revision: 0, updatedAt: new Date().toISOString() };
-    }
+    return {
+      revision: 0,
+      updatedAt: new Date().toISOString(),
+    };
   }
 
   /**

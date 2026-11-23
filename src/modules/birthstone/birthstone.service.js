@@ -2,12 +2,32 @@ const Birthstone = require('./birthstone.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
+const MONTH_DEFAULT_ORDER = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
+};
+
 class BirthstoneService {
   // ------------------------------- create birthstone ----------------------------
   async create(data) {
     const existing = await Birthstone.findOne({ month: data.month });
     if (existing) {
       throw new ApiError(409, `A birthstone for ${data.month} already exists`);
+    }
+    if (data.order === undefined || data.order === null || isNaN(Number(data.order))) {
+      data.order = MONTH_DEFAULT_ORDER[String(data.month).toLowerCase()] || 0;
+    } else {
+      data.order = Number(data.order);
     }
     return await Birthstone.create(data);
   }
@@ -48,9 +68,13 @@ class BirthstoneService {
       filter.$or = [{ month: searchRegex }, { stoneName: searchRegex }];
     }
 
+    const sort = queryParams.sortBy
+      ? { [queryParams.sortBy]: queryParams.sortOrder === 'desc' ? -1 : 1 }
+      : { order: 1, 'meta.createdAt': -1 };
+
     const [items, total] = await Promise.all([
       Birthstone.find(filter)
-        .sort({ 'meta.createdAt': -1 })
+        .sort(sort)
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -65,7 +89,8 @@ class BirthstoneService {
     const filter = { 'meta.deletedAt': null, status: 'active' };
 
     return await Birthstone.find(filter)
-      .select('_id month stoneName image color')
+      .select('_id month stoneName image order')
+      .sort({ order: 1 })
       .lean();
   }
 
@@ -79,6 +104,10 @@ class BirthstoneService {
       if (duplicate) {
         throw new ApiError(409, `A birthstone for ${data.month} already exists`);
       }
+    }
+
+    if (data.order !== undefined && data.order !== null) {
+      data.order = Number(data.order);
     }
 
     const item = await Birthstone.findOneAndUpdate(

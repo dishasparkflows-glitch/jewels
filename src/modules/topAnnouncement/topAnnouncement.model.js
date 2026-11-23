@@ -44,34 +44,8 @@ const topAnnouncementSchema = new mongoose.Schema(
   }
 );
 
-
-const topAnnouncementSettingSchema = new mongoose.Schema(
-  {
-    isEnabled: {
-      type: Boolean,
-      default: true,
-    },
-    autoplayInterval: {
-      type: Number,
-      default: 4000,
-    },
-    displayDirection: {
-      type: String,
-      enum: ['horizontal', 'vertical'],
-      default: 'horizontal',
-    },
-  },
-  {
-    versionKey: false,
-    collection: 'top_announcement_settings',
-  }
-);
-
-
 const TopAnnouncement = mongoose.model('TopAnnouncement', topAnnouncementSchema, 'top_announcements');
-const TopAnnouncementSetting = mongoose.model('TopAnnouncementSetting', topAnnouncementSettingSchema, 'top_announcement_settings');
 
 module.exports = {
   TopAnnouncement,
-  TopAnnouncementSetting,
 };

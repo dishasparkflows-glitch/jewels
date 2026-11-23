@@ -714,6 +714,29 @@ class ProductService {
         filter.$and = [...(filter.$and || []), { $or: orBranches }];
       }
     }
+
+    // Dynamic Filter: Birth Month
+    const birthMonthParam = queryParams.birthMonth || queryParams['birthMonth[]'];
+    if (birthMonthParam) {
+      const rawMonths = Array.isArray(birthMonthParam)
+        ? birthMonthParam
+        : String(birthMonthParam).split(',').map((s) => s.trim()).filter(Boolean);
+
+      const months = rawMonths
+        .map((m) => {
+          const s = String(m).trim();
+          return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
+        })
+        .filter(Boolean);
+
+      if (months.length > 0) {
+        const regexList = months.map((m) => new RegExp(`^${m}$`, 'i'));
+        filter.$and = [
+          ...(filter.$and || []),
+          { birthMonth: { $in: regexList } },
+        ];
+      }
+    }
     const facetsQuery =
       queryParams.includeFacets === 'true'
         ? Promise.all(
@@ -900,6 +923,25 @@ class ProductService {
           { 'pricing.mrp': priceFilter }
         ]
       });
+    }
+
+    const birthMonthSearchParam = queryParams.birthMonth || queryParams['birthMonth[]'];
+    if (birthMonthSearchParam) {
+      const rawMonths = Array.isArray(birthMonthSearchParam)
+        ? birthMonthSearchParam
+        : String(birthMonthSearchParam).split(',').map((s) => s.trim()).filter(Boolean);
+
+      const months = rawMonths
+        .map((m) => {
+          const s = String(m).trim();
+          return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
+        })
+        .filter(Boolean);
+
+      if (months.length > 0) {
+        const regexList = months.map((m) => new RegExp(`^${m}$`, 'i'));
+        conditions.push({ birthMonth: { $in: regexList } });
+      }
     }
 
     // Support representative group cards when requested (defaults to true for storefront)

@@ -3,14 +3,13 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const redisClient = require('../../utils/redisClient');
 const { CACHE_TTL } = require('../../config/constants');
-const { ThemeSettings } = require('../theme/theme.model');
+const Setting = require('../setting/setting.model');
 
 async function bumpStorefrontRevision() {
   try {
-    await ThemeSettings.findOneAndUpdate(
-      { key: 'storefront' },
-      { $inc: { revision: 1 } },
-      { upsert: true }
+    await Setting.updateOne(
+      { 'meta.deletedAt': null },
+      { $inc: { revision: 1 } }
     );
   } catch (_) {}
 }

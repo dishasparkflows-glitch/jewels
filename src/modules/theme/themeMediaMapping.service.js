@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const ThemeMediaMapping = require('./themeMediaMapping.model');
-const { Theme, ThemeSettings } = require('./theme.model');
+const { Theme } = require('./theme.model');
+const Setting = require('../setting/setting.model');
 const Gallery = require('../gallery/gallery.model');
 const Banner = require('../banner/banner.model');
 const Featured = require('../featured/featured.model');
@@ -469,6 +470,23 @@ class ThemeMediaMappingService {
       }
     );
 
+    // If this theme is currently active, immediately sync this mapped record to banner/featureds
+    try {
+      const activeTheme = await Theme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id').lean();
+      if (activeTheme && String(activeTheme._id) === String(themeId)) {
+        await this.syncSingleMappingToRecord(recordId, galleryAsset);
+        const redisClient = require('../../utils/redisClient');
+        await Promise.allSettled([
+          redisClient.deleteByPattern('banners:*'),
+          redisClient.deleteByPattern('featured:*'),
+          redisClient.deleteByPattern('categories:*'),
+          redisClient.deleteByPattern('storefront:*'),
+        ]);
+      }
+    } catch (syncErr) {
+      console.warn('[upsertMapping] Sync to record error:', syncErr.message);
+    }
+
     const gAsset = mapping.galleryId;
     const gAssetId = gAsset?._id || gAsset;
 
@@ -576,6 +594,16 @@ class ThemeMediaMappingService {
       bulkResult = await ThemeMediaMapping.bulkWrite(ops, { ordered: false });
     }
 
+    // If this theme is currently active, immediately sync all mappings to records
+    try {
+      const activeTheme = await Theme.findOne({ status: 'active', 'meta.deletedAt': null }).select('_id').lean();
+      if (activeTheme && String(activeTheme._id) === String(themeId)) {
+        await this.syncThemeMappingsToRecords(themeId);
+      }
+    } catch (syncErr) {
+      console.warn('[bulkSaveMappings] Sync to records error:', syncErr.message);
+    }
+
     return {
       message: `Successfully processed ${ops.length} mapping(s).`,
       matchedCount: bulkResult.matchedCount,
@@ -679,6 +707,130 @@ class ThemeMediaMappingService {
     };
   }
 
+  // ------------------------------- sync a single mapping to target record ----------------------------
+  async syncSingleMappingToRecord(recordId, galleryAsset) {
+    if (!recordId || !galleryAsset) return null;
+    const gAsset =
+      typeof galleryAsset === 'object' && galleryAsset?.image?.url
+        ? galleryAsset
+        : await Gallery.findById(galleryAsset).lean();
+
+    if (!gAsset || !gAsset.image?.url) return null;
+
+    const imageUrl = gAsset.image.url;
+    const imageKey = gAsset.image.key || '';
+
+    // 1. Check in Featured collection (featureds)
+    const featured = await Featured.findById(recordId);
+    if (featured) {
+      featured.image = {
+        url: imageUrl,
+        key: imageKey,
+      };
+      await featured.save();
+      return { model: 'Featured', id: recordId };
+    }
+
+    // 2. Check in Banner collection (banners) - primary banner
+    const banner = await Banner.findById(recordId);
+    if (banner) {
+      banner.image = {
+        url: imageUrl,
+        key: imageKey,
+        mediaType: banner.image?.mediaType || 'image',
+      };
+      // If mobileImage exists or this banner is for mobile/common, update mobileImage as well
+      if (!banner.mobileImage?.url || banner.display?.platform === 'mobile' || gAsset.platform === 'app') {
+        banner.mobileImage = {
+          url: imageUrl,
+          key: imageKey,
+          mediaType: banner.mobileImage?.mediaType || 'image',
+        };
+      }
+      await banner.save();
+      return { model: 'Banner', id: recordId };
+    }
+
+    // 3. Check if recordId is a tile in Banner.collectionImages
+    const bannerWithTile = await Banner.findOne({ 'collectionImages._id': recordId });
+    if (bannerWithTile) {
+      await Banner.updateOne(
+        { 'collectionImages._id': recordId },
+        {
+          $set: {
+            'collectionImages.$.url': imageUrl,
+            'collectionImages.$.key': imageKey,
+          },
+        }
+      );
+      return { model: 'Banner.collectionImages', id: recordId };
+    }
+
+    // 4. Check in Category collection (categories)
+    const category = await Category.findById(recordId);
+    if (category) {
+      category.banner = {
+        url: imageUrl,
+        key: imageKey,
+      };
+      await category.save();
+      return { model: 'Category', id: recordId };
+    }
+
+    return null;
+  }
+
+  // ------------------------------- sync all theme mappings to records ----------------------------
+  async syncThemeMappingsToRecords(themeId) {
+    if (!mongoose.isValidObjectId(themeId)) return { synced: 0 };
+
+    // 1. Take themeId wise data from theme_media_mappings
+    const mappings = await ThemeMediaMapping.find({
+      themeId,
+      status: 'active',
+    })
+      .populate('galleryId')
+      .lean();
+
+    if (!mappings || mappings.length === 0) {
+      return { synced: 0 };
+    }
+
+    let syncedCount = 0;
+    // 2. Take one by one recordId and galleryId, check banner and featureds table, and update image fields & url
+    for (const mapping of mappings) {
+      const { recordId, galleryId: gAsset } = mapping;
+      if (!recordId || !gAsset?.image?.url) continue;
+
+      try {
+        const synced = await this.syncSingleMappingToRecord(recordId, gAsset);
+        if (synced) syncedCount++;
+      } catch (err) {
+        console.warn(`[syncThemeMappingsToRecords] Error syncing record ${recordId}:`, err.message);
+      }
+    }
+
+    // 3. Invalidate Redis caches so storefront immediately reflects updated records
+    try {
+      const redisClient = require('../../utils/redisClient');
+      await Promise.allSettled([
+        redisClient.deleteByPattern('banners:*'),
+        redisClient.deleteByPattern('featured:*'),
+        redisClient.deleteByPattern('categories:*'),
+        redisClient.deleteByPattern('themes:*'),
+        redisClient.deleteByPattern('website-themes:*'),
+        redisClient.deleteByPattern('storefront:*'),
+      ]);
+    } catch (cacheErr) {
+      console.warn('[syncThemeMappingsToRecords] Redis cache invalidation error:', cacheErr.message);
+    }
+
+    console.log(
+      `[syncThemeMappingsToRecords] Successfully synced ${syncedCount} mapped images to banner & featured tables for theme ${themeId}`
+    );
+    return { synced: syncedCount };
+  }
+
   async activateTheme(themeId, actorId = null) {
     if (!mongoose.isValidObjectId(themeId)) {
       throw new ApiError(400, 'Invalid Theme ID');
@@ -696,17 +848,14 @@ class ThemeMediaMappingService {
     const previousActive = await Theme.findOne({ status: 'active', 'meta.deletedAt': null });
     const prevId = previousActive ? previousActive._id : null;
 
-    const updatedSettings = await ThemeSettings.findOneAndUpdate(
-      { key: 'storefront' },
+    const updatedSettings = await Setting.findOneAndUpdate(
+      { 'meta.deletedAt': null },
       {
         $set: {
-          activeThemeId: theme._id,
-          scheduledThemeId: null,
-          previousThemeId: prevId,
+          currentThemeId: theme._id,
         },
-        $inc: { revision: 1 },
       },
-      { upsert: true, returnDocument: 'after' }
+      { returnDocument: 'after' }
     );
 
     // Deactivate all previously active themes
@@ -725,6 +874,9 @@ class ThemeMediaMappingService {
     }
     await theme.save();
 
+    // Take theme_media_mappings by themeId, iterate recordId, check banner and featureds table, and update image fields & URL
+    const syncResult = await this.syncThemeMappingsToRecords(theme._id);
+
     return {
       message: `Theme "${theme.name}" activated successfully! Storefront is now using this theme.`,
       theme: {
@@ -733,8 +885,9 @@ class ThemeMediaMappingService {
         code: theme.code,
         status: theme.status,
       },
-      revision: updatedSettings.revision,
+      revision: updatedSettings?.revision || 1,
       summary: summary.summary,
+      syncedMediaCount: syncResult.synced,
     };
   }
 
@@ -747,8 +900,8 @@ class ThemeMediaMappingService {
 
     let themeId = activeThemeId;
     if (!themeId) {
-      const settings = await ThemeSettings.findOne({ key: 'storefront' }).lean();
-      themeId = settings?.activeThemeId;
+      const settings = await Setting.findOne({ 'meta.deletedAt': null }).select('currentThemeId').lean();
+      themeId = settings?.currentThemeId;
     }
 
     if (!themeId) {

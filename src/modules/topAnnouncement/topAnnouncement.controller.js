@@ -3,21 +3,8 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 
 class TopAnnouncementController {
-  // Global settings
-    // ------------------------------- get announcement settings ----------------------------
-  getSettings = catchAsync(async (req, res) => {
-    const settings = await topAnnouncementService.getSettings();
-    ApiResponse.success(res, settings, 'Settings retrieved successfully');
-  });
-
-    // ------------------------------- update announcement settings ----------------------------
-  updateSettings = catchAsync(async (req, res) => {
-    const settings = await topAnnouncementService.updateSettings(req.body);
-    ApiResponse.success(res, null, 'Settings updated successfully');
-  });
-
   // Storefront Public endpoint
-    // ------------------------------- get public announcements ----------------------------
+  // ------------------------------- get public announcements ----------------------------
   getPublic = catchAsync(async (req, res) => {
     const data = await topAnnouncementService.getPublic();
     ApiResponse.success(res, data, 'Active top announcements retrieved successfully');
@@ -61,12 +48,6 @@ class TopAnnouncementController {
   toggleStatus = catchAsync(async (req, res) => {
     const item = await topAnnouncementService.toggleStatus(req.params.id);
     ApiResponse.success(res, item, `Announcement set to ${item.isActive ? 'active' : 'inactive'}`);
-  });
-
-  // Duplicate
-  duplicate = catchAsync(async (req, res) => {
-    const item = await topAnnouncementService.duplicate(req.params.id);
-    ApiResponse.created(res, null, 'Announcement duplicated successfully');
   });
 
   // Reorder

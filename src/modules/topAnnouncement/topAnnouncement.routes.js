@@ -6,7 +6,6 @@ const { ROLES } = require('../../config/constants');
 
 // ─── Public Storefront Endpoints ────────────────────────
 router.get('/public', topAnnouncementController.getPublic);
-router.get('/settings', topAnnouncementController.getSettings);
 
 // ─── Admin Endpoints ────────────────────────────────────
 router.get('/', topAnnouncementController.getAll);
@@ -20,26 +19,12 @@ router.post(
 );
 
 router.put(
-  '/settings',
-  authenticate,
-  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
-  topAnnouncementController.updateSettings
-);
-
-router.put(
   '/reorder',
   authenticate,
   authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
   topAnnouncementController.reorder
 );
 
-
-router.post(
-  '/:id/duplicate',
-  authenticate,
-  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
-  topAnnouncementController.duplicate
-);
 
 router.patch(
   '/:id/toggle-status',

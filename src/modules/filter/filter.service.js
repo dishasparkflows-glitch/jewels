@@ -6,18 +6,20 @@ const DiamondClarity = require('../diamondClarity/diamondClarity.model');
 const Featured = require('../featured/featured.model');
 const GemstoneType = require('../gemstoneType/gemstoneType.model');
 const GemstoneShape = require('../gemstoneShape/gemstoneShape.model');
+const Birthstone = require('../birthstone/birthstone.model');
 const ApiError = require('../../utils/ApiError');
 
 async function loadAllFilterOptions() {
   const activeFilter = { 'meta.deletedAt': null, status: 'active' };
 
-  const [diamondTypes, diamondClarities, collections, categories, gemstoneTypes, gemstoneShapes] = await Promise.all([
+  const [diamondTypes, diamondClarities, collections, categories, gemstoneTypes, gemstoneShapes, birthstones] = await Promise.all([
     DiamondType.find(activeFilter).sort({ name: 1 }).select('_id name').lean(),
     DiamondClarity.find(activeFilter).sort({ name: 1 }).select('_id name').lean(),
     Featured.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name').lean(),
     Category.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name slug').lean(),
     GemstoneType.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name slug colorCode colorCodeEnd swatchImage image').lean(),
     GemstoneShape.find(activeFilter).sort({ order: 1, name: 1 }).select('_id name code iconSvg image').lean(),
+    Birthstone.find(activeFilter).sort({ order: 1 }).select('_id month stoneName image order').lean(),
   ]);
 
   const caratWeights = [];
@@ -87,6 +89,16 @@ async function loadAllFilterOptions() {
     iconSvg: item.iconSvg || null,
   }));
 
+  const formattedBirthstones = (birthstones || []).map((item) => ({
+    _id: String(item._id),
+    name: item.month,
+    value: item.month,
+    month: item.month,
+    stoneName: item.stoneName || '',
+    imageUrl: item.image?.url || '',
+    order: item.order || 0,
+  }));
+
   return {
     'jewellery-types': formattedCategories,
     'price-range': [],
@@ -98,6 +110,9 @@ async function loadAllFilterOptions() {
     collections: formattedCollections,
     gender: genders,
     metal: metals,
+    birthstones: formattedBirthstones,
+    birthMonth: formattedBirthstones,
+    'birthstone-months': formattedBirthstones,
     _raw: {
       diamondTypes: formattedDiamondTypes,
       diamondClarities: formattedDiamondClarities,
@@ -106,6 +121,7 @@ async function loadAllFilterOptions() {
       gemstoneShapes: formattedGemstoneShapes,
       collections: formattedCollections,
       categories: formattedCategories,
+      birthstones: formattedBirthstones,
       genders,
       metals,
     },
@@ -113,8 +129,40 @@ async function loadAllFilterOptions() {
 }
 
 class FilterService {
+  // ------------------------------- ensure default filters exist ----------------------------
+  async ensureDefaultFilters() {
+    try {
+      const existing = await Filter.findOne({
+        $or: [{ filterId: 'birthstones' }, { key: 'birthMonth' }],
+      });
+      if (!existing) {
+        const categories = await Category.find({ 'meta.deletedAt': null }).select('_id slug').lean();
+        const categoryConfigs = categories.map((cat, idx) => ({
+          categoryId: cat._id,
+          categorySlug: cat.slug || '',
+          enabled: true,
+          order: 11,
+          customTitle: '',
+        }));
+
+        await Filter.create({
+          filterId: 'birthstones',
+          title: 'Birthstone',
+          key: 'birthMonth',
+          type: 'checkbox',
+          order: 11,
+          enabled: true,
+          categoryConfigs,
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to ensure default filters:', err);
+    }
+  }
+
   // ------------------------------- get filters ----------------------------
   async getFilters(queryParams = {}) {
+    await this.ensureDefaultFilters();
 
     const categoryParam = queryParams.categoryId || queryParams.category || queryParams.categorySlug;
     let targetCategory = null;
@@ -230,6 +278,8 @@ class FilterService {
           value: opt.value || opt.name || opt.slug,
           ...(opt.slug ? { slug: opt.slug } : {}),
           ...(opt.weight !== undefined ? { weight: opt.weight } : {}),
+          ...(opt.imageUrl ? { imageUrl: opt.imageUrl } : {}),
+          ...(opt.stoneName ? { stoneName: opt.stoneName } : {}),
         })),
       }))
       .sort((a, b) => a.order - b.order);
@@ -285,6 +335,7 @@ class FilterService {
   }
   // ------------------------------- get all filters with categories ----------------------------
   async getAllFiltersWithCategories() {
+    await this.ensureDefaultFilters();
     const allFilters = await Filter.find({ 'meta.deletedAt': null }).sort({ order: 1 }).lean();
     const allCategories = await Category.find({ 'meta.deletedAt': null })
       .select('_id name slug icon images order')

@@ -4,8 +4,7 @@ const settingSchema = new mongoose.Schema(
   {
     // Business & Identity
     businessDetails: {
-      companyName: {
-        type: String,
+      companyName: {       type: String,
         trim: true,
       },
       emailAddress: {
@@ -167,11 +166,37 @@ const settingSchema = new mongoose.Schema(
       linkedin: { type: String, default: '', trim: true },
       whatsapp: { type: String, default: '', trim: true },
     },
+
+    // Top Announcement Bar Settings
+    topAnnouncement: {
+      _id: false,
+      isEnabled: {
+        type: Boolean,
+        default: true,
+      },
+      autoplayInterval: {
+        type: Number,
+        default: 4000,
+      },
+      displayDirection: {
+        type: String,
+        enum: ['horizontal', 'vertical'],
+        default: 'horizontal',
+      },
+    },
+
+    // Birthstone Showcase Settings
+    birthstones: {
+      _id: false,
+      showOnStorefront: {
+        type: Boolean,
+        default: true,
+      },
+    },
   },
   {
     versionKey: false,
   }
 );
-
 
 module.exports = mongoose.model('Setting', settingSchema);

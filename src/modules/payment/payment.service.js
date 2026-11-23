@@ -1,6 +1,7 @@
 const Order = require('../order/order.model');
 const providersRegistry = require('./providers');
 const ApiError = require('../../utils/ApiError');
+const { getTestPaymentPhoneNumbers, isTestPaymentUser } = require('../../utils/testPaymentUtils');
 
 class PaymentService {
   // ------------------------------- get payment config ----------------------------
@@ -28,7 +29,8 @@ class PaymentService {
 
     return {
       defaultProvider: defaultGateway,
-      availableProviders: activeProviders
+      availableProviders: activeProviders,
+      testPhoneNumbers: getTestPaymentPhoneNumbers(),
     };
   }
 
@@ -54,6 +56,17 @@ class PaymentService {
       (orderDoc.pricing?.codDueNow || 0) > 0
     ) {
       payableAmount = orderDoc.pricing.codDueNow;
+    }
+
+    // Override payable amount to ₹1 if user's phone matches TEST_PAYMENT_PHONE_NUMBERS in .env
+    if (
+      isTestPaymentUser({
+        user: orderDoc.userId,
+        customer: orderDoc.customer,
+        shippingAddress: orderDoc.shippingAddress,
+      })
+    ) {
+      payableAmount = 1;
     }
 
     if (payableAmount <= 0) {

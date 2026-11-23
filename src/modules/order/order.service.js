@@ -8,6 +8,7 @@ const whatsappService = require('../whatsapp/whatsapp.service');
 const { sendEmail } = require('../../utils/emailService');
 const { generateInvoicePDF } = require('../../utils/invoiceGenerator');
 const { getInvoiceEmailHtml } = require('../../template');
+const { isTestPaymentUser } = require('../../utils/testPaymentUtils');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const {
@@ -95,7 +96,7 @@ class OrderService {
     }
 
     // Complete pricing calculations
-    const pricing = calculateOrderPricing({
+    let pricing = calculateOrderPricing({
       subtotal,
       discount,
       paymentMethod,
@@ -106,6 +107,23 @@ class OrderService {
     const shippingAddress = buildShippingAddress(data, user);
     validateShippingAddress(shippingAddress);
     const customer = buildCustomerInfo(shippingAddress, user);
+
+    // Override to ₹1 for test payment numbers in .env
+    const isTestPayment = isTestPaymentUser({
+      user,
+      customer,
+      shippingAddress,
+      phone: data.phone || data.shippingAddress?.phone,
+    });
+
+    if (isTestPayment && pricing.total > 0) {
+      pricing.discount = Math.max(0, pricing.subtotal + pricing.shipping + pricing.tax - 1);
+      pricing.total = 1;
+      if (paymentMethod === 'cod' && pricing.codDueNow > 0) {
+        pricing.codDueNow = 1;
+        pricing.codRemaining = 0;
+      }
+    }
 
     const orderNumber = await generateOrderNumber();
     const chosenProvider = await resolvePaymentProvider(data.paymentProvider);

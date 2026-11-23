@@ -153,12 +153,6 @@ const themeSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 80 },
     code: { type: String, required: true, trim: true, lowercase: true, unique: true, index: true },
     description: { type: String, trim: true, default: '', maxlength: 500 },
-    status: {
-      type: String,
-      enum: ['draft', 'scheduled', 'active', 'archived'],
-      default: 'draft',
-      index: true,
-    },
     config: { type: configSchema, default: () => ({}) },
     publishedSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
     schedule: {
@@ -175,23 +169,12 @@ const themeSchema = new mongoose.Schema(
   { versionKey: false }
 );
 
-themeSchema.index({ status: 1, 'schedule.startAt': 1, 'schedule.endAt': 1 });
-
-const themeSettingsSchema = new mongoose.Schema(
-  {
-    key: { type: String, default: 'storefront', unique: true },
-    activeThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Theme', default: null },
-    scheduledThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Theme', default: null },
-    previousThemeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Theme', default: null },
-    revision: { type: Number, default: 0 },
-  },
-  { versionKey: false }
-);
+themeSchema.index({ 'schedule.startAt': 1, 'schedule.endAt': 1 });
 
 const Theme = mongoose.model('Theme', themeSchema, 'themes');
-const ThemeSettings = mongoose.model('ThemeSettings', themeSettingsSchema, 'theme_settings');
+const Setting = require('../setting/setting.model');
 
 module.exports = {
   Theme,
-  ThemeSettings,
+  ThemeSettings: Setting,
 };

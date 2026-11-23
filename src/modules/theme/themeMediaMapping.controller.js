@@ -110,7 +110,11 @@ class ThemeMediaMappingController {
     const result = await themeMediaMappingService.activateTheme(themeId, req.user?._id);
     await redisClient.deleteByPattern('themes:*');
     await redisClient.deleteByPattern('website-themes:*');
-    ApiResponse.success(res, null, result.message);
+    await redisClient.deleteByPattern('banners:*');
+    await redisClient.deleteByPattern('featured:*');
+    await redisClient.deleteByPattern('categories:*');
+    await redisClient.deleteByPattern('storefront:*');
+    ApiResponse.success(res, result, result.message);
   });
 }
 

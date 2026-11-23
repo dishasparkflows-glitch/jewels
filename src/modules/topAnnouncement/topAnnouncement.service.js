@@ -1,31 +1,26 @@
-const { TopAnnouncement, TopAnnouncementSetting } = require('./topAnnouncement.model');
+const { TopAnnouncement } = require('./topAnnouncement.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class TopAnnouncementService {
-  // ------------------------------- get announcement settings ----------------------------
+  // ------------------------------- get announcement settings from Setting ----------------------------
   async getSettings() {
-    let settings = await TopAnnouncementSetting.findOne({ 'meta.deletedAt': null });
-    if (!settings) {
-      settings = await TopAnnouncementSetting.create({
-        isEnabled: true,
-        autoplayInterval: 4000,
-        displayDirection: 'horizontal',
-      });
-    }
-    return settings;
-  }
-
-  // ------------------------------- update announcement settings ----------------------------
-  async updateSettings(data) {
-    let settings = await TopAnnouncementSetting.findOne({ 'meta.deletedAt': null });
-    if (!settings) {
-      settings = await TopAnnouncementSetting.create(data);
-    } else {
-      Object.assign(settings, data);
-      await settings.save();
-    }
-    return settings;
+    try {
+      const Setting = require('../setting/setting.model');
+      const mainSetting = await Setting.findOne({ 'meta.deletedAt': null }).lean();
+      if (mainSetting?.topAnnouncement) {
+        return {
+          isEnabled: mainSetting.topAnnouncement.isEnabled !== false,
+          autoplayInterval: mainSetting.topAnnouncement.autoplayInterval || 4000,
+          displayDirection: mainSetting.topAnnouncement.displayDirection || 'horizontal',
+        };
+      }
+    } catch (_) {}
+    return {
+      isEnabled: true,
+      autoplayInterval: 4000,
+      displayDirection: 'horizontal',
+    };
   }
 
   // ------------------------------- get all announcements (Admin) ----------------------------
@@ -150,28 +145,6 @@ class TopAnnouncementService {
     item.isActive = !item.isActive;
     await item.save();
     return item;
-  }
-
-  // ------------------------------- duplicate announcement ----------------------------
-  async duplicate(id) {
-    const source = await TopAnnouncement.findOne({ _id: id, 'meta.deletedAt': null }).lean();
-    if (!source) {
-      throw new ApiError(404, 'Announcement not found');
-    }
-
-    const highestItem = await TopAnnouncement.findOne({ 'meta.deletedAt': null }).sort({ order: -1 }).select('order');
-    const newOrder = (highestItem?.order || 0) + 1;
-
-    const duplicated = await TopAnnouncement.create({
-      message: source.message,
-      link: source.link,
-      isActive: source.isActive,
-      order: newOrder,
-      date: source.date,
-      hasNoEndDate: source.hasNoEndDate,
-    });
-
-    return duplicated;
   }
 
   // ------------------------------- reorder announcements ----------------------------

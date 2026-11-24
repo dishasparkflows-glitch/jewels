@@ -1,6 +1,5 @@
 const Setting = require('./setting.model');
 const ApiError = require('../../utils/ApiError');
-const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const topAnnouncementService = require('../topAnnouncement/topAnnouncement.service');
 
 class SettingService {
@@ -21,7 +20,7 @@ class SettingService {
           setting.currentThemeId = defaultTheme;
           await Setting.updateOne({ _id: setting._id }, { $set: { currentThemeId: defaultTheme._id } });
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     return setting;

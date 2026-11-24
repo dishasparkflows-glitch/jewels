@@ -202,13 +202,17 @@ class FilterService {
 
         const isMasterActive = f.status === 'active' || (f.status !== 'inactive' && f.enabled !== false);
         let isEnabled = isMasterActive;
-        let order = f.order || 0;
+        const masterOrder = f.order !== undefined ? f.order : 0;
         let customTitle = f.title;
 
         if (config) {
           isEnabled = isMasterActive && config.enabled !== false;
-          if (config.order !== undefined) order = config.order;
           if (config.customTitle) customTitle = config.customTitle;
+        }
+
+        // Always keep Jewellery Types / category filter enabled across all categories so users can switch types
+        if (f.filterId === 'jewellery-types' || f.key === 'category') {
+          isEnabled = isMasterActive;
         }
 
         return {
@@ -218,7 +222,7 @@ class FilterService {
           customTitle: config?.customTitle || '',
           key: f.key,
           type: f.type,
-          order,
+          order: masterOrder,
           status: isMasterActive ? 'active' : 'inactive',
           enabled: isEnabled,
           options: loadedOptions[f.filterId] || loadedOptions[f.key] || [],

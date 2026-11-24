@@ -58,9 +58,11 @@ const filterSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    enabled: {
-      type: Boolean,
-      default: true,
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'active',
+      index: true,
     },
     // Category-wise overrides for enabled/disabled, order, custom title and default value
     categoryConfigs: [categoryConfigSchema],

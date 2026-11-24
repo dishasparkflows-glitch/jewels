@@ -151,60 +151,15 @@ class WhatsAppTemplateService {
   }
 
     // ------------------------------- validate template config ----------------------------
-  validateTemplateConfig({ name, body, language, category, variables, header, buttons }) {
+  validateTemplateConfig({ name, displayName, body, language, category }) {
     if (!name || typeof name !== 'string' || !name.trim()) {
       throw new ApiError(400, 'Template name is required.');
     }
     if (!body || typeof body !== 'string' || !body.trim()) {
       throw new ApiError(400, 'Template body is required.');
     }
-    if (!language || typeof language !== 'string' || !language.trim()) {
-      throw new ApiError(400, 'Template language is required.');
-    }
     if (category && !['UTILITY', 'MARKETING', 'AUTHENTICATION'].includes(category.toUpperCase())) {
       throw new ApiError(400, 'Category must be UTILITY, MARKETING, or AUTHENTICATION.');
-    }
-
-    const vars = Array.isArray(variables) ? variables : [];
-    const bodyPositions = this.extractTemplateVariables(body);
-    const configuredPositions = vars.map((v) => v.position);
-
-    // Duplicate positions check
-    const uniquePositions = new Set(configuredPositions);
-    if (uniquePositions.size !== configuredPositions.length) {
-      throw new ApiError(400, 'Duplicate variable positions detected in template configuration.');
-    }
-
-    // Sequential positions check (1..N)
-    const sortedPositions = [...configuredPositions].sort((a, b) => a - b);
-    for (let i = 0; i < sortedPositions.length; i++) {
-      if (sortedPositions[i] !== i + 1) {
-        throw new ApiError(
-          400,
-          `Invalid variable positions: expected consecutive positions 1 to ${sortedPositions.length}, but found ${sortedPositions[i]}.`
-        );
-      }
-    }
-
-    // Body variables match configured variables
-    if (
-      bodyPositions.length !== sortedPositions.length ||
-      !bodyPositions.every((pos, idx) => pos === sortedPositions[idx])
-    ) {
-      throw new ApiError(
-        400,
-        `Body variables [${bodyPositions.join(', ')}] do not match configured variables [${sortedPositions.join(', ')}].`
-      );
-    }
-
-    // Formatter validation
-    for (const v of vars) {
-      if (v.formatter && !getFormatter(v.formatter)) {
-        throw new ApiError(
-          400,
-          `Invalid formatter '${v.formatter}'. Valid options: orderItems, currency, date, time, address.`
-        );
-      }
     }
   }
 
@@ -215,28 +170,55 @@ class WhatsAppTemplateService {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
-    if (queryParams.category) filter.category = queryParams.category;
-    if (queryParams.status) filter.status = queryParams.status;
-    if (queryParams.isActive !== undefined) filter.isActive = queryParams.isActive === 'true';
-    if (queryParams.search) {
+    if (queryParams.category && queryParams.category !== 'All Categories') {
+      const cat = queryParams.category.toUpperCase();
       filter.$or = [
-        { name: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
-        { displayName: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
-        { body: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { 'template.category': cat },
+        { category: cat },
+      ];
+    }
+    if (queryParams.status && queryParams.status !== 'All Status') {
+      filter.status = queryParams.status;
+    }
+    if (queryParams.search) {
+      const term = escapeRegex(queryParams.search.trim());
+      filter.$or = [
+        { 'template.name': new RegExp(term, 'i') },
+        { 'template.displayName': new RegExp(term, 'i') },
+        { 'template.body': new RegExp(term, 'i') },
+        { name: new RegExp(term, 'i') },
+        { displayName: new RegExp(term, 'i') },
+        { body: new RegExp(term, 'i') },
       ];
     }
 
     const [items, total] = await Promise.all([
       WhatsAppTemplate.find(filter)
-        .sort({ isSystemTemplate: -1, createdAt: -1 })
+        .sort({ 'meta.createdAt': -1, createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
       WhatsAppTemplate.countDocuments(filter),
     ]);
 
+    const formattedItems = items.map((doc) => {
+      const t = doc.template || {};
+      const meta = doc.meta || {};
+      return {
+        ...doc,
+        name: t.name || doc.name,
+        displayName: t.displayName || doc.displayName || t.name || doc.name,
+        category: t.category || doc.category || 'UTILITY',
+        language: t.language || doc.language || 'English',
+        body: t.body || doc.body || '',
+        variables: doc.variables || [],
+        createdAt: meta.createdAt || doc.createdAt,
+        updatedAt: meta.updatedAt || doc.updatedAt,
+      };
+    });
+
     return {
-      items,
+      items: formattedItems,
       pagination: getPaginationMeta(total, page, limit),
     };
   }
@@ -246,42 +228,66 @@ class WhatsAppTemplateService {
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
     const template = isObjectId
       ? await WhatsAppTemplate.findOne({ _id: id })
-      : await WhatsAppTemplate.findOne({ name: id.toLowerCase() });
+      : await WhatsAppTemplate.findOne({
+          $or: [
+            { 'template.name': id.toLowerCase() },
+            { name: id.toLowerCase() },
+          ],
+        });
 
     if (!template) {
       throw new ApiError(404, `WhatsApp template '${id}' not found`);
     }
-    return template;
+
+    const doc = template.toObject ? template.toObject() : template;
+    const t = doc.template || {};
+    const meta = doc.meta || {};
+    return {
+      ...doc,
+      name: t.name || doc.name,
+      displayName: t.displayName || doc.displayName || t.name || doc.name,
+      category: t.category || doc.category || 'UTILITY',
+      language: t.language || doc.language || 'English',
+      body: t.body || doc.body || '',
+      createdAt: meta.createdAt || doc.createdAt,
+      updatedAt: meta.updatedAt || doc.updatedAt,
+    };
   }
 
     // ------------------------------- create whatsapp template ----------------------------
   async createTemplate(data, userId) {
-    const { name, displayName, category = 'UTILITY', language = 'en_US', body, header, buttons, variables, provider } = data;
+    const raw = data.template || data;
+    const name = (raw.name || '').trim().toLowerCase();
+    const displayName = (raw.displayName || raw.name || '').trim();
+    const category = (raw.category || 'UTILITY').toUpperCase();
+    const language = (raw.language || 'English').trim();
+    const body = (raw.body || '').trim();
 
-    this.validateTemplateConfig({ name, displayName, category, language, body, variables, header, buttons });
+    this.validateTemplateConfig({ name, displayName, category, language, body });
 
-    const existing = await WhatsAppTemplate.findOne({ name: name.trim().toLowerCase() });
+    const existing = await WhatsAppTemplate.findOne({
+      $or: [{ 'template.name': name }, { name }],
+      'meta.deletedAt': null,
+    });
     if (existing) {
       throw new ApiError(400, `Template with name '${name}' already exists.`);
     }
 
     return await WhatsAppTemplate.create({
-      name: name.trim().toLowerCase(),
-      displayName: displayName.trim(),
-      category: category.toUpperCase(),
-      language: language.trim(),
-      body: body.trim(),
-      header: header || { type: 'NONE' },
-      buttons: buttons || [],
-      variables: variables || [],
-      provider: {
-        name: PROVIDER,
-        templateName: provider?.templateName || name.trim().toLowerCase(),
-        templateId: provider?.templateId || '',
-        status: provider?.status || 'PENDING',
+      template: {
+        name,
+        displayName,
+        category,
+        language,
+        body,
       },
-      isSystemTemplate: false,
-      isActive: true,
+      variables: Array.isArray(data.variables) ? data.variables : [],
+      status: data.status || 'APPROVED',
+      meta: {
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      },
       createdBy: userId,
     });
   }
@@ -293,44 +299,47 @@ class WhatsAppTemplateService {
       throw new ApiError(404, 'Template not found');
     }
 
-    const updatedBody = data.body !== undefined ? data.body : template.body;
-    const updatedVars = data.variables !== undefined ? data.variables : template.variables;
-    const updatedLang = data.language !== undefined ? data.language : template.language;
-    const updatedCat = data.category !== undefined ? data.category : template.category;
+    const raw = data.template || data;
+    const currentTmpl = template.template || {};
+
+    const updatedName = raw.name !== undefined ? raw.name.trim().toLowerCase() : (currentTmpl.name || template.name);
+    const updatedDisplayName = raw.displayName !== undefined ? raw.displayName.trim() : (currentTmpl.displayName || template.displayName || updatedName);
+    const updatedCategory = raw.category !== undefined ? raw.category.toUpperCase() : (currentTmpl.category || template.category || 'UTILITY');
+    const updatedLanguage = raw.language !== undefined ? raw.language.trim() : (currentTmpl.language || template.language || 'English');
+    const updatedBody = raw.body !== undefined ? raw.body.trim() : (currentTmpl.body || template.body);
 
     this.validateTemplateConfig({
-      name: template.name,
-      displayName: data.displayName || template.displayName,
-      category: updatedCat,
-      language: updatedLang,
+      name: updatedName,
+      displayName: updatedDisplayName,
+      category: updatedCategory,
+      language: updatedLanguage,
       body: updatedBody,
-      variables: updatedVars,
-      header: data.header || template.header,
-      buttons: data.buttons || template.buttons,
     });
 
-    const allowed = ['displayName', 'category', 'language', 'body', 'header', 'buttons', 'variables', 'provider', 'isActive', 'status'];
-    allowed.forEach((field) => {
-      if (data[field] !== undefined) {
-        template[field] = data[field];
-      }
-    });
+    template.template = {
+      name: updatedName,
+      displayName: updatedDisplayName,
+      category: updatedCategory,
+      language: updatedLanguage,
+      body: updatedBody,
+    };
 
+    if (data.variables !== undefined) {
+      template.variables = Array.isArray(data.variables) ? data.variables : [];
+    }
+    if (data.status !== undefined) template.status = data.status;
     template.updatedBy = userId;
     return await template.save();
   }
 
     // ------------------------------- update whatsapp template status ----------------------------
-  async updateTemplateStatus(id, { isActive, status, providerStatus, providerTemplateId }, userId) {
+  async updateTemplateStatus(id, { status }, userId) {
     const template = await WhatsAppTemplate.findOne({ _id: id });
     if (!template) {
       throw new ApiError(404, 'Template not found');
     }
 
-    if (isActive !== undefined) template.isActive = Boolean(isActive);
     if (status) template.status = status;
-    if (providerStatus) template.provider.status = providerStatus;
-    if (providerTemplateId) template.provider.templateId = providerTemplateId;
 
     template.updatedBy = userId;
     return await template.save();
@@ -339,9 +348,7 @@ class WhatsAppTemplateService {
     // ------------------------------- preview whatsapp template ----------------------------
   async previewTemplate(id, customContext = null) {
     const template = await this.getTemplateById(id);
-
     const sampleContext = { ...(customContext || {}), __strictNoDefaults: true };
-
     const parameters = this.resolveTemplateVariables(template, sampleContext);
     const renderedText = this.renderTemplatePreview(template, parameters);
 
@@ -351,8 +358,6 @@ class WhatsAppTemplateService {
       category: template.category,
       parameters,
       renderedText,
-      header: template.header,
-      buttons: template.buttons,
     };
   }
 
@@ -362,11 +367,9 @@ class WhatsAppTemplateService {
     if (!template) {
       throw new ApiError(404, 'Template not found');
     }
-    if (template.isSystemTemplate) {
-      throw new ApiError(403, 'System templates cannot be deleted.');
-    }
 
-    template.meta = template.meta || {}; template.meta.deletedAt = new Date();
+    template.meta = template.meta || {};
+    template.meta.deletedAt = new Date();
     await template.save();
     return { id, message: 'Template deleted successfully' };
   }
@@ -395,7 +398,9 @@ class WhatsAppTemplateService {
 
       if (!remoteName) continue;
 
-      const local = await WhatsAppTemplate.findOne({ name: remoteName });
+      const local = await WhatsAppTemplate.findOne({
+        $or: [{ 'template.name': remoteName }, { name: remoteName }],
+      });
       if (local) {
         const prevStatus = local.provider?.status;
         local.provider.templateId = remoteId || local.provider.templateId;
@@ -408,7 +413,7 @@ class WhatsAppTemplateService {
         await local.save();
 
         updates.push({
-          name: local.name,
+          name: local.template?.name || local.name,
           previousStatus: prevStatus,
           currentStatus: local.provider.status,
           templateId: remoteId,

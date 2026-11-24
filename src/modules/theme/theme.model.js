@@ -153,6 +153,7 @@ const themeSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 80 },
     code: { type: String, required: true, trim: true, lowercase: true, unique: true, index: true },
     description: { type: String, trim: true, default: '', maxlength: 500 },
+    status: { type: String, enum: ['draft', 'active', 'archived', 'scheduled'], default: 'draft', index: true },
     config: { type: configSchema, default: () => ({}) },
     publishedSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
     schedule: {

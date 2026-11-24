@@ -11,7 +11,6 @@ const adminOnly = [authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN)];
 router.get('/:themeId/media-mapping/records', ...adminOnly, themeMediaMappingController.getModuleRecords);
 router.get('/:themeId/media-mapping/summary', ...adminOnly, themeMediaMappingController.getSummary);
 router.put('/:themeId/media-mappings', ...adminOnly, themeMediaMappingController.upsert);
-router.delete('/:themeId/media-mappings', ...adminOnly, themeMediaMappingController.deleteMappingByTarget);
 router.post('/:themeId/activate', ...adminOnly, themeMediaMappingController.activateTheme);
 
 // ------------------------------- theme management endpoints ----------------------------

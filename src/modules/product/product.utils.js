@@ -853,10 +853,14 @@ const formatLookupProduct = (p) => {
 // ------------------------------- build product search filter ----------------------------
 const buildProductSearchFilter = (search) => {
   if (!search || !String(search).trim()) return null;
-  const searchRegex = new RegExp(String(search).trim(), 'i');
+  const safeTerm = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const searchRegex = new RegExp(safeTerm, 'i');
   return [
     { 'basicInfo.title': searchRegex },
     { 'basicInfo.sku': searchRegex },
+    { 'basicInfo.slug': searchRegex },
+    { 'basicInfo.description': searchRegex },
+    { productType: searchRegex },
     { 'ornate.tagNo': searchRegex },
     { 'ornate.barcode': searchRegex },
     { 'ornate.itemCode': searchRegex },

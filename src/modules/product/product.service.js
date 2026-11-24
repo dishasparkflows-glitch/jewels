@@ -324,9 +324,12 @@ class ProductService {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
-    if (queryParams.search) {
-      const searchConditions = buildProductSearchFilter(queryParams.search);
-      if (searchConditions) filter.$or = searchConditions;
+    const searchParam = queryParams.search || queryParams.q;
+    if (searchParam) {
+      const searchConditions = buildProductSearchFilter(searchParam);
+      if (searchConditions) {
+        filter.$and = [...(filter.$and || []), { $or: searchConditions }];
+      }
     }
 
     const isOrnateSpecified =
@@ -526,11 +529,14 @@ class ProductService {
           standaloneFilter.categoryIds = queryParams.category;
         }
 
-        filter.$or = [
-          { _id: { $in: repProductIds } },
-          ...(featuredHandpickedIds.length ? [{ _id: { $in: featuredHandpickedIds } }] : []),
-          standaloneFilter,
-        ];
+        const groupListingCondition = {
+          $or: [
+            { _id: { $in: repProductIds } },
+            ...(featuredHandpickedIds.length ? [{ _id: { $in: featuredHandpickedIds } }] : []),
+            standaloneFilter,
+          ],
+        };
+        filter.$and = [...(filter.$and || []), groupListingCondition];
 
         // Clear top-level categoryIds as it is handled by the $or branches
         if (queryParams.category) {

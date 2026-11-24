@@ -1,9 +1,6 @@
 const mongoose = require('mongoose');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
-const Category = require('../category/category.model');
-const Banner = require('../banner/banner.model');
-const Featured = require('../featured/featured.model');
 const { Theme } = require('./theme.model');
 const themeMedia = require('./themeMedia');
 const Setting = require('../setting/setting.model');
@@ -23,7 +20,6 @@ const SECTION_KEYS = [
   'mobileApp',
   'appointment',
 ];
-const BANNER_TYPES = ['herobanner', 'collectionbanner', 'categorybanner', 'offerbanner', 'customizebanner', 'mobileappbanner', 'bookappointbanner', 'websitebanner'];
 
 const snapshotOf = (theme) => ({
   id: String(theme._id),
@@ -33,7 +29,8 @@ const snapshotOf = (theme) => ({
 });
 
 class ThemeService {
-  async validateConfig(config = {}, { requireComplete = false, requireActiveBanners = false } = {}) {
+  async validateConfig(config = {}) {
+    if (!config) return;
     for (const row of config.mediaOverrides || []) {
       await themeMedia.validateTarget(row.module, row.recordId, row.slot);
     }
@@ -50,88 +47,6 @@ class ThemeService {
         throw new ApiError(400, 'Sections must use unique supported keys.');
       }
     }
-    const ensureUniqueCategoryIds = (rows, fieldName) => {
-      const ids = rows.map((row) => String(row.categoryId?._id || row.categoryId || ''));
-      if (ids.some((id) => !mongoose.isValidObjectId(id))) throw new ApiError(400, `${fieldName} entries must reference an existing category ID.`);
-      if (new Set(ids).size !== ids.length) throw new ApiError(400, `${fieldName} cannot contain the same category more than once.`);
-    };
-    if (config.categoryAppearances) ensureUniqueCategoryIds(config.categoryAppearances, 'Category appearance');
-    if (config.navigation) ensureUniqueCategoryIds(config.navigation, 'Navigation');
-    const bannerSelections = config.bannerSelections || [];
-    if (bannerSelections.length > 100) throw new ApiError(400, 'A theme can reference at most 100 website banners.');
-    for (const selection of bannerSelections) {
-      if (!BANNER_TYPES.includes(selection.type)) throw new ApiError(400, 'Theme banner selections must use a supported banner type.');
-      if (!['web', 'mobile'].includes(selection.platform || 'web')) throw new ApiError(400, 'Theme banner platform must be web or mobile.');
-    }
-    const selectedBannerIds = bannerSelections.map((selection) => selection.bannerId?._id || selection.bannerId).filter(Boolean);
-    if (selectedBannerIds.some((id) => !mongoose.isValidObjectId(id))) throw new ApiError(400, 'Theme banner selections must reference valid banner IDs.');
-    if (new Set(selectedBannerIds.map(String)).size !== selectedBannerIds.length) throw new ApiError(400, 'A website banner can only be selected once per theme.');
-
-    const featuredSelections = config.featuredSelections || [];
-    if (featuredSelections.length > 100) throw new ApiError(400, 'A theme can reference at most 100 featured showcases.');
-    for (const selection of featuredSelections) {
-      if (!['Celebrate', 'Gifts'].includes(selection.placement || 'Celebrate')) {
-        throw new ApiError(400, 'Theme showcase placement must be Celebrate or Gifts.');
-      }
-    }
-    const selectedFeaturedIds = featuredSelections.map((selection) => selection.featuredId?._id || selection.featuredId).filter(Boolean);
-    if (selectedFeaturedIds.some((id) => !mongoose.isValidObjectId(id))) throw new ApiError(400, 'Theme showcase selections must reference valid IDs.');
-    if (new Set(selectedFeaturedIds.map(String)).size !== selectedFeaturedIds.length) throw new ApiError(400, 'A showcase can only be selected once per theme.');
-    if (selectedFeaturedIds.length) {
-      const referencedFeatured = await Featured.find({ _id: { $in: selectedFeaturedIds }, 'meta.deletedAt': null })
-        .select('_id display.type status')
-        .lean();
-      const referencedById = new Map(referencedFeatured.map((item) => [String(item._id), item]));
-      for (const selection of featuredSelections) {
-        const featuredId = selection.featuredId?._id || selection.featuredId;
-        if (!featuredId) continue;
-        const item = referencedById.get(String(featuredId));
-        if (!item) throw new ApiError(400, 'A selected showcase no longer exists.');
-      }
-    }
-    if (selectedBannerIds.length) {
-      const referencedBanners = await Banner.find({ _id: { $in: selectedBannerIds }, 'meta.deletedAt': null })
-        .select('_id display.type display.platform status')
-        .lean();
-      const referencedById = new Map(referencedBanners.map((banner) => [String(banner._id), banner]));
-      for (const selection of bannerSelections) {
-        const bannerId = selection.bannerId?._id || selection.bannerId;
-        if (!bannerId) {
-          if (requireComplete && selection.visible !== false) throw new ApiError(400, 'Select a website banner for each visible theme banner slot before publishing.');
-          continue;
-        }
-        const banner = referencedById.get(String(bannerId));
-        if (!banner) throw new ApiError(400, 'A selected website banner no longer exists.');
-        if (banner.display?.type !== selection.type || (banner.display?.platform || 'web') !== (selection.platform || 'web')) {
-          throw new ApiError(400, 'Each theme banner selection must match the selected banner type and platform.');
-        }
-        if (selection.visible !== false && (requireActiveBanners || requireComplete) && banner.status !== 'active') {
-          throw new ApiError(400, 'Visible theme banner selections must reference active website banners.');
-        }
-      }
-    } else if (requireComplete && bannerSelections.some((selection) => selection.visible !== false)) {
-      throw new ApiError(400, 'Select existing website banners before publishing visible theme banner slots.');
-    }
-    const categoryIds = [
-      ...(config.categoryAppearances || []).map((row) => row.categoryId?._id || row.categoryId),
-      ...(config.navigation || []).map((row) => row.categoryId?._id || row.categoryId),
-    ].filter(Boolean);
-    if (categoryIds.some((id) => !mongoose.isValidObjectId(id))) {
-      throw new ApiError(400, 'Theme category settings must reference valid category IDs.');
-    }
-    if (categoryIds.length) {
-      const existingCount = await Category.countDocuments({ _id: { $in: categoryIds }, 'meta.deletedAt': null });
-      if (existingCount !== new Set(categoryIds.map(String)).size) throw new ApiError(400, 'Theme category settings must reference existing categories.');
-    }
-    if ((config.categoryAppearances || []).length > 100) throw new ApiError(400, 'A theme can contain at most 100 category overrides.');
-    const validateAsset = (asset) => {
-      if (!asset?.url) return;
-      if (!asset.url.startsWith('/') && !/^https:\/\//i.test(asset.url)) {
-        throw new ApiError(400, 'Theme media must use an HTTPS or site-relative URL.');
-      }
-      if (asset.key && asset.key.includes('..')) throw new ApiError(400, 'Invalid theme media storage key.');
-    };
-    for (const category of config.categoryAppearances || []) validateAsset(category.icon);
   }
 
   async writeHistory() {
@@ -143,12 +58,15 @@ class ThemeService {
     if (!data.name?.trim()) throw new ApiError(400, 'Theme name is required.');
     const code = (data.code || data.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     if (!code) throw new ApiError(400, 'Theme code is required.');
-    await this.validateConfig(data.config);
+    if (data.config) await this.validateConfig(data.config);
     const theme = await Theme.create({
-      name: data.name.trim(), code, description: data.description || '',
-      config: data.config || {}, schedule: data.schedule || {}, meta: { createdBy: actorId, updatedBy: actorId },
+      name: data.name.trim(),
+      code,
+      description: data.description || '',
+      config: data.config || {},
+      schedule: data.schedule || {},
+      meta: { createdBy: actorId, updatedBy: actorId },
     });
-    await this.writeHistory(theme, 'created', actorId, 'Theme created.');
     return theme;
   }
 
@@ -173,6 +91,46 @@ class ThemeService {
         .lean(),
       Theme.countDocuments(filter),
     ]);
+
+    // Attach one preview gallery photo by themeId so admin can identify themes visually
+    if (items && items.length > 0) {
+      try {
+        const Gallery = require('../gallery/gallery.model');
+        const ThemeMediaMapping = require('./themeMediaMapping.model');
+        const themeIds = items.map((t) => t._id);
+
+        const [galleries, mappings] = await Promise.all([
+          Gallery.find({ themeId: { $in: themeIds }, 'meta.deletedAt': null })
+            .sort({ 'meta.createdAt': -1 })
+            .lean(),
+          ThemeMediaMapping.find({ themeId: { $in: themeIds }, status: 'active' })
+            .populate('galleryId')
+            .lean(),
+        ]);
+
+        const photoMap = new Map();
+        for (const m of mappings) {
+          const tId = String(m.themeId);
+          const url = m.galleryId?.image?.url || m.galleryId?.url;
+          if (!photoMap.has(tId) && url) photoMap.set(tId, url);
+        }
+        for (const g of galleries) {
+          const tId = String(g.themeId);
+          const url = g.image?.url || g.url;
+          if (!photoMap.has(tId) && url) photoMap.set(tId, url);
+        }
+
+        items.forEach((t) => {
+          const url = photoMap.get(String(t._id)) || null;
+          t.coverImage = url ? { url } : null;
+          t.galleryPhoto = url;
+          t.coverUrl = url;
+        });
+      } catch (err) {
+        console.warn('[ThemeService.list] Failed to attach preview gallery photos:', err.message);
+      }
+    }
+
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
@@ -193,9 +151,9 @@ class ThemeService {
   async update(id, data, actorId) {
     const theme = await this.getById(id);
     if (theme.status === 'archived') throw new ApiError(409, 'Archived themes cannot be edited.');
-    if (data.status) throw new ApiError(400, 'Theme status can only be changed through publish, schedule, or archive actions.');
+    if (data.status) throw new ApiError(400, 'Theme status can only be changed through publish or schedule actions.');
     if (data.config) {
-      data.config.mediaOverrides = theme.config.mediaOverrides;
+      data.config.mediaOverrides = theme.config?.mediaOverrides;
       await this.validateConfig(data.config);
     }
     for (const key of ['name', 'description', 'schedule']) {
@@ -220,23 +178,6 @@ class ThemeService {
       theme.publishedSnapshot = snapshotOf(theme);
       await theme.save();
     }
-    await this.writeHistory(theme, 'updated', actorId, 'Theme configuration updated.');
-    return theme;
-  }
-
-  // ------------------------------- duplicate website theme ----------------------------
-  async duplicate(id, actorId) {
-    const source = await this.getById(id);
-    const codeBase = `${source.code}-copy`;
-    let code = codeBase;
-    let index = 2;
-    while (await Theme.exists({ code })) code = `${codeBase}-${index++}`;
-    const theme = await Theme.create({
-      name: `${source.name} Copy`, code, description: source.description,
-      config: source.publishedSnapshot?.config || source.config,
-      meta: { createdBy: actorId, updatedBy: actorId },
-    });
-    await this.writeHistory(theme, 'duplicated', actorId, `Duplicated from ${source.name}.`);
     return theme;
   }
 
@@ -251,15 +192,16 @@ class ThemeService {
     };
   }
 
-  async setActive(theme, actorId, action = 'published') {
+  async setActive(theme, actorId) {
     if (!theme.publishedSnapshot) {
-      await this.validateConfig(theme.config);
+      if (theme.config) await this.validateConfig(theme.config);
       theme.publishedSnapshot = snapshotOf(theme);
     }
     await Setting.updateOne(
       { 'meta.deletedAt': null },
       { $set: { currentThemeId: theme._id } }
     );
+    theme.status = 'active';
     theme.publishedAt = new Date();
     if (theme.schedule) theme.schedule.startAt = null;
     theme.meta = theme.meta || {};
@@ -280,9 +222,8 @@ class ThemeService {
   // ------------------------------- publish website theme ----------------------------
   async publish(id, data = {}, actorId) {
     const theme = await this.getById(id);
-    if (theme.status === 'archived') throw new ApiError(409, 'Restore an archived theme by duplicating it before publishing.');
-    const requireComplete = data.requireComplete === true;
-    await this.validateConfig(theme.config, { requireComplete, requireActiveBanners: requireComplete });
+    if (theme.status === 'archived') throw new ApiError(409, 'Archived themes cannot be published.');
+    if (theme.config) await this.validateConfig(theme.config);
     const startAt = data.startAt ? new Date(data.startAt) : null;
     const endAt = data.endAt ? new Date(data.endAt) : null;
     if (startAt && Number.isNaN(startAt.getTime())) throw new ApiError(400, 'Invalid schedule start date.');
@@ -292,28 +233,21 @@ class ThemeService {
       const fallback = await this.getById(data.fallbackThemeId);
       if (String(fallback._id) === String(theme._id)) throw new ApiError(400, 'A theme cannot fall back to itself.');
       if (fallback.status === 'scheduled') throw new ApiError(400, 'A scheduled theme cannot be used as an expiry fallback.');
-      if (!fallback.publishedSnapshot) throw new ApiError(400, 'The fallback must have a published version.');
     }
     if (startAt && startAt > new Date()) {
       theme.schedule = { startAt, endAt, fallbackThemeId: data.fallbackThemeId || null };
       theme.status = 'scheduled';
       theme.publishedSnapshot = snapshotOf(theme);
       await theme.save();
-      const settings = await this.settings();
-      if (settings.scheduledThemeId && String(settings.scheduledThemeId) !== String(theme._id)) {
-        await Theme.updateOne({ _id: settings.scheduledThemeId, status: 'scheduled', 'meta.deletedAt': null }, { $set: { status: 'draft', 'schedule.startAt': null } });
-      }
-      settings.scheduledThemeId = theme._id;
-      await settings.save();
-      await this.writeHistory(theme, 'scheduled', actorId, `Scheduled for ${startAt.toISOString()}.`, settings.revision);
-      return { theme, scheduled: true, revision: settings.revision };
+      return { theme, scheduled: true };
     }
     theme.schedule = { startAt: null, endAt, fallbackThemeId: data.fallbackThemeId || null };
     theme.publishedSnapshot = snapshotOf(theme);
     await theme.save();
-    return { ...(await this.setActive(theme, actorId, 'published')), scheduled: false };
+    return { ...(await this.setActive(theme, actorId)), scheduled: false };
   }
 
+  // ------------------------------- remove website theme ----------------------------
   async remove(id, actorId) {
     const theme = await this.getById(id);
     theme.meta = theme.meta || {};
@@ -327,231 +261,7 @@ class ThemeService {
       { currentThemeId: theme._id },
       { $set: { currentThemeId: null }, $inc: { revision: 1 } }
     );
-    await this.writeHistory(theme, 'deleted', actorId, 'Theme deleted. Shared media retained.', settings?.revision || 0);
     return { id: String(theme._id) };
-  }
-
-  // ------------------------------- archive website theme ----------------------------
-  async archive(id, actorId) {
-    const theme = await this.getById(id);
-    const settings = await this.settings();
-    if (String(settings.activeThemeId || '') === String(theme._id)) throw new ApiError(409, 'The active theme cannot be archived.');
-    if (String(settings.scheduledThemeId || '') === String(theme._id)) {
-      settings.scheduledThemeId = null;
-      await settings.save();
-    }
-    theme.status = 'archived';
-    await theme.save();
-    await this.writeHistory(theme, 'archived', actorId, 'Theme archived.');
-    return theme;
-  }
-
-  // ------------------------------- rollback website theme ----------------------------
-  async rollback(id, actorId) {
-    const theme = await this.getById(id);
-    if (!theme.publishedSnapshot) throw new ApiError(409, 'This theme has no published version to restore.');
-    theme.config = theme.publishedSnapshot.config;
-    return this.setActive(theme, actorId, 'rolled_back');
-  }
-
-  // ------------------------------- preview website theme ----------------------------
-  async preview(id) {
-    const theme = await this.getById(id);
-    const snapshot = snapshotOf(theme);
-    snapshot.config = await themeMedia.resolve(snapshot.config);
-    return snapshot;
-  }
-
-  // ------------------------------- get theme media library ----------------------------
-  async getMediaLibrary(id) {
-    let theme = null;
-    if (id && mongoose.isValidObjectId(id)) {
-      theme = await Theme.findOne({ _id: id, 'meta.deletedAt': null }).lean();
-    }
-
-    const config = theme?.config || {};
-    const bannerSelections = config.bannerSelections || [];
-    const selectedBannerIds = new Set(bannerSelections.map((s) => String(s.bannerId?._id || s.bannerId || '')).filter(Boolean));
-    const featuredSelections = config.featuredSelections || [];
-    const selectedFeaturedIds = new Set(featuredSelections.map((s) => String(s.featuredId?._id || s.featuredId || '')).filter(Boolean));
-    const categoryAppearances = config.categoryAppearances || [];
-    const selectedCategoryIds = new Set(categoryAppearances.map((c) => String(c.categoryId?._id || c.categoryId || '')).filter(Boolean));
-    const mediaOverrides = config.mediaOverrides || [];
-
-    const [allBanners, allFeatured, allCategories] = await Promise.all([
-      Banner.find({ 'meta.deletedAt': null }).lean(),
-      Featured.find({ 'meta.deletedAt': null }).lean(),
-      Category.find({ 'meta.deletedAt': null }).select('name slug icon banner promoBanners').lean(),
-    ]);
-
-    const items = [];
-    const seenUrls = new Set();
-
-    const extractName = (url, fallback) => {
-      if (!url) return fallback;
-      try {
-        const parts = url.split('/');
-        return parts[parts.length - 1].split('?')[0] || fallback;
-      } catch {
-        return fallback;
-      }
-    };
-
-    allBanners.forEach((banner) => {
-      const bannerId = String(banner._id);
-      const isSelectedInTheme = selectedBannerIds.has(bannerId);
-      const type = banner.display?.type || 'herobanner';
-      const platform = banner.display?.platform || 'web';
-      const title = banner.content?.title || banner.title || `${type} ${bannerId.slice(-4)}`;
-
-      if (banner.image?.url) {
-        const url = banner.image.url;
-        const key = banner.image.key || '';
-        const itemKey = `${bannerId}:desktop:${url}`;
-        items.push({
-          id: itemKey,
-          url,
-          key,
-          name: extractName(url, `${title} (Desktop)`),
-          mediaType: banner.mediaType || 'image',
-          variant: platform === 'mobile' ? 'mobile' : 'desktop',
-          module: 'banner',
-          filterType: type === 'herobanner' ? 'hero' : type === 'collectionbanner' ? 'collection' : type === 'categorybanner' ? 'category' : type === 'mobileappbanner' ? 'app' : 'banner',
-          recordId: bannerId,
-          recordTitle: title,
-          bannerType: type,
-          platform,
-          slot: 'image',
-          usageLocation: `${type.toUpperCase()} · ${platform === 'mobile' ? 'Mobile App' : 'Storefront Desktop'}`,
-          isUsed: isSelectedInTheme && banner.status === 'active',
-          status: banner.status,
-        });
-        seenUrls.add(url);
-      }
-
-      if (Array.isArray(banner.collectionImages)) {
-        banner.collectionImages.forEach((img, idx) => {
-          if (!img?.url) return;
-          const url = img.url;
-          const key = img.key || '';
-          const itemKey = `${bannerId}:collection:${idx}:${url}`;
-          items.push({
-            id: itemKey,
-            url,
-            key,
-            name: extractName(url, `${title} - Tile ${idx + 1}`),
-            mediaType: 'image',
-            variant: 'desktop',
-            module: 'banner',
-            filterType: 'collection',
-            recordId: bannerId,
-            recordTitle: title,
-            bannerType: type,
-            platform,
-            slot: `collection:${img._id || idx}`,
-            usageLocation: `Collection Banner · Tile ${idx + 1}`,
-            isUsed: isSelectedInTheme && banner.status === 'active',
-            status: banner.status,
-          });
-          seenUrls.add(url);
-        });
-      }
-    });
-
-    allFeatured.forEach((item) => {
-      const featId = String(item._id);
-      const isSelectedInTheme = selectedFeaturedIds.has(featId);
-      const placement = item.display?.type || 'Celebrate';
-      const title = item.name || `${placement} Item`;
-
-      if (item.image?.url) {
-        const url = item.image.url;
-        const key = item.image.key || '';
-        items.push({
-          id: `${featId}:${url}`,
-          url,
-          key,
-          name: extractName(url, title),
-          mediaType: 'image',
-          variant: 'universal',
-          module: 'featured',
-          filterType: 'celebrate_gifts',
-          recordId: featId,
-          recordTitle: title,
-          placement,
-          slot: 'image',
-          usageLocation: `${placement} Showcase · ${title}`,
-          isUsed: isSelectedInTheme && item.status === 'active',
-          status: item.status,
-        });
-        seenUrls.add(url);
-      }
-    });
-
-    allCategories.forEach((cat) => {
-      const catId = String(cat._id);
-      const isSelectedInTheme = selectedCategoryIds.has(catId);
-      const name = cat.name || 'Category';
-
-      if (cat.icon?.url) {
-        const url = cat.icon.url;
-        items.push({
-          id: `${catId}:icon:${url}`,
-          url,
-          key: cat.icon.key || '',
-          name: extractName(url, `${name} Icon`),
-          mediaType: 'image',
-          variant: 'universal',
-          module: 'category',
-          filterType: 'category_icons',
-          recordId: catId,
-          recordTitle: name,
-          slot: 'icon',
-          usageLocation: `Category Icon · ${name}`,
-          isUsed: isSelectedInTheme,
-          status: 'active',
-        });
-        seenUrls.add(url);
-      }
-
-      if (cat.banner?.url) {
-        const url = cat.banner.url;
-        items.push({
-          id: `${catId}:banner:${url}`,
-          url,
-          key: cat.banner.key || '',
-          name: extractName(url, `${name} Category Banner`),
-          mediaType: 'image',
-          variant: 'desktop',
-          module: 'category',
-          filterType: 'category',
-          recordId: catId,
-          recordTitle: name,
-          slot: 'banner',
-          usageLocation: `Category Header · ${name}`,
-          isUsed: true,
-          status: 'active',
-        });
-        seenUrls.add(url);
-      }
-    });
-
-
-
-    return {
-      items,
-      total: items.length,
-      counts: {
-        all: items.length,
-        hero: items.filter((i) => i.filterType === 'hero').length,
-        collection: items.filter((i) => i.filterType === 'collection').length,
-        category: items.filter((i) => i.filterType === 'category').length,
-        app: items.filter((i) => i.filterType === 'app').length,
-        celebrate_gifts: items.filter((i) => i.filterType === 'celebrate_gifts').length,
-        category_icons: items.filter((i) => i.filterType === 'category_icons').length,
-        unused: items.filter((i) => !i.isUsed).length,
-      },
-    };
   }
 
   // ------------------------------- get public config ----------------------------
@@ -574,13 +284,12 @@ class ThemeService {
     return {
       revision,
       timezone: TIMEZONE,
-      theme: theme?.publishedSnapshot ? { ...theme.publishedSnapshot, config: await themeMedia.resolve(theme.publishedSnapshot.config) } : (theme?.config ? { id: String(theme._id), name: theme.name, code: theme.code, config: await themeMedia.resolve(theme.config) } : null),
+      theme: theme?.publishedSnapshot
+        ? { ...theme.publishedSnapshot, config: await themeMedia.resolve(theme.publishedSnapshot.config) }
+        : theme?.config
+          ? { id: String(theme._id), name: theme.name, code: theme.code, config: await themeMedia.resolve(theme.config) }
+          : null,
     };
-  }
-
-  // ------------------------------- get theme publishing history ----------------------------
-  async getHistory() {
-    return [];
   }
 
   // ------------------------------- reconcile theme schedule ----------------------------
@@ -595,7 +304,7 @@ class ThemeService {
         await active.save();
         if (fallback?.publishedSnapshot) {
           fallback.config = fallback.publishedSnapshot.config;
-          await this.setActive(fallback, null, 'expired');
+          await this.setActive(fallback, null);
           return { expiredThemeId: active._id, activatedThemeId: fallback._id };
         } else {
           await Setting.updateOne(

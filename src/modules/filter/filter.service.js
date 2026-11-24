@@ -151,7 +151,7 @@ class FilterService {
           key: 'birthMonth',
           type: 'checkbox',
           order: 11,
-          enabled: true,
+          status: 'active',
           categoryConfigs,
         });
       }
@@ -200,12 +200,13 @@ class FilterService {
           (c) => String(c.categoryId) === catIdStr || (c.categorySlug && c.categorySlug.toLowerCase() === catSlug)
         );
 
-        let isEnabled = f.enabled !== false;
+        const isMasterActive = f.status === 'active' || (f.status !== 'inactive' && f.enabled !== false);
+        let isEnabled = isMasterActive;
         let order = f.order || 0;
         let customTitle = f.title;
 
         if (config) {
-          isEnabled = config.enabled !== false;
+          isEnabled = isMasterActive && config.enabled !== false;
           if (config.order !== undefined) order = config.order;
           if (config.customTitle) customTitle = config.customTitle;
         }
@@ -218,6 +219,7 @@ class FilterService {
           key: f.key,
           type: f.type,
           order,
+          status: isMasterActive ? 'active' : 'inactive',
           enabled: isEnabled,
           options: loadedOptions[f.filterId] || loadedOptions[f.key] || [],
         };
@@ -233,17 +235,21 @@ class FilterService {
 
     // 2. Global / Unfiltered response: return all master filters
     const globalFilters = allFilters
-      .map((f) => ({
-        id: f.filterId,
-        filterId: f.filterId,
-        title: f.title,
-        customTitle: '',
-        key: f.key,
-        type: f.type,
-        order: f.order,
-        enabled: f.enabled !== false,
-        options: loadedOptions[f.filterId] || loadedOptions[f.key] || [],
-      }))
+      .map((f) => {
+        const isMasterActive = f.status === 'active' || (f.status !== 'inactive' && f.enabled !== false);
+        return {
+          id: f.filterId,
+          filterId: f.filterId,
+          title: f.title,
+          customTitle: '',
+          key: f.key,
+          type: f.type,
+          order: f.order,
+          status: isMasterActive ? 'active' : 'inactive',
+          enabled: isMasterActive,
+          options: loadedOptions[f.filterId] || loadedOptions[f.key] || [],
+        };
+      })
       .sort((a, b) => a.order - b.order);
 
     return {
@@ -260,7 +266,7 @@ class FilterService {
     // Keep only enabled filters that have valid options (or range filters)
     const cleanFilters = (result.filters || [])
       .filter((f) => {
-        if (f.enabled === false) return false;
+        if (f.status === 'inactive' || f.enabled === false) return false;
         if (f.type === 'checkbox' && (!f.options || f.options.length === 0)) return false;
         return true;
       })
@@ -317,6 +323,7 @@ class FilterService {
         };
       }).sort((a, b) => a.order - b.order);
 
+      const isMasterActive = f.status === 'active' || (f.status !== 'inactive' && f.enabled !== false);
       return {
         _id: f._id,
         filterId: f.filterId,
@@ -324,7 +331,8 @@ class FilterService {
         key: f.key,
         type: f.type,
         order: f.order,
-        enabled: f.enabled !== false,
+        status: isMasterActive ? 'active' : 'inactive',
+        enabled: isMasterActive,
         categories: categoriesWithConfig,
       };
     });
@@ -387,9 +395,19 @@ class FilterService {
   }
   // ------------------------------- update filter ----------------------------
   async updateFilter(filterId, data) {
+    const updateData = { ...data };
+    if (updateData.status) {
+      updateData.status = updateData.status === 'active' ? 'active' : 'inactive';
+    }
     const filter = await Filter.findOneAndUpdate(
-      { filterId, 'meta.deletedAt': null },
-      { $set: data },
+      {
+        $or: [
+          { filterId },
+          ...(mongoose.isValidObjectId(filterId) ? [{ _id: filterId }] : []),
+        ],
+        'meta.deletedAt': null,
+      },
+      { $set: updateData },
       { new: true }
     );
     if (!filter) {

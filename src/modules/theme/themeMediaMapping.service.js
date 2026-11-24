@@ -99,7 +99,7 @@ class ThemeMediaMappingService {
   }
 
   // ------------------------------- get module records ----------------------------
-  async getModuleRecords({ themeId, module = 'herobanner', page = 1, limit = 50, search = '' }) {
+  async getModuleRecords({ themeId, module = 'herobanner', page = 1, limit = 50 }) {
     if (!mongoose.isValidObjectId(themeId)) {
       throw new ApiError(400, 'Invalid Theme ID');
     }
@@ -114,21 +114,6 @@ class ThemeMediaMappingService {
     const Model = modConfig.model;
 
     const filter = { ...modConfig.filter, 'meta.deletedAt': null };
-
-    // Search filter
-    if (search && search.trim()) {
-      const term = search.trim();
-      const searchRegex = { $regex: term, $options: 'i' };
-      if (normModule === 'category' || normModule === 'celebrate') {
-        filter.name = searchRegex;
-      } else {
-        filter.$or = [
-          { 'content.title': searchRegex },
-          { 'content.subtitle': searchRegex },
-          { 'content.description': searchRegex },
-        ];
-      }
-    }
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 50));
@@ -519,21 +504,6 @@ class ThemeMediaMappingService {
     return {
       message: 'Media mapping removed successfully. Original record and gallery asset remain intact.',
       id: mappingId,
-    };
-  }
-
-  async deleteMappingByTarget({ themeId, recordId }) {
-    if (!mongoose.isValidObjectId(themeId) || !mongoose.isValidObjectId(recordId)) {
-      throw new ApiError(400, 'Invalid Theme ID or Record ID');
-    }
-
-    await ThemeMediaMapping.deleteMany({
-      themeId,
-      recordId,
-    });
-
-    return {
-      message: 'Theme media mapping removed successfully.',
     };
   }
 

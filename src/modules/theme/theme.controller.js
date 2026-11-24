@@ -14,10 +14,14 @@ class ThemeController {
   // ------------------------------- get theme lookup ----------------------------
   getLookup = catchAsync(async (_req, res) => {
     const items = await Theme.find({ 'meta.deletedAt': null })
-      .select('_id name code')
+      .select('_id name code status')
       .sort({ name: 1 })
       .lean();
-    ApiResponse.success(res, items, 'Theme lookup list retrieved successfully');
+    const mapped = (items || []).map((t) => ({
+      ...t,
+      isLive: t.status === 'active',
+    }));
+    ApiResponse.success(res, mapped, 'Theme lookup list retrieved successfully');
   });
 
   // ------------------------------- get one theme ----------------------------

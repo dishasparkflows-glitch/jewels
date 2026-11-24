@@ -7,14 +7,13 @@ class ThemeMediaMappingController {
   // ------------------------------- get theme module records ----------------------------
   getModuleRecords = catchAsync(async (req, res) => {
     const { themeId } = req.params;
-    const { module, page, limit, search } = req.query;
+    const { module, page, limit } = req.query;
 
     const data = await themeMediaMappingService.getModuleRecords({
       themeId,
       module,
       page,
       limit,
-      search,
     });
 
     ApiResponse.success(res, data, 'Module records retrieved successfully');
@@ -34,20 +33,6 @@ class ThemeMediaMappingController {
 
     await redisClient.deleteByPattern('themes:*');
     ApiResponse.success(res, result.mapping, result.message);
-  });
-
-  // ------------------------------- delete mapping by target ----------------------------
-  deleteMappingByTarget = catchAsync(async (req, res) => {
-    const { themeId } = req.params;
-    const { recordId } = req.query;
-
-    const result = await themeMediaMappingService.deleteMappingByTarget({
-      themeId,
-      recordId,
-    });
-
-    await redisClient.deleteByPattern('themes:*');
-    ApiResponse.success(res, null, result.message);
   });
 
   // ------------------------------- get mapping summary ----------------------------

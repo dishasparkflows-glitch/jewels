@@ -38,128 +38,70 @@ const variableSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const buttonSchema = new mongoose.Schema(
-  {
-    type: {
-      type: String,
-      enum: ['URL', 'PHONE_NUMBER', 'QUICK_REPLY'],
-      default: 'URL',
-    },
-    text: {
-      type: String,
-      trim: true,
-    },
-    url: {
-      type: String,
-      trim: true,
-    },
-    phoneNumber: {
-      type: String,
-      trim: true,
-    },
-  },
-  { _id: false }
-);
-
 const whatsAppTemplateSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-      lowercase: true,
-    },
-    displayName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    category: {
-      type: String,
-      enum: ['UTILITY', 'MARKETING', 'AUTHENTICATION'],
-      required: true,
-      default: 'UTILITY',
-    },
-    language: {
-      type: String,
-      default: 'en_US',
-      trim: true,
-    },
-    status: {
-      type: String,
-      enum: ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'DISABLED'],
-      default: 'PENDING',
-      index: true,
-    },
-    header: {
-      type: {
+    template: {
+      name: {
         type: String,
-        enum: ['TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT', 'NONE'],
-        default: 'NONE',
+        required: true,
+        trim: true,
+        lowercase: true,
       },
-      text: { type: String, default: '' },
-      mediaUrl: { type: String, default: '' },
-    },
-    body: {
-      type: String,
-      required: true,
-    },
-    buttons: {
-      type: [buttonSchema],
-      default: [],
+      displayName: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+      category: {
+        type: String,
+        enum: ['UTILITY', 'MARKETING', 'AUTHENTICATION'],
+        required: true,
+      },
+      language: {
+        type: String,
+        default: 'English',
+        trim: true,
+      },
+      body: {
+        type: String,
+        required: true,
+      },
     },
     variables: {
       type: [variableSchema],
       default: [],
     },
-    provider: {
-      name: {
-        type: String,
-        default: 'connectwhats',
-        trim: true,
-      },
-      templateId: {
-        type: String,
-        trim: true,
-        default: '',
-      },
-      templateName: {
-        type: String,
-        trim: true,
-        default: '',
-      },
-      status: {
-        type: String,
-        enum: ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED'],
-        default: 'PENDING',
-        index: true,
-      },
-      rejectionReason: {
-        type: String,
-        default: '',
-      },
-    },
-    isSystemTemplate: {
-      type: Boolean,
-      default: false,
+    status: {
+      type: String,
+      enum: ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'DISABLED'],
+      default: 'APPROVED',
       index: true,
     },
-    isActive: {
-      type: Boolean,
-      default: true,
-      index: true,
+    meta: {
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now },
+      deletedAt: { type: Date, default: null },
     },
   },
   {
+    timestamps: false,
     versionKey: false,
     collection: 'whatsapp_templates',
   }
 );
 
-// Compound index for querying active approved templates
-whatsAppTemplateSchema.index({ name: 1, isActive: 1, 'provider.status': 1 });
+whatsAppTemplateSchema.index({ 'template.name': 1 });
 whatsAppTemplateSchema.index({ 'meta.createdAt': -1 });
 
+whatsAppTemplateSchema.pre('save', function (next) {
+  if (!this.meta) {
+    this.meta = {};
+  }
+  if (!this.meta.createdAt) {
+    this.meta.createdAt = new Date();
+  }
+  this.meta.updatedAt = new Date();
+  next();
+});
 
 module.exports = mongoose.model('WhatsAppTemplate', whatsAppTemplateSchema, 'whatsapp_templates');

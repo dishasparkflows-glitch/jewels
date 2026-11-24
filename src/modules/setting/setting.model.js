@@ -4,7 +4,8 @@ const settingSchema = new mongoose.Schema(
   {
     // Business & Identity
     businessDetails: {
-      companyName: {       type: String,
+      companyName: {      
+        type: String,
         trim: true,
       },
       emailAddress: {
@@ -54,6 +55,8 @@ const settingSchema = new mongoose.Schema(
       url: { type: String, default: '' },
       key: { type: String, default: '' },
     },
+
+    // trust badges
     trustBadges: [{
       title: { type: String, trim: true, default: '' },
       image: {
@@ -62,6 +65,8 @@ const settingSchema = new mongoose.Schema(
       },
       order: { type: Number, default: 0 },
     }],
+
+    // media compression
     mediaCompression: {
       enabled: { type: Boolean, default: true },
       quality: { type: Number, min: 50, max: 100, default: 82 },
@@ -92,12 +97,14 @@ const settingSchema = new mongoose.Schema(
       },
     },
 
-    // Storefront Theme & Colors (Object for buttons, header, top bar, footer)
+    // Storefront Theme
     currentThemeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Theme',
       default: null,
     },
+
+    // theme colors
     themeColors: {
       buttonColor: {
         type: String,
@@ -130,6 +137,16 @@ const settingSchema = new mongoose.Schema(
         default: '#201e1b',
       },
       headerTextColor: {
+        type: String,
+        trim: true,
+        default: '#ffffff',
+      },
+      couponBgColor: {
+        type: String,
+        trim: true,
+        default: '#201e1b',
+      },
+      couponTextColor: {
         type: String,
         trim: true,
         default: '#ffffff',

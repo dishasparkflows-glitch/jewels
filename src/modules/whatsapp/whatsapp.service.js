@@ -224,15 +224,23 @@ class WhatsAppService {
 
     // 1. Look up template
     const template = await WhatsAppTemplate.findOne({
-      name: templateName.trim().toLowerCase(),
+      $or: [
+        { 'template.name': templateName.trim().toLowerCase() },
+        { name: templateName.trim().toLowerCase() },
+      ],
+      'meta.deletedAt': null,
     });
 
     if (!template) {
       throw new ApiError(404, `WhatsApp template '${templateName}' not found`);
     }
 
-    if (!template.isActive) {
-      throw new ApiError(400, `WhatsApp template '${template.displayName || template.name}' is currently disabled.`);
+    const t = template.template || {};
+    const tName = t.name || template.name;
+    const tDisplayName = t.displayName || template.displayName || tName;
+
+    if (template.status === 'DISABLED') {
+      throw new ApiError(400, `WhatsApp template '${tDisplayName}' is currently disabled.`);
     }
 
     // 2. Resolve parameters dynamically via template service
@@ -252,8 +260,8 @@ class WhatsAppService {
 
     const renderedPreview = whatsappTemplateService.renderTemplatePreview(template, parameters);
     const plainVariables = parameters.map((p) => p.text);
-    const templateLang = template.language || language || 'en_US';
-    const providerTemplateName = template.provider?.templateName || template.name;
+    const templateLang = t.language || template.language || language || 'English';
+    const providerTemplateName = template.provider?.templateName || tName;
 
     // 3. Create queued message record
     const messageRecord = await WhatsAppMessage.create({
@@ -262,7 +270,7 @@ class WhatsAppService {
       to: normalizedTo,
       from: creds.phoneNumber,
       type: 'template',
-      templateName: template.name,
+      templateName: tName,
       templateLanguage: templateLang,
       variables: plainVariables,
       parameters,
@@ -312,7 +320,7 @@ class WhatsAppService {
         externalMessageId,
         messageId: messageRecord._id,
         renderedPreview,
-        templateName: template.name,
+        templateName: template.template?.name || template.name,
         data: result,
       };
     } catch (err) {
@@ -423,16 +431,19 @@ class WhatsAppService {
       const normalizedPhone = normalizePhoneNumber(phoneNumber);
       const dateStr = getFormatter('date')(appointmentDate);
 
+      const templateTargetName = status === 'confirmed' ? 'neirah_appointment_confirmed' : 'neirah_appointment_request';
       const tmpl = await WhatsAppTemplate.findOne({
-        name: status === 'confirmed' ? 'neirah_appointment_confirmed' : 'neirah_appointment_request',
-        isActive: true,
-        'provider.status': 'APPROVED',
+        $or: [
+          { 'template.name': templateTargetName },
+          { name: templateTargetName },
+        ],
+        status: { $ne: 'DISABLED' },
       });
 
       if (tmpl) {
         await this.sendTemplateMessage({
           to: normalizedPhone,
-          templateName: tmpl.name,
+          templateName: tmpl.template?.name || tmpl.name,
           context: {
             customer: { name: fullName },
             appointment: {

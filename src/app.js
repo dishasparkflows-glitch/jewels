@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 require('./config/db');
-const { ADMIN_URL, FRONTEND_URL, NODE_ENV } = require('./config/constants');
+const { NODE_ENV, URL } = require('./config/constants');
 const routes = require('./routes');
 const { errorHandler } = require('./middleware/error.middleware');
 const { requestContextMiddleware } = require('./utils/context');
@@ -18,8 +18,8 @@ app.use(helmet({
 }));
 
 const allowedOrigins = [
-  ADMIN_URL,
-  FRONTEND_URL,
+  URL.ADMIN_URL,
+  URL.FRONTEND_URL,
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175'

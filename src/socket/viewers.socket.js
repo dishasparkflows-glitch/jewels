@@ -1,5 +1,5 @@
 const { Server } = require('socket.io');
-const { ADMIN_URL, FRONTEND_URL, NODE_ENV } = require('../config/constants');
+const { NODE_ENV, URL } = require('../config/constants');
 
 // In-memory state of live viewer counts per product
 // Map<string, { count: number, sockets: Set<string>, timer: NodeJS.Timeout | null, cleanupTimer: NodeJS.Timeout | null }>
@@ -104,8 +104,8 @@ function getProductViewerCount(productId) {
 
 function initViewerSocket(server) {
   const allowedOrigins = [
-    ADMIN_URL,
-    FRONTEND_URL,
+    URL.ADMIN_URL,
+    URL.FRONTEND_URL,
     'http://localhost:5173',
     'http://localhost:5174',
     'http://127.0.0.1:5173',

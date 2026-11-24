@@ -27,17 +27,6 @@ class CouponService {
     return coupon;
   }
 
-  // ------------------------------- get coupon by code ----------------------------
-  async getByCode(code) {
-    const coupon = await Coupon.findOne({
-      'coupon.code': code.trim().toUpperCase(),
-    });
-    if (!coupon) {
-      throw new ApiError(404, 'Coupon not found');
-    }
-    return coupon;
-  }
-
   // ------------------------------- get all coupons ----------------------------
   async getAll(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);

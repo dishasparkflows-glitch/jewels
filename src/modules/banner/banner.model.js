@@ -27,10 +27,6 @@ const bannerSchema = new mongoose.Schema(
         }],
         default: undefined,
       },
-      collectionGroup: {
-        type: String,
-        enum: ['gold', 'silver', 'spiritual'],
-      },
       type: {
         type: String,
         enum: [

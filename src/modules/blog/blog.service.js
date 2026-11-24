@@ -94,7 +94,7 @@ class BlogService {
       ];
     }
 
-    const [items, total] = await Promise.all([
+    const [items, total, totalAll, publishedCount, draftCount] = await Promise.all([
       Blog.find(filter)
         .populate('blogCategory', 'name slug')
         .sort({ 'meta.createdAt': -1 })
@@ -102,9 +102,20 @@ class BlogService {
         .limit(limit)
         .lean(),
       Blog.countDocuments(filter),
+      Blog.countDocuments({ 'meta.deletedAt': null }),
+      Blog.countDocuments({ 'meta.deletedAt': null, status: 'active' }),
+      Blog.countDocuments({ 'meta.deletedAt': null, status: 'inactive' }),
     ]);
 
-    return { items, pagination: getPaginationMeta(total, page, limit) };
+    return {
+      items,
+      pagination: getPaginationMeta(total, page, limit),
+      facets: {
+        total: totalAll,
+        published: publishedCount,
+        draft: draftCount,
+      },
+    };
   }
 
     // ------------------------------- get recent blog posts ----------------------------

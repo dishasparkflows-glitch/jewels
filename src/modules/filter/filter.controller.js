@@ -26,14 +26,6 @@ class FilterController {
     ApiResponse.success(res, data, 'Filter category assignments updated successfully');
   });
 
-  // ------------------------------- update category filters ----------------------------
-  updateCategoryFilters = catchAsync(async (req, res) => {
-    const categoryId = req.params.categoryId || req.query.categoryId || req.body.categoryId;
-    const filterList = req.body.filters || req.body;
-    const data = await filterService.updateCategoryFilters(categoryId, filterList);
-    ApiResponse.success(res, data, 'Category filters updated successfully in filters table');
-  });
-
   // ------------------------------- reorder filters ----------------------------
   reorderFilters = catchAsync(async (req, res) => {
     const list = req.body.filterIds || req.body.filters || req.body;

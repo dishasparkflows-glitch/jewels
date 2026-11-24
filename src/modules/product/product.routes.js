@@ -7,8 +7,6 @@ const { ROLES } = require('../../config/constants');
 router.post('/pricing-preview', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), productController.previewPricing);
 router.post('/calculate', optionalAuth, productController.calculateProductPrice);
 
-const { getProductViewerCount } = require('../../socket/viewers.socket');
-
 // Public or Storefront / Lookup endpoints (with optionalAuth to identify logged-in users for inWishlist flag)
 router.get('/storefront', optionalAuth, productController.getStorefrontProducts);
 router.get('/search/storefront', optionalAuth, productController.getSearchStorefront);
@@ -19,17 +17,6 @@ router.get('/lookup', productController.getLookup);
 router.get('/sku/:code', optionalAuth, productController.getBySkuOrTag);
 router.get('/:id/similar', optionalAuth, productController.getSimilarProducts);
 router.get('/:id', optionalAuth, productController.getOne);
-router.get('/:id/live-viewers', (req, res) => {
-  const count = getProductViewerCount(req.params.id);
-  res.json({
-    success: true,
-    data: {
-      productId: req.params.id,
-      count,
-      timestamp: Date.now(),
-    },
-  });
-});
 router.get('/', optionalAuth, productController.getAll);
 
 // Protected Admin endpoints

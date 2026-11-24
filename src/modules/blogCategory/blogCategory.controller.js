@@ -14,8 +14,8 @@ class BlogCategoryController {
 
   // ------------------------------- get all blog categories ----------------------------
   getAll = catchAsync(async (req, res) => {
-    const { items, pagination } = await blogCategoryService.getAll(req.query);
-    ApiResponse.paginated(res, items, pagination, 'Blog categories retrieved successfully');
+    const { items, pagination, facets } = await blogCategoryService.getAll(req.query);
+    ApiResponse.paginated(res, items, pagination, 'Blog categories retrieved successfully', facets);
   });
 
   // ------------------------------- get blog category lookup ----------------------------

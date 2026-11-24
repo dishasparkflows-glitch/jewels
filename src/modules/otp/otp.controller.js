@@ -2,12 +2,14 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const otpService = require('./otp.service');
 
+// ------------------------------- send otp ----------------------------
 const sendOtp = catchAsync(async (req, res) => {
   const { phone, purpose, countryCode } = req.body;
   const result = await otpService.sendOtp(phone, purpose, countryCode);
   return ApiResponse.success(res, result, result.message);
 });
 
+// ------------------------------- verify otp ----------------------------
 const verifyOtp = catchAsync(async (req, res) => {
   const { phone, otp, purpose, countryCode } = req.body;
   const result = await otpService.verifyOtp(phone, otp, purpose, countryCode);

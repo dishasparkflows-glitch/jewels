@@ -11,7 +11,6 @@ router.get('/lookup', settingController.getLookup);
 // Protected admin settings
 router.put('/', authenticate, settingController.updateSettings);
 router.post('/', authenticate, settingController.create);
-router.get('/all', authenticate, settingController.getAll);
 router.get('/:id', settingController.getOne);
 router.put('/:id', authenticate, settingController.update);
 router.delete('/:id', authenticate, settingController.delete);

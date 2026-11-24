@@ -15,7 +15,6 @@ router.post(
 // Public or storefront checkout endpoints
 router.get('/lookup', couponController.getLookup);
 router.post('/validate', couponController.validateCoupon);
-router.get('/code/:code', couponController.getByCode);
 router.get('/', couponController.getAll);
 router.get('/:id', couponController.getOne);
 

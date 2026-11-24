@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const BasePaymentProvider = require('./base.provider');
 const Order = require('../../order/order.model');
 const ApiError = require('../../../utils/ApiError');
-const { CCAVENUE, BACKEND_URL, FRONTEND_URL } = require('../../../config/constants');
+const { CCAVENUE, URL } = require('../../../config/constants');
 
 class CCAvenueService extends BasePaymentProvider {
   constructor() {
@@ -111,7 +111,7 @@ class CCAvenueService extends BasePaymentProvider {
     }
 
     const formattedAmount = Number(amount).toFixed(2);
-    const backendUrl = BACKEND_URL || 'http://localhost:5000';
+    const backendUrl = URL?.BACKEND_URL || 'http://localhost:5000';
 
     const defaultRedirectUrl = `${backendUrl}/api/payments/ccavenue/response`;
     const defaultCancelUrl = `${backendUrl}/api/payments/ccavenue/response`;
@@ -220,7 +220,7 @@ class CCAvenueService extends BasePaymentProvider {
   async handleResponse(encResp) {
     if (!encResp) {
       return {
-        redirectUrl: `${FRONTEND_URL}/order-failed?error=Missing+CCAvenue+response`,
+        redirectUrl: `${URL.FRONTEND_URL}/order-failed?error=Missing+CCAvenue+response`,
       };
     }
 
@@ -239,7 +239,7 @@ class CCAvenueService extends BasePaymentProvider {
 
     if (!order) {
       return {
-        redirectUrl: `${FRONTEND_URL}/order-failed?error=Order+not+found&trackingId=${encodeURIComponent(trackingId || '')}`,
+        redirectUrl: `${URL.FRONTEND_URL}/order-failed?error=Order+not+found&trackingId=${encodeURIComponent(trackingId || '')}`,
         response,
       };
     }
@@ -256,7 +256,7 @@ class CCAvenueService extends BasePaymentProvider {
         status: 'Success',
         order,
         response,
-        redirectUrl: `${FRONTEND_URL}/order-success?orderId=${order._id}&orderNumber=${order.orderNumber}&trackingId=${encodeURIComponent(trackingId || '')}`,
+        redirectUrl: `${URL.FRONTEND_URL}/order-success?orderId=${order._id}&orderNumber=${order.orderNumber}&trackingId=${encodeURIComponent(trackingId || '')}`,
       };
     } else {
       await this.markOrderAsFailed(order, {
@@ -269,7 +269,7 @@ class CCAvenueService extends BasePaymentProvider {
         status: orderStatus || 'Failure',
         order,
         response,
-        redirectUrl: `${FRONTEND_URL}/order-failed?orderId=${order._id}&orderNumber=${order.orderNumber}&error=${encodeURIComponent(failureMessage)}`,
+        redirectUrl: `${URL.FRONTEND_URL}/order-failed?orderId=${order._id}&orderNumber=${order.orderNumber}&error=${encodeURIComponent(failureMessage)}`,
       };
     }
   }

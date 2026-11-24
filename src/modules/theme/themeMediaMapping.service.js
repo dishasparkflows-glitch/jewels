@@ -243,8 +243,6 @@ class ThemeMediaMappingService {
         subtitle =
           rec.content?.subtitle && rec.content?.subtitle !== 'none'
             ? rec.content.subtitle
-            : rec.display?.collectionGroup
-            ? `Collection Group: ${rec.display.collectionGroup.toUpperCase()}`
             : `Storefront Display Slide #${orderNum}`;
         originalDesktopImage = rec.image?.url || null;
         originalMobileImage = rec.mobileImage?.url || rec.image?.url || null;
@@ -298,7 +296,6 @@ class ThemeMediaMappingService {
         platform: rec.display?.platform || 'web',
         order: rec.display?.order ?? rec.order ?? 0,
         status: rec.status || 'active',
-        collectionGroup: rec.display?.collectionGroup || null,
         originalDesktopImage,
         originalMobileImage,
         originalIcon,

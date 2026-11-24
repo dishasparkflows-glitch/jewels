@@ -191,7 +191,7 @@ class BannerService {
 
     const items = await Banner.find(filter)
       .select(
-        '_id content.title display.type display.platform display.order display.collectionGroup display.categoryId image mobileImage collectionImages status'
+        '_id content.title display.type display.platform display.order display.categoryId image mobileImage collectionImages status'
       )
       .populate('display.categoryId', 'name slug')
       .populate('collectionImages.categoryId', 'name slug')

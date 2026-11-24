@@ -58,16 +58,27 @@ class BlogCategoryService {
       filter.$or = [{ name: searchRegex }, { slug: searchRegex }, { description: searchRegex }];
     }
 
-    const [items, total] = await Promise.all([
+    const [items, total, totalAll, activeCount, inactiveCount] = await Promise.all([
       BlogCategory.find(filter)
         .sort({ order: 1, 'meta.createdAt': -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
       BlogCategory.countDocuments(filter),
+      BlogCategory.countDocuments({ 'meta.deletedAt': null }),
+      BlogCategory.countDocuments({ 'meta.deletedAt': null, status: 'active' }),
+      BlogCategory.countDocuments({ 'meta.deletedAt': null, status: 'inactive' }),
     ]);
 
-    return { items, pagination: getPaginationMeta(total, page, limit) };
+    return {
+      items,
+      pagination: getPaginationMeta(total, page, limit),
+      facets: {
+        total: totalAll,
+        active: activeCount,
+        inactive: inactiveCount,
+      },
+    };
   }
 
     // ------------------------------- get blog category lookup ----------------------------

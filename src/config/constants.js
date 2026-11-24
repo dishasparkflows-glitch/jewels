@@ -2,9 +2,6 @@ const env = require('./env');
 
 module.exports = {
   ...env,
-  BACKEND_URL: env.URL?.BACKEND_URL,
-  FRONTEND_URL: env.URL?.FRONTEND_URL,
-  ADMIN_URL: env.URL?.ADMIN_URL,
 
   // Roles & Permissions
   ROLES: {

@@ -11,8 +11,8 @@ class BlogController {
 
   // ------------------------------- get all blog posts ----------------------------
   getAll = catchAsync(async (req, res) => {
-    const { items, pagination } = await blogService.getAll(req.query);
-    ApiResponse.paginated(res, items, pagination, 'Blog posts retrieved successfully');
+    const { items, pagination, facets } = await blogService.getAll(req.query);
+    ApiResponse.paginated(res, items, pagination, 'Blog posts retrieved successfully', facets);
   });
 
   // ------------------------------- get recent blog posts ----------------------------

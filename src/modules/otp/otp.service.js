@@ -10,10 +10,12 @@ const verifiedStore = new Map();
 const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 const VERIFIED_TOKEN_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
+// ------------------------------- normalize phone ----------------------------
 const normalizePhone = (rawPhone) => {
   return String(rawPhone || '').replace(/\D/g, '').trim();
 };
 
+// ------------------------------- normalize country code ----------------------------
 const normalizeCountryCode = (code) => {
   if (!code) return '+91';
   const cleaned = String(code).trim();
@@ -21,6 +23,7 @@ const normalizeCountryCode = (code) => {
 };
 
 class OtpService {
+  // ------------------------------- send otp ----------------------------
   /**
    * Generates and sends a 4-digit OTP to the recipient's phone number
    */
@@ -72,6 +75,7 @@ class OtpService {
     };
   }
 
+  // ------------------------------- verify otp ----------------------------
   /**
    * Verifies the 4-digit OTP for the given phone number
    */
@@ -124,6 +128,7 @@ class OtpService {
     };
   }
 
+  // ------------------------------- check if phone is verified ----------------------------
   /**
    * Helper to check if a verification token is valid for a given phone number
    */

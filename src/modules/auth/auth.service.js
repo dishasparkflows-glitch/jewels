@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../user/user.model');
 const ApiError = require('../../utils/ApiError');
-const { JWT, FRONTEND_URL, STORE_NAME } = require('../../config/constants');
+const { JWT, STORE_NAME, URL } = require('../../config/constants');
 const smsService = require('../sms/sms.service');
 const otpService = require('../otp/otp.service');
 const { sendEmail } = require('../../utils/emailService');
@@ -255,7 +255,7 @@ class AuthService {
     user.auth.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save();
 
-    const clientUrl = (FRONTEND_URL).replace(/\/+$/, '');
+    const clientUrl = (URL.FRONTEND_URL).replace(/\/+$/, '');
     const resetUrl = new URL(`${clientUrl}/reset-password`);
     resetUrl.searchParams.set('token', token);
 

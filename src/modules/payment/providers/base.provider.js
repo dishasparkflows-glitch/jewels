@@ -40,7 +40,7 @@ class BasePaymentProvider {
         ? order.pricing.codDueNow
         : order.pricing?.total || 0);
 
-    order.payment.status = 'paid';
+    order.payment.status = order.payment?.method === 'cod' ? 'partially_paid' : 'paid';
     order.payment.provider = this.name;
     if (details.transactionId) order.payment.transactionId = details.transactionId;
     if (details.gatewayOrderId) order.payment.gatewayOrderId = details.gatewayOrderId;
@@ -49,6 +49,9 @@ class BasePaymentProvider {
     if (details.paymentDetails) order.payment.paymentDetails = details.paymentDetails;
     order.payment.paidAt = new Date();
     order.payment.paidAmount = payableAmount;
+    if (order.pricing) {
+      order.pricing.paidAmount = payableAmount;
+    }
 
     // Advance orderStatus if pending
     if (order.orderStatus === 'pending') {

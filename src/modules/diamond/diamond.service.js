@@ -345,17 +345,11 @@ class DiamondService {
     ]);
 
     return {
-      colors,
       diamondColors: colors,
-      clarities,
       diamondClarities: clarities,
-      cuts: [],
       diamondCuts: [],
-      shapes,
       diamondShapes: shapes,
-      types,
       diamondTypes: types,
-      sizes,
       diamondSizes: sizes,
       sieveSizes: [],
       metalColors,

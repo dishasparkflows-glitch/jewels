@@ -31,17 +31,6 @@ class SettingController {
     ApiResponse.created(res, null, 'Setting record created successfully');
   });
 
-  // ------------------------------- get all settings ----------------------------
-  getAll = catchAsync(async (req, res) => {
-    const { items, pagination } = await settingService.getAll(req.query);
-    ApiResponse.paginated(
-      res,
-      items,
-      pagination,
-      'Settings retrieved successfully'
-    );
-  });
-
   // ------------------------------- get setting lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {
     const cacheKey = `settings:lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;

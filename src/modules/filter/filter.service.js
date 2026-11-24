@@ -291,48 +291,6 @@ class FilterService {
       filters: cleanFilters,
     };
   }
-  // ------------------------------- update category filters ----------------------------
-  async updateCategoryFilters(categoryId, filterList) {
-    const category = await Category.findOne({ _id: categoryId, 'meta.deletedAt': null }).lean();
-    if (!category) {
-      throw new ApiError(404, 'Category not found');
-    }
-
-    const items = Array.isArray(filterList) ? filterList : (filterList?.filters || []);
-    const catIdStr = String(category._id);
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const filterDoc = await Filter.findOne({
-        $or: [{ filterId: item.filterId || item.id }, { _id: item._id }],
-        'meta.deletedAt': null,
-      });
-
-      if (!filterDoc) continue;
-
-      const existingIndex = (filterDoc.categoryConfigs || []).findIndex(
-        (c) => String(c.categoryId) === catIdStr
-      );
-
-      const updatedConfig = {
-        categoryId: category._id,
-        categorySlug: category.slug || '',
-        enabled: item.enabled !== false,
-        order: item.order !== undefined ? Number(item.order) : i + 1,
-        customTitle: item.customTitle ? String(item.customTitle).trim() : '',
-      };
-
-      if (existingIndex >= 0) {
-        filterDoc.categoryConfigs[existingIndex] = updatedConfig;
-      } else {
-        filterDoc.categoryConfigs.push(updatedConfig);
-      }
-
-      await filterDoc.save();
-    }
-
-    return this.getFilters({ categoryId: category._id });
-  }
   // ------------------------------- get all filters with categories ----------------------------
   async getAllFiltersWithCategories() {
     await this.ensureDefaultFilters();

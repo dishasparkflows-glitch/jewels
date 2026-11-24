@@ -33,12 +33,6 @@ class CouponController {
     ApiResponse.success(res, item, 'Coupon retrieved successfully');
   });
 
-  // ------------------------------- get coupon by code ----------------------------
-  getByCode = catchAsync(async (req, res) => {
-    const item = await couponService.getByCode(req.params.code);
-    ApiResponse.success(res, item, 'Coupon retrieved successfully');
-  });
-
   // ------------------------------- validate coupon ----------------------------
   validateCoupon = catchAsync(async (req, res) => {
     const { code, cartAmount } = req.body;

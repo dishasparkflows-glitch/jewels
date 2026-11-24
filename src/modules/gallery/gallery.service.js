@@ -121,7 +121,13 @@ class GalleryService {
     }
 
     if (platform && platform !== 'all') {
-      filter.platform = platform;
+      if (platform === 'web') {
+        filter.platform = { $in: ['web', 'common'] };
+      } else if (platform === 'app') {
+        filter.platform = { $in: ['app', 'common'] };
+      } else {
+        filter.platform = platform;
+      }
     }
 
     if (status && status !== 'all') {
@@ -372,7 +378,13 @@ class GalleryService {
 
     // Platform filter
     if (platform && platform !== 'all') {
-      andConditions.push({ platform });
+      if (platform === 'web') {
+        andConditions.push({ platform: { $in: ['web', 'common'] } });
+      } else if (platform === 'app') {
+        andConditions.push({ platform: { $in: ['app', 'common'] } });
+      } else {
+        andConditions.push({ platform });
+      }
     }
 
     // Status filter

@@ -6,17 +6,9 @@ const { ROLES } = require('../../config/constants');
 
 // Public storefront filters endpoint
 router.get('/', filterController.getFilters);
-router.get('/category/:categoryId', filterController.getFilters);
 router.get('/admin/all', filterController.getAllWithCategories);
 
 // Protected admin endpoints to manage filters and category-wise configurations
-router.put(
-  '/category/:categoryId',
-  authenticate,
-  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
-  filterController.updateCategoryFilters
-);
-
 router.put(
   '/:filterId/categories',
   authenticate,

@@ -100,7 +100,7 @@ class OrderService {
       subtotal,
       discount,
       paymentMethod,
-      codFee: codCheck?.charge,
+      codFee: codCheck?.calculatedCharge ?? codCheck?.charge ?? 0,
     });
 
     // Shipping address & Customer snapshot
@@ -119,7 +119,7 @@ class OrderService {
     if (isTestPayment && pricing.total > 0) {
       pricing.discount = Math.max(0, pricing.subtotal + pricing.shipping + pricing.tax - 1);
       pricing.total = 1;
-      if (paymentMethod === 'cod' && pricing.codDueNow > 0) {
+      if (paymentMethod === 'cod' && (pricing.codDueNow > 0 || (codCheck && codCheck.calculatedCharge > 0))) {
         pricing.codDueNow = 1;
         pricing.codRemaining = 0;
       }

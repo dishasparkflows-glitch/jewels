@@ -15,6 +15,7 @@ router.get('/health', analyticsController.getAnalyticsHealth);
 router.get('/status', analyticsController.getStatus);
 router.get('/overview', analyticsController.getOverview);
 router.get('/dashboard', analyticsController.getDashboardAll);
+router.get('/dashboard-sales', analyticsController.getDashboardSalesMetrics);
 
 // GA4 Product Activity & Lead Reports
 router.get('/products/add-to-cart', analyticsController.getProductsAddToCartReport);

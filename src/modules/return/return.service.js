@@ -4,6 +4,7 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class ReturnService {
+  // ------------------------------- create return request ----------------------------
   async createReturn(data, user = null) {
     const orderId = data.orderId;
     if (!orderId) throw new ApiError(400, 'Order ID is required');
@@ -66,6 +67,7 @@ class ReturnService {
     return returnDoc;
   }
 
+  // ------------------------------- get all returns ----------------------------
   async getAllReturns(queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = {};
@@ -99,6 +101,7 @@ class ReturnService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
+  // ------------------------------- get my returns ----------------------------
   async getMyReturns(userId, queryParams = {}) {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { userId };
@@ -117,6 +120,7 @@ class ReturnService {
     return { items, pagination: getPaginationMeta(total, page, limit) };
   }
 
+  // ------------------------------- get return by id ----------------------------
   async getReturnById(returnId) {
     const returnDoc = await Return.findById(returnId)
       .populate('orderId')
@@ -126,6 +130,7 @@ class ReturnService {
     return returnDoc;
   }
 
+  // ------------------------------- update return status ----------------------------
   async updateReturnStatus(returnId, { status, adminNotes }) {
     const returnDoc = await Return.findById(returnId);
     if (!returnDoc) throw new ApiError(404, 'Return record not found');

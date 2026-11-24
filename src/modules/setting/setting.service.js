@@ -164,23 +164,6 @@ class SettingService {
     return item;
   }
 
-  // ------------------------------- get all settings ----------------------------
-  async getAll(queryParams = {}) {
-    const { page, limit, skip } = getPagination(queryParams);
-    const filter = { 'meta.deletedAt': null };
-
-    const [items, total] = await Promise.all([
-      Setting.find(filter)
-        .sort({ 'meta.createdAt': -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Setting.countDocuments(filter),
-    ]);
-
-    return { items, pagination: getPaginationMeta(total, page, limit) };
-  }
-
   // ------------------------------- get setting lookup ----------------------------
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null };

@@ -50,7 +50,7 @@ class GalleryService {
             if (!img?.url) return;
             galleryDocs.push({
               themeId: bThemeId,
-              placement: 'collectionbanner',
+              type: 'collectionbanner',
               platform: bPlatform,
               image: { url: img.url, key: img.key || '' },
               status: b.status || 'active',
@@ -60,7 +60,7 @@ class GalleryService {
           if (b.image?.url) {
             galleryDocs.push({
               themeId: bThemeId,
-              placement: bType,
+              type: bType,
               platform: bPlatform === 'mobile' ? 'app' : bPlatform,
               image: { url: b.image.url, key: b.image.key || '' },
               status: b.status || 'active',
@@ -69,7 +69,7 @@ class GalleryService {
           if (b.mobileImage?.url && b.mobileImage.url !== b.image?.url) {
             galleryDocs.push({
               themeId: bThemeId,
-              placement: bType,
+              type: bType,
               platform: 'app',
               image: { url: b.mobileImage.url, key: b.mobileImage.key || '' },
               status: b.status || 'active',
@@ -83,7 +83,7 @@ class GalleryService {
         if (feat.image?.url) {
           galleryDocs.push({
             themeId: activeThemeId,
-            placement: 'celebrate',
+            type: 'celebrate',
             platform: 'web',
             image: { url: feat.image.url, key: feat.image.key || '' },
             status: feat.status || 'active',
@@ -101,7 +101,7 @@ class GalleryService {
 
   // ------------------------------- get gallery lookup ----------------------------
   async getLookup(queryParams = {}) {
-    const { themeId, placement, type, platform, status, search } = queryParams;
+    const { themeId, type, platform, status, search } = queryParams;
     const filter = { 'meta.deletedAt': null };
 
     if (themeId && themeId !== 'all') {
@@ -112,23 +112,16 @@ class GalleryService {
       }
     }
 
-    const targetType = type || placement;
-    if (targetType && targetType !== 'all') {
-      if (targetType === 'category' || targetType === 'categorybanner') {
-        filter.placement = { $in: ['category', 'categorybanner'] };
+    if (type && type !== 'all') {
+      if (type === 'category' || type === 'categorybanner') {
+        filter.type = { $in: ['category', 'categorybanner'] };
       } else {
-        filter.placement = targetType;
+        filter.type = type;
       }
     }
 
     if (platform && platform !== 'all') {
-      if (platform === 'common') {
-        filter.platform = 'common';
-      } else if (platform === 'web' || platform === 'desktop') {
-        filter.platform = { $in: ['web', 'desktop', 'common'] };
-      } else if (platform === 'app' || platform === 'mobile') {
-        filter.platform = { $in: ['app', 'mobile', 'common'] };
-      }
+      filter.platform = platform;
     }
 
     if (status && status !== 'all') {
@@ -140,12 +133,52 @@ class GalleryService {
       filter.$or = [
         { 'image.url': searchRegex },
         { 'image.key': searchRegex },
-        { placement: searchRegex },
+        { type: searchRegex },
       ];
     }
 
+    const hasPagination = queryParams.page !== undefined || queryParams.limit !== undefined;
+
+    if (hasPagination) {
+      const pageNum = Math.max(1, parseInt(queryParams.page, 10) || 1);
+      const limitNum = Math.max(1, Math.min(200, parseInt(queryParams.limit, 10) || 20));
+      const skip = (pageNum - 1) * limitNum;
+
+      const [rawItems, total] = await Promise.all([
+        Gallery.find(filter)
+          .populate('themeId', 'name')
+          .sort({ 'meta.createdAt': -1 })
+          .skip(skip)
+          .limit(limitNum)
+          .lean(),
+        Gallery.countDocuments(filter),
+      ]);
+
+      const items = rawItems.map((doc) => ({
+        _id: doc._id,
+        id: doc._id,
+        themeId: doc.themeId,
+        type: doc.type,
+        platform: doc.platform,
+        image: doc.image,
+        status: doc.status,
+        linkedRecord: doc.linkedRecord,
+        meta: doc.meta,
+      }));
+
+      return {
+        items,
+        total,
+        pagination: {
+          ...getPaginationMeta(total, pageNum, limitNum),
+          page: pageNum,
+          totalItems: total,
+        },
+      };
+    }
+
     const items = await Gallery.find(filter)
-      .populate('themeId', 'name status code description')
+      .populate('themeId', 'name')
       .sort({ 'meta.createdAt': -1 })
       .lean();
 
@@ -153,12 +186,9 @@ class GalleryService {
       _id: doc._id,
       id: doc._id,
       themeId: doc.themeId,
-      themeName: doc.themeId?.name || null,
-      placement: doc.placement,
+      type: doc.type,
       platform: doc.platform,
       image: doc.image,
-      url: doc.image?.url || '',
-      key: doc.image?.key || '',
       status: doc.status,
       linkedRecord: doc.linkedRecord,
       meta: doc.meta,
@@ -300,7 +330,6 @@ class GalleryService {
       limit = 10,
       themeId,
       type = 'all',
-      placement,
       platform = 'all',
       status,
       sortBy = 'newest',
@@ -332,25 +361,18 @@ class GalleryService {
       }
     }
 
-    // Placement filter
-    const targetType = type !== 'all' ? type : (placement && placement !== 'all' ? placement : null);
-    if (targetType) {
-      if (targetType === 'category' || targetType === 'categorybanner') {
-        andConditions.push({ placement: { $in: ['category', 'categorybanner'] } });
+    // Type filter
+    if (type && type !== 'all') {
+      if (type === 'category' || type === 'categorybanner') {
+        andConditions.push({ type: { $in: ['category', 'categorybanner'] } });
       } else {
-        andConditions.push({ placement: targetType });
+        andConditions.push({ type });
       }
     }
 
     // Platform filter
     if (platform && platform !== 'all') {
-      if (platform === 'common') {
-        andConditions.push({ platform: 'common' });
-      } else if (platform === 'web' || platform === 'desktop') {
-        andConditions.push({ platform: { $in: ['web', 'desktop', 'common'] } });
-      } else if (platform === 'app' || platform === 'mobile') {
-        andConditions.push({ platform: { $in: ['app', 'mobile', 'common'] } });
-      }
+      andConditions.push({ platform });
     }
 
     // Status filter
@@ -366,14 +388,14 @@ class GalleryService {
       andConditions.push({ 'linkedRecord.recordId': new mongoose.Types.ObjectId(queryParams.recordId) });
     }
 
-    // Search filter (searches URL, key, placement)
+    // Search filter (searches URL, key, type)
     if (search && search.trim()) {
       const searchRegex = new RegExp(escapeRegex(search.trim()), 'i');
       andConditions.push({
         $or: [
           { 'image.url': searchRegex },
           { 'image.key': searchRegex },
-          { placement: searchRegex },
+          { type: searchRegex },
         ],
       });
     }
@@ -410,7 +432,7 @@ class GalleryService {
     }
     const countFilter = countConditions.length > 1 ? { $and: countConditions } : countConditions[0];
 
-    const allDocsForCounts = await Gallery.find(countFilter).select('placement').lean();
+    const allDocsForCounts = await Gallery.find(countFilter).select('type').lean();
     const counts = {
       total: allDocsForCounts.length,
       herobanner: 0,
@@ -425,7 +447,7 @@ class GalleryService {
     };
 
     allDocsForCounts.forEach((doc) => {
-      const p = doc.placement || 'asset';
+      const p = doc.type || 'asset';
       if (counts[p] !== undefined) {
         counts[p]++;
       }
@@ -488,7 +510,7 @@ class GalleryService {
       linkedRecord: doc.linkedRecord || null,
       linkedBanner: doc.linkedRecord?.recordId ? bannerLookup[String(doc.linkedRecord.recordId)] || null : null,
       linkedFeatured: doc.linkedRecord?.recordId ? featuredLookup[String(doc.linkedRecord.recordId)] || null : null,
-      placement: doc.placement,
+      type: doc.type,
       platform: doc.platform,
       image: {
         url: doc.image?.url || '',
@@ -569,7 +591,7 @@ class GalleryService {
       linkedRecord: item.linkedRecord || null,
       linkedBanner,
       linkedFeatured,
-      placement: item.placement,
+      type: item.type,
       platform: item.platform,
       image: {
         url: item.image?.url || '',
@@ -584,16 +606,13 @@ class GalleryService {
   async create(payload, actorId = null) {
     const {
       themeId,
-      placement,
-      type,
+      type = 'herobanner',
       platform = 'common',
       image,
       images,
       linkedRecord,
       status = 'active',
     } = payload;
-
-    const actualPlacement = placement || type || 'herobanner';
 
     let theme = null;
     if (themeId && mongoose.isValidObjectId(themeId)) {
@@ -603,7 +622,7 @@ class GalleryService {
       }
     }
 
-    const targetModule = actualPlacement === 'celebrate' ? 'featured' : 'banner';
+    const targetModule = type === 'celebrate' ? 'featured' : 'banner';
     const defaultLinkedRecord = this._normalizeLinkedRecord(linkedRecord, targetModule);
 
     // Support both single image and multiple images batch creation
@@ -642,7 +661,7 @@ class GalleryService {
       const galleryItem = await Gallery.create({
         themeId: theme?._id || null,
         linkedRecord: single.linkedRecord || null,
-        placement: actualPlacement,
+        type,
         platform,
         image: { url: single.url, key: single.key || '' },
         status: status || 'active',
@@ -666,7 +685,7 @@ class GalleryService {
     const docs = validImages.map((img) => ({
       themeId: theme?._id || null,
       linkedRecord: img.linkedRecord || null,
-      placement: actualPlacement,
+      type,
       platform,
       image: { url: img.url, key: img.key || '' },
       status: status || 'active',
@@ -742,7 +761,7 @@ class GalleryService {
     const oldThemeId = item.themeId;
     const oldRecordId = item.linkedRecord?.recordId;
 
-    if (data.placement !== undefined) item.placement = data.placement;
+    if (data.type !== undefined) item.type = data.type;
     if (data.platform !== undefined) item.platform = data.platform;
     if (data.themeId !== undefined) {
       item.themeId = data.themeId && mongoose.isValidObjectId(data.themeId) ? data.themeId : null;
@@ -752,7 +771,7 @@ class GalleryService {
       item.image = { url: data.image.url, key: data.image.key || '' };
     }
     if (data.linkedRecord !== undefined) {
-      const targetModule = (data.placement || item.placement) === 'celebrate' ? 'featured' : 'banner';
+      const targetModule = (data.type || item.type) === 'celebrate' ? 'featured' : 'banner';
       item.linkedRecord = this._normalizeLinkedRecord(data.linkedRecord, targetModule);
     }
 

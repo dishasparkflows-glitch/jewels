@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const ornateService = require('./ornate.service');
+const { ORNATE } = require('../../config/constants');
 
 let cronJob = null;
 let isSyncing = false;
@@ -42,8 +43,8 @@ async function triggerOrnateSync(source = 'cron', userId = null) {
 }
 
 function startOrnateCron() {
-  const isEnabled = process.env.ORNATE_SYNC_ENABLED !== 'false';
-  const cronSchedule = process.env.ORNATE_SYNC_CRON || '*/30 * * * *';
+  const isEnabled = ORNATE.SYNC_ENABLED;
+  const cronSchedule = ORNATE.SYNC_CRON || '*/30 * * * *';
 
   if (!isEnabled || cronJob) {
     return;
@@ -64,8 +65,8 @@ function stopOrnateCron() {
 function getOrnateSyncStatus() {
   return {
     isCronScheduled: Boolean(cronJob),
-    cronSchedule: process.env.ORNATE_SYNC_CRON || '*/30 * * * *',
-    isEnabled: process.env.ORNATE_SYNC_ENABLED !== 'false',
+    cronSchedule: ORNATE.SYNC_CRON || '*/30 * * * *',
+    isEnabled: ORNATE.SYNC_ENABLED,
     isSyncing,
     lastSyncStatus,
     lastSyncTime,

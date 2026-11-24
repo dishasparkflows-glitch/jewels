@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 require('./config/db');
+const { ADMIN_URL, FRONTEND_URL, NODE_ENV } = require('./config/constants');
 const routes = require('./routes');
 const { errorHandler } = require('./middleware/error.middleware');
 const { requestContextMiddleware } = require('./utils/context');
@@ -17,19 +18,16 @@ app.use(helmet({
 }));
 
 const allowedOrigins = [
-  process.env.ADMIN_URL,
-  process.env.FRONTEND_URL,
+  ADMIN_URL,
+  FRONTEND_URL,
   'http://localhost:5173',
   'http://localhost:5174',
-  'http://127.0.0.1:5173',
-  'http://localhost:5175',
-  'http://127.0.0.1:5174',
-  'http://127.0.0.1:5175',
+  'http://localhost:5175'
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+    if (!origin || allowedOrigins.includes(origin) || NODE_ENV === 'development') {
       return callback(null, true);
     }
     return callback(new Error(`CORS blocked: Origin ${origin} is not allowed`));
@@ -42,7 +40,7 @@ app.use(express.json({ limit: '10mb', verify: (req, res, buf) => { req.rawBody =
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ─── Logging ───────────────────────────────────────────────────
-if (process.env.NODE_ENV === 'development') {
+if (NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
@@ -55,7 +53,7 @@ app.get('/health', (req, res) => {
     success: true,
     message: 'Jewels API is running',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
+    environment: NODE_ENV,
   });
 });
 

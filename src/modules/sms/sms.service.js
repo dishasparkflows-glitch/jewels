@@ -1,4 +1,5 @@
 const NetSmsProvider = require('./providers/netsms.provider');
+const { SMS_PROVIDER, NETSMS } = require('../../config/constants');
 
 const providers = {
   netsms: NetSmsProvider,
@@ -13,7 +14,7 @@ const applyVariables = (template, variables) =>
 class SmsService {
   // ------------------------------- get sms provider ----------------------------
   getProvider() {
-    const providerName = (process.env.SMS_PROVIDER || 'netsms').trim().toLowerCase();
+    const providerName = (SMS_PROVIDER || 'netsms').trim().toLowerCase();
     const Provider = providers[providerName];
     if (!Provider) throw new Error('SMS provider "' + providerName + '" is not registered');
     return new Provider();
@@ -33,11 +34,11 @@ class SmsService {
       name: user.profile?.firstName || user.profile?.lastName || '',
       email: user.auth?.email || '',
     };
-    const message = applyVariables(process.env.SMS_SIGNUP_MESSAGE, variables);
+    const message = applyVariables(NETSMS.SIGNUP_MESSAGE, variables);
     return this.sendSms({
       to: user.profile?.phone,
       message,
-      templateId: process.env.NETSMS_OTP_TEMPLATE_ID,
+      templateId: NETSMS.OTP_TEMPLATE_ID,
       variables,
     });
   }
@@ -48,20 +49,20 @@ class SmsService {
       orderId: order.orderNumber || String(order._id || ''),
       amount: order.totalAmount ?? order.grandTotal ?? order.total ?? '',
     };
-    const message = applyVariables(process.env.SMS_ORDER_MESSAGE, variables);
+    const message = applyVariables(NETSMS.ORDER_MESSAGE, variables);
     return this.sendSms({
       to: order.customer?.phone || order.shippingAddress?.phone,
       message,
-      templateId: process.env.NETSMS_OTP_TEMPLATE_ID,
+      templateId: NETSMS.OTP_TEMPLATE_ID,
       variables,
     });
   }
 
   // ------------------------------- send OTP sms ----------------------------
   async sendOtp({ to, otp, countryCode }) {
-    const rawTemplate = process.env.NETSMS_OTP_TEMPLATE || 'Your OTP for verification is {#var#}. Valid for 5 minutes.';
+    const rawTemplate = NETSMS.OTP_TEMPLATE || 'Your OTP for verification is {#var#}. Valid for 5 minutes.';
     const message = rawTemplate.replace('{#var#}', String(otp));
-    const templateId = process.env.NETSMS_OTP_TEMPLATE_ID;
+    const templateId = NETSMS.OTP_TEMPLATE_ID;
     return this.sendSms({ to, message, templateId, countryCode });
   }
 }

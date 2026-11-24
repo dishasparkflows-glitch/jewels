@@ -273,7 +273,6 @@ orderSchema.pre('validate', async function (next) {
 
 orderSchema.index({ userId: 1, 'meta.createdAt': -1 });
 orderSchema.index({ orderStatus: 1, 'meta.createdAt': -1 });
-orderSchema.index({ 'payment.status': 1 });
 orderSchema.index({ 'customer.email': 1, 'meta.createdAt': -1 });
 orderSchema.index({ 'customer.phone': 1, 'meta.createdAt': -1 });
 

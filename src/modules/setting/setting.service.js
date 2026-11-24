@@ -1,7 +1,6 @@
 const Setting = require('./setting.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
-const footerSettingsService = require('../footerSettings/footerSettings.service');
 const topAnnouncementService = require('../topAnnouncement/topAnnouncement.service');
 
 class SettingService {
@@ -30,9 +29,8 @@ class SettingService {
 
   // ------------------------------- get common layout settings ----------------------------
   async getCommonSettings() {
-    const [settingsRes, footerRes, announcementRes] = await Promise.allSettled([
+    const [settingsRes, announcementRes] = await Promise.allSettled([
       this.getSettings(),
-      footerSettingsService.getSettings(),
       topAnnouncementService.getPublic(),
     ]);
 
@@ -40,10 +38,10 @@ class SettingService {
 
     return {
       settings,
-      footerSettings: footerRes.status === 'fulfilled' ? footerRes.value : {},
+      footerSettings: {},
       topAnnouncement: announcementRes.status === 'fulfilled' ? announcementRes.value : { isEnabled: false, items: [] },
       birthstones: {
-        showOnStorefront: settings?.birthstones?.showOnStorefront !== false,
+        showOnStorefront: settings?.birthstones?.showOnStorefront === true,
       },
     };
   }
@@ -126,6 +124,7 @@ class SettingService {
 
       // Top-level fields (logoImage, mobileLogoImage, certificateImage, loginModalImage, trustBadges, paymentProvider, currentThemeId)
       Object.assign(settings, data);
+      settings.revision = (settings.revision || 0) + 1;
       await settings.save();
     }
 

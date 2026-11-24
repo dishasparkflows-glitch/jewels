@@ -1,9 +1,12 @@
 const BaseLogisticsProvider = require('./base.logistics.provider');
 const ApiError = require('../../../utils/ApiError');
 const { shiprocketRequest } = require('../../shiprocket/integrationToken.service');
+const {
+  SHIPROCKET,
+} = require('../../../config/constants');
 
-const WAREHOUSE_PINCODE = process.env.SHIPROCKET_PICKUP_PINCODE || '382006'; // Gandhinagar
-const PICKUP_LOCATION = process.env.SHIPROCKET_PICKUP_LOCATION || 'work';
+const WAREHOUSE_PINCODE = SHIPROCKET?.PICKUP_PINCODE;
+const PICKUP_LOCATION = SHIPROCKET?.PICKUP_LOCATION;
 
 class ShiprocketLogisticsProvider extends BaseLogisticsProvider {
   constructor() {
@@ -12,8 +15,8 @@ class ShiprocketLogisticsProvider extends BaseLogisticsProvider {
 
   isConfigured() {
     return Boolean(
-      (process.env.SHIPROCKET_EMAIL && process.env.SHIPROCKET_PASSWORD) ||
-      String(process.env.SHIPROCKET_MOCK_MODE).toLowerCase() === 'true'
+      (SHIPROCKET?.EMAIL && SHIPROCKET?.PASSWORD) ||
+      String(SHIPROCKET?.MOCK_MODE).toLowerCase() === 'true'
     );
   }
 

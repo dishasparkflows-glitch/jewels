@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const axios = require('axios');
 const ftp = require('basic-ftp');
+const { ORNATE } = require('../../config/constants');
 const { Writable } = require('stream');
 const path = require('path');
 const Product = require('../product/product.model');
@@ -149,10 +150,10 @@ async function processImageSyncQueue() {
   });
 
   const ftpConfig = {
-    host: process.env.ORNATE_FTP_HOST || '142.79.228.244',
-    user: process.env.ORNATE_FTP_USER || 'ecomm',
-    password: process.env.ORNATE_FTP_PASSWORD || 'nx@123',
-    port: Number(process.env.ORNATE_FTP_PORT) || 2166,
+    host: ORNATE.FTP_HOST || '142.79.228.244',
+    user: ORNATE.FTP_USER || 'ecomm',
+    password: ORNATE.FTP_PASSWORD || 'nx@123',
+    port: Number(ORNATE.FTP_PORT) || 2166,
     secure: false,
   };
 

@@ -22,13 +22,10 @@ class ThemeController {
 
   // ------------------------------- get theme lookup ----------------------------
   getLookup = catchAsync(async (_req, res) => {
-    const cacheKey = 'themes:lookup:all';
-    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, async () => {
-      return await Theme.find({ 'meta.deletedAt': null })
-        .select('_id name code status description publishedAt schedule')
-        .sort({ status: 1, name: 1 })
-        .lean();
-    });
+    const items = await Theme.find({ 'meta.deletedAt': null })
+      .select('_id name code')
+      .sort({ name: 1 })
+      .lean();
     ApiResponse.success(res, items, 'Theme lookup list retrieved successfully');
   });
 

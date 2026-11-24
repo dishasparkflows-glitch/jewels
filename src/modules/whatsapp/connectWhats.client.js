@@ -2,6 +2,7 @@ const axios = require('axios');
 const IntegrationToken = require('./integrationToken.model');
 const { decryptToken } = require('../../utils/encryption');
 const { normalizeUrl } = require('./whatsapp.utils');
+const { CONNECTWHATS } = require('../../config/constants');
 const ApiError = require('../../utils/ApiError');
 
 const PROVIDER = 'connectwhats';
@@ -11,12 +12,12 @@ const RETRY_DELAY_MS = 1000;
 
 class ConnectWhatsClient {
   getEnvConfig() {
-    const apiKey = (process.env.CONNECTWHATS_API_KEY || process.env.CONNECTWHATS_TOKEN || '').trim();
-    const apiUrl = normalizeUrl(process.env.CONNECTWHATS_API_URL);
-    const instanceId = (process.env.CONNECTWHATS_INSTANCE_ID || '').trim();
-    const phoneNumber = (process.env.CONNECTWHATS_PHONE_NUMBER || '').trim();
-    const phoneNumberId = (process.env.CONNECTWHATS_PHONE_NUMBER_ID || '').trim();
-    const wabaId = (process.env.CONNECTWHATS_WABA_ID || '').trim();
+    const apiKey = (CONNECTWHATS.API_KEY || CONNECTWHATS.TOKEN || '').trim();
+    const apiUrl = normalizeUrl(CONNECTWHATS.API_URL);
+    const instanceId = (CONNECTWHATS.INSTANCE_ID || '').trim();
+    const phoneNumber = (CONNECTWHATS.PHONE_NUMBER || '').trim();
+    const phoneNumberId = (CONNECTWHATS.PHONE_NUMBER_ID || '').trim();
+    const wabaId = (CONNECTWHATS.WABA_ID || '').trim();
 
     return {
       apiKey,

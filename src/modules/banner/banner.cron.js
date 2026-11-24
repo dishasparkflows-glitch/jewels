@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const bannerService = require('./banner.service');
 const redisClient = require('../../utils/redisClient');
+const { CRON_TIME } = require('../../config/constants');
 
 let cronJob = null;
 let isCleaning = false;
@@ -45,18 +46,7 @@ async function triggerOfferCleanup(source = 'cron') {
 }
 
 function startBannerCron() {
-  const isEnabled = process.env.OFFER_EXPIRATION_CRON_ENABLED !== 'false';
-  const cronSchedule = process.env.OFFER_EXPIRATION_CRON || '*/5 * * * *';
-
-  if (!isEnabled) {
-    console.log('[Banner Cron] ⚠️ Offer expiration cron is disabled via OFFER_EXPIRATION_CRON_ENABLED=false');
-    return null;
-  }
-
-  if (!cron.validate(cronSchedule)) {
-    console.error(`[Banner Cron] ❌ Invalid cron expression: "${cronSchedule}". Cron will not start.`);
-    return null;
-  }
+  const cronSchedule = CRON_TIME.OFFER_EXPIRATION_CRON || '0 * * * *';
 
   // Run cleanup once immediately on startup to prune any offers that expired while server was offline
   setTimeout(() => {
@@ -68,7 +58,6 @@ function startBannerCron() {
     triggerOfferCleanup('scheduled_cron');
   });
 
-  console.log(`[Banner Cron] 🕒 Expired offer auto-deletion cron scheduled: "${cronSchedule}"`);
   return cronJob;
 }
 

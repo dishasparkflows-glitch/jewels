@@ -3,6 +3,7 @@ const fs = require('fs');
 const mongoose = require('mongoose');
 const { BetaAnalyticsDataClient } = require('@google-analytics/data');
 const { GoogleAuth } = require('google-auth-library');
+const { GOOGLE } = require('../../config/constants');
 
 const Product = require('../product/product.model');
 const Diamond = require('../diamond/diamond.model');
@@ -149,7 +150,7 @@ class AnalyticsService {
 
   // ------------------------------- Resolve GA4 Configuration ----------------------------
   getAnalyticsConfig() {
-    const propertyId = (process.env.GA4_PROPERTY_ID).trim();
+    const propertyId = (GOOGLE.GA4_PROPERTY_ID || '').trim();
 
     const candidateFiles = [
       path.join(__dirname, '../../config/firebase-service-account.json'),
@@ -173,9 +174,9 @@ class AnalyticsService {
       }
     }
 
-    if (process.env.GA_SERVICE_ACCOUNT_KEY) {
+    if (GOOGLE.GA_SERVICE_ACCOUNT_KEY) {
       try {
-        const credentials = JSON.parse(process.env.GA_SERVICE_ACCOUNT_KEY);
+        const credentials = JSON.parse(GOOGLE.GA_SERVICE_ACCOUNT_KEY);
         return {
           propertyId,
           clientOptions: { credentials },

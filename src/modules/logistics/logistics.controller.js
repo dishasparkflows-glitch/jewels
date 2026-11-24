@@ -47,7 +47,8 @@ class LogisticsController {
 
   // ------------------------------- handle carrier webhook ----------------------------
   handleWebhook = catchAsync(async (req, res) => {
-    const webhookToken = process.env.SHIPROCKET_WEBHOOK_TOKEN || process.env.LOGISTICS_WEBHOOK_TOKEN;
+    const { SHIPROCKET } = require('../../config/constants');
+    const webhookToken = SHIPROCKET?.WEBHOOK_TOKEN;
     const incomingToken =
       req.headers['x-api-key'] ||
       req.headers['authorization']?.replace(/^Bearer\s+/i, '');

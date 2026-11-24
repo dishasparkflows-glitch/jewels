@@ -1,20 +1,24 @@
 const crypto = require('crypto');
+const {
+  INTEGRATION_TOKEN_ENCRYPTION_KEY,
+  PAYLOAD_ENCRYPTION_KEY,
+  JWT,
+} = require('../config/constants');
 
 const ALGORITHM = 'aes-256-gcm';
 
 // ------------------------------- get encryption key ----------------------------
 const getEncryptionKey = () => {
   const keyHex =
-    process.env.INTEGRATION_TOKEN_ENCRYPTION_KEY ||
-    process.env.SHIPROCKET_TOKEN_ENCRYPTION_KEY ||
-    process.env.PAYLOAD_ENCRYPTION_KEY;
+    INTEGRATION_TOKEN_ENCRYPTION_KEY ||
+    PAYLOAD_ENCRYPTION_KEY;
 
   if (keyHex && keyHex.length === 64) {
     return Buffer.from(keyHex, 'hex');
   }
 
-  // Fallback: derive 32-byte key from JWT_SECRET or default secret
-  const secret = process.env.JWT_SECRET || 'jewels_default_encryption_secret_key';
+  // Fallback: derive 32-byte key from JWT.SECRET or default secret
+  const secret = JWT?.SECRET || 'jewels_default_encryption_secret_key';
   return crypto.createHash('sha256').update(secret).digest();
 };
 

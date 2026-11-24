@@ -3,6 +3,10 @@ const crypto = require('crypto');
 const IntegrationToken = require('../whatsapp/integrationToken.model');
 const { encryptToken, decryptToken } = require('../../utils/encryption');
 
+const {
+  SHIPROCKET,
+} = require('../../config/constants');
+
 const PROVIDER = 'shiprocket';
 const ACCOUNT_KEY = 'default';
 const LOCK_DURATION_MS = 30000; // 30s lock duration
@@ -14,7 +18,7 @@ let inProcessRefreshPromise = null;
  * Checks if mock mode should be used
  */
 const isMockMode = () => {
-  return String(process.env.SHIPROCKET_MOCK_MODE).toLowerCase() === 'true';
+  return String(SHIPROCKET?.MOCK_MODE).toLowerCase() === 'true';
 };
 
 /**
@@ -28,8 +32,8 @@ const generateMockToken = () => {
  * Authenticates with Shiprocket API v2 to acquire a new JWT token
  */
 const fetchNewTokenFromShiprocket = async () => {
-  const email = process.env.SHIPROCKET_EMAIL;
-  const password = process.env.SHIPROCKET_PASSWORD;
+  const email = SHIPROCKET?.EMAIL;
+  const password = SHIPROCKET?.PASSWORD;
 
   if (isMockMode() || !email || !password) {
     if (!isMockMode()) {

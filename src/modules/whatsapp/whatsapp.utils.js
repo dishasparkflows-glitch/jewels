@@ -1,6 +1,8 @@
 
+const { CONNECTWHATS } = require('../../config/constants');
+
 const normalizeUrl = (url) => {
-  let clean = (url || process.env.CONNECTWHATS_API_URL || 'https://app.connectwhats.com')
+  let clean = (url || CONNECTWHATS?.API_URL || 'https://app.connectwhats.com')
     .trim()
     .replace(/\/+$/, '');
 

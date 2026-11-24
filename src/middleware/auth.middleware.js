@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../config/constants');
+const { JWT } = require('../config/constants');
 const User = require('../modules/user/user.model');
 const { setRequestContext, getRequestContext, asyncLocalStorage } = require('../utils/context');
 
@@ -16,7 +16,7 @@ const authenticate = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT.SECRET);
 
     const user = await User.findById(decoded.id).select('-auth.password -password');
     if (!user) {
@@ -81,7 +81,7 @@ const optionalAuth = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, JWT.SECRET);
       const user = await User.findById(decoded.id).select('-auth.password -password');
       if (user && user.isActive) {
         req.user = user;

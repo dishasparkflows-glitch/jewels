@@ -118,20 +118,10 @@ class BannerService {
       andConditions.push({ 'display.categoryId': queryParams.category });
     }
 
-    // 4. Filter by bannerKey
-    if (queryParams.bannerKey) {
-      andConditions.push({ 'display.bannerKey': queryParams.bannerKey });
-    }
-
-    // 5. Search query
+    // 4. Search query
     if (queryParams.search) {
       const searchRegex = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
-      andConditions.push({
-        $or: [
-          { 'content.title': searchRegex },
-          { 'content.subtitle': searchRegex },
-        ],
-      });
+      andConditions.push({ 'content.title': searchRegex });
     }
 
     const filter = andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
@@ -201,7 +191,7 @@ class BannerService {
 
     const items = await Banner.find(filter)
       .select(
-        '_id content.title content.subtitle display.type display.platform display.order display.collectionGroup display.categoryId image mobileImage collectionImages status'
+        '_id content.title display.type display.platform display.order display.collectionGroup display.categoryId image mobileImage collectionImages status'
       )
       .populate('display.categoryId', 'name slug')
       .populate('collectionImages.categoryId', 'name slug')
@@ -316,7 +306,6 @@ class BannerService {
               _id: `category-banner-${categoryDoc._id}`,
               content: {
                 title: categoryDoc.name || 'Category Banner',
-                subtitle: '',
                 description: '',
               },
               image: {
@@ -454,11 +443,6 @@ class BannerService {
     const result = await Banner.updateMany(
       { _id: { $in: expiredIds } },
       { $set: { status: 'inactive', 'meta.deletedAt': now } }
-    );
-
-    console.log(
-      `[Banner Cron] 🕒 Auto-deleted ${result.modifiedCount} expired offer banner(s):`,
-      expiredOffers.map((o) => `[ID: ${o._id}, Title: "${o.content?.title || 'Offer'}", EndDate: ${o.endDate}]`).join(', ')
     );
 
     return {

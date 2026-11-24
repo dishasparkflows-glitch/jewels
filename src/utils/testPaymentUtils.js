@@ -1,14 +1,12 @@
+const { TEST_PAYMENT_PHONE_NUMBERS } = require('../config/constants');
+
 /**
  * Utility to check if a user/order qualifies for the ₹1 test payment override.
  * Controlled by TEST_PAYMENT_PHONE_NUMBERS in .env (JSON array or comma-separated numbers).
  */
 
 function getTestPaymentPhoneNumbers() {
-  const raw =
-    process.env.TEST_PAYMENT_PHONE_NUMBERS ||
-    process.env.TEST_MOBILE_NUMBERS ||
-    process.env.TEST_PHONE_NUMBERS ||
-    '';
+  const raw = TEST_PAYMENT_PHONE_NUMBERS || '';
 
   if (!raw) return [];
 

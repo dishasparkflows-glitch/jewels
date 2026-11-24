@@ -4,13 +4,14 @@ const Razorpay = require('razorpay');
 const BasePaymentProvider = require('./base.provider');
 const Order = require('../../order/order.model');
 const ApiError = require('../../../utils/ApiError');
+const { RAZORPAY } = require('../../../config/constants');
 
 class RazorpayService extends BasePaymentProvider {
   constructor() {
     super('razorpay', 'Razorpay');
-    this.keyId = process.env.RAZORPAY_KEY_ID || '';
-    this.keySecret = process.env.RAZORPAY_KEY_SECRET || '';
-    this.webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || '';
+    this.keyId = RAZORPAY.KEY_ID || '';
+    this.keySecret = RAZORPAY.KEY_SECRET || '';
+    this.webhookSecret = RAZORPAY.WEBHOOK_SECRET || '';
     this.client = null;
 
     if (this.keyId && this.keySecret) {
@@ -29,9 +30,9 @@ class RazorpayService extends BasePaymentProvider {
   // ------------------------------- get razorpay client ----------------------------
   getClient() {
     if (!this.client) {
-      this.keyId = process.env.RAZORPAY_KEY_ID || '';
-      this.keySecret = process.env.RAZORPAY_KEY_SECRET || '';
-      this.webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || '';
+      this.keyId = RAZORPAY.KEY_ID || '';
+      this.keySecret = RAZORPAY.KEY_SECRET || '';
+      this.webhookSecret = RAZORPAY.WEBHOOK_SECRET || '';
 
       if (this.keyId && this.keySecret) {
         this.client = new Razorpay({
@@ -94,7 +95,7 @@ class RazorpayService extends BasePaymentProvider {
       throw new ApiError(400, 'Missing required Razorpay signature parameters');
     }
 
-    const secret = this.keySecret || process.env.RAZORPAY_KEY_SECRET;
+    const secret = this.keySecret || RAZORPAY.KEY_SECRET;
     if (!secret) {
       throw new ApiError(500, 'Razorpay secret key is not configured');
     }
@@ -118,7 +119,7 @@ class RazorpayService extends BasePaymentProvider {
 
   // ------------------------------- get webhook secret ----------------------------
   getWebhookSecret() {
-    return process.env.RAZORPAY_WEBHOOK_SECRET || this.webhookSecret || '';
+    return RAZORPAY.WEBHOOK_SECRET || this.webhookSecret || '';
   }
 
   // ------------------------------- verify webhook signature ----------------------------

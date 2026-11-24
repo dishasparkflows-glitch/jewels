@@ -1,5 +1,6 @@
 const path = require('path');
 require('dotenv').config();
+const { PORT, NODE_ENV } = require('./config/constants');
 const connectDB = require('./config/db');
 const { connectRedis } = require('./config/redis');
 const app = require('./app');
@@ -9,8 +10,6 @@ const { startThemeCron } = require('./modules/theme/theme.cron');
 
 const http = require('http');
 const { initViewerSocket } = require('./socket/viewers.socket');
-
-const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB and start server
 connectDB().then(async () => {
@@ -31,7 +30,7 @@ connectDB().then(async () => {
 
   server.listen(PORT, () => {
     console.log(`\n🚀 Jewels API Server running on port ${PORT}`);
-    console.log(`📋 Environment: ${process.env.NODE_ENV}`);
+    console.log(`📋 Environment: ${NODE_ENV}`);
   });
 });
 

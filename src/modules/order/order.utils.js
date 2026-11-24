@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Setting = require('../setting/setting.model');
 const ApiError = require('../../utils/ApiError');
+const { PAYMENT_PROVIDER } = require('../../config/constants');
 
 // ------------------------------- generate order number ----------------------------
 async function generateOrderNumber() {
@@ -16,11 +17,11 @@ async function resolvePaymentProvider(requestedProvider) {
       .lean();
     if (setting?.paymentProvider) {
       configured = setting.paymentProvider.toLowerCase();
-    } else if (process.env.PAYMENT_PROVIDER) {
-      configured = process.env.PAYMENT_PROVIDER.toLowerCase();
+    } else if (PAYMENT_PROVIDER) {
+      configured = PAYMENT_PROVIDER.toLowerCase();
     }
   } catch {
-    configured = (process.env.PAYMENT_PROVIDER || 'razorpay').toLowerCase();
+    configured = (PAYMENT_PROVIDER || 'razorpay').toLowerCase();
   }
   return (requestedProvider || configured).toLowerCase();
 }

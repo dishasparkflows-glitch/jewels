@@ -36,14 +36,6 @@ class BannerController {
     ApiResponse.success(res, items, 'Banner lookup list retrieved');
   });
 
-  // ------------------------------- get banner theme lookup ----------------------------
-  getThemeLookup = catchAsync(async (req, res) => {
-    req.query.theme = 'true';
-    const cacheKey = `banners:theme-lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
-    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => bannerService.getLookup(req.query));
-    ApiResponse.success(res, items, 'Banner theme lookup list retrieved');
-  });
-
   // ----------------------- get category display banner ----------------------
   getCategoryDisplayBanner = catchAsync(async (req, res) => {
     const categoryId = req.query.categoryId || req.query.category;
@@ -77,29 +69,6 @@ class BannerController {
     const result = await bannerService.bulkDelete(ids);
     await redisClient.deleteByPattern('banners:*');
     ApiResponse.success(res, result, result.message);
-  });
-
-  // ------------------------------- get themes lookup for banners ----------------------------
-  getThemesLookup = catchAsync(async (_req, res) => {
-    const { Theme } = require('../theme/theme.model');
-    const items = await Theme.find({ 'meta.deletedAt': null })
-      .select('_id name code status description publishedAt schedule')
-      .sort({ status: 1, name: 1 })
-      .lean();
-    ApiResponse.success(res, items, 'Theme lookup list retrieved successfully');
-  });
-
-  // ------------------------------- get theme placement wise images ----------------------------
-  getThemeImages = catchAsync(async (req, res) => {
-    const galleryService = require('../gallery/gallery.service');
-    const { themeId, placement, type, platform, limit } = req.query;
-    const data = await galleryService.listImages({
-      themeId,
-      placement: placement || type,
-      platform,
-      limit: limit ? parseInt(limit, 10) : 100,
-    });
-    ApiResponse.success(res, data.items || [], 'Theme images retrieved successfully');
   });
 
   // ----------------------- manual trigger offer cleanup ---------------------

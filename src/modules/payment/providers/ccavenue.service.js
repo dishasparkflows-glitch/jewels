@@ -2,19 +2,16 @@ const crypto = require('crypto');
 const BasePaymentProvider = require('./base.provider');
 const Order = require('../../order/order.model');
 const ApiError = require('../../../utils/ApiError');
+const { CCAVENUE, BACKEND_URL, FRONTEND_URL } = require('../../../config/constants');
 
 class CCAvenueService extends BasePaymentProvider {
   constructor() {
     super('ccavenue', 'CCAvenue');
-    this.merchantId = process.env.CCAVENUE_MERCHANT_ID || '';
-    this.accessCode = process.env.CCAVENUE_ACCESS_CODE || '';
-    this.workingKey = process.env.CCAVENUE_WORKING_KEY || '';
-    this.environment = (process.env.CCAVENUE_ENVIRONMENT || 'uat').toLowerCase();
-    this.gatewayUrl =
-      process.env.CCAVENUE_URL ||
-      (this.environment === 'production'
-        ? 'https://secure.ccavenue.com/transaction/transaction.do?command=initiateTransaction'
-        : 'https://test.ccavenue.com/transaction/transaction.do?command=initiateTransaction');
+    this.merchantId = CCAVENUE.MERCHANT_ID || '';
+    this.accessCode = CCAVENUE.ACCESS_CODE || '';
+    this.workingKey = CCAVENUE.WORKING_KEY || '';
+    this.environment = (CCAVENUE.ENVIRONMENT || 'uat').toLowerCase();
+    this.gatewayUrl = CCAVENUE.URL;
 
     this.iv = Buffer.from([
       0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
@@ -41,7 +38,7 @@ class CCAvenueService extends BasePaymentProvider {
   }
 
   getKey() {
-    const workingKey = this.workingKey || process.env.CCAVENUE_WORKING_KEY;
+    const workingKey = this.workingKey || CCAVENUE.WORKING_KEY;
     if (!workingKey) {
       throw new ApiError(500, 'CCAVENUE_WORKING_KEY is not configured');
     }
@@ -106,15 +103,15 @@ class CCAvenueService extends BasePaymentProvider {
     delivery = {},
     customParams = {},
   }) {
-    const merchantId = this.merchantId || process.env.CCAVENUE_MERCHANT_ID;
-    const accessCode = this.accessCode || process.env.CCAVENUE_ACCESS_CODE;
+    const merchantId = this.merchantId || CCAVENUE.MERCHANT_ID;
+    const accessCode = this.accessCode || CCAVENUE.ACCESS_CODE;
 
     if (!merchantId || !accessCode) {
       throw new ApiError(500, 'CCAvenue merchant ID or access code is missing');
     }
 
     const formattedAmount = Number(amount).toFixed(2);
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+    const backendUrl = BACKEND_URL || 'http://localhost:5000';
 
     const defaultRedirectUrl = `${backendUrl}/api/payments/ccavenue/response`;
     const defaultCancelUrl = `${backendUrl}/api/payments/ccavenue/response`;
@@ -221,11 +218,9 @@ class CCAvenueService extends BasePaymentProvider {
   }
 
   async handleResponse(encResp) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
-
     if (!encResp) {
       return {
-        redirectUrl: `${frontendUrl}/order-failed?error=Missing+CCAvenue+response`,
+        redirectUrl: `${FRONTEND_URL}/order-failed?error=Missing+CCAvenue+response`,
       };
     }
 
@@ -244,7 +239,7 @@ class CCAvenueService extends BasePaymentProvider {
 
     if (!order) {
       return {
-        redirectUrl: `${frontendUrl}/order-failed?error=Order+not+found&trackingId=${encodeURIComponent(trackingId || '')}`,
+        redirectUrl: `${FRONTEND_URL}/order-failed?error=Order+not+found&trackingId=${encodeURIComponent(trackingId || '')}`,
         response,
       };
     }
@@ -261,7 +256,7 @@ class CCAvenueService extends BasePaymentProvider {
         status: 'Success',
         order,
         response,
-        redirectUrl: `${frontendUrl}/order-success?orderId=${order._id}&orderNumber=${order.orderNumber}&trackingId=${encodeURIComponent(trackingId || '')}`,
+        redirectUrl: `${FRONTEND_URL}/order-success?orderId=${order._id}&orderNumber=${order.orderNumber}&trackingId=${encodeURIComponent(trackingId || '')}`,
       };
     } else {
       await this.markOrderAsFailed(order, {
@@ -274,7 +269,7 @@ class CCAvenueService extends BasePaymentProvider {
         status: orderStatus || 'Failure',
         order,
         response,
-        redirectUrl: `${frontendUrl}/order-failed?orderId=${order._id}&orderNumber=${order.orderNumber}&error=${encodeURIComponent(failureMessage)}`,
+        redirectUrl: `${FRONTEND_URL}/order-failed?orderId=${order._id}&orderNumber=${order.orderNumber}&error=${encodeURIComponent(failureMessage)}`,
       };
     }
   }

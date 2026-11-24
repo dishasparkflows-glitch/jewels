@@ -1,4 +1,5 @@
 const redisClient = require('../utils/redisClient');
+const { REDIS_URL } = require('./constants');
 
 /**
  * Initializes and verifies Redis connection at server starting time.
@@ -6,7 +7,7 @@ const redisClient = require('../utils/redisClient');
  */
 const connectRedis = async () => {
   try {
-    const redisUrl = process.env.REDIS_URL;
+    const redisUrl = REDIS_URL;
     if (!redisUrl) {
       console.warn(`\x1b[33m%s\x1b[0m`, `⚠ REDIS_URL is not defined in .env`);
       return null;

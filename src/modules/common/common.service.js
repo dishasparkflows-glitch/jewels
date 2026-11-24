@@ -9,17 +9,34 @@ class CommonService {
    * settings, navigation, categories, banners, or themes change.
    */
   async bumpRevision() {
-    return 1;
+    try {
+      const setting = await Setting.findOneAndUpdate(
+        { 'meta.deletedAt': null },
+        { $inc: { revision: 1 } },
+        { new: true }
+      );
+      return setting?.revision || 1;
+    } catch (_) {
+      return 1;
+    }
   }
 
   /**
    * Returns current master revision number for lightweight freshness checks.
    */
   async getRevision() {
-    return {
-      revision: 0,
-      updatedAt: new Date().toISOString(),
-    };
+    try {
+      const setting = await Setting.findOne({ 'meta.deletedAt': null }).select('revision updatedAt').lean();
+      return {
+        revision: setting?.revision || 0,
+        updatedAt: setting?.updatedAt || new Date().toISOString(),
+      };
+    } catch (_) {
+      return {
+        revision: 0,
+        updatedAt: new Date().toISOString(),
+      };
+    }
   }
 
   /**
@@ -40,9 +57,17 @@ class CommonService {
     const revisionDoc = await this.getRevision();
     const masterRevision = Math.max(revisionDoc.revision || 0, websiteConfig?.revision || 0);
 
+    const mergedSettings = {
+      ...(common.settings || {}),
+      birthstones: {
+        showOnStorefront: Boolean(common.settings?.birthstones?.showOnStorefront ?? common.birthstones?.showOnStorefront),
+      },
+    };
+
     return {
       revision: masterRevision,
-      settings: common.settings || {},
+      settings: mergedSettings,
+      birthstones: mergedSettings.birthstones,
       footerSettings: common.footerSettings || {},
       topAnnouncement: common.topAnnouncement || { isEnabled: false, items: [] },
       navigation,

@@ -7,7 +7,6 @@ const { ROLES } = require('../../config/constants');
 
 // Public or storefront lookup
 router.get('/lookup', featuredController.getLookup);
-router.get('/theme-lookup', featuredController.getThemeLookup);
 router.get('/', featuredController.getAll);
 router.get('/:id', featuredController.getOne);
 

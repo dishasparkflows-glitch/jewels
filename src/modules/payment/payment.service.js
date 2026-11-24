@@ -2,6 +2,7 @@ const Order = require('../order/order.model');
 const providersRegistry = require('./providers');
 const ApiError = require('../../utils/ApiError');
 const { getTestPaymentPhoneNumbers, isTestPaymentUser } = require('../../utils/testPaymentUtils');
+const { PAYMENT_PROVIDER } = require('../../config/constants');
 
 class PaymentService {
   // ------------------------------- get payment config ----------------------------
@@ -14,12 +15,12 @@ class PaymentService {
         .lean();
       if (setting?.paymentProvider) {
         defaultGateway = setting.paymentProvider.toLowerCase();
-      } else if (process.env.PAYMENT_PROVIDER) {
-        defaultGateway = process.env.PAYMENT_PROVIDER.toLowerCase();
+      } else if (PAYMENT_PROVIDER) {
+        defaultGateway = PAYMENT_PROVIDER.toLowerCase();
       }
     } catch {
       defaultGateway = (
-        process.env.PAYMENT_PROVIDER || 'razorpay'
+        PAYMENT_PROVIDER || 'razorpay'
       ).toLowerCase();
     }
 
@@ -80,7 +81,7 @@ class PaymentService {
     const chosenProviderName =
       provider ||
       orderDoc.payment?.provider ||
-      process.env.PAYMENT_PROVIDER ||
+      PAYMENT_PROVIDER ||
       'razorpay';
     const providerInstance = providersRegistry.getProvider(chosenProviderName);
 

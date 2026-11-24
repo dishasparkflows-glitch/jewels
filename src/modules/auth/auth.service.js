@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../user/user.model');
 const ApiError = require('../../utils/ApiError');
-const { JWT_SECRET, JWT_EXPIRES_IN } = require('../../config/constants');
+const { JWT, FRONTEND_URL, STORE_NAME } = require('../../config/constants');
 const smsService = require('../sms/sms.service');
 const otpService = require('../otp/otp.service');
 const { sendEmail } = require('../../utils/emailService');
@@ -15,8 +15,8 @@ class AuthService {
     const userEmail = user.auth?.email || '';
     return jwt.sign(
       { id: user._id, email: userEmail, role: user.role },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      JWT.SECRET,
+      { expiresIn: JWT.EXPIRES_IN }
     );
   }
 
@@ -255,7 +255,7 @@ class AuthService {
     user.auth.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save();
 
-    const clientUrl = (process.env.FRONTEND_URL).replace(/\/+$/, '');
+    const clientUrl = (FRONTEND_URL).replace(/\/+$/, '');
     const resetUrl = new URL(`${clientUrl}/reset-password`);
     resetUrl.searchParams.set('token', token);
 
@@ -266,7 +266,7 @@ class AuthService {
         (await Setting.findOne({ 'meta.deletedAt': null }).lean()) ||
         (await Setting.findOne().lean()) ||
         {};
-      const storeName = setting?.businessDetails?.companyName || process.env.STORE_NAME || 'Neirah';
+      const storeName = setting?.businessDetails?.companyName || STORE_NAME;
 
       await sendEmail({
         to: normalizedEmail,

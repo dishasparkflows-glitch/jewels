@@ -41,14 +41,12 @@ class GalleryController {
 
   // ------------------------------- gallery lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {
-    const items = await galleryService.getLookup(req.query);
-    ApiResponse.success(res, items, 'Gallery lookup retrieved successfully');
-  });
-
-  // ------------------------------- themes lookup ----------------------------
-  getThemesLookup = catchAsync(async (req, res) => {
-    const themes = await galleryService.getThemesLookup();
-    ApiResponse.success(res, themes, 'Themes lookup retrieved successfully');
+    const result = await galleryService.getLookup(req.query);
+    if (result && result.pagination) {
+      ApiResponse.paginated(res, result.items, result.pagination, 'Gallery lookup retrieved successfully');
+    } else {
+      ApiResponse.success(res, result, 'Gallery lookup retrieved successfully');
+    }
   });
 
   // ------------------------------- banners lookup ----------------------------

@@ -1,4 +1,5 @@
 const { Server } = require('socket.io');
+const { ADMIN_URL, FRONTEND_URL, NODE_ENV } = require('../config/constants');
 
 // In-memory state of live viewer counts per product
 // Map<string, { count: number, sockets: Set<string>, timer: NodeJS.Timeout | null, cleanupTimer: NodeJS.Timeout | null }>
@@ -103,8 +104,8 @@ function getProductViewerCount(productId) {
 
 function initViewerSocket(server) {
   const allowedOrigins = [
-    process.env.ADMIN_URL,
-    process.env.FRONTEND_URL,
+    ADMIN_URL,
+    FRONTEND_URL,
     'http://localhost:5173',
     'http://localhost:5174',
     'http://127.0.0.1:5173',
@@ -114,7 +115,7 @@ function initViewerSocket(server) {
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+        if (!origin || allowedOrigins.includes(origin) || NODE_ENV === 'development') {
           return callback(null, true);
         }
         return callback(null, true); // Permissive in dev/local

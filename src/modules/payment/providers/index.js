@@ -1,6 +1,7 @@
 const razorpayService = require('./razorpay.service');
 const ccavenueService = require('./ccavenue.service');
 const ApiError = require('../../../utils/ApiError');
+const { PAYMENT_PROVIDER } = require('../../../config/constants');
 
 /**
  * Registry of available payment providers.
@@ -16,7 +17,7 @@ const providers = {
 const getProvider = (name) => {
   if (!name) {
     const defaultName = (
-      process.env.PAYMENT_PROVIDER || 'razorpay'
+      PAYMENT_PROVIDER || 'razorpay'
     ).toLowerCase();
     return providers[defaultName] || razorpayService;
   }

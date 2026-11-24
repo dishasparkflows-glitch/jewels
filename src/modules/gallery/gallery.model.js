@@ -20,7 +20,7 @@ const gallerySchema = new mongoose.Schema(
         index: true,
       },
     },
-    placement: {
+    type: {
       type: String,
       enum: [
         'herobanner',

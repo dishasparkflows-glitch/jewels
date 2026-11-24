@@ -32,15 +32,6 @@ class FeaturedController {
     ApiResponse.success(res, items, 'Featured item lookup list retrieved');
   });
 
-  // ------------------------------- get featured theme lookup ----------------------------
-
-  getThemeLookup = catchAsync(async (req, res) => {
-    req.query.theme = 'true';
-    const cacheKey = `featured:theme-lookup:${Object.keys(req.query || {}).length ? JSON.stringify(req.query) : 'all'}`;
-    const items = await redisClient.getOrSet(cacheKey, CACHE_TTL, () => featuredService.getLookup(req.query));
-    ApiResponse.success(res, items, 'Featured theme lookup list retrieved');
-  });
-
   // ------------------------------- get one featured item ----------------------------
 
   getOne = catchAsync(async (req, res) => {

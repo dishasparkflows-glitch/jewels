@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const smsService = require('../sms/sms.service');
 const ApiError = require('../../utils/ApiError');
+const { NODE_ENV } = require('../../config/constants');
 
 // In-memory stores (no Redis)
 const otpStore = new Map();
@@ -54,7 +55,7 @@ class OtpService {
     // Send SMS via provider
     const smsResult = await smsService.sendOtp({ to: fullMobile, otp, countryCode });
 
-    const isDev = process.env.NODE_ENV !== 'production';
+    const isDev = NODE_ENV !== 'production';
     const maskedPhone =
       phone.length > 4
         ? `${phone.slice(0, 2)}****${phone.slice(-2)}`

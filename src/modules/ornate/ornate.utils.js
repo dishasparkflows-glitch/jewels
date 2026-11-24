@@ -1,10 +1,11 @@
 const axios = require('axios');
 const mongoose = require('mongoose');
+const { ORNATE } = require('../../config/constants');
 
-const ORNATE_BASE_URL = process.env.ORNATE_BASE_URL;
-const ORNATE_USERNAME = process.env.ORNATE_USERNAME;
-const ORNATE_PASSWORD = process.env.ORNATE_PASSWORD;
-const ORNATE_TIMEOUT = Number(process.env.ORNATE_TIMEOUT);
+const ORNATE_BASE_URL = ORNATE.BASE_URL;
+const ORNATE_USERNAME = ORNATE.USERNAME;
+const ORNATE_PASSWORD = ORNATE.PASSWORD;
+const ORNATE_TIMEOUT = Number(ORNATE.TIMEOUT);
 
 // ------------------------------- session & token cache ----------------------------
 let lastSessionId = '0';

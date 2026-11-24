@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const themeService = require('./theme.service');
 const redisClient = require('../../utils/redisClient');
+const { CRON_TIME } = require('../../config/constants');
 
 let job;
 let running = false;
@@ -31,7 +32,7 @@ async function reconcile(source = 'cron') {
 }
 
 function startThemeCron() {
-  if (process.env.THEME_CRON_ENABLED === 'false' || job) return job;
+  if (CRON_TIME.THEME_CRON_ENABLED === false || job) return job;
   setTimeout(() => reconcile('startup'), 3000);
   job = cron.schedule('* * * * *', () => reconcile(), { timezone: 'Asia/Kolkata' });
   console.log('[Theme] Scheduled publish and expiry check enabled (Asia/Kolkata).');

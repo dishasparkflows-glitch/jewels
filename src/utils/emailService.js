@@ -1,17 +1,14 @@
 const nodemailer = require('nodemailer');
+const { SMTP } = require('../config/constants');
 
 // ------------------------------- get smtp config ----------------------------
 function getSmtpConfig() {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = Number(process.env.SMTP_PORT || 587);
+  const host = SMTP.HOST;
+  const port = SMTP.PORT;
   const secure = port === 465;
-  const user = process.env.SMTP_USER || process.env.SMTP_EMAIL;
-  const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
-  const from =
-    process.env.SMTP_FROM ||
-    (process.env.FROM_NAME && process.env.FROM_EMAIL
-      ? `"${process.env.FROM_NAME}" <${process.env.FROM_EMAIL}>`
-      : process.env.FROM_EMAIL || user);
+  const user = SMTP.USER;
+  const pass = SMTP.PASS;
+  const from = SMTP.FROM || user;
 
   return { host, port, secure, user, pass, from };
 }

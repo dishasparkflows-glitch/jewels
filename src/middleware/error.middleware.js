@@ -1,3 +1,5 @@
+const { NODE_ENV } = require('../config/constants');
+
 // Global error handler middleware
 const errorHandler = (err, req, res, next) => {
   console.error('❌ Error:', err.stack);
@@ -37,7 +39,7 @@ const errorHandler = (err, req, res, next) => {
   res.status(statusCode).json({
     success: false,
     message: err.message || 'Internal Server Error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    ...(NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
 

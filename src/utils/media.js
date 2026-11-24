@@ -1,7 +1,7 @@
+const { CLOUDFLARE_R2 } = require('../config/constants');
+
 function publicBase() {
-  const base =
-    process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN ||
-    process.env.CLOUDFLARE_R2_PUBLIC_URL;
+  const base = CLOUDFLARE_R2?.PUBLIC_DOMAIN;
   return String(base || '').replace(/\/+$/, '');
 }
 

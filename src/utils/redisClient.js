@@ -1,5 +1,5 @@
 const Redis = require('ioredis');
-const { CACHE_TTL } = require('../config/constants');
+const { CACHE_TTL, REDIS_URL } = require('../config/constants');
 
 /**
  * Production-ready Redis Client utility.
@@ -31,7 +31,7 @@ class RedisClient {
 
       const redisUrl = (typeof customConfig === 'string' && customConfig.trim())
         ? customConfig.trim()
-        : (process.env.REDIS_URL || '');
+        : (REDIS_URL || '');
 
       if (!redisUrl) {
         return;

@@ -8,7 +8,6 @@ const adminOnly = [authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN)];
 
 // ------------------------------- gallery routes ----------------------------
 router.get('/lookup', ...adminOnly, galleryController.getLookup);
-router.get('/themes', ...adminOnly, galleryController.getThemesLookup);
 router.get('/banners', ...adminOnly, galleryController.getBannersLookup);
 router.get('/featured', ...adminOnly, galleryController.getFeaturedsLookup);
 router.get('/', ...adminOnly, galleryController.list);
@@ -20,4 +19,3 @@ router.patch('/:id/status', ...adminOnly, galleryController.toggleStatus);
 router.delete('/:id', ...adminOnly, galleryController.deleteItem);
 
 module.exports = router;
-

@@ -13,6 +13,8 @@ const ApiError = require('../../utils/ApiError');
 const PROVIDER = 'connectwhats';
 const ACCOUNT_KEY = 'default';
 
+const { NODE_ENV } = require('../../config/constants');
+
 class WhatsAppService {
   // ─── Integration Management ────────────────────────────────────────
 
@@ -47,7 +49,7 @@ class WhatsAppService {
       });
     } catch (err) {
       if (
-        process.env.NODE_ENV === 'development' &&
+        NODE_ENV === 'development' &&
         (err.message.includes('ENOTFOUND') || err.message.includes('ECONNREFUSED'))
       ) {
         console.warn('[ConnectWhats] Network unreachable in dev; connection accepted via config.');

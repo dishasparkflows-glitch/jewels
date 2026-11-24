@@ -1,18 +1,25 @@
+const env = require('./env');
+
 module.exports = {
-  JWT_SECRET: process.env.JWT_SECRET,
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  ...env,
+  BACKEND_URL: env.URL?.BACKEND_URL,
+  FRONTEND_URL: env.URL?.FRONTEND_URL,
+  ADMIN_URL: env.URL?.ADMIN_URL,
+
+  // Roles & Permissions
   ROLES: {
     SUPER_ADMIN: 'super_admin',
     ADMIN: 'admin',
     USER: 'user',
   },
+
+  // Pagination Defaults
   PAGINATION: {
     DEFAULT_PAGE: 1,
     DEFAULT_LIMIT: 10,
     MAX_LIMIT: 100,
   },
-  CRON_TIME: {
-    COUPON_EXPIRATION: '0 0,12 * * *', // Every 12 AM and 12 PM
-  },
+
+  // Cache
   CACHE_TTL: 86400, // 24 hours in seconds
 };

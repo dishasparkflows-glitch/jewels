@@ -1,5 +1,6 @@
 const shiprocketProvider = require('./shiprocket.provider');
 const ApiError = require('../../../utils/ApiError');
+const { LOGISTICS_PROVIDER } = require('../../../config/constants');
 
 /**
  * Registry of available logistics providers.
@@ -15,11 +16,7 @@ const providers = {
 // ------------------------------- get provider ----------------------------
 const getProvider = (name) => {
   if (!name) {
-    const defaultName = (
-      process.env.LOGISTICS_PROVIDER ||
-      process.env.SHIPPING_PROVIDER ||
-      'shiprocket'
-    ).toLowerCase().trim();
+    const defaultName = (LOGISTICS_PROVIDER || 'shiprocket').toLowerCase().trim();
     return providers[defaultName] || shiprocketProvider;
   }
 

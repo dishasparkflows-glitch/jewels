@@ -20,11 +20,6 @@ const productGroupSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-    description: {
-      type: String,
-      default: '',
-      trim: true,
-    },
     productIds: [
       {
         type: mongoose.Schema.Types.ObjectId,

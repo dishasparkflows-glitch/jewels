@@ -163,7 +163,7 @@ class AnalyticsController {
   // ------------------------------- GET Dashboard Sales Metrics ----------------------------
   // @route   GET /api/analytics/dashboard-sales
   getDashboardSalesMetrics = catchAsync(async (req, res) => {
-    const data = await analyticsService.getDashboardSalesMetrics();
+    const data = await analyticsService.getDashboardSalesMetrics(req.query);
     ApiResponse.success(res, data, 'Dashboard sales metrics retrieved successfully');
   });
 }

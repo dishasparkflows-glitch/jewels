@@ -148,7 +148,6 @@ class ProductGroupService {
       groupCode,
       groupName: candidateName,
       slug: finalSlug,
-      description: `Common product group for ${candidateName}`,
       productIds: [product._id],
       primaryProductId: product._id,
       status: 'active',
@@ -640,7 +639,6 @@ class ProductGroupService {
         groupCode: g.groupCode,
         groupName: g.groupName,
         slug: g.slug,
-        description: g.description,
         status: g.status,
         primaryProductId: g.primaryProductId,
         createdAt: g.meta?.createdAt,
@@ -895,7 +893,6 @@ class ProductGroupService {
       groupCode,
       groupName,
       slug: safeSlug,
-      description: data.description || '',
       productIds: validIds,
       primaryProductId,
       status: data.status || 'active',
@@ -931,10 +928,6 @@ class ProductGroupService {
         throw new ApiError(409, `A group with slug "${nextSlug}" already exists`);
       }
       group.slug = nextSlug;
-    }
-
-    if (data.description !== undefined) {
-      group.description = data.description;
     }
 
     if (data.status && ['active', 'inactive'].includes(data.status)) {
@@ -1141,7 +1134,6 @@ class ProductGroupService {
         groupCode,
         groupName: trimmedName,
         slug: safeSlug,
-        description: '',
         productIds: validIds,
         primaryProductId: validIds[0] || null,
         status: 'active',
@@ -1339,7 +1331,6 @@ class ProductGroupService {
         groupCode,
         groupName,
         slug,
-        description: '',
         productIds: [p._id],
         primaryProductId: p._id,
         status: 'active',

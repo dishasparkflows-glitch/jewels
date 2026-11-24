@@ -17,6 +17,7 @@ const Order = require('../order/order.model');
 const reportCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
 
+// ------------------------------- get cached report ----------------------------
 function getCachedReport(cacheKey) {
   const entry = reportCache.get(cacheKey);
   if (!entry) return null;
@@ -27,6 +28,7 @@ function getCachedReport(cacheKey) {
   return entry.data;
 }
 
+// ------------------------------- set cached report ----------------------------
 function setCachedReport(cacheKey, data) {
   if (reportCache.size > 200) {
     const oldestKey = reportCache.keys().next().value;
@@ -35,6 +37,7 @@ function setCachedReport(cacheKey, data) {
   reportCache.set(cacheKey, { timestamp: Date.now(), data });
 }
 
+// ------------------------------- clear report cache ----------------------------
 function clearReportCache() {
   reportCache.clear();
 }
@@ -43,6 +46,7 @@ function clearReportCache() {
 const VALID_NAMED_RANGES = ['today', 'yesterday', '7daysAgo', '30daysAgo', '90daysAgo'];
 const isIsoDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
 
+// ------------------------------- validate date range ----------------------------
 function validateDateRange(startDate, endDate) {
   let start = startDate || '30daysAgo';
   let end = endDate || 'today';
@@ -74,6 +78,7 @@ function validateDateRange(startDate, endDate) {
   return { valid: true, startDate: start, endDate: end };
 }
 
+// ------------------------------- get previous period ----------------------------
 function getPreviousPeriod(startDateStr, endDateStr) {
   let start, end;
   const today = new Date();
@@ -123,6 +128,7 @@ function getPreviousPeriod(startDateStr, endDateStr) {
   };
 }
 
+// ------------------------------- calculate growth ----------------------------
 function calculateGrowth(current, previous) {
   if (previous === 0) return current > 0 ? '+100%' : '0%';
   const diff = current - previous;
@@ -130,6 +136,7 @@ function calculateGrowth(current, previous) {
   return `${diff >= 0 ? '+' : ''}${percent}%`;
 }
 
+// ------------------------------- format ga date ----------------------------
 function formatGaDate(dateStr) {
   if (!dateStr || dateStr.length !== 8) {
     return { iso: dateStr || '', label: dateStr || '' };
@@ -144,12 +151,13 @@ function formatGaDate(dateStr) {
 }
 
 class AnalyticsService {
+  // ------------------------------- constructor ----------------------------
   constructor() {
     this.client = null;
     this.clientKeyPath = null;
   }
 
-  // ------------------------------- Resolve GA4 Configuration ----------------------------
+  // ------------------------------- get analytics config ----------------------------
   getAnalyticsConfig() {
     const propertyId = (GOOGLE.GA4_PROPERTY_ID || '').trim();
 
@@ -199,7 +207,7 @@ class AnalyticsService {
     };
   }
 
-  // ------------------------------- Get GA4 Client ----------------------------
+  // ------------------------------- get analytics client ----------------------------
   getClient() {
     const config = this.getAnalyticsConfig();
     if (!config.configured || !config.clientOptions) {
@@ -224,7 +232,7 @@ class AnalyticsService {
     }
   }
 
-  // ------------------------------- Cross-Collection MongoDB Enrichment ----------------------------
+  // ------------------------------- enrich products with db ----------------------------
   async enrichProductsWithDb(rawItems = [], activityType = 'cart') {
     if (!rawItems || rawItems.length === 0) return [];
 
@@ -421,7 +429,7 @@ class AnalyticsService {
     });
   }
 
-  // ------------------------------- GET Overview ----------------------------
+  // ------------------------------- get analytics overview ----------------------------
   async getAnalyticsOverview({ startDate = '30daysAgo', endDate = 'today', limit = 10, offset = 0 } = {}) {
     const dateValidation = validateDateRange(startDate, endDate);
     const start = dateValidation.valid ? dateValidation.startDate : '30daysAgo';
@@ -598,7 +606,7 @@ class AnalyticsService {
     }
   }
 
-  // ------------------------------- GET Product Add to Cart Report ----------------------------
+  // ------------------------------- get product add to cart report ----------------------------
   async getProductAddToCartReport({
     startDate = '30daysAgo',
     endDate = 'today',
@@ -735,7 +743,7 @@ class AnalyticsService {
     }
   }
 
-  // ------------------------------- GET Product Wishlist Report ----------------------------
+  // ------------------------------- get product wishlist report ----------------------------
   async getProductWishlistReport({
     startDate = '30daysAgo',
     endDate = 'today',
@@ -866,7 +874,7 @@ class AnalyticsService {
     }
   }
 
-  // ------------------------------- Test Connectivity & Health ----------------------------
+  // ------------------------------- test analytics connection ----------------------------
   async testAnalyticsConnection() {
     const config = this.getAnalyticsConfig();
     const client = this.getClient();
@@ -905,7 +913,7 @@ class AnalyticsService {
     }
   }
 
-  // ------------------------------- Generate Temporary Google OAuth2 Access Token ----------------------------
+  // ------------------------------- get google access token ----------------------------
   async getGoogleAccessToken() {
     const config = this.getAnalyticsConfig();
     if (!config.keyFile) {
@@ -926,7 +934,7 @@ class AnalyticsService {
     };
   }
 
-  // ------------------------------- Status & Fallback Generators ----------------------------
+  // ------------------------------- get analytics status ----------------------------
   async getStatus() {
     const config = this.getAnalyticsConfig();
     return {
@@ -939,7 +947,7 @@ class AnalyticsService {
     };
   }
 
-  // ------------------------------- GET Product Views Report ----------------------------
+  // ------------------------------- get product views report ----------------------------
   async getProductViewsReport({
     startDate = '30daysAgo',
     endDate = 'today',
@@ -1013,7 +1021,7 @@ class AnalyticsService {
     }
   }
 
-  // ------------------------------- Real Database Queries & Reports ----------------------------
+  // ------------------------------- get database cart report ----------------------------
   async getDatabaseCartReport({
     startDate = '30daysAgo',
     endDate = 'today',
@@ -1084,6 +1092,7 @@ class AnalyticsService {
     }
   }
 
+  // ------------------------------- get database wishlist report ----------------------------
   async getDatabaseWishlistReport({
     startDate = '30daysAgo',
     endDate = 'today',
@@ -1154,6 +1163,7 @@ class AnalyticsService {
     }
   }
 
+  // ------------------------------- get database views report ----------------------------
   async getDatabaseViewsReport({
     startDate = '30daysAgo',
     endDate = 'today',
@@ -1217,6 +1227,7 @@ class AnalyticsService {
     }
   }
 
+  // ------------------------------- get database overview ----------------------------
   async getDatabaseOverview(startDate, endDate) {
     const config = this.getAnalyticsConfig();
     try {
@@ -1278,48 +1289,125 @@ class AnalyticsService {
     }
   }
 
-  // ─── Dashboard Sales & Category Metrics ─────────────────────────────────────
-  async getDashboardSalesMetrics() {
+  // ------------------------------- get dashboard sales metrics ----------------------------
+  async getDashboardSalesMetrics(query = {}) {
     try {
       const now = new Date();
-      // Generate 11 anchor dates (30 days ago to today, stepping ~3 days)
-      const numPoints = 11;
-      const points = [];
-      for (let i = 0; i < numPoints; i++) {
-        const d = new Date(now);
-        d.setDate(now.getDate() - (numPoints - 1 - i) * 3);
-        d.setHours(0, 0, 0, 0);
-        points.push(d);
-      }
-      const thirtyDaysAgo = points[0];
+      const period = query.period || '30days';
+      const startDate = query.startDate;
+      const endDate = query.endDate;
 
-      // Query real orders in DB
+      let startTime, endTime;
+      let numPoints = 11;
+      const points = [];
+
+      if (startDate && endDate) {
+        startTime = new Date(startDate);
+        startTime.setHours(0, 0, 0, 0);
+        endTime = new Date(endDate);
+        endTime.setHours(23, 59, 59, 999);
+        const totalDuration = endTime.getTime() - startTime.getTime();
+        const daysDiff = Math.max(1, Math.round(totalDuration / (1000 * 60 * 60 * 24)));
+        numPoints = Math.min(12, Math.max(2, daysDiff + 1));
+        for (let i = 0; i < numPoints; i++) {
+          const d = new Date(startTime.getTime() + (totalDuration / (numPoints - 1 || 1)) * i);
+          points.push(d);
+        }
+      } else if (period === 'today') {
+        numPoints = 8;
+        startTime = new Date(now);
+        startTime.setHours(0, 0, 0, 0);
+        endTime = new Date(now);
+        endTime.setHours(23, 59, 59, 999);
+        for (let i = 0; i < numPoints; i++) {
+          const d = new Date(startTime);
+          d.setHours(i * 3, 0, 0, 0);
+          points.push(d);
+        }
+      } else if (period === 'yesterday') {
+        numPoints = 8;
+        startTime = new Date(now);
+        startTime.setDate(now.getDate() - 1);
+        startTime.setHours(0, 0, 0, 0);
+        endTime = new Date(startTime);
+        endTime.setHours(23, 59, 59, 999);
+        for (let i = 0; i < numPoints; i++) {
+          const d = new Date(startTime);
+          d.setHours(i * 3, 0, 0, 0);
+          points.push(d);
+        }
+      } else if (period === '7days') {
+        numPoints = 7;
+        for (let i = 0; i < numPoints; i++) {
+          const d = new Date(now);
+          d.setDate(now.getDate() - (numPoints - 1 - i));
+          d.setHours(0, 0, 0, 0);
+          points.push(d);
+        }
+        startTime = new Date(points[0]);
+        endTime = new Date(now);
+      } else if (period === '90days') {
+        numPoints = 10;
+        for (let i = 0; i < numPoints; i++) {
+          const d = new Date(now);
+          d.setDate(now.getDate() - (numPoints - 1 - i) * 9);
+          d.setHours(0, 0, 0, 0);
+          points.push(d);
+        }
+        startTime = new Date(points[0]);
+        endTime = new Date(now);
+      } else if (period === 'thisYear' || period === '1year') {
+        numPoints = 12;
+        const currentYear = now.getFullYear();
+        for (let i = 0; i < 12; i++) {
+          const d = new Date(currentYear, i, 1);
+          points.push(d);
+        }
+        startTime = new Date(currentYear, 0, 1);
+        endTime = new Date(now);
+      } else {
+        // Default: 30 days
+        numPoints = 11;
+        for (let i = 0; i < numPoints; i++) {
+          const d = new Date(now);
+          d.setDate(now.getDate() - (numPoints - 1 - i) * 3);
+          d.setHours(0, 0, 0, 0);
+          points.push(d);
+        }
+        startTime = new Date(points[0]);
+        endTime = new Date(now);
+      }
+
+      // Query real orders in DB (checking meta.createdAt, orderTimeline, or createdAt)
       let orders = [];
       try {
         orders = await Order.find({
-          createdAt: { $gte: thirtyDaysAgo },
+          'meta.deletedAt': null,
           orderStatus: { $ne: 'cancelled' },
+          $or: [
+            { 'meta.createdAt': { $gte: startTime, $lte: endTime } },
+            { 'orderTimeline.placed.at': { $gte: startTime, $lte: endTime } },
+            { createdAt: { $gte: startTime, $lte: endTime } },
+          ],
         })
           .populate({
             path: 'items.productId',
-            select: 'basicInfo categoryIds',
+            select: 'basicInfo categoryIds productType',
             populate: { path: 'categoryIds', select: 'name slug' },
           })
           .lean();
       } catch (err) {
-        console.warn('[AnalyticsService] Orders query failed, fallback to defaults:', err.message);
+        console.warn('[AnalyticsService] Orders query failed:', err.message);
+        orders = [];
       }
-
-      // Base mockup revenues that total ₹56,42,000 (₹56.42L as in the dashboard mockup)
-      const baselineRevenues = [200000, 440000, 350000, 520000, 470000, 640000, 410000, 690000, 560000, 820000, 542000];
-      const baselineOrders = [14, 28, 22, 34, 30, 42, 26, 46, 38, 54, 36];
 
       // Map real orders to closest anchor date
       const realDailyMetrics = new Array(numPoints).fill(null).map(() => ({ revenue: 0, orders: 0 }));
       const realCategoryMap = new Map();
 
       for (const order of orders) {
-        const orderTime = new Date(order.createdAt).getTime();
+        const orderDateStr = order.orderTimeline?.placed?.at || order.meta?.createdAt || order.createdAt;
+        const orderTime = orderDateStr ? new Date(orderDateStr).getTime() : Date.now();
         const orderRev = Number(order.pricing?.total) || Number(order.pricing?.subtotal) || 0;
 
         let closestIdx = numPoints - 1;
@@ -1340,37 +1428,41 @@ class AnalyticsService {
             const p = item.productId;
             const catName = p?.categoryIds?.[0]?.name || (
               item.title?.toLowerCase().includes('ring') ? 'Rings' :
-              item.title?.toLowerCase().includes('earring') ? 'Earrings' :
+              item.title?.toLowerCase().includes('earring') || item.title?.toLowerCase().includes('butti') ? 'Earrings' :
               item.title?.toLowerCase().includes('pendant') ? 'Pendant' :
               item.title?.toLowerCase().includes('necklace') ? 'Necklace' :
-              item.title?.toLowerCase().includes('bangle') ? 'Bangles' : 'Others'
+              item.title?.toLowerCase().includes('bangle') || item.title?.toLowerCase().includes('bracelet') ? 'Bangles' : 'Other Jewelry'
             );
             realCategoryMap.set(catName, (realCategoryMap.get(catName) || 0) + itemPrice);
           }
         }
       }
 
-      const hasSufficientRealData = orders.length >= 15;
-
       const formatCurrencyShort = (val) => {
+        if (!val || val === 0) return '₹0';
         if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)}Cr`;
         if (val >= 100000) return `₹${(val / 100000).toFixed(2)}L`;
         if (val >= 1000) return `₹${(val / 1000).toFixed(1)}k`;
-        return `₹${Math.round(val)}`;
+        return `₹${Math.round(val).toLocaleString('en-IN')}`;
       };
 
       const timeline = points.map((date, idx) => {
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = date.toLocaleDateString('en-US', { month: 'short' });
-        const label = `${day} ${month}`;
+        let label;
+        if (period === 'today' || period === 'yesterday') {
+          const h = date.getHours();
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          const h12 = h % 12 || 12;
+          label = `${h12} ${ampm}`;
+        } else if (period === 'thisYear' || period === '1year') {
+          label = date.toLocaleDateString('en-US', { month: 'short' });
+        } else {
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = date.toLocaleDateString('en-US', { month: 'short' });
+          label = `${day} ${month}`;
+        }
 
-        const rev = hasSufficientRealData
-          ? realDailyMetrics[idx].revenue
-          : Math.round(baselineRevenues[idx] + realDailyMetrics[idx].revenue);
-
-        const ord = hasSufficientRealData
-          ? realDailyMetrics[idx].orders
-          : Math.round(baselineOrders[idx] + realDailyMetrics[idx].orders);
+        const rev = Math.round(realDailyMetrics[idx]?.revenue || 0);
+        const ord = realDailyMetrics[idx]?.orders || 0;
 
         return {
           date: date.toISOString().split('T')[0],
@@ -1384,43 +1476,22 @@ class AnalyticsService {
       const totalSales = timeline.reduce((sum, item) => sum + item.revenue, 0);
       const totalOrdersCount = timeline.reduce((sum, item) => sum + item.orders, 0);
 
-      // Proportions matching dashboard mockup:
-      // Necklace 34%, Earrings 22%, Pendant 16%, Bangles 12%, Rings 9%, Others 7%
-      const baseCategoryConfig = [
-        { name: 'Necklace', defaultPct: 34, color: '#7c4a27' },
-        { name: 'Earrings', defaultPct: 22, color: '#9d6935' },
-        { name: 'Pendant', defaultPct: 16, color: '#be894e' },
-        { name: 'Bangles', defaultPct: 12, color: '#d3aa76' },
-        { name: 'Rings', defaultPct: 9, color: '#e4caa3' },
-        { name: 'Others', defaultPct: 7, color: '#f0dfc8' },
-      ];
+      // Category breakdown dynamically derived strictly from real orders
+      const palette = ['#7c4a27', '#9d6935', '#be894e', '#d3aa76', '#e4caa3', '#f0dfc8', '#a07855', '#6b4423'];
+      const totalCatRev = Array.from(realCategoryMap.values()).reduce((a, b) => a + b, 0);
 
-      let categorySales = [];
-      if (!hasSufficientRealData) {
-        categorySales = baseCategoryConfig.map((cat) => {
-          const rev = Math.round((totalSales * cat.defaultPct) / 100);
+      const categorySales = Array.from(realCategoryMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, catRev], idx) => {
+          const pct = totalCatRev > 0 ? Math.round((catRev / totalCatRev) * 100) : 0;
           return {
-            name: cat.name,
-            percentage: cat.defaultPct,
-            revenue: rev,
-            formattedRevenue: formatCurrencyShort(rev),
-            color: cat.color,
-          };
-        });
-      } else {
-        const totalCatRev = Array.from(realCategoryMap.values()).reduce((a, b) => a + b, 0) || totalSales;
-        categorySales = baseCategoryConfig.map((cat) => {
-          const catRev = realCategoryMap.get(cat.name) || 0;
-          const pct = totalCatRev > 0 ? Math.round((catRev / totalCatRev) * 100) : cat.defaultPct;
-          return {
-            name: cat.name,
+            name,
             percentage: pct,
-            revenue: catRev,
+            revenue: Math.round(catRev),
             formattedRevenue: formatCurrencyShort(catRev),
-            color: cat.color,
+            color: palette[idx % palette.length],
           };
         });
-      }
 
       return {
         timeline,

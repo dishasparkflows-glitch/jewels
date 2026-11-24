@@ -815,7 +815,6 @@ class ThemeMediaMappingService {
         redisClient.deleteByPattern('featured:*'),
         redisClient.deleteByPattern('categories:*'),
         redisClient.deleteByPattern('themes:*'),
-        redisClient.deleteByPattern('website-themes:*'),
         redisClient.deleteByPattern('storefront:*'),
       ]);
     } catch (cacheErr) {

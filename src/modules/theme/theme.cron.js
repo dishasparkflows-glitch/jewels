@@ -14,14 +14,11 @@ async function reconcile(source = 'cron') {
     if (result) {
       if (result.activatedThemeId) {
         await redisClient.deleteByPattern(`themes:*${result.activatedThemeId}*`);
-        await redisClient.deleteByPattern(`website-themes:*${result.activatedThemeId}*`);
       }
       if (result.expiredThemeId) {
         await redisClient.deleteByPattern(`themes:*${result.expiredThemeId}*`);
-        await redisClient.deleteByPattern(`website-themes:*${result.expiredThemeId}*`);
       }
       await redisClient.deleteByPattern('themes:*');
-      await redisClient.deleteByPattern('website-themes:*');
       console.log(`[Theme] Reconciled schedule (${source}) and invalidated Redis cache.`);
     }
   } catch (error) {

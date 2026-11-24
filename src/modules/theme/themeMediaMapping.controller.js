@@ -4,12 +4,7 @@ const redisClient = require('../../utils/redisClient');
 const catchAsync = require('../../utils/catchAsync');
 
 class ThemeMediaMappingController {
-  getSupportedModules = catchAsync(async (req, res) => {
-    const modules = themeMediaMappingService.getSupportedModules();
-    ApiResponse.success(res, modules, 'Supported modules retrieved successfully');
-  });
-
-    // ------------------------------- get theme module records ----------------------------
+  // ------------------------------- get theme module records ----------------------------
   getModuleRecords = catchAsync(async (req, res) => {
     const { themeId } = req.params;
     const { module, page, limit, search } = req.query;
@@ -25,19 +20,7 @@ class ThemeMediaMappingController {
     ApiResponse.success(res, data, 'Module records retrieved successfully');
   });
 
-    // ------------------------------- get theme mappings ----------------------------
-  getThemeMappings = catchAsync(async (req, res) => {
-    const { themeId } = req.params;
-    const { module } = req.query;
-
-    const mappings = await themeMediaMappingService.getThemeMappings({
-      themeId,
-      module,
-    });
-
-    ApiResponse.success(res, mappings, 'Theme mappings retrieved successfully');
-  });
-
+  // ------------------------------- save / update mapping ----------------------------
   upsert = catchAsync(async (req, res) => {
     const { themeId } = req.params;
     const { recordId, galleryId, mediaId, status } = req.body;
@@ -50,24 +33,10 @@ class ThemeMediaMappingController {
     });
 
     await redisClient.deleteByPattern('themes:*');
-    await redisClient.deleteByPattern('website-themes:*');
     ApiResponse.success(res, result.mapping, result.message);
   });
 
-    // ------------------------------- delete theme mapping ----------------------------
-  deleteMapping = catchAsync(async (req, res) => {
-    const { themeId, mappingId } = req.params;
-
-    const result = await themeMediaMappingService.deleteMapping({
-      themeId,
-      mappingId,
-    });
-
-    await redisClient.deleteByPattern('themes:*');
-    await redisClient.deleteByPattern('website-themes:*');
-    ApiResponse.success(res, null, result.message);
-  });
-
+  // ------------------------------- delete mapping by target ----------------------------
   deleteMappingByTarget = catchAsync(async (req, res) => {
     const { themeId } = req.params;
     const { recordId } = req.query;
@@ -78,25 +47,10 @@ class ThemeMediaMappingController {
     });
 
     await redisClient.deleteByPattern('themes:*');
-    await redisClient.deleteByPattern('website-themes:*');
     ApiResponse.success(res, null, result.message);
   });
 
-  bulkSave = catchAsync(async (req, res) => {
-    const { themeId } = req.params;
-    const { mappings } = req.body;
-
-    const result = await themeMediaMappingService.bulkSaveMappings({
-      themeId,
-      mappings,
-      userId: req.user?._id,
-    });
-
-    await redisClient.deleteByPattern('themes:*');
-    await redisClient.deleteByPattern('website-themes:*');
-    ApiResponse.success(res, null, result.message);
-  });
-
+  // ------------------------------- get mapping summary ----------------------------
   getSummary = catchAsync(async (req, res) => {
     const { themeId } = req.params;
 
@@ -104,12 +58,12 @@ class ThemeMediaMappingController {
     ApiResponse.success(res, summary, 'Theme mapping summary retrieved successfully');
   });
 
+  // ------------------------------- activate theme ----------------------------
   activateTheme = catchAsync(async (req, res) => {
     const { themeId } = req.params;
 
     const result = await themeMediaMappingService.activateTheme(themeId, req.user?._id);
     await redisClient.deleteByPattern('themes:*');
-    await redisClient.deleteByPattern('website-themes:*');
     await redisClient.deleteByPattern('banners:*');
     await redisClient.deleteByPattern('featured:*');
     await redisClient.deleteByPattern('categories:*');
@@ -119,4 +73,3 @@ class ThemeMediaMappingController {
 }
 
 module.exports = new ThemeMediaMappingController();
-

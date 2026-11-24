@@ -10,5 +10,8 @@ router.use(authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN));
 
 router.get('/stats', dashboardController.getCounts);
 router.get('/sales', analyticsController.getDashboardSalesMetrics);
+router.get('/top-selling-products', dashboardController.getTopSellingProducts);
+router.get('/recent-orders', dashboardController.getRecentOrders);
+router.get('/sections', dashboardController.getSections);
 
 module.exports = router;

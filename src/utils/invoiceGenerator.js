@@ -108,10 +108,11 @@ function generateInvoiceNumber(order) {
  */
 function extractItemDetails(item) {
   const attrs = item.selectedAttributes || {};
+  const refDoc = item.refId;
   const isSilver =
     item.productType === 'silver' ||
-    item.productId?.basicInfo?.productType === 'silver' ||
-    Boolean(item.productId?.isOrnate) ||
+    refDoc?.basicInfo?.productType === 'silver' ||
+    Boolean(refDoc?.isOrnate) ||
     String(item.title || '').toLowerCase().startsWith('92.5') ||
     String(item.selectedMetal || '').toLowerCase().includes('silver');
 
@@ -168,8 +169,10 @@ async function fetchImageBuffer(url) {
 function resolveItemImageUrl(item) {
   if (item?.image) return item.image;
   if (item?.thumbnail) return item.thumbnail;
-  const prod = item?.productId;
+  const prod = item?.refId;
   if (!prod) return '';
+  if (prod.image?.url) return prod.image.url;
+  if (typeof prod.image === 'string' && prod.image) return prod.image;
   if (Array.isArray(prod.ornate?.ornateImages) && prod.ornate.ornateImages.length > 0) {
     const found = prod.ornate.ornateImages.find((img) => img?.url);
     if (found?.url) return found.url;
@@ -609,7 +612,8 @@ async function generateInvoicePDF(order, options = {}) {
         // Product Information beside thumbnail
         const textX = leftMargin + thumbBoxSize + 12;
         const textWidth = 235;
-        const itemTitle = item.title || item.productId?.basicInfo?.title || 'Fine Jewellery Masterpiece';
+        const refDoc = item.refId;
+        const itemTitle = item.title || refDoc?.basicInfo?.title || refDoc?.title || 'Fine Jewellery Masterpiece';
 
         doc.font('Sans-Bold').fontSize(9.5).fillColor('#2B2015').text(itemTitle, textX, y, {
           width: textWidth,
@@ -622,7 +626,7 @@ async function generateInvoicePDF(order, options = {}) {
         const details = extractItemDetails(item);
 
         // Pills Row: SKU & Shape
-        const itemSku = item.sku || item.productId?.basicInfo?.sku || `RJ-${index + 1}`;
+        const itemSku = item.sku || refDoc?.sku || refDoc?.basicInfo?.sku || `RJ-${index + 1}`;
         const skuText = `SKU: ${itemSku}`;
         const shapeText = details.shape ? `Shape: ${details.shape}` : null;
 

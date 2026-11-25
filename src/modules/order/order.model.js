@@ -1,10 +1,21 @@
 const mongoose = require('mongoose');
 
+const resolveOrderItemModel = function () {
+  const type = String(this?.itemType || 'product').toLowerCase();
+  return type === 'diamond' ? 'Diamond' : 'Product';
+};
+
 const orderItemSchema = new mongoose.Schema(
   {
-    productId: {
+    itemType: {
+      type: String,
+      enum: ['product', 'diamond'],
+      default: 'product',
+      required: true,
+    },
+    refId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
+      ref: resolveOrderItemModel,
       required: true,
     },
     title: {

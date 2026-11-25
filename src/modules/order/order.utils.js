@@ -29,50 +29,61 @@ async function resolvePaymentProvider(requestedProvider) {
 // ------------------------------- format order items ----------------------------
 async function formatOrderItems(items = []) {
   const Product = mongoose.model('Product');
+  const Diamond = mongoose.model('Diamond');
 
-  // Extract all valid product IDs to query products in DB
-  const productIds = items
+  // Extract all valid ref IDs to query in DB
+  const itemIds = items
     .map((item) => {
-      const rawId = item.productId?._id || item.productId || item.id || item._id;
+      const rawId = item.refId?._id || item.refId || item.productId?._id || item.productId || item.id || item._id;
       return mongoose.isValidObjectId(rawId) ? String(rawId) : null;
     })
     .filter(Boolean);
 
   const productMap = new Map();
-  if (productIds.length > 0) {
+  const diamondMap = new Map();
+  if (itemIds.length > 0) {
     try {
-      const prods = await Product.find({ _id: { $in: productIds } })
-        .select('basicInfo pricing')
-        .lean();
-      prods.forEach((p) => {
-        productMap.set(String(p._id), p);
-      });
+      const [prods, diams] = await Promise.all([
+        Product.find({ _id: { $in: itemIds } }).select('basicInfo pricing').lean(),
+        Diamond.find({ _id: { $in: itemIds } }).select('sku title price carat').lean(),
+      ]);
+      prods.forEach((p) => productMap.set(String(p._id), p));
+      diams.forEach((d) => diamondMap.set(String(d._id), d));
     } catch (err) {
-      console.warn('Failed to fetch products for SKU fallback in order items:', err.message);
+      console.warn('Failed to fetch products/diamonds for SKU fallback in order items:', err.message);
     }
   }
 
   return items.map((item) => {
     const qty = Math.max(1, Number(item.quantity) || 1);
     const price = Number(item.price) || 0;
-    const prodId = item.productId?._id || item.productId || item.id || item._id;
-    const prodIdStr = String(prodId || '');
-    const dbProduct = productMap.get(prodIdStr);
+    const rawRefId = item.refId?._id || item.refId || item.productId?._id || item.productId || item.id || item._id;
+    const refIdStr = String(rawRefId || '');
+    const dbProduct = productMap.get(refIdStr);
+    const dbDiamond = diamondMap.get(refIdStr);
+    const isDiamond = Boolean(item.itemType === 'diamond' || item.isDiamond || (!dbProduct && dbDiamond));
+    const resolvedItemType = isDiamond ? 'diamond' : 'product';
 
+    const refDoc = typeof item.refId === 'object' ? item.refId : null;
     const resolvedSku =
       item.sku ||
-      item.productId?.basicInfo?.sku ||
+      refDoc?.sku ||
+      refDoc?.basicInfo?.sku ||
+      dbDiamond?.sku ||
       dbProduct?.basicInfo?.sku ||
       '';
 
     const resolvedTitle =
       item.title ||
-      item.productId?.basicInfo?.title ||
+      refDoc?.title ||
+      refDoc?.basicInfo?.title ||
+      dbDiamond?.title ||
       dbProduct?.basicInfo?.title ||
       '';
 
     return {
-      productId: prodId,
+      itemType: resolvedItemType,
+      refId: rawRefId,
       title: resolvedTitle,
       sku: resolvedSku,
       price,
@@ -93,16 +104,18 @@ function mapCartItemsToOrderItems(cartItems = []) {
   return cartItems.map((cartItem) => {
     const qty = Math.max(1, Number(cartItem.quantity) || 1);
     const price = Number(cartItem.price) || 0;
-    const prod =
-      cartItem.productId && typeof cartItem.productId === 'object'
-        ? cartItem.productId
-        : null;
-    const prodId = prod?._id || cartItem.productId;
-    const title = prod?.basicInfo?.title || cartItem.title || '';
-    const sku = cartItem.sku || prod?.basicInfo?.sku || '';
+    const doc = cartItem.refId && typeof cartItem.refId === 'object' ? cartItem.refId : null;
+    const itemType = cartItem.itemType || 'product';
+    const isDiamond = itemType === 'diamond';
+    const refId = doc?._id || cartItem.refId;
+    const title = isDiamond
+      ? (doc?.title || cartItem.title || '')
+      : (doc?.basicInfo?.title || doc?.title || cartItem.title || '');
+    const sku = cartItem.sku || (isDiamond ? doc?.sku : doc?.basicInfo?.sku) || '';
 
     return {
-      productId: prodId,
+      itemType,
+      refId,
       title,
       sku,
       price,

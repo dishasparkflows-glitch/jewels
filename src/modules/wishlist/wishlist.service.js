@@ -3,13 +3,18 @@ const Wishlist = require('./wishlist.model');
 const ApiError = require('../../utils/ApiError');
 const { formatStorefrontProduct } = require('../product/product.utils');
 
-const PRODUCT_POPULATE_CONFIG = {
-  path: 'productIds',
-  select: '_id basicInfo pricing colorImages metalColorIds productType isOrnate variants centerDiamondRows stockStatus categoryIds ornate.ornateImages',
-  populate: {
-    path: 'metalColorIds colorImages.metalColorId',
-    select: 'name colorCode colorCodeEnd code hex',
-  },
+const WISHLIST_POPULATE_CONFIG = {
+  path: 'items.refId',
+  select: '_id basicInfo pricing colorImages metalColorIds productType isOrnate variants centerDiamondRows stockStatus categoryIds ornate.ornateImages title sku price carat image shapeId colorId clarityId typeId',
+  strictPopulate: false,
+  populate: [
+    { path: 'metalColorIds', select: 'name colorCode colorCodeEnd code hex', strictPopulate: false },
+    { path: 'colorImages.metalColorId', select: 'name colorCode colorCodeEnd code hex', strictPopulate: false },
+    { path: 'colorId', select: 'name', strictPopulate: false },
+    { path: 'clarityId', select: 'name', strictPopulate: false },
+    { path: 'shapeId', select: 'name', strictPopulate: false },
+    { path: 'typeId', select: 'name', strictPopulate: false },
+  ],
 };
 
 function formatWishlistProduct(p) {
@@ -31,6 +36,8 @@ function formatWishlistProduct(p) {
 
   return {
     _id: formatted._id,
+    refId: formatted._id,
+    itemType: 'product',
     basicInfo: {
       title: formatted.basicInfo?.title || formatted.title || '',
       slug: formatted.basicInfo?.slug || formatted.slug || '',
@@ -49,20 +56,56 @@ function formatWishlistProduct(p) {
   };
 }
 
+function formatWishlistDiamond(d) {
+  if (!d) return null;
+  return {
+    _id: d._id,
+    refId: d._id,
+    itemType: 'diamond',
+    isDiamond: true,
+    productType: 'diamond',
+    basicInfo: {
+      title: d.title || '',
+      slug: d.sku || String(d._id),
+    },
+    pricing: {
+      salePrice: Number(d.price) || 0,
+      mrp: Number(d.price) || 0,
+    },
+    image: d.image?.url || '',
+    metalColors: [],
+    carat: d.carat,
+    shape: d.shapeId?.name || '',
+    color: d.colorId?.name || '',
+    clarity: d.clarityId?.name || '',
+    diamondType: d.typeId?.name || '',
+    stockStatus: 'in_stock',
+  };
+}
+
+const normalizeItemType = (itemType) =>
+  String(itemType || 'product').toLowerCase() === 'diamond' ? 'diamond' : 'product';
+
 class WishlistService {
   // ------------------------------- format wishlist ----------------------------
   formatWishlist(wishlistDoc) {
     if (!wishlistDoc) return null;
     const w = typeof wishlistDoc.toObject === 'function' ? wishlistDoc.toObject() : wishlistDoc;
-    const rawList = Array.isArray(w.productIds) ? w.productIds : [];
-    const formattedProducts = rawList
-      .map(formatWishlistProduct)
+    const rawItems = Array.isArray(w.items) ? w.items : [];
+    const formattedItems = rawItems
+      .map((entry) => {
+        const doc = entry?.refId && typeof entry.refId === 'object' ? entry.refId : null;
+        if (!doc) return null;
+        return entry.itemType === 'diamond'
+          ? formatWishlistDiamond(doc)
+          : formatWishlistProduct(doc);
+      })
       .filter(Boolean);
 
     return {
       _id: w._id,
       userId: w.userId,
-      productIds: formattedProducts,
+      items: formattedItems,
       addedAt: w.addedAt,
     };
   }
@@ -77,7 +120,7 @@ class WishlistService {
     if (!wishlist) {
       wishlist = await Wishlist.create({
         userId,
-        productIds: [],
+        items: [],
         addedAt: new Date(),
       });
     }
@@ -88,8 +131,8 @@ class WishlistService {
   // ------------------------------- get count ----------------------------
   async getCount(userId) {
     if (!userId) return { count: 0, wishlistCount: 0 };
-    const wishlist = await Wishlist.findOne({ userId }).select('productIds').lean();
-    const count = wishlist?.productIds?.length || 0;
+    const wishlist = await Wishlist.findOne({ userId }).select('items').lean();
+    const count = wishlist?.items?.length || 0;
     return { count, wishlistCount: count };
   }
 
@@ -99,35 +142,38 @@ class WishlistService {
       return null;
     }
 
-    const wishlist = await Wishlist.findOne({ userId }).populate(PRODUCT_POPULATE_CONFIG);
+    let wishlist = await Wishlist.findOne({ userId }).populate(WISHLIST_POPULATE_CONFIG);
     if (!wishlist) {
-      const created = await this.findOrCreateWishlist(userId);
-      return this.formatWishlist(created);
+      wishlist = await this.findOrCreateWishlist(userId);
     }
 
     return this.formatWishlist(wishlist);
   }
 
   // ------------------------------- toggle item in wishlist ----------------------------
-  async toggleItem({ userId, productData }) {
-    const productId = typeof productData === 'string' ? productData : productData?.productId;
-    if (!productId) {
-      throw new ApiError(400, 'Product ID is required');
+  async toggleItem({ userId, refId, itemType = 'product' }) {
+    const refIdStr = String(refId || '').trim();
+    if (!refIdStr || !mongoose.Types.ObjectId.isValid(refIdStr)) {
+      throw new ApiError(400, 'A valid reference ID is required');
     }
 
-    const productIdStr = String(productId).trim();
+    const resolvedType = normalizeItemType(itemType);
     const wishlist = await this.findOrCreateWishlist(userId);
 
-    const existingIndex = wishlist.productIds.findIndex(
-      (id) => String(id) === productIdStr
+    const existingIndex = wishlist.items.findIndex(
+      (entry) => String(entry.refId) === refIdStr
     );
 
     let isWishlisted = false;
     if (existingIndex > -1) {
-      wishlist.productIds.splice(existingIndex, 1);
+      wishlist.items.splice(existingIndex, 1);
       isWishlisted = false;
     } else {
-      wishlist.productIds.push(productIdStr);
+      wishlist.items.push({
+        itemType: resolvedType,
+        refId: new mongoose.Types.ObjectId(refIdStr),
+        addedAt: new Date(),
+      });
       wishlist.addedAt = new Date();
       isWishlisted = true;
     }
@@ -136,22 +182,29 @@ class WishlistService {
 
     return {
       isWishlisted,
-      wishlistCount: wishlist.productIds.length,
+      wishlistCount: wishlist.items.length,
+      refId: refIdStr,
+      itemType: resolvedType,
     };
   }
 
   // ------------------------------- add item to wishlist ----------------------------
-  async addItem({ userId, productData }) {
-    const productId = typeof productData === 'string' ? productData : productData?.productId;
-    if (!productId) {
-      throw new ApiError(400, 'Product ID is required');
+  async addItem({ userId, refId, itemType = 'product' }) {
+    const refIdStr = String(refId || '').trim();
+    if (!refIdStr || !mongoose.Types.ObjectId.isValid(refIdStr)) {
+      throw new ApiError(400, 'A valid reference ID is required');
     }
 
+    const resolvedType = normalizeItemType(itemType);
     const wishlist = await this.findOrCreateWishlist(userId);
 
-    const exists = wishlist.productIds.some((id) => String(id) === productIdStr);
+    const exists = wishlist.items.some((entry) => String(entry.refId) === refIdStr);
     if (!exists) {
-      wishlist.productIds.push(productIdStr);
+      wishlist.items.push({
+        itemType: resolvedType,
+        refId: new mongoose.Types.ObjectId(refIdStr),
+        addedAt: new Date(),
+      });
       wishlist.addedAt = new Date();
       await wishlist.save();
     }
@@ -160,19 +213,20 @@ class WishlistService {
   }
 
   // ------------------------------- remove item from wishlist ----------------------------
-  async removeItem({ userId, productId }) {
-    if (!productId) {
-      throw new ApiError(400, 'Product ID is required');
+  async removeItem({ userId, refId }) {
+    const refIdStr = String(refId || '').trim();
+    if (!refIdStr || !mongoose.Types.ObjectId.isValid(refIdStr)) {
+      throw new ApiError(400, 'A valid reference ID is required');
     }
-    const productIdStr = String(productId).trim();
+
     const wishlist = await this.findOrCreateWishlist(userId);
 
-    const initialLength = wishlist.productIds.length;
-    wishlist.productIds = wishlist.productIds.filter(
-      (id) => String(id) !== productIdStr
+    const initialLength = wishlist.items.length;
+    wishlist.items = wishlist.items.filter(
+      (entry) => String(entry.refId) !== refIdStr
     );
 
-    if (wishlist.productIds.length !== initialLength) {
+    if (wishlist.items.length !== initialLength) {
       await wishlist.save();
     }
 
@@ -182,7 +236,7 @@ class WishlistService {
   // ------------------------------- clear wishlist ----------------------------
   async clearWishlist(userId) {
     const wishlist = await this.findOrCreateWishlist(userId);
-    wishlist.productIds = [];
+    wishlist.items = [];
     await wishlist.save();
     return this.formatWishlist(wishlist);
   }

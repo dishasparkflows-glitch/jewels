@@ -48,13 +48,12 @@ class CartController {
   // ------------------------------- update quantity ----------------------------
   updateQuantity = catchAsync(async (req, res) => {
     const { userId } = this.getIdentity(req);
-    const { productId, quantity, options } = req.body;
+    const { refId, quantity } = req.body;
 
     const data = await cartService.updateQuantity({
       userId,
-      productId: productId || req.params.productId,
+      refId,
       quantity,
-      options,
     });
 
     try {
@@ -70,11 +69,11 @@ class CartController {
   // ------------------------------- remove item ----------------------------
   removeItem = catchAsync(async (req, res) => {
     const { userId } = this.getIdentity(req);
-    const { productId } = req.params;
+    const { refId } = req.params;
 
     const data = await cartService.removeItem({
       userId,
-      productId,
+      refId,
     });
 
     try {

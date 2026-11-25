@@ -13,7 +13,7 @@ router.use(authenticate);
 router.get('/', wishlistController.getWishlist);
 router.post('/toggle', wishlistController.toggleItem);
 router.post('/add', wishlistController.addItem);
-router.delete('/:productId', wishlistController.removeItem);
+router.delete('/:refId', wishlistController.removeItem);
 router.delete('/', wishlistController.clearWishlist);
 
 module.exports = router;

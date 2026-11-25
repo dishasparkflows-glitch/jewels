@@ -43,7 +43,7 @@ class DashboardService {
       { $unwind: '$items' },
       {
         $group: {
-          _id: '$items.productId',
+          _id: '$items.refId',
           title: { $first: '$items.title' },
           sku: { $first: '$items.sku' },
           price: { $first: '$items.price' },

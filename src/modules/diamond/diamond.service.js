@@ -22,6 +22,34 @@ function getSafePopulates() {
   return POPULATE_FIELDS;
 }
 
+async function resolveAttributeFilterIds(Model, rawValue) {
+  if (!rawValue) return null;
+  const parts = String(rawValue)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return null;
+
+  const objectIds = [];
+  const namePatterns = [];
+  for (const part of parts) {
+    if (mongoose.isValidObjectId(part)) {
+      objectIds.push(new mongoose.Types.ObjectId(part));
+    } else {
+      namePatterns.push(new RegExp(`^${escapeRegex(part)}$`, 'i'));
+    }
+  }
+
+  if (namePatterns.length > 0 && Model) {
+    const matched = await Model.find({ name: { $in: namePatterns } })
+      .select('_id')
+      .lean();
+    matched.forEach((doc) => objectIds.push(doc._id));
+  }
+
+  return objectIds.length > 0 ? { $in: objectIds } : { $in: [] };
+}
+
 class DiamondService {
   // ------------------------------- create diamond ----------------------------
   async create(data) {
@@ -142,7 +170,11 @@ class DiamondService {
   // ------------------------------- get one diamond ----------------------------
 
   async getOne(id) {
-    let query = Diamond.findOne({ _id: id });
+    const cleanId = String(id || '').trim();
+    const filter = mongoose.isValidObjectId(cleanId)
+      ? { _id: cleanId }
+      : { sku: cleanId };
+    let query = Diamond.findOne(filter);
     const populates = getSafePopulates();
     if (populates.length > 0) {
       query = query.populate(populates);
@@ -177,18 +209,40 @@ class DiamondService {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
-    if (queryParams.status) filter.status = queryParams.status;
-    const resolvedColorId = queryParams.colorId || queryParams.color;
-    const resolvedClarityId = queryParams.clarityId || queryParams.clarity;
-    const resolvedShapeId = queryParams.shapeId || queryParams.shape;
-    const resolvedTypeId = queryParams.typeId || queryParams.type;
+    const isForWeb = queryParams.forweb === true || queryParams.forweb === 'true';
+    if (isForWeb) {
+      filter.status = queryParams.status || 'active';
+      filter['visibility.web'] = { $ne: false };
+    } else if (queryParams.status) {
+      filter.status = queryParams.status;
+    }
 
-    if (resolvedColorId) filter.colorId = resolvedColorId;
-    if (resolvedClarityId) filter.clarityId = resolvedClarityId;
-    if (resolvedShapeId) filter.shapeId = resolvedShapeId;
-    if (resolvedTypeId) filter.typeId = resolvedTypeId;
+    const resolvedColorVal = queryParams.colorId || queryParams.color || queryParams.diamondColor;
+    const resolvedClarityVal = queryParams.clarityId || queryParams.clarity || queryParams.diamondClarity;
+    const resolvedShapeVal = queryParams.shapeId || queryParams.shape || queryParams.diamondShape;
+    const resolvedTypeVal = queryParams.typeId || queryParams.type || queryParams.diamondType;
 
-    if (queryParams.minCarat || queryParams.maxCarat) {
+    const [colorFilter, clarityFilter, shapeFilter, typeFilter] = await Promise.all([
+      resolveAttributeFilterIds(DiamondColor, resolvedColorVal),
+      resolveAttributeFilterIds(DiamondClarity, resolvedClarityVal),
+      resolveAttributeFilterIds(DiamondShape, resolvedShapeVal),
+      resolveAttributeFilterIds(DiamondType, resolvedTypeVal),
+    ]);
+
+    if (colorFilter) filter.colorId = colorFilter;
+    if (clarityFilter) filter.clarityId = clarityFilter;
+    if (shapeFilter) filter.shapeId = shapeFilter;
+    if (typeFilter) filter.typeId = typeFilter;
+
+    if (queryParams.carat) {
+      const caratValues = String(queryParams.carat)
+        .split(',')
+        .map((s) => Number(s.trim().replace(/[^\d.]/g, '')))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      if (caratValues.length > 0) {
+        filter.carat = { $in: caratValues };
+      }
+    } else if (queryParams.minCarat || queryParams.maxCarat) {
       filter.carat = {};
       if (queryParams.minCarat) filter.carat.$gte = Number(queryParams.minCarat);
       if (queryParams.maxCarat) filter.carat.$lte = Number(queryParams.maxCarat);
@@ -208,8 +262,18 @@ class DiamondService {
       ];
     }
 
+    const sortMap = {
+      'price-asc': { price: 1, _id: -1 },
+      'price-desc': { price: -1, _id: -1 },
+      'carat-asc': { carat: 1, price: 1 },
+      'carat-desc': { carat: -1, price: -1 },
+      popular: { 'demoMetrics.soldCount': -1, _id: -1 },
+      newest: { _id: -1 },
+    };
+    const sort = sortMap[queryParams.sort] || { _id: -1 };
+
     let findQuery = Diamond.find(filter)
-      .sort({ 'meta.createdAt': -1 })
+      .sort(sort)
       .skip(skip)
       .limit(limit);
 

@@ -30,7 +30,7 @@ class ReturnService {
     const items = Array.isArray(data.items) && data.items.length > 0
       ? data.items
       : order.items.map((it) => ({
-          productId: it.productId,
+          productId: it.refId,
           title: it.title,
           sku: it.sku || '',
           price: it.price || 0,

@@ -1038,7 +1038,7 @@ class AnalyticsService {
         { $unwind: '$items' },
         {
           $group: {
-            _id: '$items.productId',
+            _id: '$items.refId',
             count: { $sum: '$items.quantity' },
             customerIds: { $addToSet: '$userId' },
           },
@@ -1106,10 +1106,10 @@ class AnalyticsService {
       const parsedOffset = Math.max(0, parseInt(offset, 10) || 0);
 
       const wishlistAgg = await Wishlist.aggregate([
-        { $unwind: '$productIds' },
+        { $unwind: '$items' },
         {
           $group: {
-            _id: '$productIds',
+            _id: '$items.refId',
             count: { $sum: 1 },
             customerIds: { $addToSet: '$userId' },
           },
@@ -1238,7 +1238,7 @@ class AnalyticsService {
           { $group: { _id: null, total: { $sum: '$items.quantity' } } },
         ]),
         Wishlist.aggregate([
-          { $unwind: '$productIds' },
+          { $unwind: '$items' },
           { $group: { _id: null, total: { $sum: 1 } } },
         ]),
       ]);
@@ -1391,9 +1391,10 @@ class AnalyticsService {
           ],
         })
           .populate({
-            path: 'items.productId',
-            select: 'basicInfo categoryIds productType',
-            populate: { path: 'categoryIds', select: 'name slug' },
+            path: 'items.refId',
+            select: 'basicInfo categoryIds productType title sku',
+            strictPopulate: false,
+            populate: { path: 'categoryIds', select: 'name slug', strictPopulate: false },
           })
           .lean();
       } catch (err) {
@@ -1425,14 +1426,14 @@ class AnalyticsService {
         if (Array.isArray(order.items)) {
           for (const item of order.items) {
             const itemPrice = Number(item.totalItemPrice) || (Number(item.price) * (item.quantity || 1)) || 0;
-            const p = item.productId;
-            const catName = p?.categoryIds?.[0]?.name || (
+            const p = item.refId;
+            const catName = item.itemType === 'diamond' ? 'Diamond' : (p?.categoryIds?.[0]?.name || (
               item.title?.toLowerCase().includes('ring') ? 'Rings' :
               item.title?.toLowerCase().includes('earring') || item.title?.toLowerCase().includes('butti') ? 'Earrings' :
               item.title?.toLowerCase().includes('pendant') ? 'Pendant' :
               item.title?.toLowerCase().includes('necklace') ? 'Necklace' :
               item.title?.toLowerCase().includes('bangle') || item.title?.toLowerCase().includes('bracelet') ? 'Bangles' : 'Other Jewelry'
-            );
+            ));
             realCategoryMap.set(catName, (realCategoryMap.get(catName) || 0) + itemPrice);
           }
         }

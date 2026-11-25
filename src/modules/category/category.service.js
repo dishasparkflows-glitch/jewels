@@ -80,7 +80,15 @@ class CategoryService {
   // ------------------------------- create category ----------------------------
   async create(data) {
     normalizeSizeChart(data);
-    if (data.order !== undefined) data.order = Number(data.order) || 0;
+    if (data.order === undefined || data.order === null || data.order === '') {
+      const lastCat = await Category.findOne({ 'meta.deletedAt': null })
+        .sort({ order: -1 })
+        .select('order')
+        .lean();
+      data.order = (Number(lastCat?.order) || 0) + 1;
+    } else {
+      data.order = Number(data.order) || 0;
+    }
     return await Category.create(data);
   }
 
@@ -114,7 +122,7 @@ class CategoryService {
       sort = { [queryParams.sortBy]: order };
     }
 
-    const [items, total] = await Promise.all([
+    const [items, total, lastOrderDoc] = await Promise.all([
       Category.find(filter)
         .collation({ locale: 'en', strength: 2 })
         .sort(sort)
@@ -122,13 +130,19 @@ class CategoryService {
         .limit(limit)
         .lean(),
       Category.countDocuments(filter),
+      Category.findOne({ 'meta.deletedAt': null }).sort({ order: -1 }).select('order').lean(),
     ]);
 
     items.forEach((cat) => {
       if (cat.promoBanners) cat.promoBanners = sanitizePromoBanners(cat.promoBanners);
     });
 
-    return { items, pagination: getPaginationMeta(total, page, limit) };
+    const pagination = {
+      ...getPaginationMeta(total, page, limit),
+      maxOrder: Number(lastOrderDoc?.order) || 0,
+    };
+
+    return { items, pagination };
   }
 
   // ------------------------------- get category lookup ----------------------------

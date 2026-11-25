@@ -1,5 +1,31 @@
 const mongoose = require('mongoose');
 
+const resolveWishlistItemModel = function () {
+  const type = String(this?.itemType || 'product').toLowerCase();
+  return type === 'diamond' ? 'Diamond' : 'Product';
+};
+
+const wishlistItemSchema = new mongoose.Schema(
+  {
+    itemType: {
+      type: String,
+      enum: ['product', 'diamond'],
+      default: 'product',
+      required: true,
+    },
+    refId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: resolveWishlistItemModel,
+      required: true,
+    },
+    addedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false }
+);
+
 const wishlistSchema = new mongoose.Schema(
   {
     userId: {
@@ -9,12 +35,7 @@ const wishlistSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
-    productIds: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Product',
-      },
-    ],
+    items: [wishlistItemSchema],
     addedAt: {
       type: Date,
       default: Date.now,

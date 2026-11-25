@@ -18,9 +18,11 @@ class WishlistController {
 
   // ------------------------------- toggle item in wishlist ----------------------------
   toggleItem = catchAsync(async (req, res) => {
+    const { refId, itemType } = req.body || {};
     const result = await wishlistService.toggleItem({
       userId: req.user._id,
-      productData: req.body,
+      refId,
+      itemType,
     });
 
     const msg = result.isWishlisted
@@ -31,7 +33,8 @@ class WishlistController {
       emitWishlistUpdate({
         userId: req.user._id,
         wishlistCount: result.wishlistCount || 0,
-        productId: req.body?.productId,
+        refId: result.refId,
+        itemType: result.itemType,
         isWishlisted: result.isWishlisted,
       });
     } catch {}
@@ -41,16 +44,19 @@ class WishlistController {
 
   // ------------------------------- add item to wishlist ----------------------------
   addItem = catchAsync(async (req, res) => {
+    const { refId, itemType } = req.body || {};
     const result = await wishlistService.addItem({
       userId: req.user._id,
-      productData: req.body,
+      refId,
+      itemType,
     });
 
     try {
       emitWishlistUpdate({
         userId: req.user._id,
-        wishlistCount: result.productIds?.length || 0,
-        productId: req.body?.productId,
+        wishlistCount: result.items?.length || 0,
+        refId,
+        itemType,
         isWishlisted: true,
       });
     } catch {}
@@ -60,17 +66,17 @@ class WishlistController {
 
   // ------------------------------- remove item from wishlist ----------------------------
   removeItem = catchAsync(async (req, res) => {
-    const { productId } = req.params;
+    const { refId } = req.params;
     const result = await wishlistService.removeItem({
       userId: req.user._id,
-      productId,
+      refId,
     });
 
     try {
       emitWishlistUpdate({
         userId: req.user._id,
-        wishlistCount: result.productIds?.length || 0,
-        productId,
+        wishlistCount: result.items?.length || 0,
+        refId,
         isWishlisted: false,
       });
     } catch {}

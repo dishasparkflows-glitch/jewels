@@ -41,7 +41,9 @@ class OrderService {
     if (items.length === 0 && effectiveUserId) {
       const cart = await Cart.findOne({
         userId: effectiveUserId,
-      }).populate('items.productId').lean();
+      })
+        .populate('items.refId')
+        .lean();
 
       if (cart && Array.isArray(cart.items) && cart.items.length > 0) {
         items = mapCartItemsToOrderItems(cart.items);
@@ -196,7 +198,7 @@ class OrderService {
   async getOrderForInvoice(orderId) {
     const order = await Order.findById(orderId)
       .populate('userId', 'profile.firstName profile.lastName auth.email')
-      .populate('items.productId', 'basicInfo media assets ornate colorImages')
+      .populate('items.refId', 'basicInfo media assets ornate colorImages sku title image carat')
       .lean();
     if (!order) {
       throw new ApiError(404, 'Order not found');
@@ -305,7 +307,7 @@ class OrderService {
   async getOrderById(orderId, user = null) {
     const order = await Order.findById(orderId)
       .populate('userId', 'profile.firstName profile.lastName auth.email')
-      .populate('items.productId', 'basicInfo media assets ornate colorImages')
+      .populate('items.refId', 'basicInfo media assets ornate colorImages sku title image carat')
       .populate('orderTimeline.placed.by', 'profile.firstName profile.lastName auth.email role')
       .populate('orderTimeline.accepted.by', 'profile.firstName profile.lastName auth.email role')
       .populate('orderTimeline.cancelled.by', 'profile.firstName profile.lastName auth.email role')
@@ -323,7 +325,7 @@ class OrderService {
   // ------------------------------- get order by number ----------------------------
   async getOrderByNumber(orderNumber, user = null) {
     const order = await Order.findOne({ orderNumber })
-      .populate('items.productId', 'basicInfo media assets ornate colorImages')
+      .populate('items.refId', 'basicInfo media assets ornate colorImages sku title image carat')
       .populate('orderTimeline.placed.by', 'profile.firstName profile.lastName auth.email role')
       .populate('orderTimeline.accepted.by', 'profile.firstName profile.lastName auth.email role')
       .populate('orderTimeline.cancelled.by', 'profile.firstName profile.lastName auth.email role')
@@ -348,7 +350,7 @@ class OrderService {
         .sort({ 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('items.productId', 'basicInfo media assets ornate colorImages')
+        .populate('items.refId', 'basicInfo media assets ornate colorImages sku title image carat')
         .populate('orderTimeline.placed.by', 'profile.firstName profile.lastName auth.email role')
         .populate('orderTimeline.accepted.by', 'profile.firstName profile.lastName auth.email role')
         .populate('orderTimeline.cancelled.by', 'profile.firstName profile.lastName auth.email role')
@@ -370,7 +372,7 @@ class OrderService {
         .skip(skip)
         .limit(limit)
         .populate('userId', 'profile.firstName profile.lastName auth.email')
-        .populate('items.productId', 'basicInfo media assets ornate colorImages')
+        .populate('items.refId', 'basicInfo media assets ornate colorImages sku title image carat')
         .populate('orderTimeline.placed.by', 'profile.firstName profile.lastName auth.email role')
         .populate('orderTimeline.accepted.by', 'profile.firstName profile.lastName auth.email role')
         .populate('orderTimeline.cancelled.by', 'profile.firstName profile.lastName auth.email role')

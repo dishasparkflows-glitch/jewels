@@ -218,11 +218,12 @@ function initViewerSocket(server) {
   return io;
 }
 
-function emitWishlistUpdate({ userId, wishlistCount, productId, isWishlisted }) {
+function emitWishlistUpdate({ userId, wishlistCount, refId, itemType, isWishlisted }) {
   if (!ioInstance) return;
   const payload = {
     wishlistCount: Number(wishlistCount) || 0,
-    productId: productId ? String(productId) : null,
+    refId: refId ? String(refId) : null,
+    itemType: itemType || 'product',
     isWishlisted: Boolean(isWishlisted),
     timestamp: Date.now(),
   };

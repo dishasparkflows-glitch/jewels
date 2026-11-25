@@ -180,6 +180,20 @@ const productSchema = new mongoose.Schema(
       }],
       default: undefined,
     },
+    gemstoneTypeIds: {
+      type: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'GemstoneType',
+      }],
+      default: undefined,
+    },
+    gemstoneShapeIds: {
+      type: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'GemstoneShape',
+      }],
+      default: undefined,
+    },
 
     // ── Media & Color Images ──────────────────────────────────
     productType: {
@@ -316,16 +330,6 @@ const productSchema = new mongoose.Schema(
     visibility: {
       web: { type: Boolean, default: true, index: true },
       app: { type: Boolean, default: true, index: true },
-    },
-    birthMonth: {
-      type: [{
-        type: String,
-        enum: [
-          'January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December',
-        ],
-      }],
-      default: undefined,
     },
     seo: {
       type: seoSchema,

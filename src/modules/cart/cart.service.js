@@ -130,7 +130,7 @@ class CartService {
           id: refId,
           refId,
           itemType,
-          ...(isDiamond ? { isDiamond: true, productType: 'diamond' } : {}),
+          ...(isDiamond ? { productType: 'diamond' } : {}),
           title,
           sku,
           slug,

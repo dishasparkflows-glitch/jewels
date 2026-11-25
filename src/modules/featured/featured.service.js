@@ -43,7 +43,7 @@ class FeaturedService {
     const item = await Featured.findOne(filter)
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
-      .populate('productIds', '_id basicInfo pricing images colorImages ornate')
+      .populate('productIds', '_id basicInfo pricing images colorImages ornate productType isOrnate')
       .lean();
     if (!item) {
       throw new ApiError(404, 'Featured item not found');
@@ -82,7 +82,7 @@ class FeaturedService {
     let query = Featured.find(filter)
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
-      .populate('productIds', '_id basicInfo pricing images colorImages ornate')
+      .populate('productIds', '_id basicInfo pricing images colorImages ornate productType isOrnate')
       .sort({ 'display.order': 1, 'meta.createdAt': -1 })
       .skip(skip)
       .limit(limit);
@@ -168,7 +168,7 @@ class FeaturedService {
     )
       .populate('categoryId', 'name type slug')
       .populate('menuItemIds', 'title')
-      .populate('productIds', '_id basicInfo pricing images colorImages ornate')
+      .populate('productIds', '_id basicInfo pricing images colorImages ornate productType isOrnate')
       .lean();
 
     if (!item) {

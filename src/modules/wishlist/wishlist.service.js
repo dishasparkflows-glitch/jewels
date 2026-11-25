@@ -62,7 +62,6 @@ function formatWishlistDiamond(d) {
     _id: d._id,
     refId: d._id,
     itemType: 'diamond',
-    isDiamond: true,
     productType: 'diamond',
     basicInfo: {
       title: d.title || '',

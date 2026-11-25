@@ -61,7 +61,7 @@ async function formatOrderItems(items = []) {
     const refIdStr = String(rawRefId || '');
     const dbProduct = productMap.get(refIdStr);
     const dbDiamond = diamondMap.get(refIdStr);
-    const isDiamond = Boolean(item.itemType === 'diamond' || item.isDiamond || (!dbProduct && dbDiamond));
+    const isDiamond = Boolean(item.itemType === 'diamond' || (!dbProduct && dbDiamond));
     const resolvedItemType = isDiamond ? 'diamond' : 'product';
 
     const refDoc = typeof item.refId === 'object' ? item.refId : null;

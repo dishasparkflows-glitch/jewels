@@ -937,6 +937,8 @@ const getProductPopulateOptions = () => {
     { path: 'sizeIds', select: 'name _id', strictPopulate: false },
     { path: 'metalColorIds', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
     { path: 'metalPurityIds', select: 'name karat metalType', strictPopulate: false },
+    { path: 'gemstoneTypeIds', select: 'name slug colorCode colorCodeEnd image swatchImage', strictPopulate: false },
+    { path: 'gemstoneShapeIds', select: 'name code image iconSvg', strictPopulate: false },
     { path: 'colorImages.metalColorId', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
     { path: 'variants.metalColorId', select: 'name code colorCode colorCodeEnd', strictPopulate: false },
     { path: 'variants.metalPurityId', select: 'name karat metalType', strictPopulate: false },

@@ -60,6 +60,11 @@ const otpRoutes = require('../modules/otp/otp.routes');
 const shiprocketRoutes = require('../modules/shiprocket/shiprocket.routes');
 const logisticsRoutes = require('../modules/logistics/logistics.routes');
 const returnRoutes = require('../modules/return/return.routes');
+const ownerRoutes = require('../modules/owner/owner.routes');
+const moduleAccessMiddleware = require('../middleware/moduleAccess.middleware');
+
+// Enforce owner-level module access restrictions when active
+router.use(moduleAccessMiddleware);
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -122,5 +127,6 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/static-pages', staticPageRoutes);
 router.use('/common', commonRoutes);
+router.use('/owners', ownerRoutes);
 
 module.exports = router;

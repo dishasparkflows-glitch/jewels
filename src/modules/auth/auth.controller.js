@@ -31,7 +31,10 @@ const googleLogin = catchAsync(async (req, res) => {
 
 // ------------------------------- password reset ----------------------------
 const requestPasswordReset = catchAsync(async (req, res) => {
-  const result = await authService.requestPasswordReset(req.body.email);
+  const result = await authService.requestPasswordReset(req.body.email, {
+    portal: req.body.portal,
+    origin: req.headers.origin || req.headers.referer,
+  });
   return ApiResponse.success(res, result, result.message);
 });
 
@@ -49,7 +52,9 @@ const changePassword = catchAsync(async (req, res) => {
 
 // ------------------------------- get current auth user ----------------------------
 const getMe = catchAsync(async (req, res) => {
-  return ApiResponse.success(res, req.user, 'User fetched successfully');
+  const userObj = req.user?.toObject ? req.user.toObject() : { ...req.user };
+  await authService.attachOwnerAccess(userObj);
+  return ApiResponse.success(res, userObj, 'User fetched successfully');
 });
 
 module.exports = {

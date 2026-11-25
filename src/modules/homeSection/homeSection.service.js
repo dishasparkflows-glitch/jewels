@@ -28,7 +28,7 @@ class HomeSectionService {
 
     const [items, total] = await Promise.all([
       HomeSection.find(filter)
-        .populate('productIds', '_id basicInfo pricing images colorImages title sku slug productType')
+        .populate('productIds', '_id basicInfo pricing images colorImages title sku slug productType isOrnate')
         .sort({ order: 1, _id: 1 })
         .skip(skip)
         .limit(limit)
@@ -45,7 +45,7 @@ class HomeSectionService {
   // ------------------------------- Get One By ID ----------------------------
   async getOne(id) {
     const section = await HomeSection.findById(id)
-      .populate('productIds', '_id basicInfo pricing images colorImages title sku productType')
+      .populate('productIds', '_id basicInfo pricing images colorImages title sku productType isOrnate')
       .lean();
 
     if (!section) {

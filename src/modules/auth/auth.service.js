@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../user/user.model');
+const Owner = require('../owner/owner.model');
 const ApiError = require('../../utils/ApiError');
 const { JWT, STORE_NAME, URL } = require('../../config/constants');
 const smsService = require('../sms/sms.service');
@@ -14,10 +15,33 @@ class AuthService {
   generateToken(user) {
     const userEmail = user.auth?.email || '';
     return jwt.sign(
-      { id: user._id, email: userEmail, role: user.role },
+      {
+        id: user._id,
+        email: userEmail,
+        role: user.role,
+        ownerId: user.ownerId ? String(user.ownerId) : null,
+      },
       JWT.SECRET,
       { expiresIn: JWT.EXPIRES_IN }
     );
+  }
+
+  async attachOwnerAccess(userObj) {
+    if (!userObj?.ownerId) return userObj;
+    const owner = await Owner.findOne({ _id: userObj.ownerId, 'meta.deletedAt': null })
+      .select('_id name websiteUrl status allowedModules')
+      .lean();
+    if (owner) {
+      userObj.ownerAccess = {
+        restricted: true,
+        inactive: owner.status !== 'active',
+        ownerId: owner._id,
+        ownerName: owner.name,
+        allowedModules: owner.status === 'active' ? (owner.allowedModules || []) : [],
+      };
+      userObj.allowedModules = userObj.ownerAccess.allowedModules;
+    }
+    return userObj;
   }
 
   // ------------------------------- check email & phone availability ----------------------------
@@ -183,6 +207,7 @@ class AuthService {
     const token = this.generateToken(user);
     const userObj = user.toObject();
     if (userObj.auth) delete userObj.auth.password;
+    await this.attachOwnerAccess(userObj);
 
     return { user: userObj, token };
   }
@@ -239,7 +264,7 @@ class AuthService {
   }
 
   // ------------------------------- password reset ----------------------------
-  async requestPasswordReset(email) {
+  async requestPasswordReset(email, options = {}) {
     const normalizedEmail = (email || '').trim().toLowerCase();
     const genericResponse = {
       message: 'If an account exists for that email, a password reset link has been sent.',
@@ -255,7 +280,17 @@ class AuthService {
     user.auth.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save();
 
-    const clientUrl = (URL.FRONTEND_URL).replace(/\/+$/, '');
+    const origin = options.origin || '';
+    const isAdminRequest =
+      options.portal === 'admin' ||
+      origin.includes(':5175') ||
+      (options.portal !== 'storefront' && (user.role === 'admin' || user.role === 'super_admin'));
+
+    const baseUrl = isAdminRequest
+      ? (URL.ADMIN_URL)
+      : (URL.FRONTEND_URL);
+
+    const clientUrl = baseUrl.replace(/\/+$/, '');
     const resetUrl = new URL(`${clientUrl}/reset-password`);
     resetUrl.searchParams.set('token', token);
 

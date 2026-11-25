@@ -82,6 +82,12 @@ const userSchema = new mongoose.Schema(
       enum: ['super_admin', 'admin', 'user'],
       default: 'user',
     },
+    ownerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Owner',
+      default: null,
+      index: true,
+    },
     isActive: {
       type: Boolean,
       default: true,

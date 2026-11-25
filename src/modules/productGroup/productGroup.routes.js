@@ -13,6 +13,7 @@ router.get('/ungrouped-products', adminAuth, productGroupController.getUngrouped
 router.get('/summary', adminAuth, productGroupController.getSummary);
 router.post('/bulk-split-individual', adminAuth, productGroupController.bulkSplitIndividual);
 router.post('/bulk-approve', adminAuth, productGroupController.bulkApprove);
+router.post('/bulk-draft', adminAuth, productGroupController.bulkDraft);
 
 // 2. Sync Operations
 router.post('/:id/sync/preview', adminAuth, productGroupController.previewSync);
@@ -23,6 +24,7 @@ router.post('/:id/products', adminAuth, productGroupController.addProducts);
 router.delete('/:id/products/:productId', adminAuth, productGroupController.removeProduct);
 router.post('/:id/move-products', adminAuth, productGroupController.moveProducts);
 router.post('/:id/approve', adminAuth, productGroupController.approveGroup);
+router.post('/:id/draft', adminAuth, productGroupController.draftGroup);
 
 // 4. Group Details & CRUD
 router.get('/:id', productGroupController.getOne);

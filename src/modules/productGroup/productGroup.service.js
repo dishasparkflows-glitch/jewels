@@ -1410,6 +1410,106 @@ class ProductGroupService {
     };
   }
 
+  async draftGroup(groupId, productIds = null, userId = null) {
+    const group = await ProductGroup.findOne({ _id: groupId, 'meta.deletedAt': null });
+    if (!group) throw new ApiError(404, 'Product group not found');
+
+    let targetIds = group.productIds || [];
+    if (Array.isArray(productIds) && productIds.length > 0) {
+      const validCustom = productIds.filter((id) => mongoose.isValidObjectId(id));
+      if (validCustom.length > 0) {
+        targetIds = targetIds.filter((id) =>
+          validCustom.some((cId) => String(cId) === String(id))
+        );
+      }
+    }
+
+    if (!targetIds.length) {
+      throw new ApiError(400, 'No products found in this group to move to draft');
+    }
+
+    const filter = {
+      _id: { $in: targetIds },
+      'meta.deletedAt': null,
+      'ornate.isSold': { $ne: true },
+    };
+
+    const updateResult = await Product.updateMany(filter, {
+      $set: {
+        status: 'draft',
+        'meta.updatedBy': userId,
+        'meta.updatedAt': new Date(),
+      },
+    });
+
+    await this.recalculateGroupRepresentative(groupId);
+
+    const updatedGroup = await this.getGroupById(groupId);
+
+    return {
+      message: `Successfully moved ${updateResult.modifiedCount} product(s) in "${group.groupName}" to draft`,
+      draftedCount: updateResult.modifiedCount,
+      group: updatedGroup,
+    };
+  }
+
+  async bulkDraftGroups(groupIds = [], userId = null) {
+    if (!Array.isArray(groupIds) || groupIds.length === 0) {
+      throw new ApiError(400, 'Please select at least one group to move to draft');
+    }
+
+    const validGroupIds = groupIds.filter((id) => mongoose.isValidObjectId(id));
+    if (!validGroupIds.length) {
+      throw new ApiError(400, 'No valid group IDs provided');
+    }
+
+    const groups = await ProductGroup.find({
+      _id: { $in: validGroupIds },
+      'meta.deletedAt': null,
+    }).select('_id productIds groupName');
+
+    if (!groups.length) {
+      throw new ApiError(404, 'No matching product groups found');
+    }
+
+    const allProductIds = [];
+    groups.forEach((g) => {
+      if (Array.isArray(g.productIds)) {
+        g.productIds.forEach((pid) => {
+          if (pid) allProductIds.push(pid);
+        });
+      }
+    });
+
+    if (!allProductIds.length) {
+      throw new ApiError(400, 'No products found in the selected groups to move to draft');
+    }
+
+    const filter = {
+      _id: { $in: allProductIds },
+      'meta.deletedAt': null,
+      'ornate.isSold': { $ne: true },
+    };
+
+    const updateResult = await Product.updateMany(filter, {
+      $set: {
+        status: 'draft',
+        'meta.updatedBy': userId,
+        'meta.updatedAt': new Date(),
+      },
+    });
+
+    for (const g of groups) {
+      await this.recalculateGroupRepresentative(g._id);
+    }
+
+    return {
+      message: `Successfully moved ${updateResult.modifiedCount} product(s) across ${groups.length} group(s) to draft`,
+      draftedCount: updateResult.modifiedCount,
+      groupsCount: groups.length,
+    };
+  }
+
   async bulkApproveGroups(groupIds = [], userId = null) {
     if (!Array.isArray(groupIds) || groupIds.length === 0) {
       throw new ApiError(400, 'Please select at least one group to approve');

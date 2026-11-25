@@ -90,10 +90,27 @@ class ProductGroupController {
     ApiResponse.success(res, null, result.message);
   });
 
-  approveGroup = catchAsync(async (req, res) => {
+    approveGroup = catchAsync(async (req, res) => {
     const result = await productGroupService.approveGroup(
       req.params.id,
       req.body.productIds,
+      req.user?._id
+    );
+    ApiResponse.success(res, null, result.message);
+  });
+
+  draftGroup = catchAsync(async (req, res) => {
+    const result = await productGroupService.draftGroup(
+      req.params.id,
+      req.body.productIds,
+      req.user?._id
+    );
+    ApiResponse.success(res, null, result.message);
+  });
+
+  bulkDraft = catchAsync(async (req, res) => {
+    const result = await productGroupService.bulkDraftGroups(
+      req.body.groupIds,
       req.user?._id
     );
     ApiResponse.success(res, null, result.message);

@@ -5,7 +5,7 @@ const ApiResponse = require('../../utils/ApiResponse');
 class OwnerController {
   // ------------------------------- get available modules ----------------------------
   getModules = catchAsync(async (req, res) => {
-    const data = ownerService.getAvailableModules();
+    const data = await ownerService.getAvailableModules();
     ApiResponse.success(res, data, 'System modules retrieved successfully');
   });
 

@@ -2,10 +2,11 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { JWT } = require('../config/constants');
 const Owner = require('../modules/owner/owner.model');
+const moduleService = require('../modules/module/module.service');
 const { getModulesForApiPath } = require('../modules/owner/owner.modules');
 
 // Endpoints that are always reachable regardless of owner module selection
-const ALWAYS_ALLOWED_PREFIXES = ['/auth', '/otp', '/common', '/notifications', '/owners/access', '/owners/modules'];
+const ALWAYS_ALLOWED_PREFIXES = ['/auth', '/otp', '/common', '/notifications', '/owners/access', '/owners/modules', '/modules'];
 
 /**
  * Enforces owner-level module access restrictions when an owner context is active
@@ -36,6 +37,20 @@ const moduleAccessMiddleware = async (req, res, next) => {
     }
 
     if (!ownerId || !mongoose.Types.ObjectId.isValid(ownerId)) {
+      const matchingLocalModules = getModulesForApiPath(reqPath);
+      if (matchingLocalModules.length > 0) {
+        const localAllowed = await moduleService.getLocalRestrictedModuleIds();
+        if (Array.isArray(localAllowed)) {
+          const allowedSet = new Set(localAllowed);
+          const isPermitted = matchingLocalModules.some((modId) => allowedSet.has(modId));
+          if (!isPermitted) {
+            return res.status(403).json({
+              success: false,
+              message: 'Access denied. This module is currently inactive in this database.',
+            });
+          }
+        }
+      }
       return next();
     }
 

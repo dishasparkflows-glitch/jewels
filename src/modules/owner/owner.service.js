@@ -1,5 +1,6 @@
 const Owner = require('./owner.model');
 const { SYSTEM_MODULES, VALID_MODULE_IDS } = require('./owner.modules');
+const moduleService = require('../module/module.service');
 const { escapeRegex } = require('../../utils/string');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
@@ -18,11 +19,30 @@ class OwnerService {
   }
 
   // ------------------------------- get all available system modules ----------------------------
-  getAvailableModules() {
+  async getAvailableModules() {
+    const dbModules = await moduleService.getAll();
+    const sysMap = new Map(SYSTEM_MODULES.map((m) => [m.id, m]));
+
+    const sourceModules = dbModules.length > 0
+      ? dbModules.map((m) => {
+          const modSlug = m.slug || m.moduleId || m.id;
+          const sys = sysMap.get(modSlug);
+          return {
+            id: modSlug,
+            slug: modSlug,
+            title: m.name || sys?.title || modSlug,
+            group: m.group || sys?.group || 'General',
+            path: m.path || sys?.path || '',
+            status: m.status || 'active',
+            apiPrefixes: sys?.apiPrefixes || [],
+          };
+        })
+      : SYSTEM_MODULES.map((m) => ({ ...m, slug: m.id, status: 'active' }));
+
     const groupOrder = [];
     const groupMap = {};
 
-    for (const mod of SYSTEM_MODULES) {
+    for (const mod of sourceModules) {
       if (!groupMap[mod.group]) {
         groupOrder.push(mod.group);
         groupMap[mod.group] = {
@@ -34,9 +54,9 @@ class OwnerService {
     }
 
     return {
-      modules: SYSTEM_MODULES,
+      modules: sourceModules,
       groups: groupOrder.map((g) => groupMap[g]),
-      totalModules: SYSTEM_MODULES.length,
+      totalModules: sourceModules.length,
     };
   }
 
@@ -59,13 +79,16 @@ class OwnerService {
 
     const allowedModules = this.normalizeModules(data.allowedModules);
 
-    return await Owner.create({
+    const created = await Owner.create({
       name,
       databaseUrl,
       websiteUrl,
       allowedModules,
       status: data.status === 'inactive' ? 'inactive' : 'active',
     });
+
+    await moduleService.syncOwnerDatabaseModules(created);
+    return created;
   }
 
   // ------------------------------- get one owner ----------------------------
@@ -206,6 +229,8 @@ class OwnerService {
       throw new ApiError(404, 'Owner not found');
     }
 
+    await moduleService.syncOwnerDatabaseModules(item);
+
     return item;
   }
 
@@ -221,6 +246,8 @@ class OwnerService {
       throw new ApiError(404, 'Owner not found');
     }
 
+    await moduleService.syncOwnerDatabaseModules(item);
+
     return { message: 'Owner deleted successfully', id };
   }
 
@@ -230,9 +257,17 @@ class OwnerService {
       throw new ApiError(400, 'Please provide an array of owner IDs to delete');
     }
 
+    const targets = await Owner.find({ _id: { $in: ids }, 'meta.deletedAt': null }).lean();
+
     const result = await Owner.updateMany(
       { _id: { $in: ids }, 'meta.deletedAt': null },
       { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+    );
+
+    await Promise.all(
+      targets.map((owner) =>
+        moduleService.syncOwnerDatabaseModules({ ...owner, status: 'inactive' })
+      )
     );
 
     return {

@@ -7,6 +7,7 @@ const app = require('./app');
 const { startBannerCron } = require('./modules/banner/banner.cron');
 const { startCouponExpirationCron } = require('./modules/coupon/coupon.cron');
 const { startThemeCron } = require('./modules/theme/theme.cron');
+const moduleService = require('./modules/module/module.service');
 
 const http = require('http');
 const { initViewerSocket } = require('./socket/viewers.socket');
@@ -15,6 +16,11 @@ const { initViewerSocket } = require('./socket/viewers.socket');
 connectDB().then(async () => {
   // Initialize and verify Redis connection
   await connectRedis();
+
+  // Ensure the local database has its `modules` collection populated
+  await moduleService.ensureLocalModulesSeeded().catch((err) => {
+    console.warn('⚠️ Failed to seed local modules collection:', err?.message || err);
+  });
 
   // Start recurring banner offer auto-cleanup cron
   startBannerCron();

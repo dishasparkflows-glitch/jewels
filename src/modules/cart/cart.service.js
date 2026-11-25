@@ -200,9 +200,12 @@ class CartService {
     return this.formatCart(cart);
   }
 
-  // ------------------------------- add to cart ----------------------------
-  async addToCart({
-    userId,
+  // ------------------------------- upsert cart item helper ----------------------------
+  /**
+   * Resolves a product or diamond item, normalizes its selected attributes,
+   * and merges it into the provided Mongoose cart document.
+   */
+  async upsertCartItem(cart, {
     refId,
     itemType = 'product',
     quantity = 1,
@@ -211,25 +214,17 @@ class CartService {
     selectedMetal,
     selectedSize,
     selectedAttributes,
+    throwOnInvalid = true,
   } = {}) {
     const rawRefId = String(refId || '').trim();
     if (!rawRefId || !mongoose.Types.ObjectId.isValid(rawRefId)) {
-      throw new ApiError(400, 'A valid reference ID is required');
-    }
-    if (!userId) {
-      throw new ApiError(401, 'Please log in to add items to your cart');
+      if (throwOnInvalid) throw new ApiError(400, 'A valid reference ID is required');
+      return false;
     }
 
     const parsedQty = Math.max(1, parseInt(quantity, 10) || 1);
     const resolvedItemType = String(itemType || 'product').toLowerCase() === 'diamond' ? 'diamond' : 'product';
     const isDiamondItem = resolvedItemType === 'diamond';
-
-    const cart = await this.findOrCreateCart(userId);
-    if (!cart) {
-      throw new ApiError(500, 'Failed to initialize cart');
-    }
-
-    cart.userId = userId;
 
     let found = null;
     let foundDiamond = null;
@@ -239,12 +234,14 @@ class CartService {
         .populate('colorId clarityId shapeId typeId')
         .lean();
       if (!foundDiamond) {
-        throw new ApiError(404, 'Diamond not found');
+        if (throwOnInvalid) throw new ApiError(404, 'Diamond not found');
+        return false;
       }
     } else {
       found = await Product.findById(rawRefId).lean();
       if (!found) {
-        throw new ApiError(404, 'Product not found');
+        if (throwOnInvalid) throw new ApiError(404, 'Product not found');
+        return false;
       }
     }
 
@@ -347,6 +344,84 @@ class CartService {
         addedAt: new Date(),
       });
     }
+
+    return true;
+  }
+
+  // ------------------------------- merge guest cart ----------------------------
+  async mergeCart({ userId, items = [] } = {}) {
+    if (!userId) {
+      throw new ApiError(401, 'Please log in to merge your cart');
+    }
+
+    const cart = await this.findOrCreateCart(userId);
+    if (!cart) {
+      throw new ApiError(500, 'Failed to initialize cart');
+    }
+
+    cart.userId = userId;
+    let modified = false;
+
+    if (Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
+        if (!item || typeof item !== 'object') continue;
+        const refId = item.refId?._id || item.refId || item._id || item.id;
+        const itemType = item.itemType || (item.productType === 'diamond' ? 'diamond' : 'product');
+        const didUpsert = await this.upsertCartItem(cart, {
+          refId,
+          itemType,
+          quantity: item.quantity,
+          price: item.price,
+          totalItemPrice: item.totalItemPrice,
+          selectedMetal: item.selectedMetal,
+          selectedSize: item.selectedSize,
+          selectedAttributes: item.selectedAttributes,
+          throwOnInvalid: false,
+        });
+        if (didUpsert) modified = true;
+      }
+    }
+
+    if (modified) {
+      await cart.save();
+    }
+    await cart.populate(cartPopulateOptions);
+    return this.formatCart(cart);
+  }
+
+  // ------------------------------- add to cart ----------------------------
+  async addToCart({
+    userId,
+    refId,
+    itemType = 'product',
+    quantity = 1,
+    price,
+    totalItemPrice,
+    selectedMetal,
+    selectedSize,
+    selectedAttributes,
+  } = {}) {
+    if (!userId) {
+      throw new ApiError(401, 'Please log in to add items to your cart');
+    }
+
+    const cart = await this.findOrCreateCart(userId);
+    if (!cart) {
+      throw new ApiError(500, 'Failed to initialize cart');
+    }
+
+    cart.userId = userId;
+    await this.upsertCartItem(cart, {
+      refId,
+      itemType,
+      quantity,
+      price,
+      totalItemPrice,
+      selectedMetal,
+      selectedSize,
+      selectedAttributes,
+      throwOnInvalid: true,
+    });
 
     await cart.save();
     await cart.populate(cartPopulateOptions);

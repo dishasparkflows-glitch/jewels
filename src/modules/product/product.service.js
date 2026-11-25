@@ -562,6 +562,189 @@ class ProductService {
     const genders = getShopForGenders(queryParams.shopFor);
     if (genders.length) filter['basicInfo.gender'] = { $in: genders };
 
+    // Dynamic Filter: Diamond & Stone Filters (diamondFilter array or comma string)
+    const rawDiamondFilter = queryParams.diamondFilter || (queryParams.filter && queryParams.filter.diamondFilter);
+    if (rawDiamondFilter) {
+      const rawFilters = Array.isArray(rawDiamondFilter)
+        ? rawDiamondFilter
+        : String(rawDiamondFilter).split(',').map((s) => s.trim()).filter(Boolean);
+      const activeFilters = [...new Set(rawFilters.filter(Boolean))];
+
+      if (activeFilters.length > 0) {
+        const typeConditions = [];
+        const colorstoneConditions = [];
+        const placementConditions = [];
+        const otherConditions = [];
+
+        for (const df of activeFilters) {
+          if (df === 'labgrown' || df === 'lab_grown') {
+            const labTypes = await DiamondType.find({
+              name: { $regex: /lab/i },
+              'meta.deletedAt': null,
+            }).distinct('_id');
+            typeConditions.push({
+              $or: [
+                { 'variants.diamondTypeId': { $in: labTypes } },
+                { 'centerDiamondRows.diamondTypeId': { $in: labTypes } },
+                { 'sideDiamondRows.diamondTypeId': { $in: labTypes } },
+                { 'colorStoneRows.diamondTypeId': { $in: labTypes } },
+                { 'sideColorStoneRows.diamondTypeId': { $in: labTypes } },
+                { 'variants.combination': { $regex: /lab\s*grown/i } },
+              ],
+            });
+          } else if (df === 'natural') {
+            const naturalTypes = await DiamondType.find({
+              name: { $regex: /natural/i },
+              'meta.deletedAt': null,
+            }).distinct('_id');
+            typeConditions.push({
+              $or: [
+                { 'variants.diamondTypeId': { $in: naturalTypes } },
+                { 'centerDiamondRows.diamondTypeId': { $in: naturalTypes } },
+                { 'sideDiamondRows.diamondTypeId': { $in: naturalTypes } },
+                { 'colorStoneRows.diamondTypeId': { $in: naturalTypes } },
+                { 'sideColorStoneRows.diamondTypeId': { $in: naturalTypes } },
+                { 'variants.combination': { $regex: /natural/i } },
+              ],
+            });
+          } else if (df === 'colorstone' || df === 'colorStone') {
+            colorstoneConditions.push({
+              $or: [
+                { stoneConfigType: 'colorStone' },
+                { 'colorStoneRows.0': { $exists: true } },
+                { 'variants.colorStoneCost': { $gt: 0 } },
+                { 'variants.colorStoneWeight': { $gt: 0 } },
+                { 'sideColorStoneRows.0': { $exists: true } },
+                { 'variants.sideColorStoneCost': { $gt: 0 } },
+                { 'variants.sideColorStoneWeight': { $gt: 0 } },
+              ],
+            });
+          } else if (df === 'center_colorstone') {
+            colorstoneConditions.push({
+              $or: [
+                { stoneConfigType: 'colorStone' },
+                { 'colorStoneRows.0': { $exists: true } },
+                { 'variants.colorStoneCost': { $gt: 0 } },
+                { 'variants.colorStoneWeight': { $gt: 0 } },
+              ],
+            });
+          } else if (df === 'side_colorstone') {
+            colorstoneConditions.push({
+              $or: [
+                { sideStoneConfigType: { $in: ['sideColorStone', 'both'] } },
+                { 'sideColorStoneRows.0': { $exists: true } },
+                { 'variants.sideColorStoneCost': { $gt: 0 } },
+                { 'variants.sideColorStoneWeight': { $gt: 0 } },
+              ],
+            });
+          } else if (df === 'center') {
+            placementConditions.push({
+              $and: [
+                {
+                  stoneConfigType: { $ne: 'colorStone' },
+                  $or: [
+                    { 'centerDiamondRows.0': { $exists: true } },
+                    { 'variants.centerDiamondCost': { $gt: 0 } },
+                  ],
+                },
+                {
+                  $or: [
+                    { sideStoneConfigType: { $ne: 'sideDiamond' } },
+                    { 'sideDiamondRows.0': { $exists: false } },
+                    { sideDiamondRows: { $size: 0 } },
+                    { 'variants.sideDiamondCost': { $exists: false } },
+                    { 'variants.sideDiamondCost': { $lte: 0 } },
+                  ],
+                },
+              ],
+            });
+          } else if (df === 'side') {
+            placementConditions.push({
+              $and: [
+                {
+                  sideStoneConfigType: { $ne: 'sideColorStone' },
+                  $or: [
+                    { 'sideDiamondRows.0': { $exists: true } },
+                    { 'variants.sideDiamondCost': { $gt: 0 } },
+                    { 'variants.sideDiamondWeight': { $gt: 0 } },
+                  ],
+                },
+                {
+                  $or: [
+                    { stoneConfigType: { $ne: 'centerDiamond' } },
+                    { 'centerDiamondRows.0': { $exists: false } },
+                    { centerDiamondRows: { $size: 0 } },
+                    { 'variants.centerDiamondCost': { $exists: false } },
+                    { 'variants.centerDiamondCost': { $lte: 0 } },
+                  ],
+                },
+              ],
+            });
+          } else if (df === 'both') {
+            placementConditions.push({
+              $and: [
+                {
+                  stoneConfigType: { $ne: 'colorStone' },
+                  $or: [
+                    { 'centerDiamondRows.0': { $exists: true } },
+                    { 'variants.centerDiamondCost': { $gt: 0 } },
+                  ],
+                },
+                {
+                  sideStoneConfigType: { $ne: 'sideColorStone' },
+                  $or: [
+                    { 'sideDiamondRows.0': { $exists: true } },
+                    { 'variants.sideDiamondCost': { $gt: 0 } },
+                    { 'variants.sideDiamondWeight': { $gt: 0 } },
+                  ],
+                },
+              ],
+            });
+          } else if (df === 'plain' || df === 'no_stones') {
+            otherConditions.push({
+              $and: [
+                { $or: [{ 'centerDiamondRows.0': { $exists: false } }, { centerDiamondRows: { $size: 0 } }] },
+                { $or: [{ 'sideDiamondRows.0': { $exists: false } }, { sideDiamondRows: { $size: 0 } }] },
+                { $or: [{ 'colorStoneRows.0': { $exists: false } }, { colorStoneRows: { $size: 0 } }] },
+                { $or: [{ 'sideColorStoneRows.0': { $exists: false } }, { sideColorStoneRows: { $size: 0 } }] },
+                { $or: [{ 'variants.centerDiamondCost': { $exists: false } }, { 'variants.centerDiamondCost': { $lte: 0 } }] },
+                { $or: [{ 'variants.sideDiamondCost': { $exists: false } }, { 'variants.sideDiamondCost': { $lte: 0 } }] },
+                { $or: [{ 'variants.colorStoneCost': { $exists: false } }, { 'variants.colorStoneCost': { $lte: 0 } }] },
+                { $or: [{ 'variants.sideColorStoneCost': { $exists: false } }, { 'variants.sideColorStoneCost': { $lte: 0 } }] },
+              ],
+            });
+          } else {
+            const rawId = df.startsWith('type_') ? df.replace('type_', '') : df;
+            if (mongoose.Types.ObjectId.isValid(rawId)) {
+              const typeObjId = new mongoose.Types.ObjectId(rawId);
+              typeConditions.push({
+                $or: [
+                  { 'variants.diamondTypeId': typeObjId },
+                  { 'centerDiamondRows.diamondTypeId': typeObjId },
+                  { 'sideDiamondRows.diamondTypeId': typeObjId },
+                  { 'colorStoneRows.diamondTypeId': typeObjId },
+                  { 'sideColorStoneRows.diamondTypeId': typeObjId },
+                ],
+              });
+            }
+          }
+        }
+
+        if (typeConditions.length > 0) {
+          filter.$and = [...(filter.$and || []), typeConditions.length > 1 ? { $or: typeConditions } : typeConditions[0]];
+        }
+        if (colorstoneConditions.length > 0) {
+          filter.$and = [...(filter.$and || []), colorstoneConditions.length > 1 ? { $or: colorstoneConditions } : colorstoneConditions[0]];
+        }
+        if (placementConditions.length > 0) {
+          filter.$and = [...(filter.$and || []), placementConditions.length > 1 ? { $or: placementConditions } : placementConditions[0]];
+        }
+        if (otherConditions.length > 0) {
+          filter.$and = [...(filter.$and || []), otherConditions.length > 1 ? { $or: otherConditions } : otherConditions[0]];
+        }
+      }
+    }
+
     // Dynamic Filter: Diamond Type
     if (queryParams.diamondType) {
       const types = String(queryParams.diamondType).split(',').map((s) => s.trim()).filter(Boolean);
@@ -1681,6 +1864,80 @@ class ProductService {
     }
 
     return { message: 'Product deleted successfully', id };
+  }
+
+  // ------------------------------- recompute and publish catalogue products ----------------------------
+  async recomputeCatalogue(options = {}) {
+    const masters = await loadPricingMasters();
+    const filter = {
+      productType: { $ne: 'silver' },
+      isOrnate: { $ne: true },
+      'meta.deletedAt': null,
+      ...(options.productId ? { _id: options.productId } : {}),
+      ...(options.productIds?.length ? { _id: { $in: options.productIds } } : {}),
+    };
+
+    const count = await Product.countDocuments(filter);
+    const cursor = Product.find(filter).cursor();
+    let processed = 0;
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (let doc = await cursor.next(); doc != null; doc = await cursor.next()) {
+      processed++;
+      try {
+        const productObj = doc.toObject();
+
+        if (Array.isArray(productObj.colorStoneRows) && productObj.colorStoneRows.length > 0) {
+          productObj.colorStoneRows = productObj.colorStoneRows.map((r) => ({
+            ...r,
+            pricePerCarat: 3000,
+          }));
+        }
+        if (Array.isArray(productObj.sideColorStoneRows) && productObj.sideColorStoneRows.length > 0) {
+          productObj.sideColorStoneRows = productObj.sideColorStoneRows.map((r) => ({
+            ...r,
+            pricePerCarat: 3000,
+          }));
+        }
+
+        normalizeStoneConfig(productObj);
+        const pricingResult = calculateProductPricing(productObj, masters);
+
+        if (pricingResult && Array.isArray(pricingResult.variants) && pricingResult.variants.length > 0) {
+          await Product.updateOne(
+            { _id: doc._id },
+            {
+              $set: {
+                stoneConfigType: productObj.stoneConfigType || 'centerDiamond',
+                colorStoneRows: productObj.colorStoneRows || [],
+                sideStoneConfigType: productObj.sideStoneConfigType || 'none',
+                sideColorStoneRows: productObj.sideColorStoneRows || [],
+                variants: pricingResult.variants,
+                'pricing.salePrice': pricingResult.salePrice || 0,
+                'meta.updatedAt': new Date(),
+              },
+            }
+          );
+          updated++;
+        } else {
+          skipped++;
+        }
+      } catch (err) {
+        skipped++;
+        errors.push({ id: String(doc._id), error: err.message });
+      }
+    }
+
+    return {
+      totalFound: count,
+      processed,
+      updated,
+      skipped,
+      errorCount: errors.length,
+      errors: errors.slice(0, 10),
+    };
   }
 }
 

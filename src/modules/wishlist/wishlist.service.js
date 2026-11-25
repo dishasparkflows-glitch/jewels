@@ -187,6 +187,46 @@ class WishlistService {
     };
   }
 
+  // ------------------------------- merge guest wishlist ----------------------------
+  async mergeWishlist({ userId, items = [] } = {}) {
+    const wishlist = await this.findOrCreateWishlist(userId);
+    if (!Array.isArray(items) || items.length === 0) {
+      return this.getWishlist(userId);
+    }
+
+    const existingIds = new Set(wishlist.items.map((entry) => String(entry.refId)));
+    let addedAny = false;
+
+    for (const entry of items) {
+      const rawRefId =
+        typeof entry === 'string'
+          ? entry
+          : entry?.refId?._id || entry?.refId || entry?._id || entry?.id;
+      const refIdStr = String(rawRefId || '').trim();
+      if (!refIdStr || !mongoose.Types.ObjectId.isValid(refIdStr) || existingIds.has(refIdStr)) {
+        continue;
+      }
+
+      const resolvedType = normalizeItemType(
+        entry?.itemType || (entry?.productType === 'diamond' ? 'diamond' : 'product')
+      );
+      wishlist.items.push({
+        itemType: resolvedType,
+        refId: new mongoose.Types.ObjectId(refIdStr),
+        addedAt: new Date(),
+      });
+      existingIds.add(refIdStr);
+      addedAny = true;
+    }
+
+    if (addedAny) {
+      wishlist.addedAt = new Date();
+      await wishlist.save();
+    }
+
+    return this.getWishlist(userId);
+  }
+
   // ------------------------------- add item to wishlist ----------------------------
   async addItem({ userId, refId, itemType = 'product' }) {
     const refIdStr = String(refId || '').trim();

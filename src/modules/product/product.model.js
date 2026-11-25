@@ -290,6 +290,7 @@ const productSchema = new mongoose.Schema(
         diamondType: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondType' },
         diamondShapeId: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape' },
         diamondShape: { type: mongoose.Schema.Types.ObjectId, ref: 'DiamondShape' },
+        pieces: Number,
         caratWeight: Number,
         pricePerCarat: { type: Number, default: 3000 },
       }],

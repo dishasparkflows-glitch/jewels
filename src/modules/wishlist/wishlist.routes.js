@@ -11,6 +11,7 @@ router.use(authenticate);
 
 // Wishlist endpoints
 router.get('/', wishlistController.getWishlist);
+router.post('/merge', wishlistController.mergeWishlist);
 router.post('/toggle', wishlistController.toggleItem);
 router.post('/add', wishlistController.addItem);
 router.delete('/:refId', wishlistController.removeItem);

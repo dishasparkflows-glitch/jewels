@@ -42,6 +42,25 @@ class WishlistController {
     ApiResponse.success(res, result, msg);
   });
 
+  // ------------------------------- merge guest wishlist ----------------------------
+  mergeWishlist = catchAsync(async (req, res) => {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    const result = await wishlistService.mergeWishlist({
+      userId: req.user._id,
+      items,
+    });
+
+    try {
+      emitWishlistUpdate({
+        userId: req.user._id,
+        wishlistCount: result?.items?.length || 0,
+        isWishlisted: true,
+      });
+    } catch {}
+
+    ApiResponse.success(res, result, 'Wishlist merged successfully');
+  });
+
   // ------------------------------- add item to wishlist ----------------------------
   addItem = catchAsync(async (req, res) => {
     const { refId, itemType } = req.body || {};

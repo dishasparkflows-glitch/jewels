@@ -42,6 +42,13 @@ router.patch(
 );
 
 router.post(
+  '/recompute-all',
+  authenticate,
+  authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),
+  productController.recomputeAll
+);
+
+router.post(
   '/bulk-delete',
   authenticate,
   authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN),

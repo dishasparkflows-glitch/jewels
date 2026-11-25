@@ -25,6 +25,22 @@ class CartController {
     ApiResponse.success(res, data, 'Cart retrieved successfully');
   });
 
+  // ------------------------------- merge guest cart ----------------------------
+  mergeCart = catchAsync(async (req, res) => {
+    const userId = req.user?._id;
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    const data = await cartService.mergeCart({ userId, items });
+
+    try {
+      emitCartUpdate({
+        userId,
+        totalItems: data.totalItems,
+      });
+    } catch {}
+
+    ApiResponse.success(res, data, 'Cart merged successfully');
+  });
+
   // ------------------------------- add to cart ----------------------------
   addToCart = catchAsync(async (req, res) => {
     const { userId: authUserId } = this.getIdentity(req);

@@ -128,6 +128,12 @@ class ProductController {
     const result = await productService.delete(req.params.id, req.user?._id);
     ApiResponse.success(res, null, result.message);
   });
+
+  // ------------------------------- recompute catalogue pricing ----------------------------
+  recomputeAll = catchAsync(async (req, res) => {
+    const result = await productService.recomputeCatalogue(req.body);
+    ApiResponse.success(res, result, 'Product prices recomputed and published successfully');
+  });
 }
 
 module.exports = new ProductController();

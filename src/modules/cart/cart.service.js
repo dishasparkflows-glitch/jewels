@@ -82,8 +82,8 @@ class CartService {
         const itemType = item.itemType || 'product';
         const isDiamond = itemType === 'diamond';
         const refId = doc?._id || item.refId;
-        const title = isDiamond ? (doc?.title || '') : (doc?.basicInfo?.title || doc?.title || '');
-        const sku = isDiamond ? (doc?.sku || '') : (doc?.basicInfo?.sku || doc?.sku || '');
+        const title = doc?.basicInfo?.title || '';
+        const sku = doc?.basicInfo?.sku || '';
         const firstImg = isDiamond
           ? (doc?.image?.url || doc?.image || '')
           : (doc?.colorImages?.[0]?.images?.[0] ||
@@ -122,7 +122,7 @@ class CartService {
         } : undefined;
 
         const slug = isDiamond
-          ? (doc?.sku || String(refId || ''))
+          ? (doc?.basicInfo?.slug || doc?.basicInfo?.sku || String(refId || ''))
           : (doc?.basicInfo?.slug || (title ? title.toLowerCase().trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') : ''));
 
         return {

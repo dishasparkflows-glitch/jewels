@@ -69,7 +69,7 @@ const settingSchema = new mongoose.Schema(
     // media compression
     mediaCompression: {
       enabled: { type: Boolean, default: true },
-      quality: { type: Number, min: 50, max: 100, default: 82 },
+      quality: { type: Number, min: 0, max: 100, default: 82 },
       format: { type: String, default: 'image/webp' },
     },
 

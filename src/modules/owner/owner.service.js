@@ -1,11 +1,41 @@
 const Owner = require('./owner.model');
-const { SYSTEM_MODULES, VALID_MODULE_IDS } = require('./owner.modules');
+const {
+  SYSTEM_MODULES,
+  VALID_MODULE_IDS,
+  attachModuleConnections,
+} = require('./owner.modules');
 const moduleService = require('../module/module.service');
+const { syncOwnerReferenceData, getOwnerSeedPreview } = require('./owner.sync');
 const { escapeRegex } = require('../../utils/string');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
+const { encryptDatabaseUrl, decryptDatabaseUrl } = require('../../utils/encryption');
 
 class OwnerService {
+  withDecryptedDatabaseUrl(owner) {
+    if (!owner) return owner;
+    const obj = typeof owner.toObject === 'function' ? owner.toObject() : { ...owner };
+    if (obj.databaseUrl !== undefined) {
+      obj.databaseUrl = decryptDatabaseUrl(obj.databaseUrl);
+    }
+    return obj;
+  }
+
+  withEncryptedDatabaseUrl(owner) {
+    if (!owner) return owner;
+    const obj = typeof owner.toObject === 'function' ? owner.toObject() : { ...owner };
+    if (obj.databaseUrl !== undefined) {
+      const decrypted = decryptDatabaseUrl(obj.databaseUrl);
+      const withoutQuery = String(decrypted || '').split('?')[0].replace(/\/+$/, '');
+      const dbMatch = withoutQuery.match(/^mongodb(?:\+srv)?:\/\/[^/]+\/([^/]+)$/i);
+      const hostMatch = withoutQuery.match(/^mongodb(?:\+srv)?:\/\/(?:[^@]+@)?([^/]+)$/i);
+      obj.databaseName = dbMatch?.[1] || hostMatch?.[1] || '—';
+      obj.databaseUrl = /^mongodb(\+srv)?:\/\//i.test(String(obj.databaseUrl || '').trim())
+        ? encryptDatabaseUrl(obj.databaseUrl)
+        : obj.databaseUrl;
+    }
+    return obj;
+  }
   normalizeModules(modulesInput) {
     if (!Array.isArray(modulesInput)) return [];
     const unique = new Set();
@@ -39,10 +69,12 @@ class OwnerService {
         })
       : SYSTEM_MODULES.map((m) => ({ ...m, slug: m.id, status: 'active' }));
 
+    const enrichedModules = attachModuleConnections(sourceModules);
+
     const groupOrder = [];
     const groupMap = {};
 
-    for (const mod of sourceModules) {
+    for (const mod of enrichedModules) {
       if (!groupMap[mod.group]) {
         groupOrder.push(mod.group);
         groupMap[mod.group] = {
@@ -54,16 +86,16 @@ class OwnerService {
     }
 
     return {
-      modules: sourceModules,
+      modules: enrichedModules,
       groups: groupOrder.map((g) => groupMap[g]),
-      totalModules: sourceModules.length,
+      totalModules: enrichedModules.length,
     };
   }
 
   // ------------------------------- create owner ----------------------------
   async create(data = {}) {
     const name = String(data.name || '').trim();
-    const databaseUrl = String(data.databaseUrl || '').trim();
+    const databaseUrl = decryptDatabaseUrl(data.databaseUrl);
     const websiteUrl = String(data.websiteUrl || '').trim();
 
     if (!name) throw new ApiError(400, 'Owner / client name is required');
@@ -78,17 +110,32 @@ class OwnerService {
     }
 
     const allowedModules = this.normalizeModules(data.allowedModules);
+    const status = data.status === 'inactive' ? 'inactive' : 'active';
+
+    const syncResult = await moduleService.syncOwnerDatabaseModules({
+      name,
+      databaseUrl,
+      allowedModules,
+      status,
+    });
+    if (syncResult?.error) {
+      throw new ApiError(
+        400,
+        `Failed to connect to database URL or update modules table: ${syncResult.error}`
+      );
+    }
 
     const created = await Owner.create({
       name,
-      databaseUrl,
+      databaseUrl: encryptDatabaseUrl(databaseUrl),
       websiteUrl,
       allowedModules,
-      status: data.status === 'inactive' ? 'inactive' : 'active',
+      status,
     });
 
-    await moduleService.syncOwnerDatabaseModules(created);
-    return created;
+    const result = this.withEncryptedDatabaseUrl(created);
+    result.moduleSync = syncResult;
+    return result;
   }
 
   // ------------------------------- get one owner ----------------------------
@@ -97,7 +144,7 @@ class OwnerService {
     if (!item) {
       throw new ApiError(404, 'Owner not found');
     }
-    return item;
+    return this.withEncryptedDatabaseUrl(item);
   }
 
   // ------------------------------- get all owners ----------------------------
@@ -109,9 +156,28 @@ class OwnerService {
       filter.status = queryParams.status;
     }
 
-    if (queryParams.search) {
-      const rx = new RegExp(escapeRegex(queryParams.search.trim()), 'i');
-      filter.$or = [{ name: rx }, { websiteUrl: rx }, { databaseUrl: rx }];
+    const search = String(queryParams.search || '').trim();
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), 'i');
+      const allItems = await Owner.find(filter)
+        .sort({ 'meta.createdAt': -1 })
+        .lean();
+
+      const matched = allItems
+        .filter((item) => {
+          const decryptedUrl = decryptDatabaseUrl(item.databaseUrl);
+          return (
+            rx.test(item.name || '') ||
+            rx.test(item.websiteUrl || '') ||
+            rx.test(decryptedUrl || '')
+          );
+        })
+        .map((item) => this.withEncryptedDatabaseUrl(item));
+
+      return {
+        items: matched.slice(skip, skip + limit),
+        pagination: getPaginationMeta(matched.length, page, limit),
+      };
     }
 
     const [items, total] = await Promise.all([
@@ -123,7 +189,10 @@ class OwnerService {
       Owner.countDocuments(filter),
     ]);
 
-    return { items, pagination: getPaginationMeta(total, page, limit) };
+    return {
+      items: items.map((item) => this.withEncryptedDatabaseUrl(item)),
+      pagination: getPaginationMeta(total, page, limit),
+    };
   }
 
   // ------------------------------- get owners lookup ----------------------------
@@ -136,21 +205,28 @@ class OwnerService {
 
   // ------------------------------- get access config for client/owner ----------------------------
   async getAccessConfig({ ownerId, name, databaseUrl } = {}) {
-    const query = { 'meta.deletedAt': null };
+    let owner = null;
 
     if (ownerId) {
-      query._id = ownerId;
+      owner = await Owner.findOne({ _id: ownerId, 'meta.deletedAt': null })
+        .select('_id name websiteUrl allowedModules status')
+        .lean();
     } else if (name) {
-      query.name = new RegExp(`^${escapeRegex(String(name).trim())}$`, 'i');
+      owner = await Owner.findOne({
+        name: new RegExp(`^${escapeRegex(String(name).trim())}$`, 'i'),
+        'meta.deletedAt': null,
+      })
+        .select('_id name websiteUrl allowedModules status')
+        .lean();
     } else if (databaseUrl) {
-      query.databaseUrl = String(databaseUrl).trim();
+      const targetDbUrl = decryptDatabaseUrl(databaseUrl);
+      const candidates = await Owner.find({ 'meta.deletedAt': null })
+        .select('_id name websiteUrl allowedModules status databaseUrl')
+        .lean();
+      owner = candidates.find((o) => decryptDatabaseUrl(o.databaseUrl) === targetDbUrl) || null;
     } else {
       return { restricted: false, allowedModules: null, owner: null };
     }
-
-    const owner = await Owner.findOne(query)
-      .select('_id name websiteUrl allowedModules status')
-      .lean();
 
     if (!owner) {
       return { restricted: false, allowedModules: null, owner: null };
@@ -185,6 +261,11 @@ class OwnerService {
 
   // ------------------------------- update owner ----------------------------
   async update(id, data = {}) {
+    const current = await Owner.findOne({ _id: id, 'meta.deletedAt': null }).lean();
+    if (!current) {
+      throw new ApiError(404, 'Owner not found');
+    }
+
     const updatePayload = {};
 
     if (data.name !== undefined) {
@@ -201,11 +282,7 @@ class OwnerService {
       updatePayload.name = name;
     }
 
-    if (data.databaseUrl !== undefined) {
-      const databaseUrl = String(data.databaseUrl || '').trim();
-      if (!databaseUrl) throw new ApiError(400, 'Database URL cannot be empty');
-      updatePayload.databaseUrl = databaseUrl;
-    }
+    const effectiveDatabaseUrl = decryptDatabaseUrl(current.databaseUrl);
 
     if (data.websiteUrl !== undefined) {
       updatePayload.websiteUrl = String(data.websiteUrl || '').trim();
@@ -219,6 +296,15 @@ class OwnerService {
       updatePayload.status = data.status === 'inactive' ? 'inactive' : 'active';
     }
 
+    const mergedOwner = { ...current, ...updatePayload, databaseUrl: effectiveDatabaseUrl };
+    const syncResult = await moduleService.syncOwnerDatabaseModules(mergedOwner);
+    if (syncResult?.error) {
+      throw new ApiError(
+        400,
+        `Failed to connect to database URL or update modules table: ${syncResult.error}`
+      );
+    }
+
     const item = await Owner.findOneAndUpdate(
       { _id: id, 'meta.deletedAt': null },
       { $set: updatePayload },
@@ -229,9 +315,36 @@ class OwnerService {
       throw new ApiError(404, 'Owner not found');
     }
 
-    await moduleService.syncOwnerDatabaseModules(item);
+    const result = this.withEncryptedDatabaseUrl(item);
+    result.moduleSync = syncResult;
+    return result;
+  }
 
-    return item;
+  // ------------------------------- get seed preview for owner ----------------------------
+  async getSeedPreview(id) {
+    const owner = await Owner.findOne({ _id: id, 'meta.deletedAt': null }).lean();
+    if (!owner) {
+      throw new ApiError(404, 'Owner not found');
+    }
+    return await getOwnerSeedPreview(this.withDecryptedDatabaseUrl(owner));
+  }
+
+  // ------------------------------- seed categories & master tables for owner ----------------------------
+  async seedReferenceData(id, collections = null) {
+    const owner = await Owner.findOne({ _id: id, 'meta.deletedAt': null }).lean();
+    if (!owner) {
+      throw new ApiError(404, 'Owner not found');
+    }
+
+    const referenceDataSync = await syncOwnerReferenceData(this.withDecryptedDatabaseUrl(owner), collections);
+    if (referenceDataSync?.error) {
+      throw new ApiError(
+        400,
+        `Failed to seed categories & master tables: ${referenceDataSync.error}`
+      );
+    }
+
+    return referenceDataSync;
   }
 
   // ------------------------------- delete owner ----------------------------
@@ -246,7 +359,7 @@ class OwnerService {
       throw new ApiError(404, 'Owner not found');
     }
 
-    await moduleService.syncOwnerDatabaseModules(item);
+    await moduleService.syncOwnerDatabaseModules(this.withDecryptedDatabaseUrl(item));
 
     return { message: 'Owner deleted successfully', id };
   }
@@ -266,7 +379,10 @@ class OwnerService {
 
     await Promise.all(
       targets.map((owner) =>
-        moduleService.syncOwnerDatabaseModules({ ...owner, status: 'inactive' })
+        moduleService.syncOwnerDatabaseModules({
+          ...this.withDecryptedDatabaseUrl(owner),
+          status: 'inactive',
+        })
       )
     );
 

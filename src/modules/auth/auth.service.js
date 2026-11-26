@@ -7,10 +7,39 @@ const ApiError = require('../../utils/ApiError');
 const { JWT, STORE_NAME, URL } = require('../../config/constants');
 const smsService = require('../sms/sms.service');
 const otpService = require('../otp/otp.service');
+const notificationService = require('../notification/notification.service');
 const { sendEmail } = require('../../utils/emailService');
 const { getPasswordResetHtml } = require('../../template');
 
 class AuthService {
+  // ------------------------------- notify admins on customer registration ----------------------------
+  async notifyAdminsOnNewUser(user, source = 'email') {
+    if (!user || (user.role && user.role !== 'user')) return;
+    try {
+      const fullName = `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim();
+      const email = user.auth?.email || '';
+      const rawPhone = user.profile?.phone ? `${user.profile?.countryCode || '+91'} ${user.profile.phone}`.trim() : '';
+      const displayName = fullName || email || 'New Customer';
+      const contactParts = [email, rawPhone].filter(Boolean).join(' · ');
+
+      await notificationService.notifyAdmins({
+        title: 'New User Registered',
+        message: `${displayName} created a new account${contactParts ? ` (${contactParts})` : ''}.`,
+        type: 'info',
+        metadata: {
+          event: 'user_registered',
+          source,
+          customerId: user._id,
+          customerName: displayName,
+          email,
+          phone: rawPhone,
+          link: '/customers',
+        },
+      });
+    } catch (err) {
+      console.warn('Admin new-user notification failed:', err.message);
+    }
+  }
   // ------------------------------- generate auth token ----------------------------
   generateToken(user) {
     const userEmail = user.auth?.email || '';
@@ -129,6 +158,7 @@ class AuthService {
     }
 
     const user = await User.create(data);
+    await this.notifyAdminsOnNewUser(user, 'email');
     try {
       await smsService.sendSignupConfirmation(user);
     } catch (error) {
@@ -248,6 +278,7 @@ class AuthService {
         },
         role: 'user',
       });
+      await this.notifyAdminsOnNewUser(user, 'google');
     } else {
       user.auth.lastLogin = new Date();
       await user.save();

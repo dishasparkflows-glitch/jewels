@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const WhatsAppMessage = require('./whatsappMessage.model');
 const { escapeRegex } = require('../../utils/string');
 const WhatsAppTemplate = require('./whatsappTemplate.model');
@@ -381,6 +382,23 @@ class WhatsAppService {
       throw new ApiError(404, 'WhatsApp message record not found');
     }
     return message;
+  }
+
+    // ------------------------------- bulk delete messages ----------------------------
+  async bulkDeleteMessages(ids = []) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new ApiError(400, 'Please select at least one message to delete');
+    }
+
+    const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (validIds.length === 0) {
+      throw new ApiError(400, 'No valid message IDs provided');
+    }
+
+    const result = await WhatsAppMessage.deleteMany({ _id: { $in: validIds } });
+    return {
+      deletedCount: result.deletedCount || 0,
+    };
   }
 
     // ------------------------------- handle webhook ----------------------------

@@ -69,4 +69,35 @@ const decryptToken = (encryptedPayload) => {
   }
 };
 
-module.exports = { encryptToken, decryptToken };
+const isEncryptedPayload = (value) => {
+  if (typeof value !== 'string') return false;
+  return /^[0-9a-f]{24}:[0-9a-f]+:[0-9a-f]{32}$/i.test(value.trim());
+};
+
+const encryptDatabaseUrl = (url) => {
+  const trimmed = String(url || '').trim();
+  if (!trimmed) return '';
+  if (isEncryptedPayload(trimmed)) return trimmed;
+  return encryptToken(trimmed);
+};
+
+const decryptDatabaseUrl = (value) => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  if (/^mongodb(\+srv)?:\/\//i.test(trimmed) || !isEncryptedPayload(trimmed)) {
+    return trimmed;
+  }
+  try {
+    return decryptToken(trimmed) || '';
+  } catch {
+    return trimmed;
+  }
+};
+
+module.exports = {
+  encryptToken,
+  decryptToken,
+  isEncryptedPayload,
+  encryptDatabaseUrl,
+  decryptDatabaseUrl,
+};

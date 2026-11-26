@@ -1,25 +1,15 @@
 const mongoose = require('mongoose');
 
+const basicInfoSchema = new mongoose.Schema({
+  title: { type: String, trim: true },
+  sku: { type: String, trim: true },
+  slug: { type: String, trim: true },
+  description: { type: String },
+}, { _id: false });
+
 const diamondSchema = new mongoose.Schema(
   {
-    sku: {
-      type: String,
-      required: [true, 'Please add a Diamond SKU'],
-      unique: true,
-      trim: true,
-      index: true,
-    },
-    title: {
-      type: String,
-      required: [true, 'Please add a Diamond title'],
-      trim: true,
-      index: true,
-    },
-    description: {
-      type: String,
-      default: '',
-      trim: true,
-    },
+    basicInfo: basicInfoSchema,
     price: {
       type: Number,
       required: [true, 'Please add the Diamond price'],
@@ -67,8 +57,8 @@ const diamondSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'draft', 'approved'],
-      default: 'active',
+      enum: ['draft', 'approved'],
+      default: 'approved',
       index: true,
     },
     visibility: {

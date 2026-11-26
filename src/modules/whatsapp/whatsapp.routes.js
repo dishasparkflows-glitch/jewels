@@ -29,6 +29,7 @@ router.delete('/templates/:id', ...adminOnly, whatsappController.deleteTemplate)
 router.post('/messages/send-text', ...adminOnly, whatsappController.sendTextMessage);
 router.post('/messages/send-template', ...adminOnly, whatsappController.sendTemplateMessage);
 router.post('/messages/test', ...adminOnly, whatsappController.sendTestMessage);
+router.post('/messages/bulk-delete', ...adminOnly, whatsappController.bulkDeleteMessages);
 router.get('/messages', ...adminOnly, whatsappController.getMessageHistory);
 router.get('/messages/:id', ...adminOnly, whatsappController.getMessageDetails);
 

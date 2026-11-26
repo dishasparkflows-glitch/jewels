@@ -32,4 +32,10 @@ const remove = catchAsync(async (req, res) => {
   return ApiResponse.success(res, null, 'Notification deleted');
 });
 
-module.exports = { getAll, markAsRead, markAllAsRead, getUnreadCount, remove };
+// ------------------------------- bulk delete notifications ----------------------------
+const bulkDelete = catchAsync(async (req, res) => {
+  const result = await notificationService.bulkDelete(req.body?.ids || [], req.user._id);
+  return ApiResponse.success(res, result, `${result.deletedCount} notification(s) deleted`);
+});
+
+module.exports = { getAll, markAsRead, markAllAsRead, getUnreadCount, remove, bulkDelete };

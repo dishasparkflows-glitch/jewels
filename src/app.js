@@ -33,8 +33,18 @@ app.use(cors({
     return callback(new Error(`CORS blocked: Origin ${origin} is not allowed`));
   },
   credentials: true,
-  methods: '*',
-  allowedHeaders: '*',
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'x-owner-id',
+    'x-session-id',
+    'x-file-name',
+    'x-api-key',
+    'Accept',
+    'Origin',
+  ],
 }));
 app.use(express.json({ limit: '10mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

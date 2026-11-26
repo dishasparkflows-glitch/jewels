@@ -217,6 +217,17 @@ function calculateProductPricing(product, masters) {
       400,
       'Too many variants; limit the configuration to 2,000 combinations'
     );
+  const distinctCenterQualityKeys = new Set(
+    choices
+      .filter((ch) => !ch.isColorStone)
+      .map((ch) => {
+        const st = ch.center || ch.side;
+        return st ? `${id(st.diamondColorId)}|${id(st.diamondClarityId)}` : '';
+      })
+      .filter(Boolean)
+  );
+  const hasMultipleCenterQualities = distinctCenterQualityKeys.size > 1;
+
   const seen = new Set();
   const variants = [];
   for (const purity of purities)
@@ -313,14 +324,24 @@ function calculateProductPricing(product, masters) {
         const finalBeforeMarkup = round(subtotal + gst);
         const extra = (finalBeforeMarkup * markup) / 100;
 
+        const primaryAccent = accents[0]?.side || null;
+        const purityShort = purity.karat
+          ? `${purity.karat}KT`
+          : String(purity.name || '').replace(/\s*Gold$/i, '').trim();
+        const puritySkuCode = purity.karat
+          ? `${purity.karat}K`
+          : String(purity.name || '').replace(/kt.*/i, 'K').trim();
+
         let combination = '';
         if (isColorStone) {
-          const csType = masters.labels?.[id(colorStone?.diamondTypeId || colorStone?.diamondType)] || '';
-          const csShape = masters.labels?.[id(colorStone?.diamondShapeId || colorStone?.diamondShape)] || '';
+          const csType = masters.labels?.[id(colorStone?.diamondTypeId || colorStone?.diamondType || primaryAccent?.diamondTypeId)] || '';
+          const sideColor = primaryAccent ? (masters.labels?.[id(primaryAccent.diamondColorId)] || '') : '';
+          const sideClarity = primaryAccent ? (masters.labels?.[id(primaryAccent.diamondClarityId)] || '') : '';
           combination = [
-            purity.name,
             csType,
-            csShape,
+            sideColor,
+            sideClarity,
+            purityShort,
             centerCaratVal ? `${centerCaratVal}ct` : ''
           ].filter(Boolean).join(' · ');
         } else {
@@ -332,27 +353,43 @@ function calculateProductPricing(product, masters) {
             typeName,
             colorName,
             clarityName,
-            purity.name,
-            stone && `${stone.caratWeight}ct`,
+            purityShort,
+            stone && stone.caratWeight ? `${stone.caratWeight}ct` : '',
           ].filter(Boolean).join(' · ');
         }
 
         const stone = center || side;
+        const variantCaratVal = Number(centerCaratVal || stone?.caratWeight || 0);
+        const caratSkuCode = variantCaratVal > 0 ? String(variantCaratVal).replace('.', '') : '';
+        const centerQualitySkuCode =
+          !isColorStone && stone && hasMultipleCenterQualities
+            ? [
+                (masters.labels?.[id(stone.diamondColorId)] || '').replace(/[^a-zA-Z0-9]/g, ''),
+                (masters.labels?.[id(stone.diamondClarityId)] || '').replace(/[^a-zA-Z0-9]/g, ''),
+              ]
+                .filter(Boolean)
+                .join('')
+            : '';
+
         variants.push({
           ...(previous?._id ? { _id: previous._id } : {}),
           pricingKey: key,
           combination,
           sku: [
             product.basicInfo?.sku || 'JEWEL',
-            purity.name,
+            puritySkuCode,
             isColorStone ? 'CS' : (center && 'C'),
-            (accents.length || sideColorStones.length) && 'S'
+            (accents.length || sideColorStones.length) && 'S',
+            centerQualitySkuCode,
+            caratSkuCode,
           ].filter(Boolean).join('-'),
           stock: previous?.stock ?? 0,
           metalPurityId: id(purity),
           ...(isColorStone ? {
-            diamondTypeId: id(colorStone?.diamondTypeId || colorStone?.diamondType) || undefined,
+            diamondTypeId: id(colorStone?.diamondTypeId || colorStone?.diamondType || primaryAccent?.diamondTypeId) || undefined,
             diamondShapeId: id(colorStone?.diamondShapeId || colorStone?.diamondShape) || undefined,
+            diamondColorId: id(primaryAccent?.diamondColorId) || undefined,
+            diamondClarityId: id(primaryAccent?.diamondClarityId) || undefined,
           } : Object.fromEntries(
             dimensions
               .filter((dimKey) => stone?.[dimKey])

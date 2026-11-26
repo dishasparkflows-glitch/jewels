@@ -58,11 +58,11 @@ class DiamondService {
     if (!data.clarityId && data.clarity) data.clarityId = data.clarity;
     if (!data.typeId && data.type) data.typeId = data.type;
 
-    if (data.sku) {
-      data.sku = data.sku.trim();
-      const existing = await Diamond.findOne({ sku: data.sku });
+    if (data.basicInfo?.sku) {
+      data.basicInfo.sku = data.basicInfo.sku.trim();
+      const existing = await Diamond.findOne({ 'basicInfo.sku': data.basicInfo.sku });
       if (existing) {
-        throw new ApiError(409, `Diamond with SKU "${data.sku}" already exists`);
+        throw new ApiError(409, `Diamond with SKU "${data.basicInfo.sku}" already exists`);
       }
     }
     return await Diamond.create(data);
@@ -80,10 +80,18 @@ class DiamondService {
       const colorId = d.colorId || d.color;
       const clarityId = d.clarityId || d.clarity;
 
+      const sku = String(d.basicInfo?.sku || d.sku || '').trim();
+      const title = String(d.basicInfo?.title || d.title || '').trim();
+      const slug = String(d.basicInfo?.slug || d.slug || '').trim();
+      const description = d.basicInfo?.description ?? d.description ?? '';
+
       const doc = {
-        sku: String(d.sku || '').trim(),
-        title: String(d.title || '').trim(),
-        description: d.description || '',
+        basicInfo: {
+          title,
+          sku,
+          slug,
+          description,
+        },
         price: parseFloat(d.price) || 0,
         rate: parseFloat(d.ratePerCarat || d.rate) || 0,
         carat: parseFloat(d.carat) || 0,
@@ -91,7 +99,7 @@ class DiamondService {
         shapeId,
         colorId,
         clarityId,
-        status: d.status || 'active',
+        status: d.status || 'approved',
       };
 
       if (d.image?.url) {
@@ -110,7 +118,7 @@ class DiamondService {
       }
       return {
         updateOne: {
-          filter: { sku: doc.sku },
+          filter: { 'basicInfo.sku': sku },
           update,
           upsert: true,
         },
@@ -150,8 +158,9 @@ class DiamondService {
           clarityId,
         });
       }
-      if (d.sku && typeof d.sku === 'string' && d.sku.trim()) {
-        orConditions.push({ sku: d.sku.trim() });
+      const skuVal = d.basicInfo?.sku || d.sku;
+      if (skuVal && typeof skuVal === 'string' && skuVal.trim()) {
+        orConditions.push({ 'basicInfo.sku': skuVal.trim() });
       }
     }
 
@@ -173,7 +182,7 @@ class DiamondService {
     const cleanId = String(id || '').trim();
     const filter = mongoose.isValidObjectId(cleanId)
       ? { _id: cleanId }
-      : { sku: cleanId };
+      : { $or: [{ 'basicInfo.slug': cleanId }, { 'basicInfo.sku': cleanId }] };
     let query = Diamond.findOne(filter);
     const populates = getSafePopulates();
     if (populates.length > 0) {
@@ -189,7 +198,7 @@ class DiamondService {
 
   async getBySku(sku) {
     let query = Diamond.findOne({
-      sku: sku.trim(),
+      'basicInfo.sku': sku.trim(),
     });
     const populates = getSafePopulates();
     if (populates.length > 0) {
@@ -211,7 +220,7 @@ class DiamondService {
 
     const isForWeb = queryParams.forweb === true || queryParams.forweb === 'true';
     if (isForWeb) {
-      filter.status = queryParams.status || 'active';
+      filter.status = queryParams.status || 'approved';
       filter['visibility.web'] = { $ne: false };
     } else if (queryParams.status) {
       filter.status = queryParams.status;
@@ -256,9 +265,10 @@ class DiamondService {
 
     if (queryParams.search) {
       filter.$or = [
-        { sku: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
-        { title: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
-        { description: new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { 'basicInfo.sku': new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { 'basicInfo.title': new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { 'basicInfo.slug': new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
+        { 'basicInfo.description': new RegExp(escapeRegex(queryParams.search.trim()), 'i') },
       ];
     }
 
@@ -293,7 +303,7 @@ class DiamondService {
   // ------------------------------- get diamond lookup ----------------------------
 
   async getLookup(queryParams = {}) {
-    const filter = { 'meta.deletedAt': null, status: 'active' };
+    const filter = { 'meta.deletedAt': null, status: 'approved' };
 
     const resolvedColorId = queryParams.colorId || queryParams.color;
     const resolvedClarityId = queryParams.clarityId || queryParams.clarity;
@@ -306,7 +316,7 @@ class DiamondService {
     if (resolvedTypeId) filter.typeId = resolvedTypeId;
 
     return await Diamond.find(filter)
-      .select('_id sku title price carat rate image colorId clarityId shapeId typeId')
+      .select('_id basicInfo price carat rate image colorId clarityId shapeId typeId')
       .sort({ carat: 1, price: 1 })
       .lean();
   }
@@ -319,14 +329,14 @@ class DiamondService {
     if (!data.clarityId && data.clarity) data.clarityId = data.clarity;
     if (!data.typeId && data.type) data.typeId = data.type;
 
-    if (data.sku) {
-      data.sku = data.sku.trim();
+    if (data.basicInfo?.sku) {
+      data.basicInfo.sku = data.basicInfo.sku.trim();
       const existing = await Diamond.findOne({
-        sku: data.sku,
+        'basicInfo.sku': data.basicInfo.sku,
         _id: { $ne: id },
       });
       if (existing) {
-        throw new ApiError(409, `Diamond with SKU "${data.sku}" already exists`);
+        throw new ApiError(409, `Diamond with SKU "${data.basicInfo.sku}" already exists`);
       }
     }
 
@@ -355,7 +365,7 @@ class DiamondService {
   async delete(id) {
     const item = await Diamond.findOneAndUpdate(
       { _id: id },
-      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } },
+      { $set: { status: 'draft', 'meta.deletedAt': new Date() } },
       { returnDocument: 'after' }
     );
 
@@ -375,7 +385,7 @@ class DiamondService {
 
     const result = await Diamond.updateMany(
       { _id: { $in: ids } },
-      { $set: { status: 'inactive', 'meta.deletedAt': new Date() } }
+      { $set: { status: 'draft', 'meta.deletedAt': new Date() } }
     );
 
     return {

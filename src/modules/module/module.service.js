@@ -3,8 +3,41 @@ const Module = require('./module.model');
 const { SYSTEM_MODULES } = require('../owner/owner.modules');
 const ApiError = require('../../utils/ApiError');
 const { escapeRegex } = require('../../utils/string');
+const { decryptDatabaseUrl } = require('../../utils/encryption');
 
 class ModuleService {
+  /**
+   * Drops legacy conflicting unique indexes (e.g., `moduleId_1`) and migrates/cleans
+   * any documents missing a valid `slug` before writing module records.
+   */
+  async prepareModulesCollection(col) {
+    if (!col) return;
+
+    const indexes = await col.indexes().catch(() => []);
+    for (const idx of indexes) {
+      if (idx?.name && idx.name !== '_id_' && idx.name !== 'slug_1' && idx.unique) {
+        await col.dropIndex(idx.name).catch(() => {});
+      }
+    }
+
+    const legacyDocs = await col
+      .find({ $or: [{ slug: null }, { slug: { $exists: false } }, { slug: '' }] })
+      .toArray()
+      .catch(() => []);
+
+    for (const doc of legacyDocs) {
+      const legacySlug = String(doc.moduleId || doc.id || '').trim();
+      if (legacySlug) {
+        const exists = await col.findOne({ slug: legacySlug, _id: { $ne: doc._id } });
+        if (!exists) {
+          await col.updateOne({ _id: doc._id }, { $set: { slug: legacySlug } }).catch(() => {});
+          continue;
+        }
+      }
+      await col.deleteOne({ _id: doc._id }).catch(() => {});
+    }
+  }
+
   /**
    * Ensures the currently connected database has a `modules` collection
    * seeded with every module from SYSTEM_MODULES (defaulting new entries to active).
@@ -12,8 +45,16 @@ class ModuleService {
   async ensureLocalModulesSeeded() {
     if (mongoose.connection.readyState !== 1) return [];
 
+    await this.prepareModulesCollection(Module.collection);
+
     const now = new Date();
-    const ops = SYSTEM_MODULES.map((mod) => ({
+    const localModules = [
+      ...SYSTEM_MODULES,
+      ...(SYSTEM_MODULES.some((m) => m.id === 'owners')
+        ? []
+        : [{ id: 'owners', title: 'Website Owners', group: 'Analytics & Administration', path: '/owners' }]),
+    ];
+    const ops = localModules.map((mod) => ({
       updateOne: {
         filter: { slug: mod.id },
         update: {
@@ -49,8 +90,14 @@ class ModuleService {
    * with each module's name and status (`active` if owner is active & module is in allowedModules, else `inactive`).
    */
   async syncOwnerDatabaseModules(owner) {
-    const databaseUrl = String(owner?.databaseUrl || '').trim();
-    if (!databaseUrl) return { synced: false, reason: 'Missing databaseUrl' };
+    const databaseUrl = decryptDatabaseUrl(owner?.databaseUrl);
+    if (!databaseUrl) return { synced: false, error: 'Missing databaseUrl' };
+    if (!/^mongodb(\+srv)?:\/\//i.test(databaseUrl)) {
+      return {
+        synced: false,
+        error: 'Database URL must start with mongodb:// or mongodb+srv://',
+      };
+    }
 
     const allowedSet = new Set(Array.isArray(owner.allowedModules) ? owner.allowedModules : []);
     const ownerActive = owner.status === 'active';
@@ -59,7 +106,8 @@ class ModuleService {
     let ownerConn = null;
     try {
       ownerConn = await mongoose.createConnection(databaseUrl, {
-        serverSelectionTimeoutMS: 5000,
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
       }).asPromise();
 
       // Avoid overwriting the central admin database's own modules catalog if an owner points to the same DB
@@ -72,8 +120,7 @@ class ModuleService {
       }
 
       const col = ownerConn.db.collection('modules');
-      await col.createIndex({ slug: 1 }, { unique: true });
-      await col.createIndex({ status: 1 });
+      await this.prepareModulesCollection(col);
 
       const ops = SYSTEM_MODULES.map((mod) => {
         const status = ownerActive && allowedSet.has(mod.id) ? 'active' : 'inactive';
@@ -106,11 +153,38 @@ class ModuleService {
         await col.bulkWrite(ops, { ordered: false });
       }
 
+      // Ensure any extra/stale modules in the target DB are aligned with the owner's status & permissions
+      const systemSlugs = SYSTEM_MODULES.map((m) => m.id);
+      if (!ownerActive) {
+        await col.updateMany(
+          { slug: { $nin: systemSlugs }, 'meta.deletedAt': null },
+          { $set: { status: 'inactive', 'meta.updatedAt': now } }
+        );
+      } else {
+        const extraAllowed = Array.from(allowedSet).filter((id) => !systemSlugs.includes(id));
+        if (extraAllowed.length > 0) {
+          await col.updateMany(
+            { slug: { $in: extraAllowed }, 'meta.deletedAt': null },
+            { $set: { status: 'active', 'meta.updatedAt': now } }
+          );
+        }
+        await col.updateMany(
+          { slug: { $nin: [...systemSlugs, ...extraAllowed] }, 'meta.deletedAt': null },
+          { $set: { status: 'inactive', 'meta.updatedAt': now } }
+        );
+      }
+
+      // Ensure helpful indexes exist without failing sync if legacy documents conflict
+      await col.createIndex({ slug: 1 }, { unique: true }).catch(() => {});
+      await col.createIndex({ status: 1 }).catch(() => {});
+
+      const activeCount = ops.filter((op) => op.updateOne.update.$set.status === 'active').length;
       return {
         synced: true,
         database: ownerConn.name,
         totalModules: ops.length,
-        activeCount: ops.filter((op) => op.updateOne.update.$set.status === 'active').length,
+        activeCount,
+        inactiveCount: ops.length - activeCount,
       };
     } catch (err) {
       console.warn(`⚠️ Failed to sync modules table for owner "${owner?.name || 'unknown'}":`, err.message);

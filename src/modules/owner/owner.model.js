@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { encryptDatabaseUrl } = require('../../utils/encryption');
 
 const ownerSchema = new mongoose.Schema(
   {
@@ -35,5 +36,11 @@ const ownerSchema = new mongoose.Schema(
     collection: 'owners',
   }
 );
+
+ownerSchema.pre('save', function encryptOwnerDatabaseUrl() {
+  if (this.isModified('databaseUrl') && this.databaseUrl) {
+    this.databaseUrl = encryptDatabaseUrl(this.databaseUrl);
+  }
+});
 
 module.exports = mongoose.model('Owner', ownerSchema, 'owners');

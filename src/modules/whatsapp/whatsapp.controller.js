@@ -69,6 +69,11 @@ class WhatsAppController {
   // ─── Templates ─────────────────────────────────────────────────────
 
     // ------------------------------- get whatsapp templates ----------------------------
+  bulkDeleteMessages = catchAsync(async (req, res) => {
+    const result = await whatsappService.bulkDeleteMessages(req.body?.ids);
+    ApiResponse.success(res, result, 'Selected messages deleted successfully');
+  });
+
   getTemplates = catchAsync(async (req, res) => {
     const { items, pagination } = await whatsappTemplateService.getTemplates(req.query);
     ApiResponse.paginated(res, items, pagination, 'WhatsApp templates retrieved successfully');

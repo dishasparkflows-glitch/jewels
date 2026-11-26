@@ -59,6 +59,18 @@ class OwnerController {
     const result = await ownerService.bulkDelete(ids);
     ApiResponse.success(res, result, result.message);
   });
+
+  // ------------------------------- get seed preview for owner ----------------------------
+  getSeedPreview = catchAsync(async (req, res) => {
+    const result = await ownerService.getSeedPreview(req.params.id);
+    ApiResponse.success(res, result, 'Seed preview loaded successfully');
+  });
+
+  // ------------------------------- seed owner categories & master data ----------------------------
+  seedData = catchAsync(async (req, res) => {
+    const result = await ownerService.seedReferenceData(req.params.id, req.body?.collections);
+    ApiResponse.success(res, result, 'Categories and master tables seeded successfully');
+  });
 }
 
 module.exports = new OwnerController();

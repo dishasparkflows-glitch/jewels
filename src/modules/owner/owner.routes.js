@@ -16,6 +16,8 @@ router.get('/', ownerController.getAll);
 router.get('/:id', ownerController.getOne);
 router.post('/', ownerController.create);
 router.put('/:id', ownerController.update);
+router.get('/:id/seed-preview', ownerController.getSeedPreview);
+router.post('/:id/seed-data', ownerController.seedData);
 router.post('/bulk-delete', ownerController.bulkDelete);
 router.delete('/:id', ownerController.delete);
 

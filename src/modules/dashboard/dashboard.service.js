@@ -4,6 +4,26 @@ const User = require('../user/user.model');
 const Review = require('../review/review.model');
 const Order = require('../order/order.model');
 
+const extractFirstProductImage = (prod) => {
+  if (!prod) return null;
+
+  if (Array.isArray(prod.colorImages)) {
+    for (const group of prod.colorImages) {
+      if (!Array.isArray(group?.images)) continue;
+      const img = group.images.find((m) => m?.url && m?.mediaType !== 'video') || group.images.find((m) => m?.url);
+      if (img?.url) return img.url;
+    }
+  }
+
+  const ornateImgs = prod.ornate?.ornateImages || prod.ornateImages;
+  if (Array.isArray(ornateImgs)) {
+    const img = ornateImgs.find((m) => m?.url && m?.mediaType !== 'video') || ornateImgs.find((m) => m?.url);
+    if (img?.url) return img.url;
+  }
+
+  return null;
+};
+
 class DashboardService {
   // ------------------------------- GET Dashboard Summary Counts ----------------------------
   /**
@@ -60,7 +80,7 @@ class DashboardService {
     const productsMap = new Map();
     if (productIds.length > 0) {
       const products = await Product.find({ _id: { $in: productIds } })
-        .select('basicInfo pricing colorImages ornateImages')
+        .select('basicInfo pricing colorImages ornate.ornateImages')
         .lean();
       products.forEach((p) => productsMap.set(String(p._id), p));
     }
@@ -70,21 +90,18 @@ class DashboardService {
       const title = prod?.basicInfo?.title || item.title || 'Untitled Jewelry';
       const sku = prod?.basicInfo?.sku || item.sku || 'SKU-N/A';
       const price = item.price || prod?.pricing?.salePrice || prod?.pricing?.calculatedPrice || prod?.pricing?.mrp || 0;
-      const imageUrl =
-        prod?.colorImages?.[0]?.images?.[0]?.url ||
-        prod?.ornateImages?.[0]?.url ||
-        null;
+      const imageUrl = extractFirstProductImage(prod);
 
       return {
-        _id: item._id,
+        _id: prod?._id || item._id,
         rank: idx + 1,
-        title,
-        sku,
+        basicInfo: prod?.basicInfo || { title, sku },
         price,
         formattedPrice: `₹${Number(price).toLocaleString('en-IN')}`,
         ordersCount: item.ordersCount || 1,
         totalQuantity: item.totalQuantity || 1,
         imageUrl,
+        images: imageUrl ? [imageUrl] : [],
       };
     });
 
@@ -97,28 +114,25 @@ class DashboardService {
         status: 'approved',
         _id: { $nin: existingIds },
       })
-        .select('basicInfo pricing colorImages ornateImages')
+        .select('basicInfo pricing colorImages ornate.ornateImages')
         .sort({ 'meta.createdAt': -1, createdAt: -1 })
         .limit(remaining)
         .lean();
 
       fallbackProducts.forEach((prod) => {
         const price = prod.pricing?.salePrice || prod.pricing?.calculatedPrice || prod.pricing?.mrp || 0;
-        const imageUrl =
-          prod.colorImages?.[0]?.images?.[0]?.url ||
-          prod.ornateImages?.[0]?.url ||
-          null;
+        const imageUrl = extractFirstProductImage(prod);
 
         result.push({
           _id: prod._id,
           rank: result.length + 1,
-          title: prod.basicInfo?.title || 'Jewelry Product',
-          sku: prod.basicInfo?.sku || 'SKU-N/A',
+          basicInfo: prod.basicInfo,
           price,
           formattedPrice: `₹${Number(price).toLocaleString('en-IN')}`,
           ordersCount: 0,
           totalQuantity: 0,
           imageUrl,
+          images: imageUrl ? [imageUrl] : [],
         });
       });
     }

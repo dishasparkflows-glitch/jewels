@@ -261,7 +261,7 @@ class AnalyticsService {
               .populate('categoryIds', 'name')
               .lean(),
             Diamond.find({ _id: { $in: validObjectIds }, 'meta.deletedAt': null })
-              .select('title sku images price shape color clarity carat slug')
+              .select('basicInfo images price shape color clarity carat')
               .lean()
           );
         } else {
@@ -342,12 +342,13 @@ class AnalyticsService {
         });
 
         (dbDiamonds || []).forEach((d) => {
+          const dSlug = d.basicInfo?.slug || String(d._id);
           const data = {
             id: String(d._id),
-            title: d.title || 'Certified Diamond',
-            name: d.title || 'Certified Diamond',
-            sku: d.sku || null,
-            slug: d.slug || String(d._id),
+            title: d.basicInfo?.title || 'Certified Diamond',
+            name: d.basicInfo?.title || 'Certified Diamond',
+            sku: d.basicInfo?.sku || null,
+            slug: dSlug,
             price: d.price || null,
             productType: 'diamond',
             itemType: 'diamond',
@@ -355,7 +356,7 @@ class AnalyticsService {
             image: getDiamondImg(d),
           };
           registerProduct(d._id, data);
-          if (d.slug) registerProduct(d.slug, data);
+          if (d.basicInfo?.slug) registerProduct(d.basicInfo.slug, data);
         });
 
         // Resolve customer lead contact details if customer IDs are present

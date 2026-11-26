@@ -158,9 +158,32 @@ class ProductService {
 
   // Refresh calculated prices before DB filtering/sorting so listing prices and
   // detail prices use the same current master rates. Manual/ERP rows are untouched.
-  async refreshCalculatedPrices() {
-    if (this.pricingRefresh) return this.pricingRefresh;
-    this.pricingRefresh = (async () => {
+  _invalidateProductCaches() {
+    this._lastPricingRefreshAt = 0;
+    if (this._detailCache) this._detailCache.clear();
+  }
+
+  async _getCachedCertificateImage() {
+    const now = Date.now();
+    if (this._certCache && now - this._certCache.at < 60_000) {
+      return this._certCache.value;
+    }
+    const setting = await Setting.findOne().select('certificateImage').lean();
+    const value = setting?.certificateImage || null;
+    this._certCache = { value, at: now };
+    return value;
+  }
+
+  async refreshCalculatedPrices({ force = false, background = false } = {}) {
+    const now = Date.now();
+    if (!force && this._lastPricingRefreshAt && now - this._lastPricingRefreshAt < 5 * 60 * 1000) {
+      return;
+    }
+    if (this.pricingRefresh) {
+      return background ? undefined : this.pricingRefresh;
+    }
+
+    const runRefresh = (async () => {
       const products = await Product.find({
         productType: { $ne: 'silver' },
         isOrnate: { $ne: true },
@@ -194,13 +217,23 @@ class ProductService {
           continue;
         }
       }
-      if (writes.length) await Product.bulkWrite(writes);
+      if (writes.length) {
+        await Product.bulkWrite(writes);
+        if (this._detailCache) this._detailCache.clear();
+      }
+      this._lastPricingRefreshAt = Date.now();
     })();
-    try {
-      await this.pricingRefresh;
-    } finally {
+
+    this.pricingRefresh = runRefresh;
+    const cleanup = runRefresh.finally(() => {
       this.pricingRefresh = null;
+    });
+
+    if (background) {
+      cleanup.catch((err) => console.warn('Background pricing refresh failed:', err));
+      return;
     }
+    await cleanup;
   }
 
   // ------------------------------- create product ----------------------------
@@ -276,14 +309,31 @@ class ProductService {
 
   // ------------------------------- get product by sku or tag ----------------------------
   async getBySkuOrTag(code, userId = null) {
-    await this.refreshCalculatedPrices();
+    // Never block product detail loads with a full-catalog pricing scan
+    this.refreshCalculatedPrices({ background: true });
+
+    if (!this._detailCache) {
+      this._detailCache = new Map();
+    }
+
+    const cacheKey = String(code || '').trim();
+    const cached = this._detailCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < 60_000) {
+      if (!userId) return cached.data;
+      const wishlistedSet = await this._getWishlistSet(userId);
+      return {
+        ...cached.data,
+        inWishlist: wishlistedSet.has(String(cached.data._id)),
+      };
+    }
+
     const product = await resolveProductByCodeOrId(code, this._getProductPopulateOptions());
     if (!product) {
       throw new ApiError(404, `Product with SKU/Tag "${code}" not found`);
     }
 
-    const [setting, wishlistedSet, sizeChart, reviews] = await Promise.all([
-      Setting.findOne().select('certificateImage').lean(),
+    const [defaultCertImage, wishlistedSet, sizeChart, reviews] = await Promise.all([
+      this._getCachedCertificateImage(),
       this._getWishlistSet(userId),
       this._extractSizeChart(product),
       Review.find({
@@ -298,12 +348,25 @@ class ProductService {
 
     const certificateImage = product.certificateImage?.url
       ? product.certificateImage
-      : setting?.certificateImage || null;
+      : defaultCertImage;
+
+    const baseProduct = withColorStatuses({
+      ...product,
+      certificateImage,
+      inWishlist: false,
+      sizeChart,
+      reviews: reviews || [],
+    });
+    const formattedBase = formatStorefrontProductDetail(baseProduct);
+
+    if (this._detailCache.size >= 200) {
+      const oldestKey = this._detailCache.keys().next().value;
+      if (oldestKey !== undefined) this._detailCache.delete(oldestKey);
+    }
+    this._detailCache.set(cacheKey, { data: formattedBase, at: Date.now() });
 
     const inWishlist = wishlistedSet.has(String(product._id));
-
-    const fullProduct = withColorStatuses({ ...product, certificateImage, inWishlist, sizeChart, reviews: reviews || [] });
-    return formatStorefrontProductDetail(fullProduct);
+    return inWishlist ? { ...formattedBase, inWishlist: true } : formattedBase;
   }
 
   _getProductPopulateOptions() {
@@ -320,7 +383,7 @@ class ProductService {
 
   // ------------------------------- get all products ----------------------------
   async getAll(queryParams = {}, userId = null) {
-    await this.refreshCalculatedPrices();
+    this.refreshCalculatedPrices({ background: true });
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
@@ -1809,6 +1872,7 @@ class ProductService {
       console.error(`Error refreshing groups after status update (${id}):`, err);
     }
 
+    this._invalidateProductCaches();
     return product;
   }
 
@@ -1832,6 +1896,7 @@ class ProductService {
     } catch (err) {
       console.error('Error refreshing groups after product bulk delete:', err);
     }
+    this._invalidateProductCaches();
     return {
       message: `${result.modifiedCount || 0} product(s) deleted successfully`,
       deletedCount: result.modifiedCount || 0,
@@ -1862,6 +1927,8 @@ class ProductService {
     } catch (err) {
       console.error(`Error refreshing groups after product delete (${id}):`, err);
     }
+
+    this._invalidateProductCaches();
 
     return { message: 'Product deleted successfully', id };
   }

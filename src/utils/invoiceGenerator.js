@@ -235,6 +235,53 @@ function drawGlobeIcon(doc, x, y, color = '#8C6D46') {
   doc.restore();
 }
 
+function drawCardIcon(doc, x, y, color = '#8C6D46') {
+  doc.save();
+  doc.strokeColor(color).lineWidth(0.85);
+  doc.roundedRect(x, y, 13, 9.5, 1.5).stroke();
+  doc.moveTo(x, y + 3.2).lineTo(x + 13, y + 3.2).stroke();
+  doc.rect(x + 2.2, y + 5.6, 3.2, 1.8).fill(color);
+  doc.restore();
+}
+
+function drawLotusEmblem(doc, cx, cy, color = '#8C6D46') {
+  doc.save();
+  doc.strokeColor(color).lineWidth(1.0);
+  // Four-petal luxury diamond lotus emblem
+  doc.path(`M ${cx},${cy - 10} Q ${cx + 5},${cy - 5} ${cx},${cy} Q ${cx - 5},${cy - 5} ${cx},${cy - 10} Z`).stroke();
+  doc.path(`M ${cx},${cy + 10} Q ${cx + 5},${cy + 5} ${cx},${cy} Q ${cx - 5},${cy + 5} ${cx},${cy + 10} Z`).stroke();
+  doc.path(`M ${cx - 10},${cy} Q ${cx - 5},${cy - 5} ${cx},${cy} Q ${cx - 5},${cy + 5} ${cx - 10},${cy} Z`).stroke();
+  doc.path(`M ${cx + 10},${cy} Q ${cx + 5},${cy - 5} ${cx},${cy} Q ${cx + 5},${cy + 5} ${cx + 10},${cy} Z`).stroke();
+  doc.circle(cx, cy, 1.6).fill(color);
+  doc.restore();
+}
+
+function drawCornerBotanical(doc, pageWidth) {
+  doc.save();
+  doc.strokeColor('#E6DACA').lineWidth(0.7);
+  // Subtle top-right botanical leaf line art
+  const ox = pageWidth;
+  doc.path(`M ${ox - 95},0 Q ${ox - 65},22 ${ox - 20},45`).stroke();
+  doc.path(`M ${ox - 72},14 Q ${ox - 82},28 ${ox - 62},32 Q ${ox - 60},20 ${ox - 72},14 Z`).stroke();
+  doc.path(`M ${ox - 50},25 Q ${ox - 58},42 ${ox - 36},44 Q ${ox - 36},30 ${ox - 50},25 Z`).stroke();
+  doc.path(`M ${ox - 28},38 Q ${ox - 32},54 ${ox - 12},56 Q ${ox - 14},42 ${ox - 28},38 Z`).stroke();
+  doc.path(`M ${ox - 42},0 Q ${ox - 25},20 ${ox},32`).stroke();
+  doc.path(`M ${ox - 26},10 Q ${ox - 10},4 ${ox - 6},20 Q ${ox - 20},20 ${ox - 26},10 Z`).stroke();
+  doc.restore();
+}
+
+function drawBottomBorderPattern(doc, pageWidth, pageHeight) {
+  doc.save();
+  doc.strokeColor('#EAE0D2').lineWidth(0.65);
+  const baseY = pageHeight;
+  const step = 26;
+  for (let x = 0; x < pageWidth + step; x += step) {
+    doc.circle(x, baseY - 2, 13).stroke();
+    doc.circle(x + step / 2, baseY - 2, 13).stroke();
+  }
+  doc.restore();
+}
+
 function drawDiamondFallback(doc, boxX, boxY, boxSize) {
   const cx = boxX + boxSize / 2;
   const cy = boxY + boxSize / 2;
@@ -388,10 +435,12 @@ async function generateInvoicePDF(order, options = {}) {
       const rightMargin = pageWidth - 36; // 559.28
       const contentWidth = rightMargin - leftMargin; // 523.28
 
-      // Background warm ivory tint
+      // Background warm ivory tint + subtle luxury accents
       doc.rect(0, 0, pageWidth, pageHeight).fill('#FAF7F2');
+      drawCornerBotanical(doc, pageWidth);
+      drawBottomBorderPattern(doc, pageWidth, pageHeight);
 
-      let y = 36;
+      let y = 34;
 
       const brandName = (
         options.brandName ||
@@ -400,84 +449,70 @@ async function generateInvoicePDF(order, options = {}) {
       ).toUpperCase();
 
       // ─── 1. Header: Brand Logo & Tax Invoice Badge ───
-      // Left Logo: Use stored logo image from Setting if available, else fallback to vector/text
       if (logoBuffer) {
         try {
-          doc.image(logoBuffer, leftMargin, y - 2, { fit: [126, 38] });
+          doc.image(logoBuffer, leftMargin, y - 2, { fit: [130, 38] });
         } catch (_) {
-          doc.font('Serif-Bold').fontSize(22).fillColor('#2B2015').text(brandName, leftMargin, y);
-          const brandWidth = doc.widthOfString(brandName);
-          doc.font('Sans').fontSize(9).fillColor('#8C6D46').text('®', leftMargin + brandWidth + 1, y - 2);
-
-          doc.save();
-          doc.strokeColor('#8C6D46').lineWidth(1.2);
-          doc.path(`M ${leftMargin - 2},${y + 24} Q ${leftMargin + brandWidth / 2},${y + 29} ${leftMargin + brandWidth + 16},${y + 23}`).stroke();
-          doc.restore();
-
-          doc.font('Serif').fontSize(6.5).fillColor('#8C6D46').text('LUXURY JEWELLERY', leftMargin, y + 28, {
-            characterSpacing: 2,
+          drawLotusEmblem(doc, leftMargin + 12, y + 15, '#8C6D46');
+          doc.font('Serif').fontSize(20).fillColor('#2B2015').text(brandName, leftMargin + 30, y + 2, { characterSpacing: 2 });
+          const brandWidth = doc.widthOfString(brandName, { characterSpacing: 2 });
+          doc.font('Sans').fontSize(8).fillColor('#8C6D46').text('®', leftMargin + 30 + brandWidth + 1, y + 1);
+          doc.font('Sans').fontSize(6.5).fillColor('#8C6D46').text('LUXURY JEWELLERS', leftMargin + 30, y + 25, {
+            characterSpacing: 2.2,
           });
         }
       } else {
-        doc.font('Serif-Bold').fontSize(22).fillColor('#2B2015').text(brandName, leftMargin, y);
-        const brandWidth = doc.widthOfString(brandName);
-        doc.font('Sans').fontSize(9).fillColor('#8C6D46').text('®', leftMargin + brandWidth + 1, y - 2);
-
-        doc.save();
-        doc.strokeColor('#8C6D46').lineWidth(1.2);
-        doc.path(`M ${leftMargin - 2},${y + 24} Q ${leftMargin + brandWidth / 2},${y + 29} ${leftMargin + brandWidth + 16},${y + 23}`).stroke();
-        doc.restore();
-
-        doc.font('Serif').fontSize(6.5).fillColor('#8C6D46').text('LUXURY JEWELLERY', leftMargin, y + 28, {
-          characterSpacing: 2,
+        drawLotusEmblem(doc, leftMargin + 12, y + 15, '#8C6D46');
+        doc.font('Serif').fontSize(20).fillColor('#2B2015').text(brandName, leftMargin + 30, y + 2, { characterSpacing: 2 });
+        const brandWidth = doc.widthOfString(brandName, { characterSpacing: 2 });
+        doc.font('Sans').fontSize(8).fillColor('#8C6D46').text('®', leftMargin + 30 + brandWidth + 1, y + 1);
+        doc.font('Sans').fontSize(6.5).fillColor('#8C6D46').text('LUXURY JEWELLERS', leftMargin + 30, y + 25, {
+          characterSpacing: 2.2,
         });
       }
 
       // Vertical Divider next to logo
-      const logoRightX = leftMargin + 145;
-      doc.strokeColor('#D8CBBF').lineWidth(0.8).moveTo(logoRightX, y + 4).lineTo(logoRightX, y + 34).stroke();
+      const logoRightX = leftMargin + 160;
+      doc.strokeColor('#D8CBBF').lineWidth(0.8).moveTo(logoRightX, y + 4).lineTo(logoRightX, y + 32).stroke();
 
       // Shaping Masterpieces tagline
-      doc.font('Sans-Bold').fontSize(7.5).fillColor('#7A5B3A').text('SHAPING MASTERPIECES', logoRightX + 16, y + 10, {
+      doc.font('Sans-Bold').fontSize(7.5).fillColor('#6E5233').text('SHAPING MASTERPIECES', logoRightX + 16, y + 8, {
         characterSpacing: 1.2,
       });
-      doc.font('Sans-Bold').fontSize(7.5).fillColor('#7A5B3A').text('FINE JEWELLERY', logoRightX + 16, y + 22, {
-        characterSpacing: 1.2,
+      doc.font('Sans').fontSize(7.5).fillColor('#7A5B3A').text('FINE JEWELLERY', logoRightX + 16, y + 20, {
+        characterSpacing: 1.4,
       });
 
       // Right Badge: TAX INVOICE
-      const badgeWidth = 120;
+      const badgeWidth = 114;
       const badgeHeight = 26;
       const badgeX = rightMargin - badgeWidth;
-      doc.roundedRect(badgeX, y + 2, badgeWidth, badgeHeight, 6).fillAndStroke('#FDFBF8', '#C9B6A1');
-      doc.font('Serif-Bold').fontSize(11).fillColor('#2B2015').text('TAX INVOICE', badgeX, y + 9, {
+      doc.roundedRect(badgeX, y + 3, badgeWidth, badgeHeight, 8).fillAndStroke('#FDFBF8', '#B89F82');
+      doc.font('Serif-Bold').fontSize(10.5).fillColor('#2B2015').text('TAX INVOICE', badgeX, y + 10, {
         width: badgeWidth,
         align: 'center',
-        characterSpacing: 1,
+        characterSpacing: 0.8,
       });
 
-      y += 56;
+      y += 54;
 
-      // ─── 2. Order Information Row ───
-      doc.font('Serif-Bold').fontSize(17).fillColor('#2B2015').text('Order Information', leftMargin, y);
+      // ─── 2. Order Invoice Row ───
+      doc.font('Serif-Bold').fontSize(18).fillColor('#2B2015').text('Order Invoice', leftMargin, y);
       const receivedStr = formatDateTime(order.meta?.createdAt || order.createdAt);
-      doc.font('Sans').fontSize(8.5).fillColor('#6B5E51').text(
-        `#${order.orderNumber || 'ORD-0000'}   |   Received: ${receivedStr}`,
-        leftMargin,
-        y + 20
-      );
+      doc.font('Sans-Bold').fontSize(8.5).fillColor('#2B2015').text(`Order ID: #${order.orderNumber || 'ORD-0000'}`, leftMargin, y + 23, { continued: true });
+      doc.font('Sans').fillColor('#6B5E51').text(`   |   Received: ${receivedStr}`);
 
       // Right: Invoice No & Date
       const invoiceNo = generateInvoiceNumber(order);
       const invoiceDateStr = formatDate(order.updatedAt || order.createdAt || new Date());
 
-      doc.font('Sans').fontSize(8.5).fillColor('#6B5E51').text('Invoice No.: ', rightMargin - 190, y + 4, { width: 95, align: 'right' });
-      doc.font('Sans-Bold').fontSize(8.5).fillColor('#2B2015').text(invoiceNo, rightMargin - 95, y + 4, { width: 95, align: 'right' });
+      doc.font('Sans').fontSize(8.5).fillColor('#6B5E51').text('Invoice No. :', rightMargin - 205, y + 4, { width: 95, align: 'right' });
+      doc.font('Sans-Bold').fontSize(8.5).fillColor('#2B2015').text(invoiceNo, rightMargin - 105, y + 4, { width: 105, align: 'right' });
 
-      doc.font('Sans').fontSize(8.5).fillColor('#6B5E51').text('Invoice Date: ', rightMargin - 190, y + 19, { width: 95, align: 'right' });
-      doc.font('Sans-Bold').fontSize(8.5).fillColor('#2B2015').text(invoiceDateStr, rightMargin - 95, y + 19, { width: 95, align: 'right' });
+      doc.font('Sans').fontSize(8.5).fillColor('#6B5E51').text('Invoice Date :', rightMargin - 205, y + 20, { width: 95, align: 'right' });
+      doc.font('Sans-Bold').fontSize(8.5).fillColor('#2B2015').text(invoiceDateStr, rightMargin - 105, y + 20, { width: 105, align: 'right' });
 
-      y += 40;
+      y += 46;
 
       // ─── 3. Customer Details & Shipping Address (Side-by-Side Cards) ───
       const cardWidth = (contentWidth - 14) / 2; // ~254.6pt
@@ -552,28 +587,24 @@ async function generateInvoicePDF(order, options = {}) {
 
       y += cardHeight + 18;
 
-      // ─── 5. Order Inventory Section ───
+      // ─── 5. Order Items Section ───
       const itemsCount = items.length;
-      doc.font('Serif-Bold').fontSize(14).fillColor('#2B2015').text(
-        `Order Inventory (${itemsCount} ${itemsCount === 1 ? 'Item' : 'Items'})`,
+      doc.font('Serif-Bold').fontSize(13.5).fillColor('#2B2015').text(
+        `Order Items (${itemsCount} ${itemsCount === 1 ? 'Item' : 'Items'})`,
         leftMargin,
         y
       );
-      y += 18;
+      y += 20;
 
-      // Full width divider under heading
-      doc.strokeColor('#2B2015').lineWidth(1.2).moveTo(leftMargin, y).lineTo(rightMargin, y).stroke();
-      y += 6;
+      // Table Header Strip (Rounded luxury header)
+      const tableHeaderHeight = 24;
+      doc.roundedRect(leftMargin, y, contentWidth, tableHeaderHeight, 4).fill('#EFE6DA');
+      doc.font('Sans-Bold').fontSize(8.5).fillColor('#3D2E1E').text('Product', leftMargin + 12, y + 7);
+      doc.font('Sans-Bold').fontSize(8.5).fillColor('#3D2E1E').text('Qty', leftMargin + 305, y + 7, { width: 40, align: 'center' });
+      doc.font('Sans-Bold').fontSize(8.5).fillColor('#3D2E1E').text('Price', leftMargin + 365, y + 7, { width: 70, align: 'right' });
+      doc.font('Sans-Bold').fontSize(8.5).fillColor('#3D2E1E').text('Total', leftMargin + 442, y + 7, { width: 70, align: 'right' });
 
-      // Table Header Strip
-      const tableHeaderHeight = 22;
-      doc.rect(leftMargin, y, contentWidth, tableHeaderHeight).fill('#F4EEE5');
-      doc.font('Sans-Bold').fontSize(8.5).fillColor('#4A3E31').text('Product', leftMargin + 10, y + 6);
-      doc.font('Sans-Bold').fontSize(8.5).fillColor('#4A3E31').text('Qty', leftMargin + 310, y + 6, { width: 40, align: 'center' });
-      doc.font('Sans-Bold').fontSize(8.5).fillColor('#4A3E31').text('Price', leftMargin + 370, y + 6, { width: 70, align: 'right' });
-      doc.font('Sans-Bold').fontSize(8.5).fillColor('#4A3E31').text('Total', leftMargin + 445, y + 6, { width: 70, align: 'right' });
-
-      y += tableHeaderHeight + 8;
+      y += tableHeaderHeight + 10;
 
       // Inventory Line Items
       items.forEach((item, index) => {
@@ -695,32 +726,32 @@ async function generateInvoicePDF(order, options = {}) {
 
       y += 4;
 
-      // ─── 6. Bottom Section: Left Brand Details & Right Financial Summary Card ───
-      const bottomY = y;
+      // ─── 6. Bottom Section: Left Payment Information & Right Financial Summary Card ───
+      const bottomY = y + 4;
       const summaryBoxWidth = 240;
       const summaryBoxX = rightMargin - summaryBoxWidth;
+      const leftBoxWidth = 245;
 
-      // Left Column: Brand & Payment
-      doc.font('Serif-Bold').fontSize(16).fillColor('#2B2015').text(brandName, leftMargin, bottomY);
-      const bWidth = doc.widthOfString(brandName);
-      doc.font('Sans').fontSize(8).fillColor('#8C6D46').text('®', leftMargin + bWidth + 1, bottomY - 1);
-
-      doc.font('Sans-Bold').fontSize(7).fillColor('#8C6D46').text('SHAPING MASTERPIECES', leftMargin, bottomY + 18, {
-        characterSpacing: 1,
-      });
+      // Left Column: Payment Information Card
+      drawCardIcon(doc, leftMargin, bottomY + 14, '#8C6D46');
+      doc.font('Serif-Bold').fontSize(12).fillColor('#2B2015').text('Payment Information', leftMargin + 18, bottomY + 12);
 
       const isCod = order.payment?.method === 'cod';
       const payMethodStatus = isCod ? 'Cash On Delivery' : `Online (${order.payment?.status === 'paid' ? 'Paid' : 'Pending'})`;
-      doc.font('Sans-Bold').fontSize(9).fillColor('#2B2015').text('Payment Method: ', leftMargin, bottomY + 36, { continued: true });
-      doc.font('Sans').fillColor('#2B2015').text(payMethodStatus);
+      doc.roundedRect(leftMargin, bottomY + 34, leftBoxWidth, 32, 8).fillAndStroke('#FBF8F3', '#E4D9CB');
+      doc.font('Sans').fontSize(8.5).fillColor('#6B5E51').text('Payment Method', leftMargin + 14, bottomY + 45);
+      doc.font('Sans-Bold').fontSize(8.5).fillColor('#2B2015').text(payMethodStatus, leftMargin, bottomY + 45, {
+        width: leftBoxWidth - 14,
+        align: 'right',
+      });
 
       // Right Column: Financial Summary Card
       const pricing = order.pricing || {};
       const subtotal = pricing.subtotal || 0;
       const discount = pricing.discount || order.coupon?.discountAmount || 0;
-      const tax = pricing.tax || Math.round(subtotal * 0.03);
+      const tax = pricing.tax ?? Math.round(subtotal * 0.03);
       const shipping = pricing.shipping || 0;
-      const grandTotal = pricing.total || (subtotal - discount + tax + shipping);
+      const grandTotal = pricing.total ?? (subtotal - discount + tax + shipping);
 
       const summaryRows = [
         { label: 'Subtotal', value: formatCurrency(subtotal, hasCustomFonts), isGreen: false },
@@ -729,46 +760,82 @@ async function generateInvoicePDF(order, options = {}) {
         { label: 'Shipping', value: shipping === 0 ? 'FREE' : formatCurrency(shipping, hasCustomFonts), isGreen: shipping === 0 },
       ];
 
-      const totalBoxH = 30;
-      const summaryBodyH = summaryRows.length * 18 + 12;
+      const totalBoxH = 34;
+      const summaryBodyH = summaryRows.length * 18 + 14;
       const totalCardH = summaryBodyH + totalBoxH;
 
       // Card Background & Border
-      doc.roundedRect(summaryBoxX, bottomY, summaryBoxWidth, totalCardH, 8).fillAndStroke('#FAF6F0', '#E8DFD3');
+      doc.roundedRect(summaryBoxX, bottomY, summaryBoxWidth, totalCardH, 8).fillAndStroke('#FDFCF9', '#E4D9CB');
 
       // Draw rows
-      let sY = bottomY + 10;
+      let sY = bottomY + 12;
       summaryRows.forEach((r) => {
-        doc.font('Sans').fontSize(8.5).fillColor(r.isGreen ? '#1E7E34' : '#2B2015').text(r.label, summaryBoxX + 14, sY);
-        doc.font(r.isGreen ? 'Sans-Bold' : 'Sans-Bold').fontSize(8.5).fillColor(r.isGreen ? '#1E7E34' : '#2B2015').text(r.value, summaryBoxX, sY, {
+        doc.font('Sans').fontSize(8.5).fillColor(r.isGreen ? '#1E7E34' : '#4A3E31').text(r.label, summaryBoxX + 14, sY);
+        doc.font('Sans-Bold').fontSize(8.5).fillColor(r.isGreen ? '#1E7E34' : '#2B2015').text(r.value, summaryBoxX, sY, {
           width: summaryBoxWidth - 14,
           align: 'right',
         });
         sY += 18;
       });
 
-      // Total Amount Accent Bar at bottom of card
+      // Total Amount Dark Bronze Accent Bar at bottom of card
       const totalBarY = bottomY + summaryBodyH;
       doc.save();
-      doc.rect(summaryBoxX, totalBarY, summaryBoxWidth, totalBoxH).fill('#F2EAE0');
-      doc.strokeColor('#E8DFD3').lineWidth(1).moveTo(summaryBoxX, totalBarY).lineTo(summaryBoxX + summaryBoxWidth, totalBarY).stroke();
+      doc.roundedRect(summaryBoxX, totalBarY, summaryBoxWidth, totalBoxH, 8).fill('#826644');
+      doc.rect(summaryBoxX, totalBarY, summaryBoxWidth, 8).fill('#826644');
       doc.restore();
 
-      doc.font('Serif-Bold').fontSize(11).fillColor('#8C6D46').text('Total Amount', summaryBoxX + 14, totalBarY + 8);
-      doc.font('Sans-Bold').fontSize(12).fillColor('#8C6D46').text(formatCurrency(grandTotal, hasCustomFonts), summaryBoxX, totalBarY + 8, {
+      doc.font('Serif-Bold').fontSize(11.5).fillColor('#FFFFFF').text('Total Amount', summaryBoxX + 14, totalBarY + 10);
+      doc.font('Sans-Bold').fontSize(12.5).fillColor('#FFFFFF').text(formatCurrency(grandTotal, hasCustomFonts), summaryBoxX, totalBarY + 9, {
         width: summaryBoxWidth - 14,
         align: 'right',
       });
 
-      // ─── 7. Footer Bar at Bottom (Dynamic info from Setting businessDetails & socialMedia) ───
-      const footerY = 780;
-      doc.strokeColor('#E8DFD3').lineWidth(0.8).moveTo(leftMargin, footerY).lineTo(rightMargin, footerY).stroke();
+      // ─── 7. Luxury Diamond Divider & Thank-You Section ───
+      const dividerY = Math.max(bottomY + totalCardH + 26, 680);
+      const midX = pageWidth / 2;
+      doc.strokeColor('#DFD4C6').lineWidth(0.8).moveTo(leftMargin, dividerY).lineTo(midX - 16, dividerY).stroke();
+      doc.strokeColor('#DFD4C6').lineWidth(0.8).moveTo(midX + 16, dividerY).lineTo(rightMargin, dividerY).stroke();
+
+      // Center diamond icon on divider
+      doc.save();
+      doc.strokeColor('#8C6D46').lineWidth(0.8);
+      doc.path(`M ${midX - 5},${dividerY - 4} L ${midX + 5},${dividerY - 4} L ${midX + 8},${dividerY} L ${midX},${dividerY + 7} L ${midX - 8},${dividerY} Z`).stroke();
+      doc.moveTo(midX - 8, dividerY).lineTo(midX + 8, dividerY).stroke();
+      doc.moveTo(midX - 5, dividerY - 4).lineTo(midX, dividerY + 7).lineTo(midX + 5, dividerY - 4).stroke();
+      doc.restore();
+
+      // Brand & Thank You Row
+      const tyY = dividerY + 18;
+      doc.font('Serif').fontSize(17).fillColor('#2B2015').text(brandName, leftMargin, tyY, { characterSpacing: 2 });
+      const tyBrandW = doc.widthOfString(brandName, { characterSpacing: 2 });
+      doc.font('Sans').fontSize(7.5).fillColor('#8C6D46').text('®', leftMargin + tyBrandW + 1, tyY);
+      doc.font('Sans').fontSize(6.5).fillColor('#6B5E51').text('LUXURY JEWELLERS', leftMargin, tyY + 21, {
+        characterSpacing: 2,
+      });
+
+      const tyDividerX = leftMargin + 150;
+      doc.strokeColor('#D8CBBF').lineWidth(0.8).moveTo(tyDividerX, tyY + 2).lineTo(tyDividerX, tyY + 36).stroke();
+
+      doc.font('Serif-Bold').fontSize(11).fillColor('#2B2015').text('Thank you for your purchase!', tyDividerX + 20, tyY);
+      doc.font('Sans').fontSize(8.5).fillColor('#4A3E31').text(
+        'We truly appreciate your trust in Neirah Jewellers.',
+        tyDividerX + 20,
+        tyY + 15
+      );
+      doc.font('Sans').fontSize(8.5).fillColor('#4A3E31').text(
+        'For any assistance, feel free to contact our support team.',
+        tyDividerX + 20,
+        tyY + 27
+      );
+
+      // ─── 8. Footer Contact Bar at Bottom ───
+      const footerY = 778;
 
       const bDetails = setting?.businessDetails || {};
       const mobileNumber = bDetails.mobileNumber || '+91 84600 91955';
       const emailAddress = bDetails.emailAddress || 'support@neirah.in';
 
-      // Infer website from email domain or fallback to www.neirah.in
       let website = 'www.neirah.in';
       if (emailAddress && emailAddress.includes('@')) {
         const domain = emailAddress.split('@')[1];
@@ -777,47 +844,45 @@ async function generateInvoicePDF(order, options = {}) {
         }
       }
 
-      const fTextY = footerY + 8;
-
-      // Calculate widths in advance to center footer contact info horizontally
-      doc.font('Sans').fontSize(8);
+      const fTextY = footerY + 6;
+      doc.font('Sans').fontSize(8.5);
       const phoneW = doc.widthOfString(mobileNumber);
       const emailW = doc.widthOfString(emailAddress);
       const websiteW = doc.widthOfString(website);
 
-      const phoneItemW = 13 + phoneW;
-      const emailItemW = 15 + emailW;
-      const websiteItemW = 14 + websiteW;
-      const itemGap = 20;
+      const phoneItemW = 14 + phoneW;
+      const emailItemW = 16 + emailW;
+      const websiteItemW = 15 + websiteW;
+      const itemGap = 28;
 
       const totalFooterW = phoneItemW + itemGap + emailItemW + itemGap + websiteItemW;
       let curX = Math.round((pageWidth - totalFooterW) / 2);
 
       // Phone
       drawPhoneIcon(doc, curX, fTextY + 1, '#8C6D46');
-      doc.font('Sans').fontSize(8).fillColor('#4A3E31');
-      doc.text(mobileNumber, curX + 13, fTextY, { lineBreak: false });
+      doc.font('Sans').fontSize(8.5).fillColor('#4A3E31');
+      doc.text(mobileNumber, curX + 14, fTextY, { lineBreak: false });
       const cleanPhone = mobileNumber.replace(/\s+/g, '');
-      doc.link(curX + 13, fTextY - 1, phoneW, 11, `tel:${cleanPhone}`);
-      curX += phoneItemW + itemGap;
+      doc.link(curX + 14, fTextY - 1, phoneW, 11, `tel:${cleanPhone}`);
+      curX += phoneItemW;
+      doc.strokeColor('#D8CBBF').lineWidth(0.7).moveTo(curX + itemGap / 2, fTextY - 1).lineTo(curX + itemGap / 2, fTextY + 11).stroke();
+      curX += itemGap;
 
       // Email
       drawMailIcon(doc, curX, fTextY + 1.5, '#8C6D46');
-      doc.font('Sans').fontSize(8).fillColor('#4A3E31');
-      doc.text(emailAddress, curX + 15, fTextY, { lineBreak: false });
-      doc.link(curX + 15, fTextY - 1, emailW, 11, `mailto:${emailAddress}`);
-      curX += emailItemW + itemGap;
+      doc.font('Sans').fontSize(8.5).fillColor('#4A3E31');
+      doc.text(emailAddress, curX + 16, fTextY, { lineBreak: false });
+      doc.link(curX + 16, fTextY - 1, emailW, 11, `mailto:${emailAddress}`);
+      curX += emailItemW;
+      doc.strokeColor('#D8CBBF').lineWidth(0.7).moveTo(curX + itemGap / 2, fTextY - 1).lineTo(curX + itemGap / 2, fTextY + 11).stroke();
+      curX += itemGap;
 
       // Website
       drawGlobeIcon(doc, curX, fTextY + 0.5, '#8C6D46');
-      doc.font('Sans').fontSize(8).fillColor('#4A3E31');
-      doc.text(website, curX + 14, fTextY, { lineBreak: false });
+      doc.font('Sans').fontSize(8.5).fillColor('#4A3E31');
+      doc.text(website, curX + 15, fTextY, { lineBreak: false });
       const webUrl = website.startsWith('http') ? website : `https://${website}`;
-      doc.link(curX + 14, fTextY - 1, websiteW, 11, webUrl);
-
-      // Social Icons from setting.socialMedia (only display if configured)
-      const social = setting?.socialMedia || {};
-      drawSocialIcons(doc, rightMargin, fTextY, social);
+      doc.link(curX + 15, fTextY - 1, websiteW, 11, webUrl);
 
       doc.end();
     } catch (err) {

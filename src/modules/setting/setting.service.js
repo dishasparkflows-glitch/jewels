@@ -99,17 +99,6 @@ class SettingService {
         settings.markModified('businessDetails');
       }
 
-      // Flat form field aliases for themeColors
-      if (data.buttonColor || data.buttonHoverColor || data.buttonTextColor) {
-        settings.themeColors = {
-          ...(settings.themeColors?.toObject ? settings.themeColors.toObject() : (settings.themeColors || {})),
-          ...(data.buttonColor ? { buttonColor: data.buttonColor } : {}),
-          ...(data.buttonHoverColor ? { buttonHoverColor: data.buttonHoverColor } : {}),
-          ...(data.buttonTextColor ? { buttonTextColor: data.buttonTextColor } : {}),
-        };
-        settings.markModified('themeColors');
-      }
-
       // Flat form field aliases for bankDetails
       if (data.bankName !== undefined || data.bankAccountNumber !== undefined || data.ifscCode !== undefined) {
         settings.bankDetails = {
@@ -125,21 +114,6 @@ class SettingService {
       Object.assign(settings, data);
       settings.revision = (settings.revision || 0) + 1;
       await settings.save();
-    }
-
-    if (data.buttonColor) {
-      try {
-        const { Theme } = require('../theme/theme.model');
-        const themeId = data.currentThemeId || settings.currentThemeId;
-        if (themeId) {
-          await Theme.updateOne(
-            { _id: themeId },
-            { $set: { 'config.colors.primary': data.buttonColor } }
-          );
-        }
-      } catch (err) {
-        console.error('Failed to sync button color to theme:', err);
-      }
     }
 
     const updated = await Setting.findById(settings._id)

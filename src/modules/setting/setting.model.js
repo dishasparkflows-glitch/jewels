@@ -106,21 +106,6 @@ const settingSchema = new mongoose.Schema(
 
     // theme colors
     themeColors: {
-      buttonColor: {
-        type: String,
-        trim: true,
-        default: '#8b6f4e',
-      },
-      buttonHoverColor: {
-        type: String,
-        trim: true,
-        default: '#755c3e',
-      },
-      buttonTextColor: {
-        type: String,
-        trim: true,
-        default: '#ffffff',
-      },
       topBarBgColor: {
         type: String,
         trim: true,

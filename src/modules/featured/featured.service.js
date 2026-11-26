@@ -5,6 +5,21 @@ const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 
 class FeaturedService {
+  // ------------------------------- compute next display order ----------------------------
+  async getNextDisplayOrder(type = 'Celebrate') {
+    const cleanType = String(type || 'Celebrate').trim();
+    const filter = {
+      'meta.deletedAt': null,
+      'display.type': new RegExp(`^${escapeRegex(cleanType)}$`, 'i'),
+    };
+    const [count, highestItem] = await Promise.all([
+      Featured.countDocuments(filter),
+      Featured.findOne(filter).sort({ 'display.order': -1 }).select('display.order').lean(),
+    ]);
+    const maxOrder = Number(highestItem?.display?.order) || 0;
+    return Math.max(maxOrder, count) + 1;
+  }
+
   // ------------------------------- create featured item ----------------------------
   async create(data) {
     if (data.name && data.name.trim()) {
@@ -20,6 +35,13 @@ class FeaturedService {
 
     if (data.categoryId === '') {
       data.categoryId = null;
+    }
+
+    if (
+      data.display &&
+      (data.display.order === undefined || data.display.order === null || data.display.order === '')
+    ) {
+      data.display.order = await this.getNextDisplayOrder(data.display.type || 'Celebrate');
     }
 
     const item = await Featured.create(data);

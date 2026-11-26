@@ -3,12 +3,24 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const redisClient = require('../../utils/redisClient');
 const { CACHE_TTL } = require('../../config/constants');
+const Setting = require('../setting/setting.model');
+
+async function bumpStorefrontRevision() {
+  try {
+    await Setting.updateOne(
+      { 'meta.deletedAt': null },
+      { $inc: { revision: 1 } }
+    );
+  } catch (_) {}
+}
 
 class MenuItemController {
   // ------------------------------- create menu item ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await menuItemService.create(req.body);
     await redisClient.deleteByPattern('menu-items:*');
+    await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.created(res, null, 'Menu item created successfully');
   });
 
@@ -44,6 +56,8 @@ class MenuItemController {
   update = catchAsync(async (req, res) => {
     const item = await menuItemService.update(req.params.id, req.body);
     await redisClient.deleteByPattern('menu-items:*');
+    await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.success(res, null, 'Menu item updated successfully');
   });
 
@@ -52,6 +66,8 @@ class MenuItemController {
     const items = req.body.items || req.body;
     const result = await menuItemService.reorder(items);
     await redisClient.deleteByPattern('menu-items:*');
+    await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.success(res, null, 'Menu items reordered successfully');
   });
 
@@ -60,6 +76,8 @@ class MenuItemController {
   delete = catchAsync(async (req, res) => {
     const result = await menuItemService.delete(req.params.id);
     await redisClient.deleteByPattern('menu-items:*');
+    await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.success(res, null, result.message);
   });
 }

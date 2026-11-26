@@ -140,12 +140,14 @@ function calculateProductPricing(product, masters) {
   const colorStones = Array.isArray(product.colorStoneRows) ? product.colorStoneRows : [];
   const centers = isColorStone ? [] : (product.centerDiamondRows || []);
 
-  const minCenterCarat = isColorStone
-    ? (colorStones.length ? Math.min(...colorStones.map((c) => Number(c.caratWeight || 0)).filter((c) => c > 0)) : 1)
-    : (centers.length ? Math.min(...centers.map((c) => Number(c.caratWeight || 0)).filter((c) => c > 0)) : 1);
+  const activeCarats = (isColorStone ? colorStones : centers)
+    .map((c) => Number(c.caratWeight || 0))
+    .filter((c) => c > 0);
+  const minCenterCarat = activeCarats.length ? Math.min(...activeCarats) : 1;
   const fallbackBaseCarat = (Number.isFinite(minCenterCarat) && minCenterCarat > 0) ? minCenterCarat : 1;
   const configuredBaseCarat = number(settings.baseCarat, 'Base center carat', 0);
-  const baseCarat = configuredBaseCarat > 0 ? configuredBaseCarat : fallbackBaseCarat;
+  const useConfiguredBase = configuredBaseCarat > 0 && (configuredBaseCarat !== 1 || activeCarats.includes(1));
+  const baseCarat = useConfiguredBase ? configuredBaseCarat : fallbackBaseCarat;
   const labourRate = number(settings.baseLabourCharge, 'Labour rate per gram');
   const certificate = number(settings.certificateCharge, 'Certificate charge');
   const markup = number(settings.otherAmountPercentage, 'Markup percentage');
@@ -295,12 +297,9 @@ function calculateProductPricing(product, masters) {
         const colorStoneRate = isColorStone ? Number(colorStone?.pricePerCarat || 3000) : 0;
         const colorStoneCost = isColorStone ? (colorStoneRate * centerCaratVal) : 0;
 
-        // Side Diamond Cost & Weight
-        const sideScale = centerCaratVal > 0 ? 1 + Math.round((centerCaratVal - baseCarat) / 0.5) * 0.25 : 1;
-        const effectiveSideScale = sideScale > 0 ? sideScale : 1;
-        if (accents.length && effectiveSideScale <= 0) throw new ApiError(400, 'Center carat produces a non-positive side diamond weight');
-        const sideWeight = accents.reduce((sum, { side }) => sum + Number(side.caratWeight) * effectiveSideScale, 0);
-        const sideCost = accents.reduce((sum, { side, sideIndex }) => sum + Number(side.caratWeight) * effectiveSideScale * sideRates[sideIndex], 0);
+        // Side Diamond Cost & Weight (flat carat weight, matching RARE pricing logic)
+        const sideWeight = accents.reduce((sum, { side }) => sum + Number(side.caratWeight), 0);
+        const sideCost = accents.reduce((sum, { side, sideIndex }) => sum + Number(side.caratWeight) * sideRates[sideIndex], 0);
 
         // Side Color Stone Cost & Weight
         const finalSideColorCost = totalSideColorStoneCost;

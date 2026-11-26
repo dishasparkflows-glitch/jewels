@@ -3,12 +3,24 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const redisClient = require('../../utils/redisClient');
 const { CACHE_TTL } = require('../../config/constants');
+const Setting = require('../setting/setting.model');
+
+async function bumpStorefrontRevision() {
+  try {
+    await Setting.updateOne(
+      { 'meta.deletedAt': null },
+      { $inc: { revision: 1 } }
+    );
+  } catch (_) {}
+}
 
 class MenuSectionController {
   // ------------------------------- create menu section ----------------------------
   create = catchAsync(async (req, res) => {
     const item = await menuSectionService.create(req.body);
     await redisClient.deleteByPattern('menu-sections:*');
+    await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.created(res, null, 'Menu section created successfully');
   });
 
@@ -40,6 +52,8 @@ class MenuSectionController {
   update = catchAsync(async (req, res) => {
     const item = await menuSectionService.update(req.params.id, req.body);
     await redisClient.deleteByPattern('menu-sections:*');
+    await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.success(res, null, 'Menu section updated successfully');
   });
 
@@ -48,6 +62,8 @@ class MenuSectionController {
     const items = req.body.items || req.body;
     const result = await menuSectionService.reorder(items);
     await redisClient.deleteByPattern('menu-sections:*');
+    await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.success(res, null, 'Menu sections reordered successfully');
   });
 
@@ -55,6 +71,8 @@ class MenuSectionController {
   delete = catchAsync(async (req, res) => {
     const result = await menuSectionService.delete(req.params.id);
     await redisClient.deleteByPattern('menu-sections:*');
+    await redisClient.deleteByPattern('categories:*');
+    await bumpStorefrontRevision();
     ApiResponse.success(res, null, result.message);
   });
 }

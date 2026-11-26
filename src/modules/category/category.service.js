@@ -35,7 +35,7 @@ function buildNavigation(categories, sections, items) {
       ).map((item) => ({
         _id: item._id,
         name: item.title,
-        icon: { url: item.icon?.url || '' },
+        icon: { url: item.icon?.url || (typeof item.icon === 'string' ? item.icon : '') || item.iconUrl || '' },
       })),
     })),
   }));
@@ -222,7 +222,7 @@ class CategoryService {
       status: 'active',
       'meta.deletedAt': null,
     })
-      .select('_id menuSectionId title icon.url order status')
+      .select('_id menuSectionId title icon iconUrl order status')
       .sort({ order: 1, _id: 1 })
       .lean();
 

@@ -1,6 +1,7 @@
-const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
-const { JWT } = require('../config/constants');
+const { CACHE_TTL } = require('../config/constants');
+const { cacheHelper } = require('../utils/redisClient');
+const { decodeTokenFromRequest } = require('./auth.middleware');
 const Owner = require('../modules/owner/owner.model');
 const moduleService = require('../modules/module/module.service');
 const { getModulesForApiPath } = require('../modules/owner/owner.modules');
@@ -23,16 +24,9 @@ const moduleAccessMiddleware = async (req, res, next) => {
     let ownerId = req.headers['x-owner-id'] || null;
 
     if (!ownerId) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const decoded = jwt.verify(authHeader.split(' ')[1], JWT.SECRET);
-          if (decoded?.ownerId) {
-            ownerId = decoded.ownerId;
-          }
-        } catch {
-          // Auth middleware will handle invalid/expired tokens on protected routes
-        }
+      const { decoded } = decodeTokenFromRequest(req);
+      if (decoded?.ownerId) {
+        ownerId = decoded.ownerId;
       }
     }
 
@@ -54,9 +48,15 @@ const moduleAccessMiddleware = async (req, res, next) => {
       return next();
     }
 
-    const owner = await Owner.findOne({ _id: ownerId, 'meta.deletedAt': null })
-      .select('name status allowedModules')
-      .lean();
+    const cacheKey = `owners:access:${String(ownerId)}`;
+    const cachedOwner = await cacheHelper.getOrSet(cacheKey, CACHE_TTL, async () => {
+      const doc = await Owner.findOne({ _id: ownerId, 'meta.deletedAt': null })
+        .select('name status allowedModules')
+        .lean();
+      return doc || { _notFound: true };
+    });
+
+    const owner = cachedOwner && !cachedOwner._notFound ? cachedOwner : null;
 
     if (!owner || owner.status !== 'active') {
       return res.status(403).json({

@@ -2,8 +2,17 @@ const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit-table');
 const axios = require('axios');
+const {
+  formatRupee: formatCurrency,
+  formatShortDate: formatDate,
+  formatDateTime,
+} = require('./templateFormatters');
 
 const fontsDir = path.resolve(__dirname, '../assets/fonts');
+const IMAGE_CACHE_TTL_MS = 15 * 60 * 1000;
+const IMAGE_CACHE_MAX_ENTRIES = 100;
+const imageBufferCache = new Map();
+const pendingImageFetches = new Map();
 
 /**
  * Configure serif and sans fonts from bundled TTF assets
@@ -34,60 +43,6 @@ function setupFonts(doc) {
   }
 
   return hasCustomFonts;
-}
-
-/**
- * Format currency with Indian Rupee symbol
- */
-function formatCurrency(num, useRupeeSymbol = true) {
-  const n = Number(num || 0);
-  const symbol = useRupeeSymbol ? '₹' : 'Rs. ';
-  return symbol + n.toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-/**
- * Format date (e.g. 17 Nov 2026)
- */
-function formatDate(dateVal) {
-  if (!dateVal) return new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  try {
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    return d.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  } catch {
-    return new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  }
-}
-
-/**
- * Format full date & time (e.g. 16 Nov 2026, 05:24 PM)
- */
-function formatDateTime(dateVal) {
-  if (!dateVal) return formatDate(new Date()) + ', 10:00 AM';
-  try {
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return formatDate(new Date()) + ', 10:00 AM';
-    const dateStr = d.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-    const timeStr = d.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-    return `${dateStr}, ${timeStr}`;
-  } catch {
-    return formatDate(new Date()) + ', 10:00 AM';
-  }
 }
 
 /**
@@ -139,7 +94,7 @@ function extractItemDetails(item) {
 }
 
 /**
- * Attempts to safely fetch an image buffer with a fast timeout
+ * Attempts to safely fetch an image buffer with a fast timeout and bounded in-memory TTL cache
  */
 async function fetchImageBuffer(url) {
   if (!url || typeof url !== 'string') return null;
@@ -151,14 +106,35 @@ async function fetchImageBuffer(url) {
     }
   }
   if (/^https?:\/\//i.test(url)) {
-    try {
-      const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 2000 });
-      if (res.status === 200 && res.data) {
-        return Buffer.from(res.data);
-      }
-    } catch {
-      return null;
+    const cached = imageBufferCache.get(url);
+    if (cached && Date.now() - cached.fetchedAt < IMAGE_CACHE_TTL_MS) {
+      return cached.buffer;
     }
+    if (pendingImageFetches.has(url)) {
+      return pendingImageFetches.get(url);
+    }
+
+    const fetchPromise = axios
+      .get(url, { responseType: 'arraybuffer', timeout: 2000, maxContentLength: 5 * 1024 * 1024 })
+      .then((res) => {
+        if (res.status === 200 && res.data) {
+          const buf = Buffer.from(res.data);
+          if (imageBufferCache.size >= IMAGE_CACHE_MAX_ENTRIES) {
+            const oldestKey = imageBufferCache.keys().next().value;
+            if (oldestKey !== undefined) imageBufferCache.delete(oldestKey);
+          }
+          imageBufferCache.set(url, { buffer: buf, fetchedAt: Date.now() });
+          return buf;
+        }
+        return null;
+      })
+      .catch(() => null)
+      .finally(() => {
+        pendingImageFetches.delete(url);
+      });
+
+    pendingImageFetches.set(url, fetchPromise);
+    return fetchPromise;
   }
   return null;
 }
@@ -449,19 +425,7 @@ async function generateInvoicePDF(order, options = {}) {
       ).toUpperCase();
 
       // ─── 1. Header: Brand Logo & Tax Invoice Badge ───
-      if (logoBuffer) {
-        try {
-          doc.image(logoBuffer, leftMargin, y - 2, { fit: [130, 38] });
-        } catch (_) {
-          drawLotusEmblem(doc, leftMargin + 12, y + 15, '#8C6D46');
-          doc.font('Serif').fontSize(20).fillColor('#2B2015').text(brandName, leftMargin + 30, y + 2, { characterSpacing: 2 });
-          const brandWidth = doc.widthOfString(brandName, { characterSpacing: 2 });
-          doc.font('Sans').fontSize(8).fillColor('#8C6D46').text('®', leftMargin + 30 + brandWidth + 1, y + 1);
-          doc.font('Sans').fontSize(6.5).fillColor('#8C6D46').text('LUXURY JEWELLERS', leftMargin + 30, y + 25, {
-            characterSpacing: 2.2,
-          });
-        }
-      } else {
+      const renderFallbackBrandHeader = () => {
         drawLotusEmblem(doc, leftMargin + 12, y + 15, '#8C6D46');
         doc.font('Serif').fontSize(20).fillColor('#2B2015').text(brandName, leftMargin + 30, y + 2, { characterSpacing: 2 });
         const brandWidth = doc.widthOfString(brandName, { characterSpacing: 2 });
@@ -469,6 +433,16 @@ async function generateInvoicePDF(order, options = {}) {
         doc.font('Sans').fontSize(6.5).fillColor('#8C6D46').text('LUXURY JEWELLERS', leftMargin + 30, y + 25, {
           characterSpacing: 2.2,
         });
+      };
+
+      if (logoBuffer) {
+        try {
+          doc.image(logoBuffer, leftMargin, y - 2, { fit: [130, 38] });
+        } catch (_) {
+          renderFallbackBrandHeader();
+        }
+      } else {
+        renderFallbackBrandHeader();
       }
 
       // Vertical Divider next to logo

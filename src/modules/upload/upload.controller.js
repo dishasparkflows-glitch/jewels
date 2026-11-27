@@ -2,6 +2,29 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
 const cloudflareR2 = require('../../utils/cloudflareR2');
+const { ROLES } = require('../../config/constants');
+
+const CUSTOMER_ALLOWED_MODULES = new Set(['users', 'reviews', 'custom-inquiries', 'custom-inquiry', 'review', 'user']);
+const MAX_PRESIGNED_BATCH = 50;
+const MAX_FILE_INFO_BATCH = 50;
+
+const assertUploadModuleAllowed = (user, moduleName, contentType) => {
+  const isAdmin = Boolean(user && [ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(user.role));
+  if (isAdmin) return;
+
+  if (!user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const normalized = String(moduleName || '').trim().toLowerCase();
+  if (!CUSTOMER_ALLOWED_MODULES.has(normalized)) {
+    throw new ApiError(403, 'You do not have permission to upload to this module');
+  }
+
+  if (contentType && !String(contentType).trim().toLowerCase().startsWith('image/')) {
+    throw new ApiError(400, 'Only image uploads are allowed');
+  }
+};
 
 // ------------------------------- get presigned url ----------------------------
 const getPresignedUrl = catchAsync(async (req, res) => {
@@ -20,6 +43,9 @@ const getPresignedUrl = catchAsync(async (req, res) => {
     if (!Array.isArray(rawFiles) || rawFiles.length === 0) {
       throw new ApiError(400, 'Files must be a non-empty array');
     }
+    if (rawFiles.length > MAX_PRESIGNED_BATCH) {
+      throw new ApiError(400, `Cannot generate more than ${MAX_PRESIGNED_BATCH} presigned URLs per request`);
+    }
 
     const inferContentType = (file) => {
       const type = file.contentType || file.type;
@@ -35,23 +61,31 @@ const getPresignedUrl = catchAsync(async (req, res) => {
       return 'image/jpeg';
     };
 
-    const results = await Promise.all(rawFiles.map(async (file, index) => {
+    const preparedFiles = rawFiles.map((file) => {
       const itemModule = file.module || file.folder || targetModule;
-      const itemProductId = file.productId || body.productId;
-      const itemSubfolder = file.subfolder || body.subfolder;
       const itemContentType = inferContentType(file);
+      assertUploadModuleAllowed(req.user, itemModule, itemContentType);
+      return {
+        file,
+        itemModule,
+        itemProductId: file.productId || body.productId,
+        itemSubfolder: file.subfolder || body.subfolder,
+        itemContentType,
+      };
+    });
 
+    const results = await Promise.all(preparedFiles.map(async (item, index) => {
       const presigned = await cloudflareR2.getPresignedPutUrl({
-        module: itemModule,
-        contentType: itemContentType,
-        productId: itemProductId,
-        subfolder: itemSubfolder,
+        module: item.itemModule,
+        contentType: item.itemContentType,
+        productId: item.itemProductId,
+        subfolder: item.itemSubfolder,
         expiresIn,
       });
 
       return {
         index,
-        ...(file.name ? { name: file.name } : {}),
+        ...(item.file.name ? { name: item.file.name } : {}),
         ...presigned,
       };
     }));
@@ -63,6 +97,8 @@ const getPresignedUrl = catchAsync(async (req, res) => {
       200
     );
   }
+
+  assertUploadModuleAllowed(req.user, targetModule, body.contentType);
 
   const result = await cloudflareR2.getPresignedPutUrl({
     module: targetModule,
@@ -82,7 +118,7 @@ const getPresignedUrl = catchAsync(async (req, res) => {
 
 const getFile = catchAsync(async (req, res) => {
   const key = typeof req.query.key === 'string' ? req.query.key : '';
-  if (!key.startsWith('products/') || key.includes('..')) {
+  if (!/^products\/[a-zA-Z0-9._/-]+$/.test(key) || key.includes('..')) {
     throw new ApiError(400, 'A valid product media key is required');
   }
 
@@ -118,6 +154,9 @@ const getFileInfo = catchAsync(async (req, res) => {
 
   if (targetList.length === 0) {
     throw new ApiError(400, 'File key is required');
+  }
+  if (targetList.length > MAX_FILE_INFO_BATCH) {
+    throw new ApiError(400, `Cannot query metadata for more than ${MAX_FILE_INFO_BATCH} files per request`);
   }
 
   if (targetList.length === 1 && !Array.isArray(keys)) {

@@ -14,7 +14,7 @@ class ReviewService {
 
   // ------------------------------- get one review ----------------------------
   async getOne(id) {
-    const item = await Review.findOne({ _id: id })
+    const item = await Review.findOne({ _id: id, 'meta.deletedAt': null })
       .populate('productId', 'basicInfo.title basicInfo.slug basicInfo.sku media.images ornate.ornateImages');
     if (!item) {
       throw new ApiError(404, 'Review not found');
@@ -85,7 +85,7 @@ class ReviewService {
     }
 
     const item = await Review.findOneAndUpdate(
-      { _id: id },
+      { _id: id, 'meta.deletedAt': null },
       { $set: data },
       { returnDocument: 'after', runValidators: true }
     ).populate('productId', 'basicInfo.title basicInfo.slug basicInfo.sku media.images ornate.ornateImages');
@@ -103,7 +103,7 @@ class ReviewService {
       throw new ApiError(400, 'ids array is required for bulk delete');
     }
     const result = await Review.updateMany(
-      { _id: { $in: ids } },
+      { _id: { $in: ids }, 'meta.deletedAt': null },
       { $set: { 'meta.deletedAt': new Date() } }
     );
     return {
@@ -116,7 +116,7 @@ class ReviewService {
   // ------------------------------- delete review ----------------------------
   async delete(id) {
     const item = await Review.findOneAndUpdate(
-      { _id: id },
+      { _id: id, 'meta.deletedAt': null },
       { $set: { 'meta.deletedAt': new Date() } },
       { returnDocument: 'after' }
     );

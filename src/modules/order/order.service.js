@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Order = require('./order.model');
 const Cart = require('../cart/cart.model');
 const Setting = require('../setting/setting.model');
@@ -10,6 +11,7 @@ const { generateInvoicePDF } = require('../../utils/invoiceGenerator');
 const { getInvoiceEmailHtml } = require('../../template');
 const { isTestPaymentUser } = require('../../utils/testPaymentUtils');
 const ApiError = require('../../utils/ApiError');
+const { ROLES } = require('../../config/constants');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
 const {
   generateOrderNumber,
@@ -21,6 +23,7 @@ const {
   buildShippingAddress,
   validateShippingAddress,
   buildCustomerInfo,
+  generateOrderAccessToken,
   checkOrderAccess,
   buildUserOrderFilters,
   buildAdminOrderFilters,
@@ -34,7 +37,8 @@ class OrderService {
 
   // ------------------------------- create order ----------------------------
   async createOrder(data, user = null) {
-    const effectiveUserId = user?._id || data.userId || null;
+    const isAdmin = Boolean(user && [ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(user.role));
+    const effectiveUserId = isAdmin ? (data.userId || user._id || null) : (user?._id || null);
     let items = Array.isArray(data.items) && data.items.length > 0 ? data.items : [];
 
     // If no items passed in request body, retrieve items from the user's saved Cart
@@ -191,12 +195,16 @@ class OrderService {
     return {
       order,
       payment: paymentResponse,
+      accessToken: generateOrderAccessToken(order),
     };
   }
 
   // ------------------------------- get order for invoice ----------------------------
   async getOrderForInvoice(orderId) {
-    const order = await Order.findById(orderId)
+    if (!mongoose.isValidObjectId(orderId)) {
+      throw new ApiError(400, 'Invalid order ID');
+    }
+    const order = await Order.findOne({ _id: orderId, 'meta.deletedAt': null })
       .populate('userId', 'profile.firstName profile.lastName auth.email')
       .populate('items.refId', 'basicInfo media assets ornate colorImages sku title image carat')
       .lean();
@@ -216,11 +224,9 @@ class OrderService {
   }
 
   // ------------------------------- generate order invoice ----------------------------
-  async generateOrderInvoice(orderId, user = null) {
+  async generateOrderInvoice(orderId, user = null, accessToken = null) {
     const order = await this.getOrderForInvoice(orderId);
-    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
-      checkOrderAccess(order, user);
-    }
+    checkOrderAccess(order, user, accessToken);
     const setting = await this.getStoreSetting();
     const pdfBuffer = await generateInvoicePDF(order, { setting });
     return { order, pdfBuffer };
@@ -304,8 +310,11 @@ class OrderService {
 
 
   // ------------------------------- get order by id ----------------------------
-  async getOrderById(orderId, user = null) {
-    const order = await Order.findById(orderId)
+  async getOrderById(orderId, user = null, accessToken = null) {
+    if (!mongoose.isValidObjectId(orderId)) {
+      throw new ApiError(400, 'Invalid order ID');
+    }
+    const order = await Order.findOne({ _id: orderId, 'meta.deletedAt': null })
       .populate('userId', 'profile.firstName profile.lastName auth.email')
       .populate('items.refId', 'basicInfo media assets ornate colorImages sku title image carat')
       .populate('orderTimeline.placed.by', 'profile.firstName profile.lastName auth.email role')
@@ -318,13 +327,13 @@ class OrderService {
       throw new ApiError(404, 'Order not found');
     }
 
-    checkOrderAccess(order, user);
+    checkOrderAccess(order, user, accessToken);
     return order;
   }
 
   // ------------------------------- get order by number ----------------------------
-  async getOrderByNumber(orderNumber, user = null) {
-    const order = await Order.findOne({ orderNumber })
+  async getOrderByNumber(orderNumber, user = null, accessToken = null) {
+    const order = await Order.findOne({ orderNumber, 'meta.deletedAt': null })
       .populate('items.refId', 'basicInfo media assets ornate colorImages sku title image carat')
       .populate('orderTimeline.placed.by', 'profile.firstName profile.lastName auth.email role')
       .populate('orderTimeline.accepted.by', 'profile.firstName profile.lastName auth.email role')
@@ -336,7 +345,7 @@ class OrderService {
       throw new ApiError(404, 'Order not found');
     }
 
-    checkOrderAccess(order, user);
+    checkOrderAccess(order, user, accessToken);
     return order;
   }
 
@@ -460,13 +469,16 @@ class OrderService {
   }
 
   // ------------------------------- cancel order ----------------------------
-  async cancelOrder(orderId, user = null) {
-    const order = await Order.findById(orderId);
+  async cancelOrder(orderId, user = null, reason = null, accessToken = null) {
+    if (!mongoose.isValidObjectId(orderId)) {
+      throw new ApiError(400, 'Invalid order ID');
+    }
+    const order = await Order.findOne({ _id: orderId, 'meta.deletedAt': null });
     if (!order) {
       throw new ApiError(404, 'Order not found');
     }
 
-    checkOrderAccess(order, user);
+    checkOrderAccess(order, user, accessToken);
 
     if (['shipped', 'out_for_delivery', 'delivered'].includes(order.orderStatus)) {
       throw new ApiError(400, `Order cannot be cancelled as it is already ${order.orderStatus}`);

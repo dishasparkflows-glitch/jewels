@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { BetaAnalyticsDataClient } = require('@google-analytics/data');
 const { GoogleAuth } = require('google-auth-library');
 const { GOOGLE } = require('../../config/constants');
+const ApiError = require('../../utils/ApiError');
 
 const Product = require('../product/product.model');
 const Diamond = require('../diamond/diamond.model');
@@ -918,7 +919,7 @@ class AnalyticsService {
   async getGoogleAccessToken() {
     const config = this.getAnalyticsConfig();
     if (!config.keyFile) {
-      throw new Error('Service account key file not configured on server.');
+      throw new ApiError(400, 'Service account key file not configured on server.');
     }
 
     const auth = new GoogleAuth({

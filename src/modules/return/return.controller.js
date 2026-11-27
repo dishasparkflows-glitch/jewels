@@ -23,7 +23,7 @@ class ReturnController {
 
   // ------------------------------- get return by id ----------------------------
   getReturnById = catchAsync(async (req, res) => {
-    const returnDoc = await returnService.getReturnById(req.params.id);
+    const returnDoc = await returnService.getReturnById(req.params.id, req.user);
     return ApiResponse.success(res, returnDoc, 'Return details retrieved');
   });
 

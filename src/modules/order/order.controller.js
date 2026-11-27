@@ -1,6 +1,10 @@
 const orderService = require('./order.service');
 const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
+const ApiError = require('../../utils/ApiError');
+
+const getOrderAccessToken = (req) =>
+  req.headers['x-order-token'] || req.query?.token || req.body?.orderToken || null;
 
 class OrderController {
   // ------------------------------- Create Order ----------------------------
@@ -18,19 +22,19 @@ class OrderController {
 
   // ------------------------------- Get Order By ID ----------------------------
   getOrderById = catchAsync(async (req, res) => {
-    const order = await orderService.getOrderById(req.params.id, req.user);
+    const order = await orderService.getOrderById(req.params.id, req.user, getOrderAccessToken(req));
     ApiResponse.success(res, order, 'Order retrieved successfully');
   });
 
   // ------------------------------- Get Order By Order Number ----------------------------
   getOrderByNumber = catchAsync(async (req, res) => {
-    const order = await orderService.getOrderByNumber(req.params.orderNumber, req.user);
+    const order = await orderService.getOrderByNumber(req.params.orderNumber, req.user, getOrderAccessToken(req));
     ApiResponse.success(res, order, 'Order retrieved successfully');
   });
 
   // ------------------------------- Cancel Order ----------------------------
   cancelOrder = catchAsync(async (req, res) => {
-    const updated = await orderService.cancelOrder(req.params.id, req.user, req.body?.reason);
+    const updated = await orderService.cancelOrder(req.params.id, req.user, req.body?.reason, getOrderAccessToken(req));
     ApiResponse.success(res, updated, 'Order cancelled successfully');
   });
 
@@ -49,7 +53,7 @@ class OrderController {
   // ------------------------------- Download Invoice PDF ----------------------------
   downloadInvoice = catchAsync(async (req, res) => {
     const orderId = req.params.id;
-    const { order, pdfBuffer } = await orderService.generateOrderInvoice(orderId, req.user);
+    const { order, pdfBuffer } = await orderService.generateOrderInvoice(orderId, req.user, getOrderAccessToken(req));
     const safeOrderNum = (order.orderNumber || 'ORD').replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `NEIRAH_INVOICE_${safeOrderNum}.pdf`;
 

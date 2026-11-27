@@ -4,7 +4,7 @@ const { OAuth2Client } = require('google-auth-library');
 const User = require('../user/user.model');
 const Owner = require('../owner/owner.model');
 const ApiError = require('../../utils/ApiError');
-const { JWT, STORE_NAME, URL } = require('../../config/constants');
+const { JWT, STORE_NAME, URL, ROLES } = require('../../config/constants');
 const smsService = require('../sms/sms.service');
 const otpService = require('../otp/otp.service');
 const notificationService = require('../notification/notification.service');
@@ -100,8 +100,8 @@ class AuthService {
   }
 
   // ------------------------------- register user ----------------------------
-  async register(data) {
-    const email = (data.auth?.email || '').trim().toLowerCase();
+  async register(data = {}) {
+    const email = (data.auth?.email || data.email || '').trim().toLowerCase();
     if (!email) throw new ApiError(400, 'Email is required');
 
     const existingUser = await User.findOne({ 'auth.email': email, 'meta.deletedAt': null });
@@ -115,10 +115,17 @@ class AuthService {
       throw new ApiError(400, 'Password must be at least 6 characters');
     }
 
-    if (data.profile) {
-      let rawPhone = String(data.profile.phone || '').trim();
-      let countryCode = String(data.profile.countryCode || '').trim();
+    const rawProfile = data.profile && typeof data.profile === 'object' ? data.profile : {};
+    const firstName = String(rawProfile.firstName || data.firstName || '').trim();
+    const lastName = String(rawProfile.lastName || data.lastName || 'Customer').trim();
+    if (!firstName) {
+      throw new ApiError(400, 'First name is required');
+    }
 
+    let rawPhone = String(rawProfile.phone || data.phone || '').trim();
+    let countryCode = String(rawProfile.countryCode || data.countryCode || '').trim();
+
+    if (rawPhone) {
       const plusMatch = rawPhone.match(/^(\+\d{1,4})[\s.-]?(\d+)$/);
       if (plusMatch) {
         if (!countryCode) countryCode = plusMatch[1];
@@ -126,38 +133,54 @@ class AuthService {
       } else {
         rawPhone = rawPhone.replace(/^\+\d{1,4}\s*/, '').replace(/\s+/g, '');
       }
+    }
 
-      if (countryCode && !countryCode.startsWith('+')) {
-        countryCode = `+${countryCode}`;
-      }
+    if (countryCode && !countryCode.startsWith('+')) {
+      countryCode = `+${countryCode}`;
+    }
+    countryCode = countryCode || '+91';
 
-      data.profile.phone = rawPhone;
-      data.profile.countryCode = countryCode || '+91';
-
-      if (data.profile.phone) {
-        const cleanPhone = String(data.profile.phone).replace(/\D/g, '').trim();
-        if (cleanPhone) {
-          const existingPhone = await User.findOne({
-            $or: [{ 'profile.phone': cleanPhone }, { 'profile.phone': data.profile.phone }],
-            'meta.deletedAt': null,
-          });
-          if (existingPhone) {
-            throw new ApiError(409, 'Mobile number already registered. Please sign in instead.');
-          }
+    if (rawPhone) {
+      const cleanPhone = rawPhone.replace(/\D/g, '').trim();
+      if (cleanPhone) {
+        const existingPhone = await User.findOne({
+          $or: [{ 'profile.phone': cleanPhone }, { 'profile.phone': rawPhone }],
+          'meta.deletedAt': null,
+        });
+        if (existingPhone) {
+          throw new ApiError(409, 'Mobile number already registered. Please sign in instead.');
         }
-      }
-
-      if (data.verificationToken && data.profile.phone) {
-        const isVerified = await otpService.isPhoneVerified(data.profile.phone, data.verificationToken);
-        if (isVerified) {
-          data.profile.isPhoneVerified = true;
-        }
-      } else if (data.profile.isPhoneVerified) {
-        data.profile.isPhoneVerified = true;
       }
     }
 
-    const user = await User.create(data);
+    // Never trust client-supplied isPhoneVerified; require a valid one-time OTP verificationToken
+    let isPhoneVerified = false;
+    if (data.verificationToken && rawPhone) {
+      isPhoneVerified = await otpService.isPhoneVerified(rawPhone, data.verificationToken, {
+        consume: true,
+        countryCode,
+      });
+    }
+
+    // Construct an explicitly whitelisted user payload (prevents role / ownerId / status mass assignment)
+    const userPayload = {
+      profile: {
+        firstName,
+        lastName,
+        phone: rawPhone,
+        countryCode,
+        isPhoneVerified,
+        ...(typeof rawProfile.location === 'string' ? { location: rawProfile.location.trim() } : {}),
+        ...(typeof rawProfile.bio === 'string' ? { bio: rawProfile.bio.trim() } : {}),
+      },
+      auth: {
+        email,
+        password,
+      },
+      role: ROLES.USER,
+    };
+
+    const user = await User.create(userPayload);
     await this.notifyAdminsOnNewUser(user, 'email');
     try {
       await smsService.sendSignupConfirmation(user);
@@ -179,7 +202,7 @@ class AuthService {
 
     if (isEmail) {
       const normalizedEmail = identifier.toLowerCase();
-      user = await User.findOne({ 'auth.email': normalizedEmail }).select('+auth.password');
+      user = await User.findOne({ 'auth.email': normalizedEmail, 'meta.deletedAt': null }).select('+auth.password');
     } else {
       const digits = identifier.replace(/\D/g, '');
       if (!digits) throw new ApiError(401, 'Invalid email/mobile number or password');
@@ -219,7 +242,7 @@ class AuthService {
         queries.push({ 'profile.phone': phone });
       }
 
-      user = await User.findOne({ $or: queries }).select('+auth.password');
+      user = await User.findOne({ $or: queries, 'meta.deletedAt': null }).select('+auth.password');
     }
 
     if (!user) throw new ApiError(401, 'Invalid email/mobile number or password');
@@ -260,7 +283,7 @@ class AuthService {
     }
 
     const email = payload.email.trim().toLowerCase();
-    let user = await User.findOne({ 'auth.email': email });
+    let user = await User.findOne({ 'auth.email': email, 'meta.deletedAt': null });
     if (user && !user.isActive) throw new ApiError(403, 'Account is deactivated. Contact admin.');
 
     if (!user) {
@@ -276,7 +299,7 @@ class AuthService {
           password: crypto.randomBytes(32).toString('hex'),
           lastLogin: new Date(),
         },
-        role: 'user',
+        role: ROLES.USER,
       });
       await this.notifyAdminsOnNewUser(user, 'google');
     } else {
@@ -291,6 +314,7 @@ class AuthService {
       delete userObj.auth.passwordResetTokenHash;
       delete userObj.auth.passwordResetExpires;
     }
+    await this.attachOwnerAccess(userObj);
     return { user: userObj, token };
   }
 

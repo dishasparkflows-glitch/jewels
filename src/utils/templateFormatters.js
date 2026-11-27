@@ -29,6 +29,13 @@ const formatCurrency = (val) => {
   return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+// ------------------------------- format currency with rupee symbol ----------------------------
+const formatRupee = (num, useRupeeSymbol = true) => {
+  const n = Number(num || 0);
+  const symbol = useRupeeSymbol ? '₹' : 'Rs. ';
+  return symbol + formatCurrency(Number.isFinite(n) ? n : 0);
+};
+
 // ------------------------------- format date ----------------------------
 const formatDate = (val) => {
   if (!val) return '';
@@ -43,6 +50,42 @@ const formatDate = (val) => {
     month: 'long',
     year: 'numeric',
   });
+};
+
+// ------------------------------- format short date (e.g. 17 Nov 2026) ----------------------------
+const formatShortDate = (dateVal) => {
+  const fallback = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (!dateVal) return fallback();
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return fallback();
+    return d.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return fallback();
+  }
+};
+
+// ------------------------------- format date & time (e.g. 16 Nov 2026, 05:24 PM) ----------------------------
+const formatDateTime = (dateVal) => {
+  const fallback = () => `${formatShortDate(new Date())}, 10:00 AM`;
+  if (!dateVal) return fallback();
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return fallback();
+    const dateStr = formatShortDate(d);
+    const timeStr = d.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    return `${dateStr}, ${timeStr}`;
+  } catch {
+    return fallback();
+  }
 };
 
 // ------------------------------- format time ----------------------------
@@ -70,8 +113,8 @@ const formatAddress = (address) => {
   if (typeof address === 'string') return address.trim();
 
   const parts = [
-    address.address || address.addressLine1,
-    address.addressLine2 || address.apartment,
+    address.address || address.addressLine || address.addressLine1,
+    address.apartment || address.addressLine2,
     address.city,
     address.state,
     address.pincode || address.postalCode ? `(${address.pincode || address.postalCode})` : null,
@@ -88,7 +131,10 @@ const formatAddress = (address) => {
 const templateFormatters = {
   orderItems: formatOrderItems,
   currency: formatCurrency,
+  rupee: formatRupee,
   date: formatDate,
+  shortDate: formatShortDate,
+  dateTime: formatDateTime,
   time: formatTime,
   address: formatAddress,
 };
@@ -102,7 +148,10 @@ const getFormatter = (name) => {
 module.exports = {
   formatOrderItems,
   formatCurrency,
+  formatRupee,
   formatDate,
+  formatShortDate,
+  formatDateTime,
   formatTime,
   formatAddress,
   templateFormatters,

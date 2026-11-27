@@ -29,9 +29,6 @@ async function expireCoupons(source = 'scheduled_cron') {
       );
       const modifiedCount = result.modifiedCount ?? result.nModified ?? 0;
 
-      for (const id of expiredIds) {
-        await redisClient.deleteByPattern(`coupons:*${id}*`);
-      }
       await redisClient.deleteByPattern('coupons:*');
 
       console.log(`[Coupon Cron] Marked ${modifiedCount} coupon(s) expired (${source}) and invalidated Redis cache.`);

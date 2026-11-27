@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const BasePaymentProvider = require('./base.provider');
 const Order = require('../../order/order.model');
+const { generateOrderAccessToken } = require('../../order/order.utils');
 const ApiError = require('../../../utils/ApiError');
 const { CCAVENUE, URL } = require('../../../config/constants');
 
@@ -252,11 +253,14 @@ class CCAvenueService extends BasePaymentProvider {
         timelineMessage: `Payment successful via CCAvenue (Tracking ID: ${trackingId})`,
       });
 
+      const accessToken = generateOrderAccessToken(order);
+      const tokenQuery = accessToken ? `&token=${encodeURIComponent(accessToken)}` : '';
+
       return {
         status: 'Success',
         order,
         response,
-        redirectUrl: `${URL.FRONTEND_URL}/order-success?orderId=${order._id}&orderNumber=${order.orderNumber}&trackingId=${encodeURIComponent(trackingId || '')}`,
+        redirectUrl: `${URL.FRONTEND_URL}/order-success?orderId=${order._id}&orderNumber=${order.orderNumber}&trackingId=${encodeURIComponent(trackingId || '')}${tokenQuery}`,
       };
     } else {
       await this.markOrderAsFailed(order, {

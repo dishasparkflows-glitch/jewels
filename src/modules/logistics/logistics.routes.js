@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const logisticsController = require('./logistics.controller');
-const { authenticate, optionalAuth } = require('../../middleware/auth.middleware');
+const { authenticate, authorize, optionalAuth } = require('../../middleware/auth.middleware');
+const { ROLES } = require('../../config/constants');
 
 // ─── Public / Customer Tracking & Serviceability Endpoints ─────────────────
 
@@ -21,16 +22,17 @@ router.get('/track/order/:orderId', optionalAuth, logisticsController.trackByOrd
 router.post('/webhook', logisticsController.handleWebhook);
 
 // ─── Protected Logistics Operations (Admin / Ops) ──────────────────────────
+router.use(authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN));
 
-router.get('/rates/:orderId', authenticate, logisticsController.getCourierRates);
-router.post('/create-shipment/:orderId', authenticate, logisticsController.createShipment);
-router.post('/assign-awb/:orderId', authenticate, logisticsController.assignAwb);
-router.get('/label/:orderId', authenticate, logisticsController.getLabel);
-router.get('/manifest/:orderId', authenticate, logisticsController.getManifest);
-router.get('/track/:orderId', authenticate, logisticsController.trackAdminOrder);
-router.post('/create-return-shipment/:returnId', authenticate, logisticsController.createReturnShipment);
-router.get('/return-label/:returnId', authenticate, logisticsController.getReturnLabel);
-router.get('/track-return/:returnId', authenticate, logisticsController.trackReturn);
-router.post('/cancel', authenticate, logisticsController.cancelShipment);
+router.get('/rates/:orderId', logisticsController.getCourierRates);
+router.post('/create-shipment/:orderId', logisticsController.createShipment);
+router.post('/assign-awb/:orderId', logisticsController.assignAwb);
+router.get('/label/:orderId', logisticsController.getLabel);
+router.get('/manifest/:orderId', logisticsController.getManifest);
+router.get('/track/:orderId', logisticsController.trackAdminOrder);
+router.post('/create-return-shipment/:returnId', logisticsController.createReturnShipment);
+router.get('/return-label/:returnId', logisticsController.getReturnLabel);
+router.get('/track-return/:returnId', logisticsController.trackReturn);
+router.post('/cancel', logisticsController.cancelShipment);
 
 module.exports = router;

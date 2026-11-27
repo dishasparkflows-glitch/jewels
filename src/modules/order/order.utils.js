@@ -1,7 +1,8 @@
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const Setting = require('../setting/setting.model');
 const ApiError = require('../../utils/ApiError');
-const { PAYMENT_PROVIDER } = require('../../config/constants');
+const { PAYMENT_PROVIDER, JWT, ROLES } = require('../../config/constants');
 
 // ------------------------------- generate order number ----------------------------
 async function generateOrderNumber() {
@@ -254,10 +255,34 @@ function buildCustomerInfo(shippingAddress, user = null) {
   };
 }
 
+// ------------------------------- order guest access token ----------------------------
+function generateOrderAccessToken(order) {
+  if (!order?._id) return null;
+  const secret = JWT?.SECRET;
+  if (!secret) return null;
+  const payload = `${String(order._id)}:${String(order.orderNumber || '')}`;
+  return crypto.createHmac('sha256', `${secret}:order-access`).update(payload).digest('hex');
+}
+
+function verifyOrderAccessToken(order, token) {
+  if (!order?._id || !token || typeof token !== 'string') return false;
+  const expected = generateOrderAccessToken(order);
+  if (!expected) return false;
+  const expectedBuf = Buffer.from(expected, 'utf8');
+  const providedBuf = Buffer.from(token.trim(), 'utf8');
+  if (expectedBuf.length !== providedBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, providedBuf);
+}
+
 // ------------------------------- check order access ----------------------------
-function checkOrderAccess(order, user = null) {
+function checkOrderAccess(order, user = null, accessToken = null) {
   // Admin / super admin has access
-  if (user && (user.role === 'admin' || user.role === 'super_admin')) {
+  if (user && (user.role === ROLES.ADMIN || user.role === ROLES.SUPER_ADMIN)) {
+    return;
+  }
+
+  // Signed guest order token allows access for the customer who placed the order
+  if (verifyOrderAccessToken(order, accessToken)) {
     return;
   }
 
@@ -268,41 +293,17 @@ function checkOrderAccess(order, user = null) {
       ? rawOwner.toString()
       : null;
 
-  // If order belongs to an authenticated user, an unauthenticated guest cannot access it
-  if (ownerId && !user) {
-    throw new ApiError(401, 'Authentication required to access this order');
+  // Unauthenticated callers without a valid signed order token cannot access ANY order
+  if (!user) {
+    throw new ApiError(401, 'Authentication or valid order access token is required to access this order');
   }
 
-  if (user) {
-    const currentUserId = user._id ? user._id.toString() : null;
-
-    // Direct owner ID match
-    if (ownerId && currentUserId && ownerId === currentUserId) {
-      return;
-    }
-
-    // Email match fallback (e.g. order placed with account email)
-    const userEmail = (user.auth?.email || user.email || '')
-      .toLowerCase()
-      .trim();
-    const customerEmail = (
-      order.customer?.email ||
-      order.shippingAddress?.email ||
-      ''
-    )
-      .toLowerCase()
-      .trim();
-    if (userEmail && customerEmail && userEmail === customerEmail) {
-      return;
-    }
-
-    if (ownerId && currentUserId && ownerId !== currentUserId) {
-      throw new ApiError(
-        403,
-        'You do not have permission to access this order'
-      );
-    }
+  const currentUserId = user._id ? user._id.toString() : null;
+  if (ownerId && currentUserId && ownerId === currentUserId) {
+    return;
   }
+
+  throw new ApiError(403, 'You do not have permission to access this order');
 }
 
 // ------------------------------- build user order filters ----------------------------
@@ -422,6 +423,8 @@ module.exports = {
   buildShippingAddress,
   validateShippingAddress,
   buildCustomerInfo,
+  generateOrderAccessToken,
+  verifyOrderAccessToken,
   checkOrderAccess,
   buildUserOrderFilters,
   buildAdminOrderFilters

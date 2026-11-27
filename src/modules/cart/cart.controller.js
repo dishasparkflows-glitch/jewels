@@ -4,15 +4,15 @@ const ApiResponse = require('../../utils/ApiResponse');
 const { emitCartUpdate } = require('../../socket/viewers.socket');
 
 class CartController {
-  // Helper to extract user identity
+  // Helper to extract authenticated user identity only (never trust client-supplied userId)
   getIdentity(req) {
-    const userId = req.user?._id || req.body?.userId || req.query?.userId || null;
+    const userId = req.user?._id || null;
     return { userId };
   }
 
   // ------------------------------- get cart & wishlist counts ----------------------------
   getCounts = catchAsync(async (req, res) => {
-    const userId = req.user?._id || req.body?.userId || req.query?.userId || null;
+    const userId = req.user?._id || null;
     const userEmail = req.user?.auth?.email || req.user?.email || null;
     const data = await cartService.getCounts({ userId, userEmail });
     ApiResponse.success(res, data, 'Counts retrieved successfully');
@@ -43,17 +43,17 @@ class CartController {
 
   // ------------------------------- add to cart ----------------------------
   addToCart = catchAsync(async (req, res) => {
-    const { userId: authUserId } = this.getIdentity(req);
-    const effectiveUserId = authUserId || req.body?.userId || null;
+    const { userId } = this.getIdentity(req);
+    const { userId: _ignoredUserId, ...itemPayload } = req.body || {};
 
     const data = await cartService.addToCart({
-      userId: effectiveUserId,
-      ...req.body,
+      ...itemPayload,
+      userId,
     });
 
     try {
       emitCartUpdate({
-        userId: effectiveUserId,
+        userId,
         totalItems: data.totalItems,
       });
     } catch {}

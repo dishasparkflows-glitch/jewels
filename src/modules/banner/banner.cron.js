@@ -27,11 +27,6 @@ async function triggerOfferCleanup(source = 'cron') {
     };
 
     if (result.deletedCount > 0) {
-      if (Array.isArray(result.expiredIds) && result.expiredIds.length > 0) {
-        for (const id of result.expiredIds) {
-          await redisClient.deleteByPattern(`banners:*${id}*`);
-        }
-      }
       await redisClient.deleteByPattern('banners:*');
       console.log(`[Banner Cron] ✅ Completed expired offer cleanup: auto-deleted ${result.deletedCount} offers in ${Date.now() - startTime}ms [Source: ${source}]`);
     }

@@ -132,9 +132,10 @@ class OtpService {
   /**
    * Helper to check if a verification token is valid for a given phone number
    */
-  async isPhoneVerified(rawPhone, verificationToken) {
-    if (!verificationToken) return false;
+  async isPhoneVerified(rawPhone, verificationToken, { consume = false, countryCode = null } = {}) {
+    if (!verificationToken || typeof verificationToken !== 'string') return false;
     const phone = normalizePhone(rawPhone);
+    if (!phone) return false;
 
     const record = verifiedStore.get(verificationToken);
     if (!record) return false;
@@ -144,7 +145,17 @@ class OtpService {
       return false;
     }
 
-    return record.phone === phone;
+    const phoneMatches = record.phone === phone || (phone.length >= 10 && record.phone.endsWith(phone.slice(-10)));
+    const codeMatches = !countryCode || record.countryCode === normalizeCountryCode(countryCode);
+    if (!phoneMatches || !codeMatches) {
+      return false;
+    }
+
+    if (consume) {
+      verifiedStore.delete(verificationToken);
+    }
+
+    return true;
   }
 }
 

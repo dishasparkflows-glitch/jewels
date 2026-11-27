@@ -4,12 +4,16 @@ const analyticsController = require('./analytics.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const { ROLES } = require('../../config/constants');
 
-// Direct dev / Postman verification test endpoints
-router.get('/test', analyticsController.getOverview);
-router.route('/google-token').get(analyticsController.getGoogleAccessToken).post(analyticsController.getGoogleAccessToken);
-
-// All other analytics endpoints require Admin or Super Admin authentication
+// All analytics endpoints require Admin or Super Admin authentication
 router.use(authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN));
+
+// Health, verification & token endpoints
+router.get('/test', analyticsController.getOverview);
+router
+  .route('/google-token')
+  .all(authorize(ROLES.SUPER_ADMIN))
+  .get(analyticsController.getGoogleAccessToken)
+  .post(analyticsController.getGoogleAccessToken);
 
 router.get('/health', analyticsController.getAnalyticsHealth);
 router.get('/status', analyticsController.getStatus);

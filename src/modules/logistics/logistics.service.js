@@ -1,6 +1,8 @@
+const mongoose = require('mongoose');
 const Order = require('../order/order.model');
 const Return = require('../return/return.model');
 const ApiError = require('../../utils/ApiError');
+const { checkOrderAccess } = require('../order/order.utils');
 const { getProvider, getAllProviders, getActiveProviders } = require('./providers');
 
 class LogisticsService {
@@ -76,11 +78,15 @@ class LogisticsService {
   }
 
   // ------------------------------- track shipment by order ID ----------------------------
-  async trackShipmentByOrderId(orderId, providerName = null) {
-    const order = await Order.findById(orderId).lean();
+  async trackShipmentByOrderId(orderId, providerName = null, user = null, accessToken = null) {
+    if (!mongoose.isValidObjectId(orderId)) {
+      throw new ApiError(400, 'Invalid order ID');
+    }
+    const order = await Order.findOne({ _id: orderId, 'meta.deletedAt': null }).lean();
     if (!order) {
       throw new ApiError(404, 'Order not found');
     }
+    checkOrderAccess(order, user, accessToken);
     return this.getProvider(providerName).trackShipmentByOrderId(order);
   }
 

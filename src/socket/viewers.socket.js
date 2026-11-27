@@ -1,5 +1,23 @@
 const { Server } = require('socket.io');
-const { NODE_ENV, URL } = require('../config/constants');
+const jwt = require('jsonwebtoken');
+const { NODE_ENV, URL, JWT } = require('../config/constants');
+const User = require('../modules/user/user.model');
+
+async function verifySocketUser(rawToken) {
+  if (!rawToken || typeof rawToken !== 'string' || !JWT?.SECRET) return null;
+  const cleanToken = rawToken.replace(/^Bearer\s+/i, '').trim();
+  if (!cleanToken) return null;
+  try {
+    const decoded = jwt.verify(cleanToken, JWT.SECRET);
+    if (!decoded?.id) return null;
+    const user = await User.findOne({ _id: decoded.id, 'meta.deletedAt': null, isActive: true })
+      .select('_id')
+      .lean();
+    return user ? String(user._id) : null;
+  } catch {
+    return null;
+  }
+}
 
 // In-memory state of live viewer counts per product
 // Map<string, { count: number, sockets: Set<string>, timer: NodeJS.Timeout | null, cleanupTimer: NodeJS.Timeout | null }>
@@ -108,8 +126,10 @@ function initViewerSocket(server) {
     URL.FRONTEND_URL,
     'http://localhost:5173',
     'http://localhost:5174',
+    'http://localhost:5175',
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
+    'http://127.0.0.1:5175',
   ].filter(Boolean);
 
   const io = new Server(server, {
@@ -118,7 +138,7 @@ function initViewerSocket(server) {
         if (!origin || allowedOrigins.includes(origin) || NODE_ENV === 'development') {
           return callback(null, true);
         }
-        return callback(null, true); // Permissive in dev/local
+        return callback(new Error(`Socket CORS blocked: Origin ${origin} is not allowed`));
       },
       credentials: true,
       methods: ['GET', 'POST'],
@@ -127,6 +147,16 @@ function initViewerSocket(server) {
   });
 
   ioInstance = io;
+
+  // Attach verified userId when a valid JWT is present in handshake (public viewers stay unauthenticated)
+  io.use(async (socket, next) => {
+    const rawToken = socket.handshake.auth?.token || socket.handshake.headers?.authorization || '';
+    const verifiedUserId = await verifySocketUser(rawToken);
+    if (verifiedUserId) {
+      socket.data.userId = verifiedUserId;
+    }
+    next();
+  });
 
   io.on('connection', (socket) => {
     let currentJoinedProduct = null;
@@ -161,27 +191,43 @@ function initViewerSocket(server) {
 
     socket.on('leave_product', ({ productId }) => {
       if (!productId) return;
-      leaveProduct(socket, String(productId).trim());
-      if (currentJoinedProduct === productId) {
+      const pid = String(productId).trim();
+      leaveProduct(socket, pid);
+      if (currentJoinedProduct === pid) {
         currentJoinedProduct = null;
       }
     });
 
-    socket.on('join_user', ({ userId, sessionId }) => {
-      if (userId) {
-        socket.join(`user:${String(userId)}`);
+    socket.on('join_user', async ({ userId, sessionId, token } = {}) => {
+      if (token && !socket.data.userId) {
+        const verifiedUserId = await verifySocketUser(token);
+        if (verifiedUserId) {
+          socket.data.userId = verifiedUserId;
+        }
       }
-      if (sessionId) {
-        socket.join(`session:${String(sessionId)}`);
+
+      const verifiedId = socket.data.userId;
+      if (userId) {
+        if (!verifiedId || String(userId) !== verifiedId) {
+          socket.emit('socket_error', { message: 'Unauthorized user room join attempt' });
+          return;
+        }
+        socket.join(`user:${verifiedId}`);
+      } else if (verifiedId) {
+        socket.join(`user:${verifiedId}`);
+      }
+
+      if (sessionId && typeof sessionId === 'string') {
+        socket.join(`session:${sessionId.trim()}`);
       }
     });
 
-    socket.on('leave_user', ({ userId, sessionId }) => {
-      if (userId) {
-        socket.leave(`user:${String(userId)}`);
+    socket.on('leave_user', ({ sessionId } = {}) => {
+      if (socket.data.userId) {
+        socket.leave(`user:${socket.data.userId}`);
       }
-      if (sessionId) {
-        socket.leave(`session:${String(sessionId)}`);
+      if (sessionId && typeof sessionId === 'string') {
+        socket.leave(`session:${sessionId.trim()}`);
       }
     });
 

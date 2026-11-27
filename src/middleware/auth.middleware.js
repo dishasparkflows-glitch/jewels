@@ -1,52 +1,77 @@
 const jwt = require('jsonwebtoken');
 const { JWT } = require('../config/constants');
 const User = require('../modules/user/user.model');
-const { setRequestContext, getRequestContext, asyncLocalStorage } = require('../utils/context');
+const { setRequestContext, asyncLocalStorage } = require('../utils/context');
+
+/**
+ * Decodes the Bearer JWT from req.headers.authorization.
+ */
+function decodeTokenFromRequest(req) {
+  const authHeader = req.headers?.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { hasToken: false, decoded: null, error: null };
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT.SECRET);
+    return { hasToken: true, decoded, error: null };
+  } catch (error) {
+    return { hasToken: true, decoded: null, error };
+  }
+}
+
+/**
+ * Resolves the authenticated user from req.headers.authorization
+ * using a lean User query.
+ */
+async function resolveUserFromHeader(req) {
+  const { hasToken, decoded, error } = decodeTokenFromRequest(req);
+  if (!hasToken) {
+    return { statusCode: 401, message: 'Access denied. No token provided.', user: null, decoded: null };
+  }
+  if (error) {
+    const msg = error.name === 'TokenExpiredError'
+      ? 'Token expired. Please login again.'
+      : 'Invalid token.';
+    return { statusCode: 401, message: msg, user: null, decoded: null };
+  }
+
+  const user = await User.findById(decoded.id)
+    .select('-auth.password -password')
+    .lean();
+  if (!user) {
+    return { statusCode: 401, message: 'Invalid token. User not found.', user: null, decoded };
+  }
+  if (!user.isActive) {
+    return { statusCode: 403, message: 'Account is deactivated. Contact admin.', user: null, decoded };
+  }
+
+  return { statusCode: 200, message: null, user, decoded };
+}
+
+function runWithUserContext(user, next) {
+  if (asyncLocalStorage.getStore()) {
+    setRequestContext('userId', user._id);
+    return next();
+  }
+  return asyncLocalStorage.run(new Map([['userId', user._id]]), next);
+}
 
 // Authenticate JWT token from Authorization header
 const authenticate = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access denied. No token provided.',
-      });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT.SECRET);
-
-    const user = await User.findById(decoded.id).select('-auth.password -password');
+    const { user, statusCode, message } = await resolveUserFromHeader(req);
     if (!user) {
-      return res.status(401).json({
+      return res.status(statusCode).json({
         success: false,
-        message: 'Invalid token. User not found.',
-      });
-    }
-
-    if (!user.isActive) {
-      return res.status(403).json({
-        success: false,
-        message: 'Account is deactivated. Contact admin.',
+        message,
       });
     }
 
     req.user = user;
-    setRequestContext('userId', user._id);
-    if (!getRequestContext('userId')) {
-      const store = new Map([['userId', user._id]]);
-      return asyncLocalStorage.run(store, () => next());
-    }
-    next();
-  } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expired. Please login again.',
-      });
-    }
+    return runWithUserContext(user, next);
+  } catch {
     return res.status(401).json({
       success: false,
       message: 'Invalid token.',
@@ -78,24 +103,21 @@ const authorize = (...roles) => {
 // Optional JWT token authentication - does not block guests
 const optionalAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, JWT.SECRET);
-      const user = await User.findById(decoded.id).select('-auth.password -password');
-      if (user && user.isActive) {
-        req.user = user;
-        setRequestContext('userId', user._id);
-        if (!getRequestContext('userId')) {
-          const store = new Map([['userId', user._id]]);
-          return asyncLocalStorage.run(store, () => next());
-        }
-      }
+    const { user } = await resolveUserFromHeader(req);
+    if (user) {
+      req.user = user;
+      return runWithUserContext(user, next);
     }
-  } catch (error) {
+  } catch {
     // Ignore error for optional authentication
   }
-  next();
+  return next();
 };
 
-module.exports = { authenticate, authorize, optionalAuth };
+module.exports = {
+  authenticate,
+  authorize,
+  optionalAuth,
+  decodeTokenFromRequest,
+  resolveUserFromHeader,
+};

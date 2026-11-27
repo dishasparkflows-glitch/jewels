@@ -10,7 +10,10 @@ class RedisClient {
   constructor(customConfig = null) {
     this.client = null;
     this.isConnected = false;
-    this.init(customConfig);
+    this.redisUrl = null;
+    if (customConfig) {
+      this.init(customConfig);
+    }
   }
 
   /**
@@ -20,15 +23,6 @@ class RedisClient {
    */
   init(customConfig = null) {
     try {
-      if (this.client && !customConfig && (this.isConnected || this.client.status === 'ready' || this.client.status === 'connecting')) {
-        return;
-      }
-      if (this.client) {
-        try {
-          this.client.disconnect();
-        } catch (_) {}
-      }
-
       const redisUrl = (typeof customConfig === 'string' && customConfig.trim())
         ? customConfig.trim()
         : (REDIS_URL || '');
@@ -37,6 +31,21 @@ class RedisClient {
         return;
       }
 
+      if (
+        this.client &&
+        this.redisUrl === redisUrl &&
+        ['connecting', 'connect', 'ready', 'reconnecting'].includes(this.client.status)
+      ) {
+        return;
+      }
+
+      if (this.client) {
+        try {
+          this.client.disconnect();
+        } catch (_) {}
+      }
+
+      this.redisUrl = redisUrl;
       const isTls = redisUrl.startsWith('rediss://');
 
       this.client = new Redis(redisUrl, {
@@ -96,6 +105,9 @@ class RedisClient {
    * @returns {Promise<boolean>}
    */
   async ensureReady(timeoutMs = 2500) {
+    if (!this.client) {
+      this.init(REDIS_URL);
+    }
     if (!this.client) return false;
     if (this.client.status === 'ready') return true;
     if (['close', 'end'].includes(this.client.status)) return false;
@@ -159,16 +171,14 @@ class RedisClient {
 
   /**
    * Helper to safely serialize values before saving to Redis
+   * Preserves booleans, numbers, arrays, objects, null, and strings accurately.
    *
    * @param {*} value
    * @returns {string}
    */
   _serialize(value) {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'object') {
-      return JSON.stringify(value);
-    }
-    return String(value);
+    if (value === undefined) return '';
+    return JSON.stringify(value);
   }
 
   /**
@@ -181,15 +191,11 @@ class RedisClient {
     if (value === null || value === undefined) return null;
     if (typeof value !== 'string') return value;
 
-    const trimmed = value.trim();
-    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value;
-      }
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
     }
-    return value;
   }
 
   /**
@@ -264,13 +270,6 @@ class RedisClient {
   }
 
   /**
-   * Alias for del
-   */
-  async delete(...keys) {
-    return this.del(...keys);
-  }
-
-  /**
    * Safe, non-blocking scan to find keys matching a pattern.
    * Uses Redis SCAN stream instead of blocking KEYS command for production safety.
    *
@@ -312,7 +311,7 @@ class RedisClient {
    * @param {string} pattern Pattern to match and delete (e.g. 'r:*')
    * @returns {Promise<number>} Number of deleted keys
    */
-  async delByPattern(pattern) {
+  async deleteByPattern(pattern) {
     try {
       if (!pattern) {
         return 0;
@@ -336,19 +335,9 @@ class RedisClient {
       }
       return totalDeleted;
     } catch (error) {
-      console.error('Redis delByPattern error:', error.message);
+      console.error('Redis deleteByPattern error:', error.message);
       return 0;
     }
-  }
-
-  /**
-   * Alias for delByPattern
-   *
-   * @param {string} pattern Pattern to match and delete (e.g. 'r:*')
-   * @returns {Promise<number>} Number of deleted keys
-   */
-  async deleteByPattern(pattern) {
-    return this.delByPattern(pattern);
   }
 
   /**
@@ -465,13 +454,6 @@ const cacheHelper = {
   async deleteByPattern(pattern) {
     return redisClient.deleteByPattern(pattern);
   },
-
-  /**
-   * Alias for deleteByPattern
-   */
-  async delByPattern(pattern) {
-    return redisClient.deleteByPattern(pattern);
-  }
 };
 
 // Attach cacheHelper to redisClient instance as well

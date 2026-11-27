@@ -41,7 +41,8 @@ class LogisticsController {
   trackByOrderId = catchAsync(async (req, res) => {
     const { orderId } = req.params;
     const { provider } = req.query;
-    const tracking = await logisticsService.trackShipmentByOrderId(orderId, provider);
+    const orderToken = req.headers['x-order-token'] || req.query?.token || null;
+    const tracking = await logisticsService.trackShipmentByOrderId(orderId, provider, req.user, orderToken);
     return ApiResponse.success(res, tracking, 'Order shipment tracking retrieved');
   });
 
@@ -177,7 +178,7 @@ class LogisticsController {
   trackAdminOrder = catchAsync(async (req, res) => {
     const { orderId } = req.params;
     const { provider } = req.query;
-    const result = await logisticsService.trackShipmentByOrderId(orderId, provider);
+    const result = await logisticsService.trackShipmentByOrderId(orderId, provider, req.user);
     return ApiResponse.success(res, result, 'Shipment tracking data retrieved');
   });
 

@@ -1,6 +1,6 @@
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { publicUrl } = require('./media');
+const { publicUrl, extractKey } = require('./media');
 const { generateR2ObjectKey } = require('./r2UploadHelper');
 const { CLOUDFLARE_R2 } = require('../config/constants');
 
@@ -95,27 +95,7 @@ class CloudflareR2Service {
 
   // ------------------------------- extract clean R2 key from string or URL ----------------------------
   extractKey(input) {
-    if (!input) return '';
-    if (typeof input === 'object' && input !== null) {
-      if (typeof input.key === 'string' && input.key) return this.extractKey(input.key);
-      if (typeof input.url === 'string' && input.url) return this.extractKey(input.url);
-      return '';
-    }
-    if (typeof input !== 'string') return '';
-    let clean = input.trim();
-    if (/^https?:\/\//i.test(clean)) {
-      try {
-        const parsed = new URL(clean);
-        clean = parsed.pathname;
-      } catch {
-        clean = clean.replace(/^https?:\/\/[^\/]+\/?/i, '');
-      }
-    }
-    clean = clean.replace(/^\/+/, '').split(/[?#]/)[0];
-    if (this.bucketName && clean.startsWith(`${this.bucketName}/`)) {
-      clean = clean.slice(this.bucketName.length + 1);
-    }
-    return clean;
+    return extractKey(input, { bucketName: this.bucketName });
   }
 
   // ------------------------------- get file metadata & size from R2 ----------------------------

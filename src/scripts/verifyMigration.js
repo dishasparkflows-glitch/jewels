@@ -103,10 +103,14 @@ async function verify() {
   const settingsCount = await db.collection('settings').countDocuments();
   const announcementsCount = await db.collection('top_announcements').countDocuments();
   const modulesCount = await db.collection('modules').countDocuments();
+  const igTotal = await db.collection('instagram_posts').countDocuments();
+  const igWithIsActive = await db.collection('instagram_posts').countDocuments({ isActive: { $exists: true } });
+  const igInvalidStatus = await db.collection('instagram_posts').countDocuments({ status: { $nin: ['draft', 'approved'] } });
   console.log('Total filters in TO_DB:', filtersCount);
   console.log('Total settings in TO_DB:', settingsCount);
   console.log('Total top_announcements in TO_DB:', announcementsCount);
   console.log('Total modules in TO_DB:', modulesCount);
+  console.log(`Instagram posts: ${igTotal} | remaining isActive: ${igWithIsActive} | invalid status: ${igInvalidStatus}`);
 
   await conn.close();
 }

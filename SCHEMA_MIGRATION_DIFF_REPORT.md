@@ -1,6 +1,6 @@
 # Database Schema Migration & Differences Report
 
-Generated on: `2026-11-27T12:39:01.634Z`  
+Generated on: `2026-11-27T12:56:00.437Z`  
 Status: **DRY RUN (Preview Only)**  
 Mode: **Cross-DB Migration (`new-rare-dev` [Read-Only] ➔ `new-rare-live`)**  
 
@@ -14,15 +14,15 @@ Mode: **Cross-DB Migration (`new-rare-dev` [Read-Only] ➔ `new-rare-live`)**
    - **62** records with `isDeleted: true` in `FROM_DB` were **skipped** and not migrated to `TO_DB`.
    - Top-level `isDeleted` (`isDeleted: false`) was stripped from all migrated records (soft deletion is represented by `meta.deletedAt: null`).
 3. **Top-Level Audit Fields Moved to `meta`**:
-   - Across **912** documents that had top-level `createdAt`, `createdBy`, `updatedAt`, or `updatedBy`, values were moved into `meta` (`meta.createdAt`, `meta.createdBy`, `meta.updatedAt`, `meta.updatedBy`) and **removed from the top level**.
+   - Across **913** documents that had top-level `createdAt`, `createdBy`, `updatedAt`, or `updatedBy`, values were moved into `meta` (`meta.createdAt`, `meta.createdBy`, `meta.updatedAt`, `meta.updatedBy`) and **removed from the top level**.
 4. **Version Key Cleanup (`__v`)**:
-   - `__v` was removed from **911** records (0 remaining in target).
+   - `__v` was removed from **912** records (0 remaining in target).
 5. **Third-Party & Cloudflare Media Safety**:
    - **Zero** media files deleted. All Cloudflare R2 / CDN image URLs and keys are fully preserved.
 6. **Mapped vs Extra Field Handling**:
    - Legacy top-level fields mapped into nested/renamed model fields (e.g., `title`, `sku`, `description`, `gstPercentage`, `baseMetalWeight`, `baseLabourCharge`, `certificateCharge`, `otherAmountPercentage`, `displayPrice`, `category`, `menuItem`, `size`, `metalColors`, `gender`, `position`, `user`, `rating`, `comment`, `images`, etc.) are **removed from the top level**.
    - Genuinely extra database fields missing from the latest Mongoose schemas (e.g., `birthMonth`, `subTypes`, `densityFactor`, `purity`, `video`, etc.) are retained at the top level (while `featured` and `subType` are explicitly skipped from `products`).
-7. **Product Slugs & Schema Mapping (993 active source records migrated)**:
+7. **Product Slugs & Schema Mapping (994 active source records migrated)**:
    - `products`: Set `productType: "gold"` & `isOrnate: false`; mapped `status` (`active` ➔ `approved`, `inactive` ➔ `draft`); converted `promoBanner` strings to MongoDB `ObjectId`; generated unique `basicInfo.slug` from `title`; mapped `basicInfo`, `pricing`, `specifications`, `categoryIds`, `menuItemIds`, `sizeIds`, `metalColorIds`, `variants`, stone rows (`centerDiamondRows`, `sideDiamondRows`, `colorStoneRows`, `sideColorStoneRows`), `colorImages`, and `meta`; removed mapped legacy fields plus `featured` and `subType` from top level and subdocuments.
 
 ---
@@ -37,6 +37,7 @@ Mode: **Cross-DB Migration (`new-rare-dev` [Read-Only] ➔ `new-rare-live`)**
 | `center_diamond_prices` | 62 | 0 | 62 | 62 | 62 | 0 | Moved top-level `createdAt`/`updatedAt`/`updatedBy` to `meta` & removed top-level; removed `__v`; preserved legacy fields. |
 | `coupons` | 1 | 0 | 1 | 1 | 1 | 0 | Copied & verified schema alignment; moved any top-level audit fields to `meta`; removed `__v`. |
 | `currencies` | 9 | 0 | 9 | 0 | 0 | 0 | Copied & verified schema alignment; moved any top-level audit fields to `meta`; removed `__v`. |
+| `custom_inquiries` | 1 | 0 | 0 | 1 | 1 | 0 | Mapped `name`/`email`/`phoneNumber*` to `customer` and `stoneType`/`jewelryType`/`metalType`/`budget`/`comments` to `requirements`; normalized `referenceImages`; removed mapped top-level keys; moved audit to `meta`; removed `__v`. |
 | `diamond_clarities` | 6 | 0 | 6 | 6 | 6 | 0 | Normalized `image` structure; moved `createdAt`/`updatedAt` to `meta` & removed top-level; removed `__v`. |
 | `diamond_colors` | 4 | 0 | 4 | 4 | 4 | 0 | Normalized `image` structure; moved `createdAt`/`updatedAt` to `meta` & removed top-level; removed `__v`. |
 | `diamond_shapes` | 2 | 0 | 2 | 2 | 2 | 0 | Normalized `image` structure; moved `createdAt`/`updatedAt` to `meta` & removed top-level; removed `__v`. |
@@ -44,7 +45,7 @@ Mode: **Cross-DB Migration (`new-rare-dev` [Read-Only] ➔ `new-rare-live`)**
 | `diamond_types` | 2 | 0 | 2 | 2 | 2 | 0 | Normalized `image` structure; moved `createdAt`/`updatedAt` to `meta` & removed top-level; removed `__v`. |
 | `featureds` | 8 | 0 | 8 | 8 | 8 | 0 | Copied & verified schema alignment; moved any top-level audit fields to `meta`; removed `__v`. |
 | `gold_prices` | 1 | 0 | 1 | 0 | 1 | 0 | Moved top-level `createdAt`/`updatedAt`/`updatedBy` to `meta` & removed top-level; removed `__v`; preserved legacy fields. |
-| `instagram_posts` | 4 | 0 | 4 | 4 | 4 | 0 | Copied & verified schema alignment; moved any top-level audit fields to `meta`; removed `__v`. |
+| `instagram_posts` | 4 | 0 | 4 | 4 | 4 | 0 | Mapped `isActive` (`true`->`approved`, `false`->`draft`) to `status` and `position` to `order`; removed `isActive` & `position`; moved audit to `meta`; removed `__v`. |
 | `menu_items` | 93 | 42 | 93 | 93 | 93 | 0 | Copied & verified schema alignment; moved any top-level audit fields to `meta`; removed `__v`. |
 | `menu_sections` | 26 | 5 | 26 | 26 | 26 | 0 | Copied & verified schema alignment; moved any top-level audit fields to `meta`; removed `__v`. |
 | `metal_colors` | 3 | 0 | 3 | 3 | 3 | 0 | Normalized `colorCode`/`colorCodeEnd`; moved `createdAt` to `meta` & removed top-level; removed `__v`. |
@@ -56,7 +57,7 @@ Mode: **Cross-DB Migration (`new-rare-dev` [Read-Only] ➔ `new-rare-live`)**
 | `users` | 4 | 0 | 4 | 0 | 0 | 0 | Ensured `ownerId: null` default; verified `meta`; removed `__v`. |
 | `vto_masters` | 4 | 0 | 4 | 0 | 0 | 0 | Copied & verified schema alignment; moved any top-level audit fields to `meta`; removed `__v`. |
 | `top_announcements` | 6 | 0 | 6 | 0 | 0 | 0 | Synced from `MASTER_DB` (`new-neirah`); verified `meta` & removed `__v` / `isDeleted`. |
-| `modules` | 47 | 0 | 47 | 0 | 0 | 47 | Synced from `MASTER_DB` (`new-neirah`); resolved any `slug` `_id` conflicts in `TO_DB`; verified `meta` & removed `__v`. |
+| `modules` | 47 | 0 | 47 | 0 | 0 | 0 | Synced from `MASTER_DB` (`new-neirah`); resolved any `slug` `_id` conflicts in `TO_DB`; verified `meta` & removed `__v`. |
 | `filters` | 10 | 0 | 10 | 0 | 0 | 0 | Synced from `MASTER_DB` (`new-neirah`); rebuilt `categoryConfigs` with `TO_DB` category `_id`s & `slug`s (preserving `priceRanges` & slug config matching). |
 | `settings` | 1 | 0 | 1 | 0 | 0 | 0 | Synced from `MASTER_DB` (`new-neirah`); normalized image keys, cleaned `trustBadges`, validated `currentThemeId` against `TO_DB.themes`, ensured `meta`. |
 

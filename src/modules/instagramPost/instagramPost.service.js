@@ -36,8 +36,8 @@ class InstagramPostService {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
-    if (queryParams.isActive !== undefined && queryParams.isActive !== '' && queryParams.isActive !== 'all') {
-      filter.isActive = queryParams.isActive === 'true' || queryParams.isActive === true;
+    if (queryParams.status !== undefined && queryParams.status !== '' && queryParams.status !== 'all') {
+      filter.status = String(queryParams.status).toLowerCase();
     }
 
     if (queryParams.search) {
@@ -68,15 +68,15 @@ class InstagramPostService {
   async getLookup(queryParams = {}) {
     const filter = { 'meta.deletedAt': null };
 
-    if (queryParams.isActive !== undefined && queryParams.isActive !== '' && queryParams.isActive !== 'all') {
-      filter.isActive = queryParams.isActive === 'true' || queryParams.isActive === true;
+    if (queryParams.status !== undefined && queryParams.status !== '' && queryParams.status !== 'all') {
+      filter.status = String(queryParams.status).toLowerCase();
     } else {
-      filter.isActive = true;
+      filter.status = 'approved';
     }
 
     return await InstagramPost.find(filter)
       .sort({ order: 1, 'meta.createdAt': -1 })
-      .select('_id url title order isActive')
+      .select('_id url title order status')
       .lean();
   }
 
@@ -136,7 +136,7 @@ class InstagramPostService {
   async delete(id) {
     const item = await InstagramPost.findOneAndUpdate(
       { _id: id },
-      { $set: { isActive: false, 'meta.deletedAt': new Date() } },
+      { $set: { status: 'draft', 'meta.deletedAt': new Date() } },
       { returnDocument: 'after' }
     );
 
@@ -155,7 +155,7 @@ class InstagramPostService {
 
     const result = await InstagramPost.updateMany(
       { _id: { $in: ids } },
-      { $set: { isActive: false, 'meta.deletedAt': new Date() } }
+      { $set: { status: 'draft', 'meta.deletedAt': new Date() } }
     );
 
     return {

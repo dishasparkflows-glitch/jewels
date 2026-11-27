@@ -18,9 +18,10 @@ const instagramPostSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    isActive: {
-      type: Boolean,
-      default: true,
+    status: {
+      type: String,
+      enum: ['draft', 'approved'],
+      default: 'approved',
       index: true,
     },
   },

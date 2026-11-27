@@ -538,7 +538,16 @@ const transformers = {
   instagram_posts: (doc) => {
     if (doc.title === undefined) doc.title = '';
     if (doc.order === undefined) doc.order = Number(doc.position) || 0;
-    if (doc.isActive === undefined) doc.isActive = true;
+    if (doc.isActive !== undefined) {
+      doc.status = doc.isActive ? 'approved' : 'draft';
+    } else if (doc.status === 'active') {
+      doc.status = 'approved';
+    } else if (doc.status === 'inactive') {
+      doc.status = 'draft';
+    } else if (!['draft', 'approved'].includes(doc.status)) {
+      doc.status = 'approved';
+    }
+    delete doc.isActive;
     delete doc.position;
   },
 
@@ -554,6 +563,58 @@ const transformers = {
   menu_sections: (doc) => {
     if (doc.order === undefined) doc.order = 0;
     if (doc.status === undefined) doc.status = 'active';
+  },
+
+  custom_inquiries: (doc) => {
+    doc.customer = doc.customer || {
+      name: doc.name || '',
+      email: doc.email ? String(doc.email).toLowerCase().trim() : '',
+      phone: {
+        countryCode: doc.phoneNumberCountryCode || '91',
+        number: doc.phoneNumber || '',
+      },
+    };
+    doc.requirements = doc.requirements || {
+      stoneType: doc.stoneType || '',
+      jewelryTypes: Array.isArray(doc.jewelryTypes)
+        ? doc.jewelryTypes
+        : Array.isArray(doc.jewelryType)
+        ? doc.jewelryType
+        : doc.jewelryType
+        ? [doc.jewelryType]
+        : [],
+      metalType: doc.metalType || '',
+      comments: doc.comments || '',
+      budget: doc.budget ?? '',
+    };
+    if (Array.isArray(doc.referenceImages)) {
+      doc.referenceImages = doc.referenceImages.map((img) => {
+        const norm = normalizeMediaObject(img);
+        return {
+          url: norm.url,
+          key: norm.key,
+          ...(img._id ? { _id: img._id } : {}),
+        };
+      });
+    } else {
+      doc.referenceImages = [];
+    }
+    if (doc.status === undefined) doc.status = 'pending';
+
+    for (const f of [
+      'name',
+      'email',
+      'phoneNumberCountryCode',
+      'phoneNumber',
+      'stoneType',
+      'jewelryType',
+      'jewelryTypes',
+      'metalType',
+      'budget',
+      'comments',
+    ]) {
+      delete doc[f];
+    }
   },
 };
 
@@ -1120,6 +1181,12 @@ Mode: **Cross-DB Migration (\`${info.fromDbName}\` [Read-Only] ➔ \`${info.toDb
     } else if (r.collection.startsWith('diamond_')) {
       diffNotes =
         'Normalized `image` structure; moved `createdAt`/`updatedAt` to `meta` & removed top-level; removed `__v`.';
+    } else if (r.collection === 'instagram_posts') {
+      diffNotes =
+        'Mapped `isActive` (`true`->`approved`, `false`->`draft`) to `status` and `position` to `order`; removed `isActive` & `position`; moved audit to `meta`; removed `__v`.';
+    } else if (r.collection === 'custom_inquiries') {
+      diffNotes =
+        'Mapped `name`/`email`/`phoneNumber*` to `customer` and `stoneType`/`jewelryType`/`metalType`/`budget`/`comments` to `requirements`; normalized `referenceImages`; removed mapped top-level keys; moved audit to `meta`; removed `__v`.';
     } else if (r.collection === 'users') {
       diffNotes = 'Ensured `ownerId: null` default; verified `meta`; removed `__v`.';
     } else if (r.collection === 'modules') {

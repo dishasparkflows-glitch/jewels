@@ -3,6 +3,12 @@ const catchAsync = require('../../utils/catchAsync');
 const ApiResponse = require('../../utils/ApiResponse');
 
 class CurrencyController {
+    // ------------------------------- get currency lookup ----------------------------
+  getLookup = catchAsync(async (req, res) => {
+    const items = await currencyService.getLookup(req.query);
+    ApiResponse.success(res, items, 'Currency lookup list retrieved');
+  });
+
     // ------------------------------- get all currencies ----------------------------
   getAll = catchAsync(async (req, res) => {
     const { items, pagination } = await currencyService.getAll(req.query);

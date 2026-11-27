@@ -7,6 +7,7 @@ const EXCLUDED_MODELS = new Set([
   'cart',
   'wishlist',
   'codsequence',
+  'currency',
   'integrationtoken',
   'whatsappmessage',
   'notification',

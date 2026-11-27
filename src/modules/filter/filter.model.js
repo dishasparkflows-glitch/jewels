@@ -1,5 +1,30 @@
 const mongoose = require('mongoose');
 
+const priceRangeOptionSchema = new mongoose.Schema(
+  {
+    label: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    min: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    max: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    order: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { _id: true }
+);
+
 const categoryConfigSchema = new mongoose.Schema(
   {
     categoryId: {
@@ -66,6 +91,11 @@ const filterSchema = new mongoose.Schema(
     },
     // Category-wise overrides for enabled/disabled, order, custom title and default value
     categoryConfigs: [categoryConfigSchema],
+    // Preset price brackets for range-type filters (e.g. price-range)
+    priceRanges: {
+      type: [priceRangeOptionSchema],
+      default: undefined,
+    },
   },
   {
     versionKey: false,

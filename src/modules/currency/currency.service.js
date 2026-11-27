@@ -31,9 +31,7 @@ class CurrencyService {
     // ------------------------------- get all currencies ----------------------------
   async getAll(queryParams = {}) {
 
-    const filter = {
-      'meta.deletedAt': { $in: [null, undefined] },
-    };
+    const filter = {};
 
     if (queryParams.activeOnly === 'true' || queryParams.status === 'active') {
       filter['settings.isActive'] = true;
@@ -51,7 +49,7 @@ class CurrencyService {
     const sortOptions = {
       'settings.sortOrder': 1,
       'settings.isBaseCurrency': -1,
-      createdAt: 1,
+      'currencyInfo.code': 1,
     };
 
     if (queryParams.page && queryParams.limit) {
@@ -80,12 +78,27 @@ class CurrencyService {
     };
   }
 
+    // ------------------------------- get currency lookup ----------------------------
+  async getLookup(queryParams = {}) {
+    const filter = {};
+
+    if (queryParams.status !== 'all') {
+      filter['settings.isActive'] = true;
+    }
+
+    return Currency.find(filter)
+      .select('_id currencyInfo exchangeRate settings')
+      .sort({
+        'settings.sortOrder': 1,
+        'settings.isBaseCurrency': -1,
+        'currencyInfo.code': 1,
+      })
+      .lean();
+  }
+
     // ------------------------------- get single currency ----------------------------
   async getOne(id) {
-    const currency = await Currency.findOne({
-      _id: id,
-      'meta.deletedAt': { $in: [null, undefined] },
-    });
+    const currency = await Currency.findOne({ _id: id });
     if (!currency) {
       throw new ApiError(404, 'Currency not found');
     }
@@ -96,7 +109,6 @@ class CurrencyService {
   async getByCode(code) {
     const currency = await Currency.findOne({
       'currencyInfo.code': code.toUpperCase(),
-      'meta.deletedAt': { $in: [null, undefined] },
     });
     if (!currency) {
       throw new ApiError(404, `Currency ${code} not found`);
@@ -114,7 +126,6 @@ class CurrencyService {
     // Check if code already exists
     const existing = await Currency.findOne({
       'currencyInfo.code': code,
-      'meta.deletedAt': { $in: [null, undefined] },
     });
     if (existing) {
       throw new ApiError(409, `Currency with code "${code}" already exists`);
@@ -160,10 +171,7 @@ class CurrencyService {
 
     // ------------------------------- update currency ----------------------------
   async update(id, data) {
-    const currency = await Currency.findOne({
-      _id: id,
-      'meta.deletedAt': { $in: [null, undefined] },
-    });
+    const currency = await Currency.findOne({ _id: id });
     if (!currency) {
       throw new ApiError(404, 'Currency not found');
     }
@@ -175,7 +183,6 @@ class CurrencyService {
         const existing = await Currency.findOne({
           _id: { $ne: id },
           'currencyInfo.code': nextCode,
-          'meta.deletedAt': { $in: [null, undefined] },
         });
         if (existing) {
           throw new ApiError(409, `Currency with code "${nextCode}" already exists`);
@@ -223,10 +230,7 @@ class CurrencyService {
 
     // ------------------------------- delete currency ----------------------------
   async delete(id) {
-    const currency = await Currency.findOne({
-      _id: id,
-      'meta.deletedAt': { $in: [null, undefined] },
-    });
+    const currency = await Currency.findOne({ _id: id });
     if (!currency) {
       throw new ApiError(404, 'Currency not found');
     }
@@ -234,10 +238,7 @@ class CurrencyService {
       throw new ApiError(400, 'Cannot delete the base currency');
     }
 
-    if (!currency.meta) currency.meta = {};
-    currency.meta.deletedAt = new Date();
-    currency.markModified('meta');
-    await currency.save();
+    await Currency.deleteOne({ _id: id });
     return { id, message: `${currency.currencyInfo.code} deleted successfully` };
   }
 
@@ -247,23 +248,14 @@ class CurrencyService {
       throw new ApiError(400, 'Please provide an array of currency IDs to delete');
     }
 
-    const result = await Currency.updateMany(
-      {
-        _id: { $in: ids },
-        'settings.isBaseCurrency': { $ne: true },
-        'meta.deletedAt': { $in: [null, undefined] },
-      },
-      {
-        $set: {
-          'meta.deletedAt': new Date(),
-          'settings.isActive': false,
-        },
-      }
-    );
+    const result = await Currency.deleteMany({
+      _id: { $in: ids },
+      'settings.isBaseCurrency': { $ne: true },
+    });
 
     return {
-      message: `${result.modifiedCount} currency(ies) deleted successfully`,
-      deletedCount: result.modifiedCount,
+      message: `${result.deletedCount || 0} currency(ies) deleted successfully`,
+      deletedCount: result.deletedCount || 0,
       ids,
     };
   }
@@ -277,14 +269,12 @@ class CurrencyService {
 
     // Determine the base currency and its rate against USD
     const baseCurDoc = await Currency.findOne({
-      'meta.deletedAt': { $in: [null, undefined] },
       'settings.isBaseCurrency': true,
     }).lean();
     const baseCode = (baseCurDoc?.currencyInfo?.code || 'INR').toUpperCase();
     const basePerUsd = liveRates[baseCode] || liveRates['INR'] || 1;
 
     const currencies = await Currency.find({
-      'meta.deletedAt': { $in: [null, undefined] },
       'settings.isBaseCurrency': false,
       'settings.useLiveRate': true,
     });
@@ -325,10 +315,7 @@ class CurrencyService {
 
   // ------------------------------- sync one rate ----------------------------
   async syncOneRate(id) {
-    const currency = await Currency.findOne({
-      _id: id,
-      'meta.deletedAt': { $in: [null, undefined] },
-    });
+    const currency = await Currency.findOne({ _id: id });
     if (!currency) {
       throw new ApiError(404, 'Currency not found');
     }
@@ -342,7 +329,6 @@ class CurrencyService {
     }
 
     const baseCurDoc = await Currency.findOne({
-      'meta.deletedAt': { $in: [null, undefined] },
       'settings.isBaseCurrency': true,
     }).lean();
     const baseCode = (baseCurDoc?.currencyInfo?.code || 'INR').toUpperCase();

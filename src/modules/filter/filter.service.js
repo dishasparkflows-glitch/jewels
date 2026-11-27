@@ -9,6 +9,97 @@ const GemstoneShape = require('../gemstoneShape/gemstoneShape.model');
 const Birthstone = require('../birthstone/birthstone.model');
 const ApiError = require('../../utils/ApiError');
 
+const DEFAULT_PRICE_RANGES = [
+  { label: 'Below ₹10,000', min: null, max: 10000, order: 1 },
+  { label: '₹10,001 - ₹25,000', min: 10001, max: 25000, order: 2 },
+  { label: '₹25,001 - ₹50,000', min: 25001, max: 50000, order: 3 },
+  { label: '₹50,001 - ₹1,00,000', min: 50001, max: 100000, order: 4 },
+  { label: '₹1,00,001 - ₹2,00,000', min: 100001, max: 200000, order: 5 },
+  { label: 'Above ₹2,00,001', min: 200001, max: null, order: 6 },
+];
+
+function isPriceRangeFilter(filterDoc) {
+  return (
+    filterDoc?.filterId === 'price-range' ||
+    filterDoc?.key === 'price' ||
+    filterDoc?.type === 'range'
+  );
+}
+
+function formatPriceRangeLabel(min, max) {
+  const hasMin = min !== null && min !== undefined && min !== '';
+  const hasMax = max !== null && max !== undefined && max !== '';
+  const fmt = (val) => `₹${Number(val).toLocaleString('en-IN')}`;
+
+  if (!hasMin && hasMax) return `Below ${fmt(max)}`;
+  if (hasMin && !hasMax) return `Above ${fmt(min)}`;
+  if (hasMin && hasMax) return `${fmt(min)} - ${fmt(max)}`;
+  return '';
+}
+
+function normalizePriceRanges(rawRanges = []) {
+  if (!Array.isArray(rawRanges)) {
+    throw new ApiError(400, 'priceRanges must be an array');
+  }
+
+  const normalized = [];
+  for (let i = 0; i < rawRanges.length; i += 1) {
+    const entry = rawRanges[i] || {};
+    const min =
+      entry.min === '' || entry.min === null || entry.min === undefined
+        ? null
+        : Number(entry.min);
+    const max =
+      entry.max === '' || entry.max === null || entry.max === undefined
+        ? null
+        : Number(entry.max);
+
+    if (min !== null && (!Number.isFinite(min) || min < 0)) {
+      throw new ApiError(400, `Price range #${i + 1}: min price must be a non-negative number`);
+    }
+    if (max !== null && (!Number.isFinite(max) || max < 0)) {
+      throw new ApiError(400, `Price range #${i + 1}: max price must be a non-negative number`);
+    }
+    if (min === null && max === null) {
+      throw new ApiError(400, `Price range #${i + 1}: enter at least a min or max price`);
+    }
+    if (min !== null && max !== null && min > max) {
+      throw new ApiError(400, `Price range #${i + 1}: max price must be greater than or equal to min price`);
+    }
+
+    const label = String(entry.label || '').trim();
+    normalized.push({
+      ...(entry._id && mongoose.isValidObjectId(entry._id) ? { _id: entry._id } : {}),
+      label,
+      min,
+      max,
+      order: entry.order !== undefined ? Number(entry.order) : i + 1,
+    });
+  }
+
+  return normalized.map((item, idx) => ({ ...item, order: idx + 1 }));
+}
+
+function mapPriceRangesToOptions(priceRanges = []) {
+  return [...(Array.isArray(priceRanges) ? priceRanges : [])]
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map((item, idx) => {
+      const min = item.min === undefined || item.min === '' ? null : item.min;
+      const max = item.max === undefined || item.max === '' ? null : item.max;
+      const value = `${min ?? ''}-${max ?? ''}`;
+      const displayLabel = item.label ? String(item.label).trim() : formatPriceRangeLabel(min, max);
+      return {
+        _id: String(item._id || value || idx),
+        name: displayLabel,
+        label: item.label ? String(item.label).trim() : '',
+        value,
+        min,
+        max,
+        order: item.order ?? idx + 1,
+      };
+    });
+}
+
 async function loadAllFilterOptions() {
   const activeFilter = { 'meta.deletedAt': null, status: 'active' };
 
@@ -155,6 +246,15 @@ class FilterService {
           categoryConfigs,
         });
       }
+
+      // Initialize default price ranges on price-range filter if not yet configured
+      await Filter.updateOne(
+        {
+          $or: [{ filterId: 'price-range' }, { key: 'price' }],
+          priceRanges: { $exists: false },
+        },
+        { $set: { priceRanges: DEFAULT_PRICE_RANGES } }
+      );
     } catch (err) {
       console.warn('Failed to ensure default filters:', err);
     }
@@ -222,6 +322,10 @@ class FilterService {
           isEnabled = isMasterActive;
         }
 
+        const priceRangeOpts = isPriceRangeFilter(f)
+          ? mapPriceRangesToOptions(f.priceRanges || [])
+          : null;
+
         return {
           id: f.filterId,
           filterId: f.filterId,
@@ -232,7 +336,8 @@ class FilterService {
           order: masterOrder,
           status: isMasterActive ? 'active' : 'inactive',
           enabled: isEnabled,
-          options: loadedOptions[f.filterId] || loadedOptions[f.key] || [],
+          ...(isPriceRangeFilter(f) ? { priceRanges: f.priceRanges || [] } : {}),
+          options: priceRangeOpts || loadedOptions[f.filterId] || loadedOptions[f.key] || [],
         };
       }).sort((a, b) => a.order - b.order);
 
@@ -248,6 +353,9 @@ class FilterService {
     const globalFilters = allFilters
       .map((f) => {
         const isMasterActive = f.status === 'active' || (f.status !== 'inactive' && f.enabled !== false);
+        const priceRangeOpts = isPriceRangeFilter(f)
+          ? mapPriceRangesToOptions(f.priceRanges || [])
+          : null;
         return {
           id: f.filterId,
           filterId: f.filterId,
@@ -258,7 +366,8 @@ class FilterService {
           order: f.order,
           status: isMasterActive ? 'active' : 'inactive',
           enabled: isMasterActive,
-          options: loadedOptions[f.filterId] || loadedOptions[f.key] || [],
+          ...(isPriceRangeFilter(f) ? { priceRanges: f.priceRanges || [] } : {}),
+          options: priceRangeOpts || loadedOptions[f.filterId] || loadedOptions[f.key] || [],
         };
       })
       .sort((a, b) => a.order - b.order);
@@ -289,10 +398,14 @@ class FilterService {
         type: f.type,
         order: f.order,
         enabled: true,
+        ...(isPriceRangeFilter(f) ? { priceRanges: f.priceRanges || [] } : {}),
         options: (f.options || []).map((opt) => ({
           _id: String(opt._id),
           name: opt.name || opt.title || opt.value,
           value: opt.value || opt.name || opt.slug,
+          ...(opt.label ? { label: opt.label } : {}),
+          ...(opt.min !== undefined ? { min: opt.min } : {}),
+          ...(opt.max !== undefined ? { max: opt.max } : {}),
           ...(opt.slug ? { slug: opt.slug } : {}),
           ...(opt.weight !== undefined ? { weight: opt.weight } : {}),
           ...(opt.imageUrl ? { imageUrl: opt.imageUrl } : {}),
@@ -344,6 +457,7 @@ class FilterService {
         order: f.order,
         status: isMasterActive ? 'active' : 'inactive',
         enabled: isMasterActive,
+        ...(isPriceRangeFilter(f) ? { priceRanges: f.priceRanges || [] } : {}),
         categories: categoriesWithConfig,
       };
     });
@@ -409,6 +523,9 @@ class FilterService {
     const updateData = { ...data };
     if (updateData.status) {
       updateData.status = updateData.status === 'active' ? 'active' : 'inactive';
+    }
+    if (updateData.priceRanges !== undefined) {
+      updateData.priceRanges = normalizePriceRanges(updateData.priceRanges);
     }
     const filter = await Filter.findOneAndUpdate(
       {

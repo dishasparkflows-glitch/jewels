@@ -77,16 +77,16 @@ const currencySchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
-    },
+    },
+
   },
   {
-    timestamps: true,
+    timestamps: false,
     versionKey: false,
   }
 );
 
-// Currency code must be unique across all documents,
-// including soft-deleted currencies.
+// Currency code must be unique across all documents.
 currencySchema.index(
   { 'currencyInfo.code': 1 },
   { unique: true }

@@ -42,6 +42,9 @@ class SettingService {
       birthstones: {
         showOnStorefront: settings?.birthstones?.showOnStorefront === true,
       },
+      currency: {
+        showOnStorefront: settings?.currency?.showOnStorefront !== false,
+      },
     };
   }
 
@@ -61,6 +64,8 @@ class SettingService {
         'mediaCompression',
         'topAnnouncement',
         'birthstones',
+        'currency',
+        'otpSettings',
       ];
 
       subdocFields.forEach((field) => {

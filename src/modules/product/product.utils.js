@@ -910,6 +910,37 @@ const getEffectivePriceExpression = () => {
   );
 };
 
+// ------------------------------- parse price range tokens ----------------------------
+const parsePriceRangeTokens = (rawRanges) => {
+  if (!rawRanges) return [];
+  const tokens = (Array.isArray(rawRanges) ? rawRanges : String(rawRanges).split(','))
+    .map((s) => String(s || '').trim())
+    .filter(Boolean);
+
+  const parsed = [];
+  for (const token of tokens) {
+    const parts = token.split('-');
+    if (parts.length !== 2) {
+      throw new ApiError(400, `Invalid price range format: "${token}"`);
+    }
+    const min = parts[0] === '' ? null : Number(parts[0]);
+    const max = parts[1] === '' ? null : Number(parts[1]);
+
+    if (min !== null && (!Number.isFinite(min) || min < 0)) {
+      throw new ApiError(400, 'Price must be a non-negative number');
+    }
+    if (max !== null && (!Number.isFinite(max) || max < 0)) {
+      throw new ApiError(400, 'Price must be a non-negative number');
+    }
+    if (min === null && max === null) continue;
+    if (min !== null && max !== null && min > max) {
+      throw new ApiError(400, 'Maximum price must be greater than minimum price');
+    }
+    parsed.push({ min, max });
+  }
+  return parsed;
+};
+
 // ------------------------------- build price range conditions ----------------------------
 const buildPriceRangeConditions = (queryParams, effectivePrice) => {
   const priceConditions = [];
@@ -925,6 +956,17 @@ const buildPriceRangeConditions = (queryParams, effectivePrice) => {
 
   if (queryParams.minPrice && queryParams.maxPrice && Number(queryParams.minPrice) > Number(queryParams.maxPrice)) {
     throw new ApiError(400, 'Maximum price must be greater than minimum price');
+  }
+
+  const presetRanges = parsePriceRangeTokens(queryParams.priceRanges || queryParams.priceRange);
+  if (presetRanges.length > 0) {
+    const rangeExprs = presetRanges.map(({ min, max }) => {
+      const bounds = [];
+      if (min !== null) bounds.push({ $gte: [effectivePrice, min] });
+      if (max !== null) bounds.push({ $lte: [effectivePrice, max] });
+      return bounds.length === 1 ? bounds[0] : { $and: bounds };
+    });
+    priceConditions.push(rangeExprs.length === 1 ? rangeExprs[0] : { $or: rangeExprs });
   }
 
   return priceConditions;
@@ -1042,6 +1084,7 @@ module.exports = {
   buildProductTypeFilter,
   buildLookupProductTypeFilter,
   getEffectivePriceExpression,
+  parsePriceRangeTokens,
   buildPriceRangeConditions,
   getProductPopulateOptions,
   extractSizeChart,

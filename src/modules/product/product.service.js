@@ -40,6 +40,7 @@ const {
   buildProductTypeFilter,
   buildLookupProductTypeFilter,
   getEffectivePriceExpression,
+  parsePriceRangeTokens,
   buildPriceRangeConditions,
   getProductPopulateOptions,
   extractSizeChart,
@@ -1228,6 +1229,23 @@ class ProductService {
           { 'pricing.salePrice': priceFilter },
           { 'pricing.mrp': priceFilter }
         ]
+      });
+    }
+
+    const presetRanges = parsePriceRangeTokens(queryParams.priceRanges || queryParams.priceRange);
+    if (presetRanges.length > 0) {
+      conditions.push({
+        $or: presetRanges.map(({ min, max }) => {
+          const priceFilter = {};
+          if (min !== null) priceFilter.$gte = min;
+          if (max !== null) priceFilter.$lte = max;
+          return {
+            $or: [
+              { 'pricing.salePrice': priceFilter },
+              { 'pricing.mrp': priceFilter },
+            ],
+          };
+        }),
       });
     }
 

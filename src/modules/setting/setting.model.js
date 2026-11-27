@@ -126,6 +126,26 @@ const settingSchema = new mongoose.Schema(
         trim: true,
         default: '#ffffff',
       },
+      navBgColor: {
+        type: String,
+        trim: true,
+        default: '#201e1b',
+      },
+      navTextColor: {
+        type: String,
+        trim: true,
+        default: '#d6d3d1',
+      },
+      megaMenuBgColor: {
+        type: String,
+        trim: true,
+        default: '#1c1a19',
+      },
+      megaMenuTextColor: {
+        type: String,
+        trim: true,
+        default: '#e7e5e4',
+      },
       couponBgColor: {
         type: String,
         trim: true,
@@ -191,6 +211,28 @@ const settingSchema = new mongoose.Schema(
     birthstones: {
       _id: false,
       showOnStorefront: {
+        type: Boolean,
+        default: true,
+      },
+    },
+
+    // Currency Switcher Display Settings
+    currency: {
+      _id: false,
+      showOnStorefront: {
+        type: Boolean,
+        default: true,
+      },
+    },
+
+    // OTP Verification & Security Settings
+    otpSettings: {
+      _id: false,
+      enableRegistrationOtp: {
+        type: Boolean,
+        default: true,
+      },
+      enableOrderOtp: {
         type: Boolean,
         default: true,
       },

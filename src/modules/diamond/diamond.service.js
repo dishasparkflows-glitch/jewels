@@ -10,6 +10,7 @@ const MetalColor = require('../metalColor/metalColor.model');
 const MetalPurity = require('../metalPurity/metalPurity.model');
 const ApiError = require('../../utils/ApiError');
 const { getPagination, getPaginationMeta } = require('../../utils/pagination');
+const { parsePriceRangeTokens } = require('../product/product.utils');
 
 const POPULATE_FIELDS = [
   { path: 'colorId' },
@@ -261,6 +262,17 @@ class DiamondService {
       filter.price = {};
       if (queryParams.minPrice) filter.price.$gte = Number(queryParams.minPrice);
       if (queryParams.maxPrice) filter.price.$lte = Number(queryParams.maxPrice);
+    }
+
+    const presetRanges = parsePriceRangeTokens(queryParams.priceRanges || queryParams.priceRange);
+    if (presetRanges.length > 0) {
+      const rangeClauses = presetRanges.map(({ min, max }) => {
+        const cond = {};
+        if (min !== null) cond.$gte = min;
+        if (max !== null) cond.$lte = max;
+        return { price: cond };
+      });
+      filter.$and = [...(filter.$and || []), { $or: rangeClauses }];
     }
 
     if (queryParams.search) {

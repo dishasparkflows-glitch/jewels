@@ -57,10 +57,16 @@ class CommonService {
     const revisionDoc = await this.getRevision();
     const masterRevision = Math.max(revisionDoc.revision || 0, websiteConfig?.revision || 0);
 
+    const currencyShowOnStorefront =
+      (common.settings?.currency?.showOnStorefront ?? common.currency?.showOnStorefront) !== false;
+
     const mergedSettings = {
       ...(common.settings || {}),
       birthstones: {
         showOnStorefront: Boolean(common.settings?.birthstones?.showOnStorefront ?? common.birthstones?.showOnStorefront),
+      },
+      currency: {
+        showOnStorefront: currencyShowOnStorefront,
       },
     };
 
@@ -68,6 +74,7 @@ class CommonService {
       revision: masterRevision,
       settings: mergedSettings,
       birthstones: mergedSettings.birthstones,
+      currency: mergedSettings.currency,
       footerSettings: common.footerSettings || {},
       topAnnouncement: common.topAnnouncement || { isEnabled: false, items: [] },
       navigation,

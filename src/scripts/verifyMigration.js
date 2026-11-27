@@ -5,7 +5,11 @@ require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 async function verify() {
   const args = process.argv.slice(2);
   const useFrom = args.includes('--from');
-  const uri = useFrom ? process.env.FROM_DB : (process.env.TO_DB || process.env.MONGODB_URI);
+  const uri = (useFrom ? process.env.FROM_DB : process.env.TO_DB)?.trim();
+
+  if (!uri) {
+    throw new Error(`${useFrom ? 'FROM_DB' : 'TO_DB'} must be defined in .env.`);
+  }
 
   const conn = await mongoose.createConnection(uri).asPromise();
   const db = conn.db;

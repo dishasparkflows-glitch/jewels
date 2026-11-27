@@ -6,7 +6,7 @@
  * Purpose:
  * Reads collections one by one from FROM_DB (read-only), maps every record to
  * match the latest Mongoose schemas, and inserts/upserts into TO_DB.
- * (Also supports --in-place on MONGODB_URI if needed.)
+ * Always strictly uses process.env.FROM_DB and process.env.TO_DB (no fallbacks).
  *
  * Key Rules & Guarantees:
  * 1. Read-Only Source: FROM_DB records are NEVER modified, updated, or deleted.
@@ -24,7 +24,6 @@
  *   node src/scripts/migrateSchemaToLatest.js --dry-run
  *   node src/scripts/migrateSchemaToLatest.js --execute
  *   node src/scripts/migrateSchemaToLatest.js --execute --collection=products
- *   node src/scripts/migrateSchemaToLatest.js --in-place --dry-run
  * ============================================================================
  */
 
@@ -513,42 +512,30 @@ async function resolveUniqueConflicts(toColl, docs, uniqueIndexes, isExecute) {
 async function main() {
   const args = process.argv.slice(2);
   const isExecute = args.includes('--execute');
-  const isInPlace = args.includes('--in-place');
   const targetColArg = args.find((a) => a.startsWith('--collection='));
   const targetCollection = targetColArg ? targetColArg.split('=')[1] : null;
 
-  const fromArg = args.find((a) => a.startsWith('--from='));
-  const toArg = args.find((a) => a.startsWith('--to='));
+  const fromUri = process.env.FROM_DB ? process.env.FROM_DB.trim() : '';
+  const toUri = process.env.TO_DB ? process.env.TO_DB.trim() : '';
 
-  const fromUri = fromArg ? fromArg.split('=')[1] : process.env.FROM_DB;
-  const toUri = toArg ? toArg.split('=')[1] : process.env.TO_DB;
-
-  const crossDbMode = !isInPlace && Boolean(fromUri && toUri);
-
-  if (!crossDbMode && !process.env.MONGODB_URI) {
-    throw new Error('Neither FROM_DB/TO_DB nor MONGODB_URI is configured.');
+  if (!fromUri || !toUri) {
+    throw new Error('Both FROM_DB and TO_DB must be defined in .env.');
+  }
+  if (fromUri === toUri) {
+    throw new Error('FROM_DB and TO_DB must point to different databases so FROM_DB is never modified.');
   }
 
   console.log(`\n======================================================`);
   console.log(`🚀 DATABASE SCHEMA MIGRATION & AUDIT TOOL`);
   console.log(`Mode: ${isExecute ? '⚡ LIVE EXECUTION' : '🔍 DRY RUN (Preview only, no DB writes)'}`);
-  console.log(`Strategy: ${crossDbMode ? '📦 CROSS-DB (FROM_DB [read-only] -> TO_DB [write])' : '🔧 IN-PLACE (MONGODB_URI)'}`);
+  console.log(`Strategy: 📦 CROSS-DB (FROM_DB [read-only] -> TO_DB [write])`);
   if (targetCollection) console.log(`Target Collection: ${targetCollection}`);
   console.log(`======================================================\n`);
 
-  let fromConn;
-  let toConn;
-
-  if (crossDbMode) {
-    fromConn = await mongoose.createConnection(fromUri).asPromise();
-    toConn = await mongoose.createConnection(toUri).asPromise();
-    console.log(`FROM_DB (READ-ONLY): ${fromConn.name}`);
-    console.log(`TO_DB   (TARGET)   : ${toConn.name}\n`);
-  } else {
-    fromConn = await mongoose.createConnection(process.env.MONGODB_URI).asPromise();
-    toConn = fromConn;
-    console.log(`Connected DB: ${fromConn.name}\n`);
-  }
+  const fromConn = await mongoose.createConnection(fromUri).asPromise();
+  const toConn = await mongoose.createConnection(toUri).asPromise();
+  console.log(`FROM_DB (READ-ONLY): ${fromConn.name}`);
+  console.log(`TO_DB   (TARGET)   : ${toConn.name}\n`);
 
   const fromDb = fromConn.db;
   const toDb = toConn.db;
@@ -574,7 +561,7 @@ async function main() {
 
     const toColl = toDb.collection(collName);
     let uniqueIndexes = [];
-    if (crossDbMode && toColNamesSet.has(collName)) {
+    if (toColNamesSet.has(collName)) {
       const idxs = await toColl.indexes();
       uniqueIndexes = idxs.filter((i) => i.unique);
     }
@@ -595,9 +582,7 @@ async function main() {
       processed++;
 
       if (batchDocs.length >= 250) {
-        if (crossDbMode) {
-          totalConflictsResolved += await resolveUniqueConflicts(toColl, batchDocs, uniqueIndexes, isExecute);
-        }
+        totalConflictsResolved += await resolveUniqueConflicts(toColl, batchDocs, uniqueIndexes, isExecute);
         if (isExecute) {
           const ops = batchDocs.map((d) => ({
             replaceOne: {
@@ -613,9 +598,7 @@ async function main() {
     }
 
     if (batchDocs.length > 0) {
-      if (crossDbMode) {
-        totalConflictsResolved += await resolveUniqueConflicts(toColl, batchDocs, uniqueIndexes, isExecute);
-      }
+      totalConflictsResolved += await resolveUniqueConflicts(toColl, batchDocs, uniqueIndexes, isExecute);
       if (isExecute) {
         const ops = batchDocs.map((d) => ({
           replaceOne: {
@@ -628,7 +611,7 @@ async function main() {
       }
     }
 
-    const toCountAfter = crossDbMode && isExecute ? await toColl.countDocuments() : await toColl.countDocuments();
+    const toCountAfter = await toColl.countDocuments();
     diffReport.push({
       collection: collName,
       fromDocs: count,
@@ -654,13 +637,12 @@ async function main() {
 
   generateMarkdownReport(diffReport, {
     isExecuted: isExecute,
-    crossDbMode,
     fromDbName: fromConn.name,
     toDbName: toConn.name,
   });
 
   await fromConn.close();
-  if (toConn !== fromConn) await toConn.close();
+  await toConn.close();
   console.log(`\nDone. Execution completed.\n`);
 }
 
@@ -674,7 +656,7 @@ function generateMarkdownReport(diffReport, info) {
 
 Generated on: \`${new Date().toISOString()}\`  
 Status: **${info.isExecuted ? 'EXECUTED (Target Database Updated)' : 'DRY RUN (Preview Only)'}**  
-Mode: **${info.crossDbMode ? `Cross-DB Migration (\`${info.fromDbName}\` [Read-Only] ➔ \`${info.toDbName}\`)` : `In-Place (\`${info.toDbName}\`)`}**  
+Mode: **Cross-DB Migration (\`${info.fromDbName}\` [Read-Only] ➔ \`${info.toDbName}\`)**  
 
 ---
 
@@ -761,9 +743,6 @@ node src/scripts/migrateSchemaToLatest.js --execute
 
 # 3. Migrate a single collection only
 node src/scripts/migrateSchemaToLatest.js --execute --collection=products
-
-# 4. In-place mode against MONGODB_URI (optional)
-node src/scripts/migrateSchemaToLatest.js --in-place --execute
 \`\`\`
 `;
 

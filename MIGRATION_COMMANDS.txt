@@ -1,0 +1,27 @@
+====================================================================
+DATABASE MIGRATION & MASTER SYNC COMMANDS
+====================================================================
+Run all commands from the backend directory:
+  cd d:\new-jewels-02\new-jewels-backend-02
+
+
+1. FULL MIGRATION (FROM_DB -> TO_DB + MASTER_DB tables)
+--------------------------------------------------------------------
+# Preview all changes (Dry Run - no DB writes)
+node src/scripts/migrateSchemaToLatest.js --dry-run
+
+# Execute full migration (FROM_DB -> TO_DB, then syncs filters, settings, top_announcements & modules from MASTER_DB)
+node src/scripts/migrateSchemaToLatest.js --execute
+
+# Migrate or sync a single collection only
+node src/scripts/migrateSchemaToLatest.js --execute --collection=products
+node src/scripts/migrateSchemaToLatest.js --execute --collection=filters
+node src/scripts/migrateSchemaToLatest.js --execute --collection=settings
+node src/scripts/migrateSchemaToLatest.js --execute --collection=top_announcements
+node src/scripts/migrateSchemaToLatest.js --execute --collection=modules
+
+
+2. VERIFY TARGET DATABASE (TO_DB)
+--------------------------------------------------------------------
+# Verify TO_DB (checks 0 __v, 0 isDeleted, 0 top-level audit fields, products, filters, settings, top_announcements, modules)
+node src/scripts/verifyMigration.js

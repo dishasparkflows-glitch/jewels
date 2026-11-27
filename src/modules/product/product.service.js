@@ -1699,6 +1699,37 @@ class ProductService {
       }
     }
 
+    // Filter out non-primary products from multi-product groups:
+    // If a product group has multiple products, only return its primary/representative product
+    const primaryOnly = queryParams.primaryOnly !== 'false';
+    if (primaryOnly) {
+      const multiGroups = await ProductGroup.find({
+        'meta.deletedAt': null,
+        'productIds.1': { $exists: true },
+      })
+        .select('productIds primaryProductId')
+        .lean();
+
+      if (multiGroups.length > 0) {
+        const secondaryIds = new Set();
+        for (const g of multiGroups) {
+          const repId = g.primaryProductId || (Array.isArray(g.productIds) ? g.productIds[0] : null);
+          if (repId && Array.isArray(g.productIds)) {
+            g.productIds.forEach((pid) => {
+              if (String(pid) !== String(repId)) {
+                secondaryIds.add(String(pid));
+              }
+            });
+          }
+        }
+        if (secondaryIds.size > 0) {
+          conditions.push({
+            _id: { $nin: Array.from(secondaryIds).map((id) => new mongoose.Types.ObjectId(id)) },
+          });
+        }
+      }
+    }
+
     const filter =
       conditions.length === 1 ? conditions[0] : { $and: conditions };
 

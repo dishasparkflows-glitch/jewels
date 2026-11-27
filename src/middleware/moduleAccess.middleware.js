@@ -1,6 +1,4 @@
 const mongoose = require('mongoose');
-const { CACHE_TTL } = require('../config/constants');
-const { cacheHelper } = require('../utils/redisClient');
 const { decodeTokenFromRequest } = require('./auth.middleware');
 const Owner = require('../modules/owner/owner.model');
 const moduleService = require('../modules/module/module.service');
@@ -48,15 +46,9 @@ const moduleAccessMiddleware = async (req, res, next) => {
       return next();
     }
 
-    const cacheKey = `owners:access:${String(ownerId)}`;
-    const cachedOwner = await cacheHelper.getOrSet(cacheKey, CACHE_TTL, async () => {
-      const doc = await Owner.findOne({ _id: ownerId, 'meta.deletedAt': null })
-        .select('name status allowedModules')
-        .lean();
-      return doc || { _notFound: true };
-    });
-
-    const owner = cachedOwner && !cachedOwner._notFound ? cachedOwner : null;
+    const owner = await Owner.findOne({ _id: ownerId, 'meta.deletedAt': null })
+      .select('name status allowedModules')
+      .lean();
 
     if (!owner || owner.status !== 'active') {
       return res.status(403).json({

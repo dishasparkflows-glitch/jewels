@@ -207,7 +207,14 @@ class FilterService {
 
         if (config) {
           isEnabled = isMasterActive && config.enabled !== false;
-          if (config.customTitle) customTitle = config.customTitle;
+          if (config.customTitle) {
+            // Guard: range/price filter titles should never be overridden by an unrelated name like a category name
+            if ((f.filterId === 'price-range' || f.key === 'price' || f.type === 'range') && !/price|budget|range|cost/i.test(config.customTitle)) {
+              customTitle = f.title || 'Price Range';
+            } else {
+              customTitle = config.customTitle;
+            }
+          }
         }
 
         // Always keep Jewellery Types / category filter enabled across all categories so users can switch types

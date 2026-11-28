@@ -53,9 +53,7 @@ class OrderController {
   // ------------------------------- Download Invoice PDF ----------------------------
   downloadInvoice = catchAsync(async (req, res) => {
     const orderId = req.params.id;
-    const { order, pdfBuffer } = await orderService.generateOrderInvoice(orderId, req.user, getOrderAccessToken(req));
-    const safeOrderNum = (order.orderNumber || 'ORD').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename = `NEIRAH_INVOICE_${safeOrderNum}.pdf`;
+    const { pdfBuffer, filename } = await orderService.generateOrderInvoice(orderId, req.user, getOrderAccessToken(req));
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -75,9 +73,7 @@ class OrderController {
 
     // Support direct PDF download via sendInvoice if methods includes 'download'
     if (methods.includes('download') && methods.length === 1) {
-      const { order, pdfBuffer } = await orderService.generateOrderInvoice(orderId, req.user);
-      const safeOrderNum = (order.orderNumber || 'ORD').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const filename = `NEIRAH_INVOICE_${safeOrderNum}.pdf`;
+      const { pdfBuffer, filename } = await orderService.generateOrderInvoice(orderId, req.user);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

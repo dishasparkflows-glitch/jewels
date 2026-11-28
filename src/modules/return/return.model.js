@@ -124,7 +124,6 @@ const returnSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
     versionKey: false,
     collection: 'returns',
   }

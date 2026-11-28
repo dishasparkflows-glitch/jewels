@@ -27,7 +27,6 @@ const themeMediaMappingSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: false,
     collection: 'theme_media_mappings',
     versionKey: false,
   }

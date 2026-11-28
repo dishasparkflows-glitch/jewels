@@ -2,6 +2,31 @@ const Setting = require('./setting.model');
 const ApiError = require('../../utils/ApiError');
 const topAnnouncementService = require('../topAnnouncement/topAnnouncement.service');
 
+const normalizeFooterLinksColumn = (links = [], { activeOnly = false } = {}) =>
+  (Array.isArray(links) ? links : [])
+    .filter((item) => {
+      if (!item || !String(item.name || '').trim() || !String(item.path || '').trim()) {
+        return false;
+      }
+      return activeOnly ? item.status !== 'inactive' : true;
+    })
+    .map((item) => ({
+      name: String(item.name).trim(),
+      path: String(item.path).trim(),
+      status: item.status === 'inactive' ? 'inactive' : 'active',
+    }));
+
+const normalizeFooterLinksPayload = (footerLinks = {}, options = {}) => {
+  const result = {};
+  if (footerLinks.brand !== undefined || options.includeEmptyColumns) {
+    result.brand = normalizeFooterLinksColumn(footerLinks.brand, options);
+  }
+  if (footerLinks.policies !== undefined || options.includeEmptyColumns) {
+    result.policies = normalizeFooterLinksColumn(footerLinks.policies, options);
+  }
+  return result;
+};
+
 class SettingService {
   // ------------------------------- get settings ----------------------------
   async getSettings() {
@@ -34,10 +59,16 @@ class SettingService {
     ]);
 
     const settings = settingsRes.status === 'fulfilled' ? settingsRes.value : {};
+    const publicFooterLinks = normalizeFooterLinksPayload(settings?.footerLinks || {}, {
+      activeOnly: true,
+      includeEmptyColumns: true,
+    });
 
     return {
       settings,
-      footerSettings: {},
+      footerSettings: {
+        footerLinks: publicFooterLinks,
+      },
       topAnnouncement: announcementRes.status === 'fulfilled' ? announcementRes.value : { isEnabled: false, items: [] },
       birthstones: {
         showOnStorefront: settings?.birthstones?.showOnStorefront === true,
@@ -50,9 +81,16 @@ class SettingService {
 
   // ------------------------------- update settings ----------------------------
   async updateSettings(data) {
+    if (data.footerLinks && typeof data.footerLinks === 'object') {
+      data.footerLinks = normalizeFooterLinksPayload(data.footerLinks);
+    }
+
     let settings = await Setting.findOne({ 'meta.deletedAt': null });
     if (!settings) {
-      settings = await Setting.create(data);
+      settings = await Setting.create({
+        ...data,
+        revision: 1,
+      });
     } else {
       // Cleanly merge nested subdocuments without overwriting untouched sibling fields
       const subdocFields = [
@@ -66,6 +104,7 @@ class SettingService {
         'birthstones',
         'currency',
         'otpSettings',
+        'footerLinks',
       ];
 
       subdocFields.forEach((field) => {
@@ -88,7 +127,9 @@ class SettingService {
         data.gstCode !== undefined ||
         data.panCode !== undefined ||
         data.playStoreUrl !== undefined ||
-        data.appStoreUrl !== undefined
+        data.appStoreUrl !== undefined ||
+        data.manufacturer !== undefined ||
+        data.countryOfOrigin !== undefined
       ) {
         settings.businessDetails = {
           ...(settings.businessDetails?.toObject ? settings.businessDetails.toObject() : (settings.businessDetails || {})),
@@ -100,6 +141,8 @@ class SettingService {
           ...(data.panCode !== undefined ? { panCode: data.panCode } : {}),
           ...(data.playStoreUrl !== undefined ? { playStoreUrl: data.playStoreUrl } : {}),
           ...(data.appStoreUrl !== undefined ? { appStoreUrl: data.appStoreUrl } : {}),
+          ...(data.manufacturer !== undefined ? { manufacturer: data.manufacturer } : {}),
+          ...(data.countryOfOrigin !== undefined ? { countryOfOrigin: data.countryOfOrigin } : {}),
         };
         settings.markModified('businessDetails');
       }

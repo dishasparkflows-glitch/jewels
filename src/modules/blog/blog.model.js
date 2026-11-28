@@ -35,7 +35,7 @@ const basicInfoSchema = new mongoose.Schema(
     author: {
       type: String,
       trim: true,
-      default: 'Neirah Atelier',
+      default: 'Admin',
     },
   },
   { _id: false }
@@ -107,8 +107,7 @@ const blogSchema = new mongoose.Schema(
     },
   },
   {
-    versionKey: false,
-    timestamps: false,
+    versionKey: false
   }
 );
 

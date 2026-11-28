@@ -4,7 +4,7 @@ module.exports = {
   // App & Server
   PORT: process.env.PORT || 9900,
   NODE_ENV: process.env.NODE_ENV || 'development',
-  STORE_NAME: process.env.STORE_NAME || 'Neirah',
+  STORE_NAME: process.env.STORE_NAME || 'Jewels',
 
   // URL
   URL: {

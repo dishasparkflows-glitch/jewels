@@ -11,39 +11,31 @@ const { getProductPopulateOptions, buildProductSearchFilter, buildProductTypeFil
  */
 async function resolveProductByCodeOrId(codeOrId, populateOptions = null) {
   const isObjectId = mongoose.Types.ObjectId.isValid(codeOrId);
-  const filter = isObjectId
-    ? {
-        $or: [
-          { _id: codeOrId },
-          { 'basicInfo.slug': codeOrId },
-          { 'basicInfo.sku': codeOrId },
-          { 'ornate.tagNo': codeOrId },
-        ],
-      }
-    : {
-        $or: [
-          { 'basicInfo.slug': codeOrId },
-          { 'basicInfo.sku': codeOrId },
-          { 'ornate.tagNo': codeOrId },
-        ],
-      };
-
   const popOptions = populateOptions || getProductPopulateOptions();
+  const findPopulated = (queryFilter) => {
+    let query = Product.findOne(queryFilter);
+    for (const pop of popOptions) {
+      query = query.populate(pop);
+    }
+    return query.lean();
+  };
 
-  let query = Product.findOne(filter);
-  for (const pop of popOptions) {
-    query = query.populate(pop);
+  // Prefer direct _id primary-key lookup when valid ObjectId, falling back to slug/sku/tag
+  let product = isObjectId ? await findPopulated({ _id: codeOrId }) : null;
+  if (!product) {
+    product = await findPopulated({
+      $or: [
+        { 'basicInfo.slug': codeOrId },
+        { 'basicInfo.sku': codeOrId },
+        { 'ornate.tagNo': codeOrId },
+      ],
+    });
   }
-  let product = await query.lean();
 
   // Fallback 1: If not found and id ends with group sequence (e.g. -000030), try stripping the sequence
   if (!product && typeof codeOrId === 'string' && /-\d{6}$/.test(codeOrId)) {
     const strippedSlug = codeOrId.replace(/-\d{6}$/, '');
-    let fallbackQuery = Product.findOne({ 'basicInfo.slug': strippedSlug });
-    for (const pop of popOptions) {
-      fallbackQuery = fallbackQuery.populate(pop);
-    }
-    product = await fallbackQuery.lean();
+    product = await findPopulated({ 'basicInfo.slug': strippedSlug });
   }
 
   // Fallback 2: Check ProductGroup by slug, groupCode, or _id
@@ -55,11 +47,7 @@ async function resolveProductByCodeOrId(codeOrId, populateOptions = null) {
     if (group) {
       const targetProdId = group.primaryProductId || (Array.isArray(group.productIds) ? group.productIds[0] : null);
       if (targetProdId) {
-        let groupProductQuery = Product.findOne({ _id: targetProdId });
-        for (const pop of popOptions) {
-          groupProductQuery = groupProductQuery.populate(pop);
-        }
-        product = await groupProductQuery.lean();
+        product = await findPopulated({ _id: targetProdId });
       }
     }
   }

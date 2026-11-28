@@ -13,7 +13,7 @@ const { escapeHtml } = require('../utils/string');
  * @returns {string} HTML string
  */
 function getPasswordResetHtml({ resetUrl, setting, storeName, expiresIn = '1 hour' }) {
-  const brand = resolveBrandContact({ setting, storeName, defaultEmail: 'support@neirah.in' });
+  const brand = resolveBrandContact({ setting, storeName, defaultEmail: 'support@jewels.in' });
   const safeCompany = escapeHtml(brand.companyName);
   const safeResetUrl = escapeHtml(sanitizeEmailUrl(resetUrl, '#'));
   const safeExpiresIn = escapeHtml(expiresIn);
@@ -63,7 +63,7 @@ function getPasswordResetHtml({ resetUrl, setting, storeName, expiresIn = '1 hou
     bodyHtml,
     setting,
     storeName,
-    defaultEmail: 'support@neirah.in',
+    defaultEmail: 'support@jewels.in',
   });
 }
 

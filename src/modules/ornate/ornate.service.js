@@ -860,7 +860,7 @@ async function pushOrderToOrnate(orderId) {
         State: address.state || '',
         Pincode: address.zipCode || address.pincode || '',
         Country: address.country || 'India',
-        EmailId: user.email || 'customer@neirah.in',
+        EmailId: user.email || 'customer@jewels.in',
         MobileNo: address.phone || user.phone || '9999999999',
       },
     ];

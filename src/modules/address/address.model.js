@@ -47,8 +47,7 @@ const addressSchema = new mongoose.Schema(
     },
   },
   {
-    versionKey: false,
-    timestamps: false,
+    versionKey: false
   }
 );
 

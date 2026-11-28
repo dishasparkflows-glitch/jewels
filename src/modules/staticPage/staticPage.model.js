@@ -1,5 +1,14 @@
 const mongoose = require('mongoose');
 
+const seoSchema = new mongoose.Schema(
+  {
+    metaTitle: { type: String, trim: true, default: '' },
+    metaDescription: { type: String, trim: true, default: '' },
+    keywords: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
 const staticPageSchema = new mongoose.Schema(
   {
     title: {
@@ -22,15 +31,9 @@ const staticPageSchema = new mongoose.Schema(
       default: 'published',
       index: true,
     },
-    seoTitle: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    metaDescription: {
-      type: String,
-      trim: true,
-      default: '',
+    seo: {
+      type: seoSchema,
+      default: () => ({}),
     },
     content: {
       type: String,
@@ -42,14 +45,9 @@ const staticPageSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
+    versionKey: false,
   }
 );
-
-// Virtual to check if page is published/active
-staticPageSchema.virtual('isPublished').get(function () {
-  return this.status === 'published' || this.status === 'active';
-});
 
 const StaticPage = mongoose.model('StaticPage', staticPageSchema);
 

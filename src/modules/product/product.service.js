@@ -35,6 +35,7 @@ const {
   formatHomeProduct,
   formatStorefrontProduct,
   formatStorefrontProductDetail,
+  formatAdminListProduct,
   formatLookupProduct,
   buildProductSearchFilter,
   buildProductTypeFilter,
@@ -65,22 +66,37 @@ function normalizeStoneConfig(data) {
 
   // Normalize ID fields for colorStoneRows
   if (Array.isArray(data.colorStoneRows)) {
-    data.colorStoneRows = data.colorStoneRows.map((r) => ({
-      diamondTypeId: r.diamondTypeId || r.diamondType?._id || r.diamondType,
-      diamondShapeId: r.diamondShapeId || r.diamondShape?._id || r.diamondShape,
-      caratWeight: Number(r.caratWeight || 0),
-      pricePerCarat: Number(r.pricePerCarat || 3000),
-    })).filter((r) => r.diamondTypeId && r.caratWeight > 0);
+    data.colorStoneRows = data.colorStoneRows.map((r) => {
+      const diamondTypeId = r.diamondTypeId || r.diamondType?._id || r.diamondType;
+      const caratWeight = Number(r.caratWeight || 0);
+      if (caratWeight > 0 && !diamondTypeId) {
+        throw new ApiError(400, 'Select diamond type for every color stone row');
+      }
+      return {
+        diamondTypeId,
+        diamondShapeId: r.diamondShapeId || r.diamondShape?._id || r.diamondShape,
+        caratWeight,
+        pricePerCarat: Number(r.pricePerCarat || 3000),
+      };
+    }).filter((r) => r.diamondTypeId && r.caratWeight > 0);
   }
 
   // Normalize ID fields for sideColorStoneRows
   if (Array.isArray(data.sideColorStoneRows)) {
-    data.sideColorStoneRows = data.sideColorStoneRows.map((r) => ({
-      diamondTypeId: r.diamondTypeId || r.diamondType?._id || r.diamondType,
-      diamondShapeId: r.diamondShapeId || r.diamondShape?._id || r.diamondShape,
-      caratWeight: Number(r.caratWeight || 0),
-      pricePerCarat: Number(r.pricePerCarat || 3000),
-    })).filter((r) => r.diamondTypeId && r.caratWeight > 0);
+    data.sideColorStoneRows = data.sideColorStoneRows.map((r) => {
+      const diamondTypeId = r.diamondTypeId || r.diamondType?._id || r.diamondType;
+      const caratWeight = Number(r.caratWeight || 0);
+      if (caratWeight > 0 && !diamondTypeId) {
+        throw new ApiError(400, 'Select diamond type for every side color stone row');
+      }
+      return {
+        diamondTypeId,
+        diamondShapeId: r.diamondShapeId || r.diamondShape?._id || r.diamondShape,
+        caratWeight,
+        pieces: Number(r.pieces || 0),
+        pricePerCarat: Number(r.pricePerCarat || 3000),
+      };
+    }).filter((r) => r.diamondTypeId && r.caratWeight > 0);
   }
 
   // Mutual Exclusivity: centerDiamond vs colorStone
@@ -144,17 +160,12 @@ class ProductService {
     if (!metalWeight || metalWeight <= 0) {
       return data;
     }
-    try {
-      const result = await this.previewPricing(data);
-      return {
-        ...data,
-        variants: result.variants,
-        pricing: { ...data.pricing, salePrice: result.salePrice }
-      };
-    } catch (err) {
-      console.warn('Could not auto-calculate pricing on product save:', err.message);
-      return data;
-    }
+    const result = await this.previewPricing(data);
+    return {
+      ...data,
+      variants: result.variants,
+      pricing: { ...data.pricing, salePrice: result.salePrice }
+    };
   }
 
   // Refresh calculated prices before DB filtering/sorting so listing prices and
@@ -278,15 +289,20 @@ class ProductService {
   }
 
   // ------------------------------- get one product ----------------------------
-  async getOne(id, userId = null) {
-    await this.refreshCalculatedPrices();
+  async getOne(id, userId = null, options = {}) {
+    // Never block single-product loads with a full-catalog pricing scan
+    this.refreshCalculatedPrices({ background: true });
     const product = await resolveProductByCodeOrId(id, this._getProductPopulateOptions());
     if (!product) {
       throw new ApiError(404, 'Product not found');
     }
 
-    const [setting, wishlistedSet, sizeChart, reviews] = await Promise.all([
-      Setting.findOne().select('certificateImage').lean(),
+    if (options?.mode === 'admin') {
+      return withColorStatuses(product);
+    }
+
+    const [defaultCertImage, wishlistedSet, sizeChart, reviews] = await Promise.all([
+      this._getCachedCertificateImage(),
       this._getWishlistSet(userId),
       this._extractSizeChart(product),
       Review.find({
@@ -301,7 +317,7 @@ class ProductService {
 
     const certificateImage = product.certificateImage?.url
       ? product.certificateImage
-      : setting?.certificateImage || null;
+      : defaultCertImage;
 
     const inWishlist = wishlistedSet.has(String(product._id));
 
@@ -382,10 +398,8 @@ class ProductService {
     return formatSizeChart(chart, categoryName);
   }
 
-  // ------------------------------- get all products ----------------------------
-  async getAll(queryParams = {}, userId = null) {
-    this.refreshCalculatedPrices({ background: true });
-    const { page, limit, skip } = getPagination(queryParams);
+  // Shared base filter for product listing (search, productType, isOrnate, status)
+  _buildBaseListFilter(queryParams = {}) {
     const filter = { 'meta.deletedAt': null };
 
     const searchParam = queryParams.search || queryParams.q;
@@ -413,20 +427,28 @@ class ProductService {
         queryParams.isOrnate === 'true' || queryParams.isOrnate === true;
       filter.$and = [
         ...(filter.$and || []),
-        { isOrnate: isO ? true : { $ne: true } }
+        { isOrnate: isO ? true : { $ne: true } },
       ];
     }
 
-    const resolvedStatus = queryParams.status === 'active' ? 'approved' : queryParams.status;
+    const resolvedStatus =
+      queryParams.status === 'active' ? 'approved' : queryParams.status;
     if (queryParams.view === 'storefront') {
       filter.status = 'approved';
     } else if (resolvedStatus && resolvedStatus !== 'all') {
       filter.status = resolvedStatus;
-    } else if (!resolvedStatus) {
-      if (!isOrnateSpecified) {
-        filter.status = 'approved';
-      }
+    } else if (!resolvedStatus && !isOrnateSpecified) {
+      filter.status = 'approved';
     }
+
+    return filter;
+  }
+
+  // ------------------------------- get all products ----------------------------
+  async getAll(queryParams = {}, userId = null) {
+    this.refreshCalculatedPrices({ background: true });
+    const { page, limit, skip } = getPagination(queryParams);
+    const filter = this._buildBaseListFilter(queryParams);
 
     // Platform visibility filter (web / app)
     if (queryParams.forweb || queryParams.view === 'storefront') {
@@ -1046,16 +1068,25 @@ class ProductService {
 
     const facetsQuery =
       queryParams.includeFacets === 'true'
-        ? Promise.all(
-            SHOP_FOR_OPTIONS.map(async (option) => ({
+        ? (async () => {
+            const facetBranches = {};
+            SHOP_FOR_OPTIONS.forEach((option) => {
+              facetBranches[option.value] = [
+                { $match: { 'basicInfo.gender': { $in: option.genders } } },
+                { $count: 'count' },
+              ];
+            });
+            const facetResults = await Product.aggregate([
+              { $match: Product.find(facetFilter).cast(Product) },
+              { $facet: facetBranches },
+            ]);
+            const rawFacet = facetResults[0] || {};
+            return SHOP_FOR_OPTIONS.map((option) => ({
               value: option.value,
               label: option.label,
-              count: await Product.countDocuments({
-                ...facetFilter,
-                'basicInfo.gender': { $in: option.genders }
-              })
-            }))
-          )
+              count: rawFacet[option.value]?.[0]?.count || 0,
+            }));
+          })()
         : Promise.resolve(undefined);
     const colorPopulation = {
       path: 'metalColorIds colorImages.metalColorId',
@@ -1150,6 +1181,59 @@ class ProductService {
       items: finalItems,
       pagination: getPaginationMeta(total, page, limit),
       facets: shopFor ? { shopFor } : undefined
+    };
+  }
+
+  // ------------------------------- get lightweight admin product list ----------------------------
+  async getAdminList(queryParams = {}) {
+    this.refreshCalculatedPrices({ background: true });
+    const { page, limit, skip } = getPagination(queryParams);
+    const filter = this._buildBaseListFilter(queryParams);
+
+    const selectFields = [
+      '_id',
+      'basicInfo.title',
+      'basicInfo.sku',
+      'basicInfo.slug',
+      'pricing.salePrice',
+      'pricing.calculatedPrice',
+      'pricing.ornatePrice',
+      'specifications.metalWeight',
+      'specifications.metalDetails.grossWeight',
+      'stockStatus',
+      'demoMetrics.soldCount',
+      'demoMetrics.reviewCount',
+      'visibility.web',
+      'visibility.app',
+      'inweb',
+      'inapp',
+      'status',
+      'productType',
+      'isOrnate',
+      'colorImages.images.url',
+      'colorImages.images.mediaType',
+      'images',
+      'image',
+      'ornate.tagNo',
+      'ornate.grossWt',
+      'ornate.firstPhoto',
+      'ornate.ornateImages',
+      'ornate.isSold',
+    ].join(' ');
+
+    const [rawItems, total] = await Promise.all([
+      Product.find(filter)
+        .select(selectFields)
+        .sort({ productType: 1, 'meta.createdAt': -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(filter),
+    ]);
+
+    return {
+      items: (rawItems || []).map(formatAdminListProduct).filter(Boolean),
+      pagination: getPaginationMeta(total, page, limit),
     };
   }
 
@@ -1592,8 +1676,15 @@ class ProductService {
 
   // ------------------------------- get similar products ----------------------------
   async getSimilarProducts(idOrCode, queryParams = {}, userId = null) {
-    await this.refreshCalculatedPrices();
-    const product = await resolveProductByCodeOrId(idOrCode, this._getProductPopulateOptions());
+    this.refreshCalculatedPrices({ background: true });
+
+    const code = String(idOrCode || '').trim();
+    const isObjectId = mongoose.Types.ObjectId.isValid(code);
+    const sourceFilter = isObjectId
+      ? { $or: [{ _id: code }, { 'basicInfo.slug': code }, { 'basicInfo.sku': code }] }
+      : { $or: [{ 'basicInfo.slug': code }, { 'basicInfo.sku': code }, { 'ornate.tagNo': code }] };
+
+    const product = await Product.findOne(sourceFilter).select('_id categoryIds').lean();
     if (!product) {
       throw new ApiError(404, 'Product not found');
     }
@@ -1616,24 +1707,43 @@ class ProductService {
 
     const [rawItems, wishlistedSet] = await Promise.all([
       Product.find(filter)
-        .populate(this._getProductPopulateOptions())
+        .select('_id basicInfo.title basicInfo.slug pricing productType isOrnate colorImages metalColorIds variants ornate')
+        .populate({
+          path: 'colorImages.metalColorId',
+          select: 'name colorCode colorCodeEnd',
+          strictPopulate: false,
+        })
+        .populate({
+          path: 'metalColorIds',
+          select: 'name colorCode colorCodeEnd',
+          strictPopulate: false,
+        })
         .limit(limit)
         .lean(),
       this._getWishlistSet(userId),
     ]);
 
-    const formattedItems = rawItems
+    const items = rawItems
       .map(formatStorefrontProduct)
       .filter((item) => item && (item.images?.length > 0 || item.image))
       .slice(0, limit)
       .map((item) => ({
-        ...item,
-        inWishlist: wishlistedSet.has(String(item.id || item._id)),
+        _id: item._id,
+        image: item.image,
+        images: item.images.slice(0, 3),
+        metalColors: item.metalColors,
+        basicInfo: {
+          title: item.basicInfo?.title,
+          slug: item.basicInfo?.slug,
+        },
+        pricing: item.pricing,
+        productType: item.productType,
+        inWishlist: wishlistedSet.has(String(item._id)),
       }));
 
     return {
-      items: formattedItems,
-      total: formattedItems.length,
+      items,
+      total: items.length,
     };
   }
 
@@ -1815,6 +1925,13 @@ class ProductService {
         pricing: { ...existing.pricing, ...data.pricing },
         specifications: { ...existing.specifications, ...data.specifications }
       };
+      normalizeStoneConfig(combined);
+      data.stoneConfigType = combined.stoneConfigType;
+      data.sideStoneConfigType = combined.sideStoneConfigType;
+      data.centerDiamondRows = combined.centerDiamondRows;
+      data.sideDiamondRows = combined.sideDiamondRows;
+      data.colorStoneRows = combined.colorStoneRows;
+      data.sideColorStoneRows = combined.sideColorStoneRows;
       const calculated = await this.applyPricing(combined);
       data = {
         ...data,

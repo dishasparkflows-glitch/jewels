@@ -66,6 +66,17 @@ class ProductController {
     );
   });
 
+  // ------------------------------- get lightweight admin product list ----------------------------
+  getAdminList = catchAsync(async (req, res) => {
+    const { items, pagination } = await productService.getAdminList(req.query);
+    ApiResponse.paginated(
+      res,
+      items,
+      pagination,
+      'Admin products retrieved successfully'
+    );
+  });
+
 
   // ------------------------------- get product lookup ----------------------------
   getLookup = catchAsync(async (req, res) => {
@@ -80,7 +91,9 @@ class ProductController {
 
   // ------------------------------- get one product ----------------------------
   getOne = catchAsync(async (req, res) => {
-    const product = await productService.getOne(req.params.id, req.user?._id);
+    const product = await productService.getOne(req.params.id, req.user?._id, {
+      mode: req.query?.mode,
+    });
     ApiResponse.success(res, product, 'Product retrieved successfully');
   });
 

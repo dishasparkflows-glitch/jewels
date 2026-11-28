@@ -1,5 +1,26 @@
 const mongoose = require('mongoose');
 
+const footerLinkSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      trim: true,
+      required: true,
+    },
+    path: {
+      type: String,
+      trim: true,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'active',
+    },
+  },
+  { _id: false }
+);
+
 const settingSchema = new mongoose.Schema(
   {
     // Business & Identity
@@ -34,6 +55,16 @@ const settingSchema = new mongoose.Schema(
         default: '',
       },
       appStoreUrl: {
+        type: String,
+        trim: true,
+        default: '',
+      },
+      manufacturer: {
+        type: String,
+        trim: true,
+        default: '',
+      },
+      countryOfOrigin: {
         type: String,
         trim: true,
         default: '',
@@ -236,6 +267,25 @@ const settingSchema = new mongoose.Schema(
         type: Boolean,
         default: true,
       },
+    },
+
+    // Dynamic Footer Links Configuration
+    footerLinks: {
+      _id: false,
+      brand: {
+        type: [footerLinkSchema],
+        default: [],
+      },
+      policies: {
+        type: [footerLinkSchema],
+        default: [],
+      },
+    },
+
+    // Master cache/revision counter for storefront freshness checks
+    revision: {
+      type: Number,
+      default: 0,
     },
   },
   {

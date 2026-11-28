@@ -166,12 +166,26 @@ function calculateProductPricing(product, masters) {
   let sideColorStoneRate = 0;
   if (sideColorStones.length > 0) {
     sideColorStones.forEach((row) => {
+      const typeId = id(row.diamondTypeId || row.diamondType);
       const cw = Number(row.caratWeight || 0);
+      if (cw > 0 && !typeId) {
+        throw new ApiError(400, 'Select diamond type for every side color stone row');
+      }
       const r = Number(row.pricePerCarat || 3000);
       totalSideColorStoneCost += r * cw;
       totalSideColorStoneWeight += cw;
       sideColorStoneRate = r;
     });
+  }
+
+  if (isColorStone) {
+    for (const row of colorStones) {
+      const typeId = id(row.diamondTypeId || row.diamondType);
+      const cw = Number(row.caratWeight || 0);
+      if (cw > 0 && !typeId) {
+        throw new ApiError(400, 'Select diamond type for every color stone row');
+      }
+    }
   }
 
   const purities = (product.metalPurityIds || []).map((value) =>
@@ -187,26 +201,31 @@ function calculateProductPricing(product, masters) {
 
   let choices = [];
   if (isColorStone) {
-    const accents = sides.map((side, sideIndex) => ({ side, sideIndex }));
-    if (colorStones.length > 0) {
-      choices = colorStones.map((cs, csIndex) => ({
-        isColorStone: true,
-        colorStone: cs,
-        csIndex,
-        accents,
-      }));
-    } else {
-      choices = [{ isColorStone: true, accents }];
+    const csRowsToLoop = colorStones.length > 0 ? colorStones : [null];
+    const sideRowsToLoop = sides.length > 0 ? sides.map((side, sideIndex) => ({ side, sideIndex })) : [null];
+    for (let csIndex = 0; csIndex < csRowsToLoop.length; csIndex++) {
+      const cs = csRowsToLoop[csIndex];
+      for (const sItem of sideRowsToLoop) {
+        choices.push({
+          isColorStone: true,
+          colorStone: cs,
+          csIndex: cs ? csIndex : null,
+          accents: sItem ? [sItem] : [],
+        });
+      }
     }
   } else {
     choices = centers.length
       ? centers.map((center, centerIndex) => {
-          const matching = sides.map((side, sideIndex) => ({ side, sideIndex }))
-            .filter(({ side }) => ['diamondTypeId', 'diamondColorId', 'diamondClarityId']
-              .every((key) => id(side[key]) === id(center[key])));
-          const accents = sides.length === 1 ? [{ side: sides[0], sideIndex: 0 }] : matching;
-          if (sides.length && !accents.length)
-            throw new ApiError(400, 'No side diamond quality matches a center variant');
+          const typeMatched = sides.map((side, sideIndex) => ({ side, sideIndex }))
+            .filter(({ side }) => id(side.diamondTypeId) === id(center.diamondTypeId));
+          if (sides.length && !typeMatched.length)
+            throw new ApiError(400, 'No side diamond matches the center diamond type (Natural / Lab Grown)');
+          const qualityMatched = typeMatched.filter(({ side }) =>
+            id(side.diamondColorId) === id(center.diamondColorId) &&
+            id(side.diamondClarityId) === id(center.diamondClarityId)
+          );
+          const accents = qualityMatched.length > 0 ? qualityMatched : typeMatched;
           return { center, centerIndex, accents };
         })
       : sides.length ? sides.map((side, sideIndex) => ({ side, accents: [{ side, sideIndex }] })) : [{ accents: [] }];
@@ -233,13 +252,15 @@ function calculateProductPricing(product, masters) {
   for (const purity of purities)
       for (const choice of choices) {
         if (
-          purity.metalType !== 'Gold' ||
-          !(purity.karat > 0 && purity.karat <= 24)
-        )
+          purity.metalType !== 'Platinum' &&
+          purity.metalType !== 'Silver' &&
+          (purity.metalType !== 'Gold' || !(purity.karat > 0 && purity.karat <= 24))
+        ) {
           throw new ApiError(
             400,
-            'Calculated jewellery pricing requires a valid gold purity'
+            'Calculated jewellery pricing requires a valid metal purity'
           );
+        }
         const { center, side, centerIndex, accents, colorStone } = choice;
 
         let key;
@@ -292,11 +313,20 @@ function calculateProductPricing(product, masters) {
             400,
             'Base carat produces a non-positive metal weight'
           );
-        const metalRate =
-          (number(masters.gold?.base24KRate, '24KT gold rate') * purity.karat) /
-          24;
-        if (!metalRate)
-          throw new ApiError(400, 'Configure a positive 24KT gold rate');
+        let metalRate = 0;
+        if (purity.metalType === 'Platinum') {
+          metalRate = number(masters.gold?.platinumRate, 'Platinum rate');
+          if (!metalRate) throw new ApiError(400, 'Configure a positive Platinum rate');
+        } else if (purity.metalType === 'Silver') {
+          metalRate = number(masters.gold?.silverRate, 'Silver rate');
+          if (!metalRate) throw new ApiError(400, 'Configure a positive Silver rate');
+        } else {
+          metalRate =
+            (number(masters.gold?.base24KRate, '24KT gold rate') * purity.karat) /
+            24;
+          if (!metalRate)
+            throw new ApiError(400, 'Configure a positive 24KT gold rate');
+        }
         const metalCost = metalWeight * metalRate;
 
         // Center Diamond Cost (0 if isColorStone)

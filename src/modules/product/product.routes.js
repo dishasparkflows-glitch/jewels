@@ -14,6 +14,7 @@ router.get('/home', optionalAuth, productController.getHomeProducts);
 router.get('/home-sections', optionalAuth, productController.getHomeSections);
 router.get('/most-liked', optionalAuth, productController.getMostLiked);
 router.get('/lookup', productController.getLookup);
+router.get('/admin-list', authenticate, authorize(ROLES.SUPER_ADMIN, ROLES.ADMIN), productController.getAdminList);
 router.get('/sku/:code', optionalAuth, productController.getBySkuOrTag);
 router.get('/:id/similar', optionalAuth, productController.getSimilarProducts);
 router.get('/:id', optionalAuth, productController.getOne);

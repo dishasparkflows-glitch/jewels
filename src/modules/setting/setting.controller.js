@@ -21,7 +21,7 @@ class SettingController {
   updateSettings = catchAsync(async (req, res) => {
     const settings = await settingService.updateSettings(req.body);
     await redisClient.deleteByPattern('settings:*');
-    ApiResponse.success(res, null, 'System settings updated successfully');
+    ApiResponse.success(res, settings, 'System settings updated successfully');
   });
 
   // ------------------------------- create setting ----------------------------

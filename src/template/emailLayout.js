@@ -15,13 +15,13 @@ function sanitizeEmailUrl(rawUrl, fallback = '#') {
   return fallback;
 }
 
-function resolveBrandContact({ setting, storeName, defaultEmail = 'support@neirah.in' } = {}) {
+function resolveBrandContact({ setting, storeName, defaultEmail = 'support@jewels.in' } = {}) {
   const bDetails = setting?.businessDetails || {};
-  const companyName = storeName || bDetails.companyName || 'Neirah';
+  const companyName = storeName || bDetails.companyName || 'Jewels';
   const mobileNumber = bDetails.mobileNumber || '+91 84600 91955';
   const emailAddress = bDetails.emailAddress || defaultEmail;
 
-  let website = 'www.neirah.in';
+  let website = 'www.jewels.in';
   if (emailAddress && emailAddress.includes('@')) {
     const domain = emailAddress.split('@')[1];
     if (domain && domain.includes('.')) {
@@ -30,7 +30,7 @@ function resolveBrandContact({ setting, storeName, defaultEmail = 'support@neira
   }
 
   const cleanPhone = String(mobileNumber).replace(/[^\d+]/g, '');
-  const webUrl = sanitizeEmailUrl(website.startsWith('http') ? website : `https://${website}`, 'https://www.neirah.in');
+  const webUrl = sanitizeEmailUrl(website.startsWith('http') ? website : `https://${website}`, 'https://www.jewels.in');
 
   return {
     companyName,
@@ -54,7 +54,7 @@ function renderEmailLayout({
   bodyHtml,
   setting,
   storeName,
-  defaultEmail = 'support@neirah.in',
+  defaultEmail = 'support@jewels.in',
 }) {
   const brand = resolveBrandContact({ setting, storeName, defaultEmail });
   const currentYear = new Date().getFullYear();

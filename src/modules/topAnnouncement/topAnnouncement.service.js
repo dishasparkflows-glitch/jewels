@@ -28,8 +28,8 @@ class TopAnnouncementService {
     const { page, limit, skip } = getPagination(queryParams);
     const filter = { 'meta.deletedAt': null };
 
-    if (queryParams.isActive !== undefined && queryParams.isActive !== '' && queryParams.isActive !== 'all') {
-      filter.isActive = queryParams.isActive === 'true' || queryParams.isActive === true;
+    if (queryParams.status && queryParams.status !== 'all') {
+      filter.status = queryParams.status;
     }
 
     if (queryParams.search) {
@@ -70,7 +70,7 @@ class TopAnnouncementService {
     const now = new Date();
     const filter = {
       'meta.deletedAt': null,
-      isActive: true,
+      status: 'active',
       $and: [
         {
           $or: [
@@ -142,7 +142,7 @@ class TopAnnouncementService {
     if (!item) {
       throw new ApiError(404, 'Announcement not found');
     }
-    item.isActive = !item.isActive;
+    item.status = item.status === 'active' ? 'inactive' : 'active';
     await item.save();
     return item;
   }

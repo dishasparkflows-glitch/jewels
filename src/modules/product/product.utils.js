@@ -115,6 +115,7 @@ const withColorStatuses = (product) => {
         : (hasCenterConfig ? (v.caratWeight ?? null) : 0);
       return {
         _id: v._id,
+        pricingKey: v.pricingKey || undefined,
         sku: v.sku || '',
         combination: v.combination || '',
         price: v.price ?? null,
@@ -127,17 +128,31 @@ const withColorStatuses = (product) => {
         diamondClarityId: v.diamondClarityId || null,
         caratWeight: v.caratWeight ?? centerWt ?? null,
         centerDiamondWeight: centerWt,
-        sideDiamondWeight: v.sideDiamondWeight ?? null,
+        centerDiamondRate: v.centerDiamondRate ?? null,
         centerDiamondCost: v.centerDiamondCost ?? null,
+        sideDiamondWeight: v.sideDiamondWeight ?? null,
         sideDiamondCost: v.sideDiamondCost ?? null,
+        colorStoneCost: v.colorStoneCost ?? null,
+        colorStoneWeight: v.colorStoneWeight ?? null,
+        colorStoneRate: v.colorStoneRate ?? null,
+        sideColorStoneCost: v.sideColorStoneCost ?? null,
+        sideColorStoneWeight: v.sideColorStoneWeight ?? null,
+        sideColorStoneRate: v.sideColorStoneRate ?? null,
         diamondCost: v.diamondCost !== undefined && v.diamondCost !== null
           ? v.diamondCost
-          : ((Number(v.centerDiamondCost || 0) + Number(v.sideDiamondCost || 0)) || null),
+          : ((Number(v.centerDiamondCost || 0) + Number(v.sideDiamondCost || 0) + Number(v.colorStoneCost || 0) + Number(v.sideColorStoneCost || 0)) || null),
         metalCost: v.metalCost ?? null,
         metalRate: v.metalRate ?? null,
         metalWeight: v.metalWeight ?? null,
         labourCharge: v.labourCharge ?? null,
+        computedMakingCharge: v.computedMakingCharge ?? v.labourCharge ?? null,
         certificateCharge: v.certificateCharge ?? null,
+        subtotal: v.subtotal ?? null,
+        computedGst: v.computedGst ?? null,
+        otherAmount: v.otherAmount ?? null,
+        isCalculated: v.isCalculated ?? true,
+        sizeFrom: v.sizeFrom ?? null,
+        sizeTo: v.sizeTo ?? null,
       };
     }).filter(Boolean);
   }
@@ -247,6 +262,10 @@ const PRICING_COMPARISON_KEYS = [
   'metalWeight',
   'centerDiamondCost',
   'sideDiamondCost',
+  'colorStoneCost',
+  'colorStoneWeight',
+  'sideColorStoneCost',
+  'sideColorStoneWeight',
   'computedGst',
   'labourCharge',
   'otherAmount',
@@ -306,6 +325,88 @@ const extractProductImages = (p) => {
   }
 
   return [...new Set(images)];
+};
+
+const isNonVideoMediaUrl = (url) =>
+  typeof url === 'string' &&
+  Boolean(url.trim()) &&
+  !/\.(mp4|webm|mov)(?:[?#]|$)/i.test(url);
+
+const extractFirstAdminThumbnail = (p) => {
+  if (!p) return '';
+  const pickFirst = (list = []) => {
+    for (const item of list) {
+      if (item?.mediaType === 'video') continue;
+      const u = typeof item === 'string' ? item : item?.url;
+      if (isNonVideoMediaUrl(u)) return u.trim();
+    }
+    return '';
+  };
+
+  if (Array.isArray(p.colorImages)) {
+    for (const ci of p.colorImages) {
+      const found = pickFirst(ci?.images);
+      if (found) return found;
+    }
+  }
+  if (Array.isArray(p.images)) {
+    const fromImages = pickFirst(p.images);
+    if (fromImages) return fromImages;
+  }
+  if (Array.isArray(p.ornate?.ornateImages)) {
+    const fromOrnate = pickFirst(p.ornate.ornateImages);
+    if (fromOrnate) return fromOrnate;
+  }
+  if (isNonVideoMediaUrl(p.ornate?.firstPhoto)) return p.ornate.firstPhoto.trim();
+  const single = typeof p.image === 'string' ? p.image : p.image?.url;
+  return isNonVideoMediaUrl(single) ? single.trim() : '';
+};
+
+// ------------------------------- format admin product list row ----------------------------
+const formatAdminListProduct = (p) => {
+  if (!p) return null;
+  const thumbnail = extractFirstAdminThumbnail(p);
+  return {
+    _id: p._id,
+    basicInfo: {
+      title: p.basicInfo?.title || '',
+      sku: p.basicInfo?.sku || '',
+      slug: p.basicInfo?.slug || '',
+    },
+    ...(thumbnail ? { thumbnail } : {}),
+    pricing: {
+      ...(p.pricing?.salePrice !== undefined ? { salePrice: p.pricing.salePrice } : {}),
+      ...(p.pricing?.calculatedPrice !== undefined ? { calculatedPrice: p.pricing.calculatedPrice } : {}),
+      ...(p.pricing?.ornatePrice !== undefined ? { ornatePrice: p.pricing.ornatePrice } : {}),
+    },
+    specifications: {
+      ...(p.specifications?.metalWeight !== undefined ? { metalWeight: p.specifications.metalWeight } : {}),
+      ...(p.specifications?.metalDetails?.grossWeight !== undefined
+        ? { metalDetails: { grossWeight: p.specifications.metalDetails.grossWeight } }
+        : {}),
+    },
+    stockStatus: p.stockStatus || '',
+    demoMetrics: {
+      soldCount: p.demoMetrics?.soldCount ?? 0,
+      reviewCount: p.demoMetrics?.reviewCount ?? 0,
+    },
+    visibility: {
+      web: p.visibility?.web !== false && p.inweb !== false,
+      app: p.visibility?.app !== false && p.inapp !== false,
+    },
+    status: p.status || 'draft',
+    productType: p.productType || '',
+    isOrnate: Boolean(p.isOrnate),
+    ...(p.ornate?.tagNo || p.ornate?.grossWt !== undefined || p.ornate?.isSold !== undefined
+      ? {
+          ornate: {
+            ...(p.ornate.tagNo ? { tagNo: p.ornate.tagNo } : {}),
+            ...(p.ornate.grossWt !== undefined ? { grossWt: p.ornate.grossWt } : {}),
+            ...(p.ornate.isSold !== undefined ? { isSold: p.ornate.isSold } : {}),
+          },
+        }
+      : {}),
+  };
 };
 
 // ------------------------------- extract metal colors ----------------------------
@@ -488,8 +589,8 @@ const formatStorefrontProduct = (p) => {
     if (!maxPrice) maxPrice = minPrice;
   }
 
-  const categoryIds = Array.isArray(p.categoryIds) ? p.categoryIds : (p.categoryIds ? [p.categoryIds] : []);
-  const menuItemIds = Array.isArray(p.menuItemIds) ? p.menuItemIds : (p.menuItemIds ? [p.menuItemIds] : []);
+  const categoryIds = p.categoryIds || [];
+  const menuItemIds = p.menuItemIds || [];
   const gender = p.basicInfo?.gender || [];
 
   const metalColors = extractMetalColors(p);
@@ -1076,6 +1177,7 @@ module.exports = {
   formatHomeProduct,
   formatStorefrontProduct,
   formatStorefrontProductDetail,
+  formatAdminListProduct,
   extractProductImages,
   extractMetalColors,
   formatColorImages,

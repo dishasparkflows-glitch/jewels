@@ -311,21 +311,30 @@ const SYSTEM_MODULES = [
     apiPrefixes: ['/static-pages'],
   },
 
-  // ─── Analytics & Administration ──────────────────────
+  // ─── Business Ops ────────────────────────────────────
+  {
+    id: 'stores',
+    title: 'Stores',
+    group: 'Business Ops',
+    path: '/stores',
+    apiPrefixes: ['/stores', '/upload'],
+  },
   {
     id: 'reports',
     title: 'Reports',
-    group: 'Analytics & Administration',
+    group: 'Business Ops',
     path: '/reports',
     apiPrefixes: ['/analytics'],
   },
   {
     id: 'whatsapp',
     title: 'WhatsApp Connect',
-    group: 'Analytics & Administration',
+    group: 'Business Ops',
     path: '/system/whatsapp',
     apiPrefixes: ['/whatsapp'],
   },
+
+  // ─── Analytics & Administration ──────────────────────
   {
     id: 'notifications',
     title: 'Notifications',

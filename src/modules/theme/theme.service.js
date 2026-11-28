@@ -5,48 +5,17 @@ const { Theme } = require('./theme.model');
 const themeMedia = require('./themeMedia');
 const Setting = require('../setting/setting.model');
 const TIMEZONE = 'Asia/Kolkata';
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
-const SECTION_KEYS = [
-  'hero',
-  'categories',
-  'products',
-  'collections',
-  'trustBadges',
-  'customBanner',
-  'reviews',
-  'instagram',
-  'celebrate',
-  'gifts',
-  'mobileApp',
-  'appointment',
-];
 
 const snapshotOf = (theme) => ({
   id: String(theme._id),
   name: theme.name,
   code: theme.code,
-  config: theme.config?.toObject ? theme.config.toObject() : theme.config,
+  description: theme.description || '',
 });
 
 class ThemeService {
-  async validateConfig(config = {}) {
-    if (!config) return;
-    for (const row of config.mediaOverrides || []) {
-      await themeMedia.validateTarget(row.module, row.recordId, row.slot);
-    }
-    const colors = config.colors || {};
-    for (const [key, value] of Object.entries(colors)) {
-      if (!HEX_COLOR.test(value)) throw new ApiError(400, `Invalid ${key} color. Use a six-digit hex color.`);
-    }
-    if (config.borderRadius !== undefined && (Number(config.borderRadius) < 0 || Number(config.borderRadius) > 32)) {
-      throw new ApiError(400, 'Border radius must be between 0 and 32 pixels.');
-    }
-    if (config.sections) {
-      const keys = config.sections.map((section) => section.key);
-      if (keys.some((key) => !SECTION_KEYS.includes(key)) || new Set(keys).size !== keys.length) {
-        throw new ApiError(400, 'Sections must use unique supported keys.');
-      }
-    }
+  async validateConfig() {
+    return;
   }
 
   async writeHistory() {
@@ -58,12 +27,11 @@ class ThemeService {
     if (!data.name?.trim()) throw new ApiError(400, 'Theme name is required.');
     const code = (data.code || data.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     if (!code) throw new ApiError(400, 'Theme code is required.');
-    if (data.config) await this.validateConfig(data.config);
+
     const theme = await Theme.create({
       name: data.name.trim(),
       code,
       description: data.description || '',
-      config: data.config || {},
       schedule: data.schedule || {},
       meta: { createdBy: actorId, updatedBy: actorId },
     });
@@ -152,17 +120,9 @@ class ThemeService {
     const theme = await this.getById(id);
     if (theme.status === 'archived') throw new ApiError(409, 'Archived themes cannot be edited.');
     if (data.status) throw new ApiError(400, 'Theme status can only be changed through publish or schedule actions.');
-    if (data.config) {
-      data.config.mediaOverrides = theme.config?.mediaOverrides;
-      await this.validateConfig(data.config);
-    }
+
     for (const key of ['name', 'description', 'schedule']) {
       if (data[key] !== undefined) theme[key] = data[key];
-    }
-    if (data.config) {
-      for (const [key, value] of Object.entries(data.config)) {
-        if (key !== 'mediaOverrides') theme.set(`config.${key}`, value);
-      }
     }
     if (data.code !== undefined) {
       const code = String(data.code).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -194,7 +154,6 @@ class ThemeService {
 
   async setActive(theme, actorId) {
     if (!theme.publishedSnapshot) {
-      if (theme.config) await this.validateConfig(theme.config);
       theme.publishedSnapshot = snapshotOf(theme);
     }
     await Setting.updateOne(
@@ -223,7 +182,6 @@ class ThemeService {
   async publish(id, data = {}, actorId) {
     const theme = await this.getById(id);
     if (theme.status === 'archived') throw new ApiError(409, 'Archived themes cannot be published.');
-    if (theme.config) await this.validateConfig(theme.config);
     const startAt = data.startAt ? new Date(data.startAt) : null;
     const endAt = data.endAt ? new Date(data.endAt) : null;
     if (startAt && Number.isNaN(startAt.getTime())) throw new ApiError(400, 'Invalid schedule start date.');
@@ -284,11 +242,9 @@ class ThemeService {
     return {
       revision,
       timezone: TIMEZONE,
-      theme: theme?.publishedSnapshot
-        ? { ...theme.publishedSnapshot, config: await themeMedia.resolve(theme.publishedSnapshot.config) }
-        : theme?.config
-          ? { id: String(theme._id), name: theme.name, code: theme.code, config: await themeMedia.resolve(theme.config) }
-          : null,
+      theme: theme
+        ? { id: String(theme._id), name: theme.name, code: theme.code }
+        : null,
     };
   }
 
@@ -302,8 +258,7 @@ class ThemeService {
         const fallbackId = active.schedule.fallbackThemeId;
         const fallback = fallbackId ? await Theme.findOne({ _id: fallbackId, 'meta.deletedAt': null }) : null;
         await active.save();
-        if (fallback?.publishedSnapshot) {
-          fallback.config = fallback.publishedSnapshot.config;
+        if (fallback) {
           await this.setActive(fallback, null);
           return { expiredThemeId: active._id, activatedThemeId: fallback._id };
         } else {

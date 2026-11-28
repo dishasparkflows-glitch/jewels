@@ -228,8 +228,12 @@ class OrderService {
     const order = await this.getOrderForInvoice(orderId);
     checkOrderAccess(order, user, accessToken);
     const setting = await this.getStoreSetting();
+    const { getCompanyPrefix } = require('../../utils/brand');
+    const brandPrefix = getCompanyPrefix(setting);
+    const safeOrderNum = (order.orderNumber || 'ORD').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `${brandPrefix}_INVOICE_${safeOrderNum}.pdf`;
     const pdfBuffer = await generateInvoicePDF(order, { setting });
-    return { order, pdfBuffer };
+    return { order, pdfBuffer, filename };
   }
 
   // ------------------------------- dispatch invoice ----------------------------
@@ -238,10 +242,11 @@ class OrderService {
     const setting = await this.getStoreSetting();
     const pdfBuffer = await generateInvoicePDF(order, { setting });
 
-    const brandName = setting?.businessDetails?.companyName || 'NEIRAH';
-    const brandPrefix = brandName.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const { getCompanyName, getCompanyPrefix } = require('../../utils/brand');
+    const brandName = getCompanyName(setting);
+    const brandPrefix = getCompanyPrefix(setting);
     const safeOrderNum = (order.orderNumber || 'ORD').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename = `${brandPrefix || 'NEIRAH'}_INVOICE_${safeOrderNum}.pdf`;
+    const filename = `${brandPrefix}_INVOICE_${safeOrderNum}.pdf`;
     const dispatched = [];
     const errors = [];
 

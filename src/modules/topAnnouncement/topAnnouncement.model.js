@@ -12,9 +12,10 @@ const topAnnouncementSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
-    isActive: {
-      type: Boolean,
-      default: true,
+    status: {
+      type: String,
+      enum: ['inactive', 'active'],
+      default: 'active',
       index: true,
     },
     order: {

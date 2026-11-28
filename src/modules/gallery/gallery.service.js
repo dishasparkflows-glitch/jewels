@@ -204,7 +204,7 @@ class GalleryService {
   // ------------------------------- get themes lookup ----------------------------
   async getThemesLookup() {
     const themes = await Theme.find({ 'meta.deletedAt': null })
-      .select('_id name code status config.bannerSelections schedule')
+      .select('_id name code status schedule')
       .sort({ status: 1, 'meta.createdAt': -1 })
       .lean();
 
@@ -214,7 +214,7 @@ class GalleryService {
       code: theme.code,
       status: theme.status,
       isLive: theme.status === 'active',
-      bannerCount: (theme.config?.bannerSelections || []).length,
+      bannerCount: 0,
     }));
   }
 
@@ -234,7 +234,7 @@ class GalleryService {
     let theme = null;
     if (themeId && mongoose.isValidObjectId(themeId)) {
       theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null })
-        .select('_id name config.bannerSelections')
+        .select('_id name')
         .lean();
     }
 
@@ -268,12 +268,6 @@ class GalleryService {
       .limit(100)
       .lean();
 
-    const themeBannerIds = new Set(
-      (theme?.config?.bannerSelections || [])
-        .map((b) => String(b.bannerId))
-        .filter(Boolean)
-    );
-
     return banners.map((b) => ({
       _id: b._id,
       title: b.content?.title || `${b.display?.type || 'banner'}`,
@@ -283,7 +277,7 @@ class GalleryService {
       categoryName: b.display?.categoryId?.name || null,
       themeId: theme?._id || null,
       themeName: theme?.name || null,
-      isSelectedInTheme: themeBannerIds.has(String(b._id)),
+      isSelectedInTheme: false,
       status: b.status || 'active',
       image: b.image,
     }));
@@ -294,7 +288,7 @@ class GalleryService {
     let theme = null;
     if (themeId && mongoose.isValidObjectId(themeId)) {
       theme = await Theme.findOne({ _id: themeId, 'meta.deletedAt': null })
-        .select('_id name config.featuredSelections')
+        .select('_id name')
         .lean();
     }
 
@@ -305,12 +299,6 @@ class GalleryService {
       .sort({ 'display.type': 1, 'display.order': 1, name: 1 })
       .lean();
 
-    const themeFeaturedIds = new Set(
-      (theme?.config?.featuredSelections || [])
-        .map((f) => String(f.featuredId || f.recordId))
-        .filter(Boolean)
-    );
-
     return items.map((f) => ({
       _id: f._id,
       title: f.name || 'Featured Item',
@@ -320,7 +308,7 @@ class GalleryService {
       platform: f.display?.platform || 'web',
       themeId: theme?._id || null,
       themeName: theme?.name || null,
-      isSelectedInTheme: themeFeaturedIds.has(String(f._id)),
+      isSelectedInTheme: false,
       status: f.status || 'active',
       image: f.image,
       categoryName: f.categoryId?.name || null,

@@ -388,6 +388,9 @@ class ShiprocketLogisticsProvider extends BaseLogisticsProvider {
       const firstName = nameParts[0] || 'Customer';
       const lastName = nameParts.slice(1).join(' ') || '';
 
+      const { getActiveCompanyName } = require('../../../utils/brand');
+      const brandName = await getActiveCompanyName();
+
       const returnPayload = {
         order_id: `${returnDoc.returnNumber}_${Date.now()}`,
         order_date: new Date().toISOString().split('T')[0],
@@ -401,7 +404,7 @@ class ShiprocketLogisticsProvider extends BaseLogisticsProvider {
         pickup_pincode: pickupAddress?.postalCode || '395006',
         pickup_email: returnDoc.customer?.email || 'customer@example.com',
         pickup_phone: pickupAddress?.phone || returnDoc.customer?.phone || '9999999999',
-        shipping_customer_name: 'Neirah Luxury Warehouse',
+        shipping_customer_name: `${brandName} Luxury Warehouse`,
         shipping_address: 'Plot 102, GIDC Electronic Estate',
         shipping_city: 'Gandhinagar',
         shipping_state: 'Gujarat',

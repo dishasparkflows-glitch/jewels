@@ -377,6 +377,10 @@ productSchema.index({ productType: 1, status: 1 });
 productSchema.index({ categoryIds: 1, status: 1 });
 productSchema.index({ 'pricing.salePrice': 1 });
 productSchema.index({ 'meta.createdAt': -1 });
+productSchema.index({ 'meta.deletedAt': 1, status: 1, 'visibility.web': 1, 'pricing.salePrice': 1 });
+productSchema.index({ 'meta.deletedAt': 1, status: 1, categoryIds: 1 });
+productSchema.index({ 'meta.deletedAt': 1, status: 1, 'basicInfo.sku': 1 });
+productSchema.index({ 'meta.deletedAt': 1, 'variants.diamondTypeId': 1 });
 productSchema.pre('save', function (next) {
   const isOrnate = Boolean(this.isOrnate);
   const tagNo = this.ornate?.tagNo;

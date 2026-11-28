@@ -81,8 +81,7 @@ const currencySchema = new mongoose.Schema(
 
   },
   {
-    timestamps: false,
-    versionKey: false,
+    versionKey: false
   }
 );
 

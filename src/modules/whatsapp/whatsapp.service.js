@@ -14,6 +14,7 @@ const ApiError = require('../../utils/ApiError');
 const PROVIDER = 'connectwhats';
 const ACCOUNT_KEY = 'default';
 
+const { getActiveStoreSetting, getCompanyName } = require('../../utils/brand');
 const { NODE_ENV } = require('../../config/constants');
 
 class WhatsAppService {
@@ -206,8 +207,10 @@ class WhatsAppService {
   }
 
     // ------------------------------- send test message ----------------------------
-  async sendTestMessage(to, message = 'Neirah Jewellery WhatsApp integration test message.') {
-    return this.sendTextMessage(to, message);
+  async sendTestMessage(to, message) {
+    const brandName = getCompanyName(await getActiveStoreSetting());
+    const text = message || `${brandName} WhatsApp integration test message.`;
+    return this.sendTextMessage(to, text);
   }
 
     // ------------------------------- send template message ----------------------------
@@ -449,6 +452,11 @@ class WhatsAppService {
       const normalizedPhone = normalizePhoneNumber(phoneNumber);
       const dateStr = getFormatter('date')(appointmentDate);
 
+      const setting = await getActiveStoreSetting();
+      const brandName = getCompanyName(setting);
+      const brandUpper = brandName.toUpperCase();
+      const storeLocation = setting?.businessDetails?.storeAddress || `${brandName} Atelier, Gandhinagar, Gujarat`;
+
       const templateTargetName = status === 'confirmed' ? 'neirah_appointment_confirmed' : 'neirah_appointment_request';
       const tmpl = await WhatsAppTemplate.findOne({
         $or: [
@@ -468,7 +476,7 @@ class WhatsAppService {
               customerName: fullName,
               date: dateStr,
               time: preferredTime,
-              location: 'Neirah Jewels Atelier, Gandhinagar, Gujarat',
+              location: storeLocation,
             },
           },
         });
@@ -477,9 +485,9 @@ class WhatsAppService {
 
       let msg = '';
       if (status === 'confirmed') {
-        msg = `💍 *NEIRAH: CONSULTATION CONFIRMED* ✨\n\nHello ${fullName},\nYour jewelry consultation has been officially *CONFIRMED*!\n\n📅 Date: ${dateStr}\n⏰ Time: ${preferredTime}\n📍 Location: Neirah Jewels Atelier\n\nWe look forward to welcoming you! ✨`;
+        msg = `💍 *${brandUpper}: CONSULTATION CONFIRMED* ✨\n\nHello ${fullName},\nYour jewelry consultation has been officially *CONFIRMED*!\n\n📅 Date: ${dateStr}\n⏰ Time: ${preferredTime}\n📍 Location: ${storeLocation}\n\nWe look forward to welcoming you! ✨`;
       } else {
-        msg = `💍 *NEIRAH: APPOINTMENT REQUEST RECEIVED* ✨\n\nHello ${fullName},\nWe have received your appointment request.\n\n📅 Date: ${dateStr}\n⏰ Time: ${preferredTime}\n⏳ Status: Under Review\n\nOur stylists will confirm your slot shortly. ✨`;
+        msg = `💍 *${brandUpper}: APPOINTMENT REQUEST RECEIVED* ✨\n\nHello ${fullName},\nWe have received your appointment request.\n\n📅 Date: ${dateStr}\n⏰ Time: ${preferredTime}\n⏳ Status: Under Review\n\nOur stylists will confirm your slot shortly. ✨`;
       }
 
       await this.sendTextMessage(normalizedPhone, msg);
@@ -494,10 +502,11 @@ class WhatsAppService {
       const { name, phone } = inquiry.customer;
       const normalizedPhone = normalizePhoneNumber(`${phone.countryCode}${phone.number}`);
       const { stoneType, metalType, budget } = inquiry.requirements;
+      const brandUpper = getCompanyName(await getActiveStoreSetting()).toUpperCase();
 
       const msg = inquiry.status === 'confirmed'
-        ? `💍 *NEIRAH: CUSTOM DESIGN CONFIRMED* ✨\n\nHello ${name},\nYour custom jewelry consultation is *CONFIRMED*. Our jewelry designers will contact you shortly to review CAD drafts. 💍`
-        : `💍 *NEIRAH: CUSTOM INQUIRY RECEIVED* ✨\n\nHello ${name},\nThank you for reaching out for a bespoke jewelry design!\n\n💎 Stone: ${stoneType}\n👑 Metal: ${metalType}\n💰 Budget: ₹${budget}\n\nOur styling team will contact you shortly. ✨`;
+        ? `💍 *${brandUpper}: CUSTOM DESIGN CONFIRMED* ✨\n\nHello ${name},\nYour custom jewelry consultation is *CONFIRMED*. Our jewelry designers will contact you shortly to review CAD drafts. 💍`
+        : `💍 *${brandUpper}: CUSTOM INQUIRY RECEIVED* ✨\n\nHello ${name},\nThank you for reaching out for a bespoke jewelry design!\n\n💎 Stone: ${stoneType}\n👑 Metal: ${metalType}\n💰 Budget: ₹${budget}\n\nOur styling team will contact you shortly. ✨`;
 
       await this.sendTextMessage(normalizedPhone, msg);
     } catch (err) {
@@ -510,7 +519,9 @@ class WhatsAppService {
     try {
       const normalizedPhone = normalizePhoneNumber(to);
       const cleanOrderNum = orderNumber ? String(orderNumber).replace(/^#/, '') : 'N/A';
-      const msg = `💍 *NEIRAH: YOUR INVOICE* 💍\n\nYour invoice for order *#${cleanOrderNum}* is ready. Please view or download it from your Neirah account order history.\n\n_Thank you for choosing NEIRAH._`;
+      const brandName = getCompanyName(await getActiveStoreSetting());
+      const brandUpper = brandName.toUpperCase();
+      const msg = `💍 *${brandUpper}: YOUR INVOICE* 💍\n\nYour invoice for order *#${cleanOrderNum}* is ready. Please view or download it from your ${brandName} account order history.\n\n_Thank you for choosing ${brandUpper}._`;
 
       await this.sendTextMessage(normalizedPhone, msg);
       return { success: true };

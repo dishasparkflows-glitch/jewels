@@ -13,7 +13,7 @@ const { escapeHtml } = require('../utils/string');
  * @returns {string} HTML string
  */
 function getInvoiceEmailHtml({ order, setting, invoiceUrl }) {
-  const brand = resolveBrandContact({ setting, defaultEmail: 'info@neirah.in' });
+  const brand = resolveBrandContact({ setting, defaultEmail: 'info@jewels.in' });
   const orderNumber = order?.orderNumber || 'RJ/ORD-0003';
   const customerName =
     order?.shippingAddress?.fullName ||
@@ -103,7 +103,7 @@ function getInvoiceEmailHtml({ order, setting, invoiceUrl }) {
     headingHtml: 'Your Tax Invoice is Ready &nbsp;✨',
     bodyHtml,
     setting,
-    defaultEmail: 'info@neirah.in',
+    defaultEmail: 'info@jewels.in',
   });
 }
 

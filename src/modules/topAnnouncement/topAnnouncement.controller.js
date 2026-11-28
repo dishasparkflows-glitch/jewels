@@ -47,7 +47,7 @@ class TopAnnouncementController {
   // Toggle Status
   toggleStatus = catchAsync(async (req, res) => {
     const item = await topAnnouncementService.toggleStatus(req.params.id);
-    ApiResponse.success(res, item, `Announcement set to ${item.isActive ? 'active' : 'inactive'}`);
+    ApiResponse.success(res, item, `Announcement set to ${item.status}`);
   });
 
   // Reorder

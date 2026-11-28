@@ -354,7 +354,7 @@ function drawSocialIcons(doc, rightMargin, y, social = {}) {
 }
 
 /**
- * Generates an A4 Luxury PDF invoice matching Neirah's exact visual design
+ * Generates an A4 Luxury PDF invoice matching  exact visual design
  * @param {Object} order The Mongoose order document or lean object
  * @param {Object} [options]
  * @param {Object} [options.setting] Settings document from setting.model.js
@@ -418,11 +418,12 @@ async function generateInvoicePDF(order, options = {}) {
 
       let y = 34;
 
-      const brandName = (
+      const rawBrandName = (
         options.brandName ||
         setting?.businessDetails?.companyName ||
-        'NEIRAH'
-      ).toUpperCase();
+        'Jewels'
+      ).trim() || 'Jewels';
+      const brandName = rawBrandName.toUpperCase();
 
       // ─── 1. Header: Brand Logo & Tax Invoice Badge ───
       const renderFallbackBrandHeader = () => {
@@ -793,7 +794,7 @@ async function generateInvoicePDF(order, options = {}) {
 
       doc.font('Serif-Bold').fontSize(11).fillColor('#2B2015').text('Thank you for your purchase!', tyDividerX + 20, tyY);
       doc.font('Sans').fontSize(8.5).fillColor('#4A3E31').text(
-        'We truly appreciate your trust in Neirah Jewellers.',
+        `We truly appreciate your trust in ${rawBrandName}.`,
         tyDividerX + 20,
         tyY + 15
       );
@@ -808,9 +809,9 @@ async function generateInvoicePDF(order, options = {}) {
 
       const bDetails = setting?.businessDetails || {};
       const mobileNumber = bDetails.mobileNumber || '+91 84600 91955';
-      const emailAddress = bDetails.emailAddress || 'support@neirah.in';
+      const emailAddress = bDetails.emailAddress || 'support@jewels.in';
 
-      let website = 'www.neirah.in';
+      let website = 'www.jewels.in';
       if (emailAddress && emailAddress.includes('@')) {
         const domain = emailAddress.split('@')[1];
         if (domain && domain.includes('.')) {

@@ -43,6 +43,7 @@ const MODULE_CONFIG = {
   'gemstone-types': { folder: 'gemstones/types', prefix: 'gemstone-type' },
   'gemstone-shapes': { folder: 'gemstones/shapes', prefix: 'gemstone-shape' },
   gemstones: { folder: 'gemstones', prefix: 'gemstone' },
+  stores: { folder: 'stores', prefix: 'store' },
   general: { folder: 'general', prefix: 'general' },
 };
 

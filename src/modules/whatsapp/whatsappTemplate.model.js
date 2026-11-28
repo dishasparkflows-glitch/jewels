@@ -84,7 +84,6 @@ const whatsAppTemplateSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: false,
     versionKey: false,
     collection: 'whatsapp_templates',
   }

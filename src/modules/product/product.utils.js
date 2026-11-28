@@ -47,7 +47,7 @@ const withColorStatuses = (product) => {
         (typeof ci.firstImage === 'string' ? ci.firstImage : '') ||
         (typeof ci.image === 'string' ? ci.image : '') ||
         '';
-      const resolved = resolveMetalColorInfo(ci.metalColorId || ci.metalColor, product);
+      const resolved = resolveMetalColorInfo(ci.metalColorId, product);
 
       const sanitizedImages = (ci.images || []).map((img) => {
         if (!img) return null;
@@ -397,6 +397,15 @@ const formatAdminListProduct = (p) => {
     status: p.status || 'draft',
     productType: p.productType || '',
     isOrnate: Boolean(p.isOrnate),
+    categories: (Array.isArray(p.categoryIds) ? p.categoryIds : []).map((c) =>
+      typeof c === 'object' && c !== null
+        ? { _id: c._id, name: c.name || '', type: c.type || '' }
+        : { _id: c }
+    ),
+    categoryNames: (Array.isArray(p.categoryIds) ? p.categoryIds : [])
+      .map((c) => (typeof c === 'object' && c !== null ? c.name : ''))
+      .filter(Boolean),
+    createdAt: p.meta?.createdAt || p.createdAt || null,
     ...(p.ornate?.tagNo || p.ornate?.grossWt !== undefined || p.ornate?.isSold !== undefined
       ? {
           ornate: {
@@ -419,7 +428,7 @@ const extractMetalColors = (p) => {
   // 1. Process colorImages rows
   for (const row of sourceColorImages) {
     if (!row || row.status === 'inactive') continue;
-    const cObj = row.metalColor || row.metalColorId || row.color;
+    const cObj = row.metalColorId;
     const resolved = resolveMetalColorInfo(cObj, p);
     const key = (resolved.name || resolved.id || resolved.hex || '').toLowerCase().trim();
     if (!key) continue;
@@ -467,7 +476,7 @@ const extractMetalColors = (p) => {
       let matchedImages = [];
       for (const row of sourceColorImages) {
         if (!row || row.status === 'inactive') continue;
-        const rResolved = resolveMetalColorInfo(row.metalColor || row.metalColorId || row.color, p);
+        const rResolved = resolveMetalColorInfo(row.metalColorId, p);
         if (
           (resolved.id && rResolved.id && resolved.id === rResolved.id) ||
           (resolved.name && rResolved.name && resolved.name.toLowerCase() === rResolved.name.toLowerCase())
@@ -714,12 +723,12 @@ const formatStorefrontProductDetail = (p) => {
 
   const variants = Array.isArray(p.variants)
     ? p.variants.map((v) => {
-        const purity = extractIdAndName(v.metalPurityId || v.metalPurity);
-        const color = extractIdAndName(v.diamondColorId || v.diamondColor);
-        const clarity = extractIdAndName(v.diamondClarityId || v.diamondClarity);
-        const dType = extractIdAndName(v.diamondTypeId || v.diamondType);
-        const shape = extractIdAndName(v.diamondShapeId || v.diamondShape);
-        const mColor = extractIdAndName(v.metalColorId || v.metalColor);
+        const purity = extractIdAndName(v.metalPurityId);
+        const color = extractIdAndName(v.diamondColorId);
+        const clarity = extractIdAndName(v.diamondClarityId);
+        const dType = extractIdAndName(v.diamondTypeId);
+        const shape = extractIdAndName(v.diamondShapeId);
+        const mColor = extractIdAndName(v.metalColorId);
 
         const hasCenterConfig = Array.isArray(p.centerDiamondRows) && p.centerDiamondRows.length > 0;
         const centerWt = v.centerDiamondWeight !== undefined && v.centerDiamondWeight !== null

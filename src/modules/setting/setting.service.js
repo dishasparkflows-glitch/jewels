@@ -59,22 +59,24 @@ class SettingService {
     ]);
 
     const settings = settingsRes.status === 'fulfilled' ? settingsRes.value : {};
-    const publicFooterLinks = normalizeFooterLinksPayload(settings?.footerLinks || {}, {
-      activeOnly: true,
-      includeEmptyColumns: true,
-    });
+    const normalizedSettings = settings && typeof settings === 'object' && Object.keys(settings).length > 0
+      ? {
+          ...settings,
+          footerLinks: normalizeFooterLinksPayload(settings?.footerLinks || {}, {
+            activeOnly: true,
+            includeEmptyColumns: true,
+          }),
+        }
+      : settings;
 
     return {
-      settings,
-      footerSettings: {
-        footerLinks: publicFooterLinks,
-      },
+      settings: normalizedSettings,
       topAnnouncement: announcementRes.status === 'fulfilled' ? announcementRes.value : { isEnabled: false, items: [] },
       birthstones: {
-        showOnStorefront: settings?.birthstones?.showOnStorefront === true,
+        showOnStorefront: normalizedSettings?.birthstones?.showOnStorefront === true,
       },
       currency: {
-        showOnStorefront: settings?.currency?.showOnStorefront !== false,
+        showOnStorefront: normalizedSettings?.currency?.showOnStorefront !== false,
       },
     };
   }

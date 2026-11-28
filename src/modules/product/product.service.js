@@ -67,14 +67,14 @@ function normalizeStoneConfig(data) {
   // Normalize ID fields for colorStoneRows
   if (Array.isArray(data.colorStoneRows)) {
     data.colorStoneRows = data.colorStoneRows.map((r) => {
-      const diamondTypeId = r.diamondTypeId || r.diamondType?._id || r.diamondType;
+      const diamondTypeId = r.diamondTypeId?._id || r.diamondTypeId;
       const caratWeight = Number(r.caratWeight || 0);
       if (caratWeight > 0 && !diamondTypeId) {
         throw new ApiError(400, 'Select diamond type for every color stone row');
       }
       return {
         diamondTypeId,
-        diamondShapeId: r.diamondShapeId || r.diamondShape?._id || r.diamondShape,
+        diamondShapeId: r.diamondShapeId?._id || r.diamondShapeId,
         caratWeight,
         pricePerCarat: Number(r.pricePerCarat || 3000),
       };
@@ -84,14 +84,14 @@ function normalizeStoneConfig(data) {
   // Normalize ID fields for sideColorStoneRows
   if (Array.isArray(data.sideColorStoneRows)) {
     data.sideColorStoneRows = data.sideColorStoneRows.map((r) => {
-      const diamondTypeId = r.diamondTypeId || r.diamondType?._id || r.diamondType;
+      const diamondTypeId = r.diamondTypeId?._id || r.diamondTypeId;
       const caratWeight = Number(r.caratWeight || 0);
       if (caratWeight > 0 && !diamondTypeId) {
         throw new ApiError(400, 'Select diamond type for every side color stone row');
       }
       return {
         diamondTypeId,
-        diamondShapeId: r.diamondShapeId || r.diamondShape?._id || r.diamondShape,
+        diamondShapeId: r.diamondShapeId?._id || r.diamondShapeId,
         caratWeight,
         pieces: Number(r.pieces || 0),
         pricePerCarat: Number(r.pricePerCarat || 3000),
@@ -142,6 +142,10 @@ function normalizeStoneConfig(data) {
 }
 
 class ProductService {
+  normalizeStoneConfig(data) {
+    return normalizeStoneConfig(data);
+  }
+
   async _populateMediaSizes(product) {
     return populateMediaSizes(product);
   }
@@ -1219,11 +1223,15 @@ class ProductService {
       'ornate.firstPhoto',
       'ornate.ornateImages',
       'ornate.isSold',
+      'categoryIds',
+      'meta.createdAt',
+      'createdAt',
     ].join(' ');
 
     const [rawItems, total] = await Promise.all([
       Product.find(filter)
         .select(selectFields)
+        .populate('categoryIds', 'name slug type')
         .sort({ productType: 1, 'meta.createdAt': -1, _id: -1 })
         .skip(skip)
         .limit(limit)

@@ -75,7 +75,6 @@ class CommonService {
       settings: mergedSettings,
       birthstones: mergedSettings.birthstones,
       currency: mergedSettings.currency,
-      footerSettings: common.footerSettings || {},
       topAnnouncement: common.topAnnouncement || { isEnabled: false, items: [] },
       navigation,
       websiteConfig,

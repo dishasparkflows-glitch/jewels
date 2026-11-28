@@ -166,7 +166,7 @@ function calculateProductPricing(product, masters) {
   let sideColorStoneRate = 0;
   if (sideColorStones.length > 0) {
     sideColorStones.forEach((row) => {
-      const typeId = id(row.diamondTypeId || row.diamondType);
+      const typeId = id(row.diamondTypeId);
       const cw = Number(row.caratWeight || 0);
       if (cw > 0 && !typeId) {
         throw new ApiError(400, 'Select diamond type for every side color stone row');
@@ -180,7 +180,7 @@ function calculateProductPricing(product, masters) {
 
   if (isColorStone) {
     for (const row of colorStones) {
-      const typeId = id(row.diamondTypeId || row.diamondType);
+      const typeId = id(row.diamondTypeId);
       const cw = Number(row.caratWeight || 0);
       if (cw > 0 && !typeId) {
         throw new ApiError(400, 'Select diamond type for every color stone row');
@@ -265,8 +265,8 @@ function calculateProductPricing(product, masters) {
 
         let key;
         if (isColorStone) {
-          const csTypeId = id(colorStone?.diamondTypeId || colorStone?.diamondType);
-          const csShapeId = id(colorStone?.diamondShapeId || colorStone?.diamondShape);
+          const csTypeId = id(colorStone?.diamondTypeId);
+          const csShapeId = id(colorStone?.diamondShapeId);
           const csCarat = Number(colorStone?.caratWeight || 0);
           key = [
             id(purity),
@@ -364,7 +364,7 @@ function calculateProductPricing(product, masters) {
 
         let combination = '';
         if (isColorStone) {
-          const csType = masters.labels?.[id(colorStone?.diamondTypeId || colorStone?.diamondType || primaryAccent?.diamondTypeId)] || '';
+          const csType = masters.labels?.[id(colorStone?.diamondTypeId || primaryAccent?.diamondTypeId)] || '';
           const sideColor = primaryAccent ? (masters.labels?.[id(primaryAccent.diamondColorId)] || '') : '';
           const sideClarity = primaryAccent ? (masters.labels?.[id(primaryAccent.diamondClarityId)] || '') : '';
           combination = [
@@ -416,8 +416,8 @@ function calculateProductPricing(product, masters) {
           stock: previous?.stock ?? 0,
           metalPurityId: id(purity),
           ...(isColorStone ? {
-            diamondTypeId: id(colorStone?.diamondTypeId || colorStone?.diamondType || primaryAccent?.diamondTypeId) || undefined,
-            diamondShapeId: id(colorStone?.diamondShapeId || colorStone?.diamondShape) || undefined,
+            diamondTypeId: id(colorStone?.diamondTypeId || primaryAccent?.diamondTypeId) || undefined,
+            diamondShapeId: id(colorStone?.diamondShapeId) || undefined,
             diamondColorId: id(primaryAccent?.diamondColorId) || undefined,
             diamondClarityId: id(primaryAccent?.diamondClarityId) || undefined,
           } : Object.fromEntries(
@@ -658,9 +658,9 @@ async function calculateCustomPriceBreakdown(body) {
       let ratePerCarat = parseFloat(d.priceINR || d.rate) || 0;
 
       if (ratePerCarat <= 0) {
-        const targetShapeId = (d.diamondShapeId || d.diamondShape)?._id || d.diamondShapeId || d.diamondShape;
-        const targetClarityId = (d.diamondClarityId || d.diamondClarity)?._id || d.diamondClarityId || d.diamondClarity;
-        const targetColorId = (d.diamondColorId || d.diamondColor)?._id || d.diamondColorId || d.diamondColor;
+        const targetShapeId = d.diamondShapeId?._id || d.diamondShapeId;
+        const targetClarityId = d.diamondClarityId?._id || d.diamondClarityId;
+        const targetColorId = d.diamondColorId?._id || d.diamondColorId;
 
         let match = sidePrices.find((p) =>
           p.diamondTypeId?.toString() === d.diamondTypeId?.toString() &&
